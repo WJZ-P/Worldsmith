@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "com.wjz.worldsmith.mixin.client",
+	"compatibilityLevel": "JAVA_25",
+	"client": [],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

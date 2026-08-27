@@ -1,0 +1,36 @@
+{
+	"schemaVersion": 1,
+	"id": "worldsmith",
+	"version": "${version}",
+	"name": "Worldsmith",
+	"description": "Forge deterministic Minecraft worlds from natural-language prompts.",
+	"authors": [
+		"wjz"
+	],
+	"license": "All-Rights-Reserved",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.wjz.worldsmith.Worldsmith"
+		],
+		"client": [
+			"com.wjz.worldsmith.client.WorldsmithClient"
+		],
+		"fabric-datagen": [
+			"com.wjz.worldsmith.datagen.WorldsmithDataGenerator"
+		]
+	},
+	"mixins": [
+		"worldsmith.mixins.json",
+		{
+			"config": "worldsmith.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
