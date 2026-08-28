@@ -1,0 +1,42 @@
+plugins {
+	id 'java-library'
+	id 'org.jetbrains.kotlin.jvm'
+	id 'org.jetbrains.kotlin.plugin.serialization'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${project.coroutines_version}"
+	implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:${project.serialization_version}"
+
+	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+kotlin {
+	compilerOptions {
+		jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+		javaParameters = true
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.release = 21
+}
+
+tasks.withType(Test).configureEach {
+	useJUnitPlatform()
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}

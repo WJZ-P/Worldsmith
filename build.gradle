@@ -1,5 +1,7 @@
 plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'org.jetbrains.kotlin.jvm' version '2.4.10' apply false
+	id 'org.jetbrains.kotlin.plugin.serialization' version '2.4.10' apply false
 	id 'maven-publish'
 }
 
@@ -32,6 +34,10 @@ dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc:fabric-language-kotlin:${project.fabric_kotlin_version}"
+
+	implementation project(':core')
+	include project(':core')
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
@@ -40,9 +46,10 @@ dependencies {
 processResources {
 	def version = project.version
 	inputs.property "version", version
+	inputs.property "fabric_kotlin_version", project.fabric_kotlin_version
 
 	filesMatching("fabric.mod.json") {
-		expand "version": version
+		expand "version": version, "fabric_kotlin_version": project.fabric_kotlin_version
 	}
 }
 

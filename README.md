@@ -13,10 +13,24 @@ deterministic Minecraft world-generation blueprint.
 
 ## Packages
 
-- `com.wjz.worldsmith`: common initialization
-- `com.wjz.worldsmith.client`: client-only initialization and future create-world UI
+- `core`: Kotlin, Minecraft-version-independent prompt and blueprint pipeline
+- `com.wjz.worldsmith`: Java common initialization
+- `com.wjz.worldsmith.client`: Java client initialization and future create-world UI
 - `com.wjz.worldsmith.datagen`: generated data entrypoint
-- `com.wjz.worldsmith.worldgen`: prompt-driven world-generation integration
+- `com.wjz.worldsmith.worldgen`: Minecraft 26.2 world-generation integration
+
+The core pipeline currently models:
+
+```text
+Player prompt
+  -> World Bible expansion
+  -> Structure catalog planning
+  -> Concurrent structure detail agents
+  -> Consistency review
+  -> WorldBlueprint JSON
+```
+
+See [the prompt pipeline architecture](docs/architecture/prompt-pipeline.md).
 
 ## Build
 

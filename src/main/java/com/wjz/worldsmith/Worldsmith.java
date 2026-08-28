@@ -1,5 +1,6 @@
 package com.wjz.worldsmith;
 
+import com.wjz.worldsmith.core.WorldsmithCore;
 import com.wjz.worldsmith.worldgen.WorldsmithWorldgen;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.resources.Identifier;
@@ -13,7 +14,10 @@ public final class Worldsmith implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		WorldsmithWorldgen.initialize();
-		LOGGER.info("Worldsmith initialized for Minecraft 26.2");
+		LOGGER.info(
+			"Worldsmith initialized for Minecraft 26.2 with blueprint schema {}",
+			WorldsmithCore.BLUEPRINT_SCHEMA_VERSION
+		);
 	}
 
 	public static Identifier id(String path) {
