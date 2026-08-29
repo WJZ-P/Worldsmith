@@ -1,0 +1,12 @@
+{
+  "values": [
+    "worldsmith:abyss",
+    "worldsmith:shallows",
+    "worldsmith:shore",
+    "worldsmith:peaks",
+    "worldsmith:highland",
+    "worldsmith:flats_cold",
+    "worldsmith:flats_temperate",
+    "worldsmith:flats_hot"
+  ]
+}

@@ -1,0 +1,277 @@
+{
+  "dimensions": {
+    "minecraft:overworld": {
+      "type": "minecraft:overworld",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:multi_noise",
+          "biomes": [
+            {
+              "biome": "worldsmith:abyss",
+              "parameters": {
+                "continentalness": [
+                  -1.2,
+                  -0.455
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  -1.0,
+                  1.0
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -1.0,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:shallows",
+              "parameters": {
+                "continentalness": [
+                  -0.455,
+                  -0.19
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  -1.0,
+                  1.0
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -1.0,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:shore",
+              "parameters": {
+                "continentalness": [
+                  -0.19,
+                  -0.11
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  -1.0,
+                  1.0
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -1.0,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:peaks",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  -1.0,
+                  -0.375
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -1.0,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:highland",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  -0.375,
+                  0.05
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -1.0,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:flats_cold",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  0.05,
+                  1.0
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -1.0,
+                  -0.15
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:flats_temperate",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  0.05,
+                  1.0
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -0.15,
+                  0.55
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:flats_hot",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  0.05,
+                  1.0
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  0.55,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            }
+          ]
+        },
+        "settings": "worldsmith:wasteland"
+      }
+    },
+    "minecraft:the_end": {
+      "type": "minecraft:the_end",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:the_end"
+        },
+        "settings": "minecraft:end"
+      }
+    },
+    "minecraft:the_nether": {
+      "type": "minecraft:the_nether",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:multi_noise",
+          "preset": "minecraft:nether"
+        },
+        "settings": "minecraft:nether"
+      }
+    }
+  }
+}

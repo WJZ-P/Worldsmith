@@ -3,6 +3,7 @@
 .gradle/
 .kotlin/
 build/
+src/main/generated/.cache/
 out/
 classes/
 
