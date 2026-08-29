@@ -12,9 +12,6 @@ object BiomeLayoutValidator {
         if (layout.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
             add(error("schemaVersion", "UNSUPPORTED_SCHEMA", "Unsupported biome layout schema ${layout.schemaVersion}"))
         }
-        if (layout.worldId.isBlank()) {
-            add(error("worldId", "EMPTY_WORLD_ID", "World id must not be blank"))
-        }
         if (layout.skeletons.isEmpty()) {
             add(error("skeletons", "EMPTY_BIOME_LAYOUT", "Biome layout must contain at least one skeleton"))
         }

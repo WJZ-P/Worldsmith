@@ -22,10 +22,6 @@ object BiomeSkinValidator {
         if (set.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
             add(error("schemaVersion", "UNSUPPORTED_SCHEMA", "Unsupported biome skin schema ${set.schemaVersion}"))
         }
-        if (set.worldId.isBlank()) {
-            add(error("worldId", "EMPTY_WORLD_ID", "World id must not be blank"))
-        }
-
         val known = layout.skeletons.mapTo(linkedSetOf()) { it.id }
         val seen = linkedSetOf<String>()
 

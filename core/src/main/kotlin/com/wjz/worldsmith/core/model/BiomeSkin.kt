@@ -59,6 +59,5 @@ data class BiomeSkin(
 @Serializable
 data class BiomeSkinSet(
     val schemaVersion: Int = WorldsmithCore.BLUEPRINT_SCHEMA_VERSION,
-    val worldId: String,
     val skins: List<BiomeSkin>,
 )

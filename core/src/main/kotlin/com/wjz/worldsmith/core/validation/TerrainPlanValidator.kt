@@ -9,9 +9,6 @@ object TerrainPlanValidator {
         if (plan.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
             add(error("schemaVersion", "UNSUPPORTED_SCHEMA", "Unsupported terrain schema ${plan.schemaVersion}"))
         }
-        if (plan.worldId.isBlank()) {
-            add(error("worldId", "EMPTY_WORLD_ID", "World id must not be blank"))
-        }
         if (plan.minY % 16 != 0) {
             add(error("minY", "MIN_Y_ALIGNMENT", "Minimum Y must be divisible by 16"))
         }

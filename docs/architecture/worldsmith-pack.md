@@ -32,3 +32,20 @@ version.
 
 Packs contain data only: no JARs, scripts, or executable code. Paths are
 resolved inside the pack root and schema validation runs before compilation.
+
+## Identity and seed
+
+The manifest `id` is the lowercase SHA-256 of the canonical generation files,
+not a user-chosen slug. The manifest itself, display name, description, previews,
+logs, and caches do not participate. Object keys are sorted before hashing, so
+formatting and key order do not change the id.
+
+`terrain.seed` is nullable. A fixed number participates in the content hash and
+reproduces the same seed when imported. A missing or null seed describes a
+random-seed recipe; the chosen seed is persisted in the created Minecraft world.
+
+```text
+./gradlew.bat :core:hashPack -PpackDir=C:\path\to\pack
+```
+
+prints the id that should be written into `worldsmith.json`.

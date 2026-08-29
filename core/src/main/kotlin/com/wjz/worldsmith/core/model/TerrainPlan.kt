@@ -34,7 +34,7 @@ enum class NoiseTemplate {
 @Serializable
 data class TerrainPlan(
     val schemaVersion: Int = WorldsmithCore.BLUEPRINT_SCHEMA_VERSION,
-    val worldId: String,
+    val seed: Long? = null,
     val minY: Int,
     val height: Int,
     val horizontalNoiseSize: Int,

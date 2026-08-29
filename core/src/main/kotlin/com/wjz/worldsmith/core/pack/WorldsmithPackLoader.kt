@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.core.pack
 
+import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import com.wjz.worldsmith.core.model.BiomeLayoutPlan
 import com.wjz.worldsmith.core.model.BiomeSkinSet
 import com.wjz.worldsmith.core.model.TerrainPlan
@@ -51,9 +52,12 @@ object WorldsmithPackLoader {
 
     fun load(source: WorldsmithPackSource): WorldsmithPack {
         val manifest = WorldsmithJson.decode<WorldsmithPackManifest>(source.readText(MANIFEST))
-        val terrain = WorldsmithJson.decode<TerrainPlan>(source.readText(manifest.files.terrain))
-        val biomeLayout = WorldsmithJson.decode<BiomeLayoutPlan>(source.readText(manifest.files.biomeLayout))
-        val biomeSkins = WorldsmithJson.decode<BiomeSkinSet>(source.readText(manifest.files.biomeSkins))
-        return WorldsmithPack(manifest, terrain, biomeLayout, biomeSkins)
+        val contents = listOf(manifest.files.terrain, manifest.files.biomeLayout, manifest.files.biomeSkins)
+            .associateWith(source::readText)
+        val terrain = WorldsmithJson.decode<TerrainPlan>(contents.getValue(manifest.files.terrain))
+        val biomeLayout = WorldsmithJson.decode<BiomeLayoutPlan>(contents.getValue(manifest.files.biomeLayout))
+        val biomeSkins = WorldsmithJson.decode<BiomeSkinSet>(contents.getValue(manifest.files.biomeSkins))
+        val computedId = WorldsmithHashUtil.computeGenerationId(manifest, contents)
+        return WorldsmithPack(manifest, terrain, biomeLayout, biomeSkins, computedId)
     }
 }

@@ -95,20 +95,11 @@ class BiomeSkinValidatorTest {
         assertEquals(listOf("DENSITY_OUT_OF_RANGE"), diagnostics.map { it.code })
     }
 
-    @Test
-    fun `a blank world id is reported`() {
-        val diagnostics = BiomeSkinValidator.validate(skinSet().copy(worldId = " "), layout())
-
-        assertEquals(listOf("EMPTY_WORLD_ID"), diagnostics.map { it.code })
-    }
-
     private fun skinSet() = BiomeSkinSet(
-        worldId = "ashlands",
         skins = skeletonIds.map(::skin),
     )
 
     private fun layout() = BiomeLayoutPlan(
-        worldId = "ashlands",
         skeletons = skeletonIds.map { id ->
             BiomeSkeletonDefinition(
                 id = id,

@@ -1,10 +1,11 @@
 package com.wjz.worldsmith.core.validation
 
+import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import com.wjz.worldsmith.core.model.WorldsmithPack
 
 object WorldsmithPackValidator {
     private const val FORMAT_VERSION = 1
-    private val ID = Regex("^[a-z0-9_.-]+$")
+    private val ID = Regex("^[0-9a-f]{64}$")
 
     fun validate(pack: WorldsmithPack): List<Diagnostic> = buildList {
         val manifest = pack.manifest
@@ -12,7 +13,9 @@ object WorldsmithPackValidator {
             add(error("manifest.formatVersion", "UNSUPPORTED_PACK_FORMAT", "Unsupported pack format ${manifest.formatVersion}"))
         }
         if (!ID.matches(manifest.id)) {
-            add(error("manifest.id", "INVALID_PACK_ID", "Pack id must match ${ID.pattern}"))
+            add(error("manifest.id", "INVALID_PACK_ID", "Pack id must be a lowercase SHA-256"))
+        } else if (!WorldsmithHashUtil.matches(manifest, pack.computedId)) {
+            add(error("manifest.id", "PACK_HASH_MISMATCH", "Pack id does not match its generation content"))
         }
         if (manifest.displayName.isBlank()) {
             add(error("manifest.displayName", "EMPTY_DISPLAY_NAME", "Pack display name must not be blank"))
@@ -25,16 +28,6 @@ object WorldsmithPackValidator {
             if (path.startsWith('/') || path.split('/').any { it == ".." }) {
                 add(error("manifest.files.$name", "UNSAFE_PACK_PATH", "Pack content paths must stay inside the pack"))
             }
-        }
-
-        if (pack.terrain.worldId != manifest.id) {
-            add(error("terrain.worldId", "WORLD_ID_MISMATCH", "Terrain world id must match the manifest"))
-        }
-        if (pack.biomeLayout.worldId != manifest.id) {
-            add(error("biomeLayout.worldId", "WORLD_ID_MISMATCH", "Biome layout world id must match the manifest"))
-        }
-        if (pack.biomeSkins.worldId != manifest.id) {
-            add(error("biomeSkins.worldId", "WORLD_ID_MISMATCH", "Biome skin world id must match the manifest"))
         }
 
         addAll(TerrainPlanValidator.validate(pack.terrain).map { it.prefixed("terrain") })

@@ -23,4 +23,5 @@ data class WorldsmithPack(
     val terrain: TerrainPlan,
     val biomeLayout: BiomeLayoutPlan,
     val biomeSkins: BiomeSkinSet,
+    val computedId: String,
 )

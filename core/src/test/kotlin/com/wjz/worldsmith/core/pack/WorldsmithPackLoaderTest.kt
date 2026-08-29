@@ -16,20 +16,20 @@ class WorldsmithPackLoaderTest {
     fun `built in ashlands pack loads and validates`() {
         val pack = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
 
-        assertEquals("ashlands", pack.manifest.id)
+        assertEquals(pack.computedId, pack.manifest.id)
         assertEquals(8, pack.biomeLayout.skeletons.size)
         assertEquals(pack.biomeLayout.skeletons.map { it.id }, pack.biomeSkins.skins.map { it.skeletonId })
         assertTrue(WorldsmithPackValidator.validate(pack).isEmpty())
     }
 
     @Test
-    fun `pack validator rejects content with mismatched world ids`() {
+    fun `display metadata does not change generation identity`() {
         val pack = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
-            .let { it.copy(terrain = it.terrain.copy(worldId = "another_world")) }
+        val renamed = pack.copy(manifest = pack.manifest.copy(displayName = "Renamed Ashlands", description = "Edited description"))
 
-        val diagnostics = WorldsmithPackValidator.validate(pack)
+        val diagnostics = WorldsmithPackValidator.validate(renamed)
 
-        assertTrue(diagnostics.any { it.path == "terrain.worldId" && it.code == "WORLD_ID_MISMATCH" })
+        assertTrue(diagnostics.isEmpty())
     }
 
     @Test
@@ -40,6 +40,16 @@ class WorldsmithPackLoaderTest {
         val diagnostics = WorldsmithPackValidator.validate(pack)
 
         assertTrue(diagnostics.any { it.path == "terrain.seaLevel" && it.code == "SEA_LEVEL_OUT_OF_RANGE" })
+    }
+
+    @Test
+    fun `pack validator rejects a stale declared hash`() {
+        val pack = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
+            .let { it.copy(manifest = it.manifest.copy(id = "0".repeat(64))) }
+
+        val diagnostics = WorldsmithPackValidator.validate(pack)
+
+        assertTrue(diagnostics.any { it.path == "manifest.id" && it.code == "PACK_HASH_MISMATCH" })
     }
 
     @Test
@@ -56,7 +66,7 @@ class WorldsmithPackLoaderTest {
 
         val pack = WorldsmithPackLoader.loadDirectory(tempDir)
 
-        assertEquals("ashlands", pack.manifest.id)
+        assertEquals(pack.computedId, pack.manifest.id)
         assertTrue(WorldsmithPackValidator.validate(pack).isEmpty())
     }
 }

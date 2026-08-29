@@ -31,6 +31,5 @@ data class BiomeSkeletonDefinition(
 @Serializable
 data class BiomeLayoutPlan(
     val schemaVersion: Int = WorldsmithCore.BLUEPRINT_SCHEMA_VERSION,
-    val worldId: String,
     val skeletons: List<BiomeSkeletonDefinition>,
 )

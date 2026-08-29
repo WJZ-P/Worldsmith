@@ -35,6 +35,15 @@ tasks.withType(Test).configureEach {
 	useJUnitPlatform()
 }
 
+tasks.register('hashPack', JavaExec) {
+	group = 'worldsmith'
+	description = 'Prints the generation-content SHA-256 for a Worldsmith Pack directory.'
+	dependsOn classes
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.wjz.worldsmith.core.hash.WorldsmithHashCli'
+	args((findProperty('packDir') ?: file('src/main/resources/worldsmith/packs/ashlands').absolutePath))
+}
+
 java {
 	withSourcesJar()
 	sourceCompatibility = JavaVersion.VERSION_21
