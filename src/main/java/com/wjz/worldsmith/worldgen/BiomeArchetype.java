@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.worldgen;
 
+import com.wjz.worldsmith.core.model.BiomeArchetypeRole;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.tags.BiomeTags;
@@ -43,5 +44,9 @@ public enum BiomeArchetype {
 
 	public boolean isAquatic() {
 		return this == DEEP_OCEAN || this == OCEAN;
+	}
+
+	public static BiomeArchetype from(BiomeArchetypeRole role) {
+		return valueOf(role.name());
 	}
 }

@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "worldId": "ashlands",
+  "skeletons": [
+    {
+      "id": "abyss",
+      "archetype": "DEEP_OCEAN",
+      "climate": {
+        "temperature": {"min": -1.0, "max": 1.0}, "humidity": {"min": -1.0, "max": 1.0},
+        "continentalness": {"min": -1.2, "max": -0.455}, "erosion": {"min": -1.0, "max": 1.0},
+        "depth": {"min": -1.0, "max": 1.0}, "weirdness": {"min": -1.0, "max": 1.0}, "offset": 0.0
+      },
+      "behavior": {"temperature": 0.5, "downfall": 0.5, "hasPrecipitation": true}
+    },
+    {
+      "id": "shallows",
+      "archetype": "OCEAN",
+      "climate": {
+        "temperature": {"min": -1.0, "max": 1.0}, "humidity": {"min": -1.0, "max": 1.0},
+        "continentalness": {"min": -0.455, "max": -0.19}, "erosion": {"min": -1.0, "max": 1.0},
+        "depth": {"min": -1.0, "max": 1.0}, "weirdness": {"min": -1.0, "max": 1.0}, "offset": 0.0
+      },
+      "behavior": {"temperature": 0.5, "downfall": 0.5, "hasPrecipitation": true}
+    },
+    {
+      "id": "shore",
+      "archetype": "BEACH",
+      "climate": {
+        "temperature": {"min": -1.0, "max": 1.0}, "humidity": {"min": -1.0, "max": 1.0},
+        "continentalness": {"min": -0.19, "max": -0.11}, "erosion": {"min": -1.0, "max": 1.0},
+        "depth": {"min": -1.0, "max": 1.0}, "weirdness": {"min": -1.0, "max": 1.0}, "offset": 0.0
+      },
+      "behavior": {"temperature": 0.7, "downfall": 0.3, "hasPrecipitation": true}
+    },
+    {
+      "id": "peaks",
+      "archetype": "MOUNTAIN",
+      "climate": {
+        "temperature": {"min": -1.0, "max": 1.0}, "humidity": {"min": -1.0, "max": 1.0},
+        "continentalness": {"min": -0.11, "max": 1.0}, "erosion": {"min": -1.0, "max": -0.375},
+        "depth": {"min": -1.0, "max": 1.0}, "weirdness": {"min": -1.0, "max": 1.0}, "offset": 0.0
+      },
+      "behavior": {"temperature": 0.1, "downfall": 0.4, "hasPrecipitation": true}
+    },
+    {
+      "id": "highland",
+      "archetype": "HILL",
+      "climate": {
+        "temperature": {"min": -1.0, "max": 1.0}, "humidity": {"min": -1.0, "max": 1.0},
+        "continentalness": {"min": -0.11, "max": 1.0}, "erosion": {"min": -0.375, "max": 0.05},
+        "depth": {"min": -1.0, "max": 1.0}, "weirdness": {"min": -1.0, "max": 1.0}, "offset": 0.0
+      },
+      "behavior": {"temperature": 0.5, "downfall": 0.4, "hasPrecipitation": true}
+    },
+    {
+      "id": "flats_cold",
+      "archetype": "LOWLAND",
+      "climate": {
+        "temperature": {"min": -1.0, "max": -0.15}, "humidity": {"min": -1.0, "max": 1.0},
+        "continentalness": {"min": -0.11, "max": 1.0}, "erosion": {"min": 0.05, "max": 1.0},
+        "depth": {"min": -1.0, "max": 1.0}, "weirdness": {"min": -1.0, "max": 1.0}, "offset": 0.0
+      },
+      "behavior": {"temperature": 0.0, "downfall": 0.4, "hasPrecipitation": true}
+    },
+    {
+      "id": "flats_temperate",
+      "archetype": "LOWLAND",
+      "climate": {
+        "temperature": {"min": -0.15, "max": 0.55}, "humidity": {"min": -1.0, "max": 1.0},
+        "continentalness": {"min": -0.11, "max": 1.0}, "erosion": {"min": 0.05, "max": 1.0},
+        "depth": {"min": -1.0, "max": 1.0}, "weirdness": {"min": -1.0, "max": 1.0}, "offset": 0.0
+      },
+      "behavior": {"temperature": 0.7, "downfall": 0.4, "hasPrecipitation": true}
+    },
+    {
+      "id": "flats_hot",
+      "archetype": "LOWLAND",
+      "climate": {
+        "temperature": {"min": 0.55, "max": 1.0}, "humidity": {"min": -1.0, "max": 1.0},
+        "continentalness": {"min": -0.11, "max": 1.0}, "erosion": {"min": 0.05, "max": 1.0},
+        "depth": {"min": -1.0, "max": 1.0}, "weirdness": {"min": -1.0, "max": 1.0}, "offset": 0.0
+      },
+      "behavior": {"temperature": 1.6, "downfall": 0.0, "hasPrecipitation": false}
+    }
+  ]
+}

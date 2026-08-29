@@ -57,7 +57,7 @@ public final class WorldsmithVegetation {
 	}
 
 	public static void bootstrapConfigured(BootstrapContext<ConfiguredFeature<?, ?>> context) {
-		BiomeSkinSet skins = WorldsmithSkins.load();
+		BiomeSkinSet skins = WorldsmithPacks.builtin().getBiomeSkins();
 		MaterialResolver resolver = new MaterialResolver();
 
 		for (BiomeSkin skin : skins.getSkins()) {
@@ -70,7 +70,7 @@ public final class WorldsmithVegetation {
 	}
 
 	public static void bootstrapPlaced(BootstrapContext<PlacedFeature> context) {
-		BiomeSkinSet skins = WorldsmithSkins.load();
+		BiomeSkinSet skins = WorldsmithPacks.builtin().getBiomeSkins();
 		HolderGetter<ConfiguredFeature<?, ?>> configured = context.lookup(Registries.CONFIGURED_FEATURE);
 
 		for (BiomeSkin skin : skins.getSkins()) {

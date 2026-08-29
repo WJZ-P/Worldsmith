@@ -24,7 +24,7 @@ public final class WorldsmithBiomeTagProvider extends FabricTagsProvider<Biome> 
 
 	@Override
 	protected void addTags(HolderLookup.Provider registries) {
-		for (BiomeSkeleton skeleton : BiomeSkeletons.ALL) {
+		for (BiomeSkeleton skeleton : BiomeSkeletons.all()) {
 			for (TagKey<Biome> tag : skeleton.archetype().tags()) {
 				tag(tag).add(skeleton.biome());
 			}

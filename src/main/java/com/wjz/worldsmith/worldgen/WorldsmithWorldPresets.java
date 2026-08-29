@@ -45,7 +45,7 @@ public final class WorldsmithWorldPresets {
 		HolderGetter<MultiNoiseBiomeSourceParameterList> multiNoisePresets =
 			context.lookup(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST);
 
-		List<Pair<Climate.ParameterPoint, Holder<Biome>>> entries = BiomeSkeletons.ALL.stream()
+		List<Pair<Climate.ParameterPoint, Holder<Biome>>> entries = BiomeSkeletons.all().stream()
 			.map(skeleton -> Pair.of(skeleton.climate(), (Holder<Biome>) biomes.getOrThrow(skeleton.biome())))
 			.toList();
 

@@ -1,0 +1,11 @@
+{
+  "formatVersion": 1,
+  "id": "ashlands",
+  "displayName": "Ashlands",
+  "description": "A wind-scoured industrial wasteland used by the stage-one compiler fixture.",
+  "files": {
+    "terrain": "terrain.json",
+    "biomeLayout": "biomes/layout.json",
+    "biomeSkins": "biomes/skins.json"
+  }
+}

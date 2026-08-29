@@ -33,7 +33,7 @@ public final class BiomeCompiler {
 	}
 
 	public static void bootstrap(BootstrapContext<Biome> context) {
-		BiomeSkinSet skins = WorldsmithSkins.load();
+		BiomeSkinSet skins = WorldsmithPacks.builtin().getBiomeSkins();
 
 		for (BiomeSkin skin : skins.getSkins()) {
 			BiomeSkeleton skeleton = BiomeSkeletons.byId(skin.getSkeletonId());

@@ -2,7 +2,7 @@ package com.wjz.worldsmith.datagen;
 
 import com.wjz.worldsmith.core.model.BiomeSkin;
 import com.wjz.worldsmith.worldgen.BiomeSkeletons;
-import com.wjz.worldsmith.worldgen.WorldsmithSkins;
+import com.wjz.worldsmith.worldgen.WorldsmithPacks;
 import com.wjz.worldsmith.worldgen.WorldsmithWorldPresets;
 import java.util.concurrent.CompletableFuture;
 import net.fabricmc.fabric.api.datagen.v1.FabricPackOutput;
@@ -25,7 +25,7 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 	public void generateTranslations(HolderLookup.Provider registries, TranslationBuilder builder) {
 		builder.add(WorldsmithWorldPresets.WASTELAND.identifier().toLanguageKey("generator"), "Wasteland");
 
-		for (BiomeSkin skin : WorldsmithSkins.load().getSkins()) {
+		for (BiomeSkin skin : WorldsmithPacks.builtin().getBiomeSkins().getSkins()) {
 			builder.add(
 				BiomeSkeletons.byId(skin.getSkeletonId()).biome().identifier().toLanguageKey("biome"),
 				skin.getDisplayName()

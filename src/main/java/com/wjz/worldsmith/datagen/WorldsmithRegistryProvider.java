@@ -4,7 +4,7 @@ import com.wjz.worldsmith.core.model.BiomeSkin;
 import com.wjz.worldsmith.worldgen.BiomeSkeleton;
 import com.wjz.worldsmith.worldgen.BiomeSkeletons;
 import com.wjz.worldsmith.worldgen.WorldsmithNoiseSettings;
-import com.wjz.worldsmith.worldgen.WorldsmithSkins;
+import com.wjz.worldsmith.worldgen.WorldsmithPacks;
 import com.wjz.worldsmith.worldgen.WorldsmithVegetation;
 import com.wjz.worldsmith.worldgen.WorldsmithWorldPresets;
 import java.util.concurrent.CompletableFuture;
@@ -34,7 +34,7 @@ public final class WorldsmithRegistryProvider extends FabricDynamicRegistryProvi
 			registries.lookupOrThrow(Registries.CONFIGURED_FEATURE);
 		HolderLookup.RegistryLookup<PlacedFeature> placedFeatures = registries.lookupOrThrow(Registries.PLACED_FEATURE);
 
-		for (BiomeSkin skin : WorldsmithSkins.load().getSkins()) {
+		for (BiomeSkin skin : WorldsmithPacks.builtin().getBiomeSkins().getSkins()) {
 			for (int index = 0; index < skin.getVegetation().size(); index++) {
 				entries.add(configuredFeatures, WorldsmithVegetation.configuredKey(skin.getSkeletonId(), index));
 				entries.add(placedFeatures, WorldsmithVegetation.placedKey(skin.getSkeletonId(), index));
@@ -42,7 +42,7 @@ public final class WorldsmithRegistryProvider extends FabricDynamicRegistryProvi
 		}
 
 		HolderLookup.RegistryLookup<Biome> biomes = registries.lookupOrThrow(Registries.BIOME);
-		for (BiomeSkeleton skeleton : BiomeSkeletons.ALL) {
+		for (BiomeSkeleton skeleton : BiomeSkeletons.all()) {
 			entries.add(biomes, skeleton.biome());
 		}
 

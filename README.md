@@ -31,6 +31,7 @@ Player prompt
 ```
 
 See [the prompt pipeline architecture](docs/architecture/prompt-pipeline.md).
+See [the portable Worldsmith Pack format](docs/architecture/worldsmith-pack.md).
 
 ## Build
 

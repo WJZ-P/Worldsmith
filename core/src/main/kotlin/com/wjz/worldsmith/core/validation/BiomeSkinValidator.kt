@@ -1,7 +1,7 @@
 package com.wjz.worldsmith.core.validation
 
 import com.wjz.worldsmith.core.WorldsmithCore
-import com.wjz.worldsmith.core.model.BiomeSkeletonIds
+import com.wjz.worldsmith.core.model.BiomeLayoutPlan
 import com.wjz.worldsmith.core.model.BiomeSkin
 import com.wjz.worldsmith.core.model.BiomeSkinSet
 import com.wjz.worldsmith.core.model.MaterialSelector
@@ -18,7 +18,7 @@ object BiomeSkinValidator {
     private const val MIN_FOG_END_DISTANCE = 16.0f
     private const val MAX_FOG_END_DISTANCE = 4096.0f
 
-    fun validate(set: BiomeSkinSet): List<Diagnostic> = buildList {
+    fun validate(set: BiomeSkinSet, layout: BiomeLayoutPlan): List<Diagnostic> = buildList {
         if (set.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
             add(error("schemaVersion", "UNSUPPORTED_SCHEMA", "Unsupported biome skin schema ${set.schemaVersion}"))
         }
@@ -26,7 +26,7 @@ object BiomeSkinValidator {
             add(error("worldId", "EMPTY_WORLD_ID", "World id must not be blank"))
         }
 
-        val known = BiomeSkeletonIds.ALL.toSet()
+        val known = layout.skeletons.mapTo(linkedSetOf()) { it.id }
         val seen = linkedSetOf<String>()
 
         set.skins.forEachIndexed { index, skin ->
