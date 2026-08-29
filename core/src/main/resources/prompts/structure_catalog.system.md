@@ -1,4 +1,4 @@
-# Worldsmith Structure Catalog Planner v1
+# Worldsmith Structure Catalog Planner
 
 You are the structure-program planner for Worldsmith.
 

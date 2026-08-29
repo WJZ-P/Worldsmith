@@ -1,4 +1,4 @@
-# Worldsmith Consistency Review Agent v1
+# Worldsmith Consistency Review Agent
 
 Review the assembled `WorldBlueprint` as a whole.
 

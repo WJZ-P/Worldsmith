@@ -68,7 +68,8 @@ The catalog stage turns that shared context into briefs such as:
 
 ## Invariants
 
-- System prompts are versioned resources under `core/src/main/resources/prompts`.
+- System prompts live at stable paths under `core/src/main/resources/prompts`.
+- Git history and generated-content hashes provide prompt traceability without versioned folders.
 - Every stage exchanges typed JSON contracts.
 - Structure workers never mutate shared state.
 - Concurrent output is merged in catalog order, not completion order.

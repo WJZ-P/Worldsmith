@@ -7,9 +7,9 @@ import org.junit.jupiter.api.Test
 
 class PromptTemplateRepositoryTest {
     @Test
-    fun `version one prompt set resolves every system prompt`() {
+    fun `default prompt set resolves every system prompt`() {
         val repository = ClasspathPromptTemplateRepository()
-        val refs = PromptSet.V1.let {
+        val refs = PromptSet.DEFAULT.let {
             listOf(it.worldBible, it.structureCatalog, it.structureDetail, it.consistencyReview)
         }
 

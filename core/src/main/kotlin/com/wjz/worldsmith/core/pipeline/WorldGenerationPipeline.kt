@@ -23,7 +23,7 @@ class WorldGenerationPipeline(
 
     suspend fun generate(
         request: WorldGenerationRequest,
-        promptSet: PromptSet = PromptSet.V1,
+        promptSet: PromptSet = PromptSet.DEFAULT,
         onProgress: suspend (GenerationProgress) -> Unit = {},
     ): GenerationResult {
         WorldBlueprintValidator.validateRequest(request).takeIf { it.isNotEmpty() }?.let {

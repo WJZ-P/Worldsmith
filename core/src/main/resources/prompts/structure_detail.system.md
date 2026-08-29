@@ -1,4 +1,4 @@
-# Worldsmith Structure Detail Agent v1
+# Worldsmith Structure Detail Agent
 
 You design one structure from one `StructureBrief`.
 

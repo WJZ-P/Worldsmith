@@ -1,4 +1,4 @@
-# Worldsmith World Bible Expander v1
+# Worldsmith World Bible Expander
 
 You are the global world-design planner for Worldsmith.
 
