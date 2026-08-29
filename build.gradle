@@ -6,11 +6,17 @@ plugins {
 }
 
 repositories {
-	// Add repositories to retrieve artifacts from in here.
-	// You should only use this when depending on other mods because
-	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
-	// See https://docs.gradle.org/current/userguide/declaring_repositories.html
-	// for more information about repositories.
+	// Only needed for the optional Mod Menu and Cloth Config integrations.
+	maven {
+		name = 'TerraformersMC'
+		url = 'https://maven.terraformersmc.com/releases/'
+		content { includeGroup 'com.terraformersmc' }
+	}
+	maven {
+		name = 'Shedaniel'
+		url = 'https://maven.shedaniel.me/'
+		content { includeGroupByRegex 'me[.]shedaniel.*' }
+	}
 }
 
 loom {
@@ -41,15 +47,27 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Optional integrations. They are on the development classpath so the
+	// settings screen can be compiled and tried, but fabric.mod.json only
+	// suggests them, so a player without either still gets a working mod.
+	clientImplementation "com.terraformersmc:modmenu:${project.modmenu_version}"
+	clientImplementation("me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}") {
+		exclude(group: 'net.fabricmc.fabric-api')
+	}
 }
 
 processResources {
-	def version = project.version
-	inputs.property "version", version
-	inputs.property "fabric_kotlin_version", project.fabric_kotlin_version
+	def expansions = [
+		"version": project.version,
+		"fabric_kotlin_version": project.fabric_kotlin_version,
+		"modmenu_version": project.modmenu_version,
+		"cloth_config_version": project.cloth_config_version,
+	]
+	expansions.each { key, value -> inputs.property key, value }
 
 	filesMatching("fabric.mod.json") {
-		expand "version": version, "fabric_kotlin_version": project.fabric_kotlin_version
+		expand expansions
 	}
 }
 

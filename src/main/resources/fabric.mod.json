@@ -18,6 +18,9 @@
 		],
 		"fabric-datagen": [
 			"com.wjz.worldsmith.datagen.WorldsmithDataGenerator"
+		],
+		"modmenu": [
+			"com.wjz.worldsmith.client.WorldsmithModMenu"
 		]
 	},
 	"mixins": [
@@ -33,5 +36,9 @@
 		"java": ">=25",
 		"fabric-api": "*",
 		"fabric-language-kotlin": ">=${fabric_kotlin_version}"
+	},
+	"suggests": {
+		"modmenu": ">=${modmenu_version}",
+		"cloth-config": ">=${cloth_config_version}"
 	}
 }
