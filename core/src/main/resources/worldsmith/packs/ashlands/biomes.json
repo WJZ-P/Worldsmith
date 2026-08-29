@@ -1,0 +1,402 @@
+{
+	"schemaVersion": 1,
+	"biomes": [
+		{
+			"id": "abyss",
+			"displayName": "Drowned Deep",
+			"archetype": "DEEP_OCEAN",
+			"slot": { "relief": "DEEP_WATER" },
+			"behavior": { "temperature": 0.5, "downfall": 0.5, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:gravel"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:tuff"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:deepslate"] }
+			},
+			"environment": {
+				"grassColor": "#5A5647",
+				"foliageColor": "#4E4B3E",
+				"waterColor": "#2E3A34",
+				"skyColor": "#6B6152",
+				"fogColor": "#5C5648",
+				"fogEndDistance": 72.0,
+				"waterFog": { "color": "#090C0D", "startDistance": -8.0, "endDistance": 24.0 }
+			}
+		},
+		{
+			"id": "rime_shallows",
+			"displayName": "Rime Shallows",
+			"archetype": "OCEAN",
+			"slot": { "relief": "SHALLOW_WATER", "temperature": ["COLD"] },
+			"behavior": { "temperature": 0.0, "downfall": 0.4, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:clay"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:packed_mud"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:tuff"] }
+			},
+			"environment": {
+				"grassColor": "#6E7568",
+				"foliageColor": "#5F6659",
+				"waterColor": "#33474A",
+				"skyColor": "#8E9791",
+				"fogColor": "#7E8781",
+				"fogEndDistance": 96.0,
+				"waterFog": { "color": "#0E1A1E", "startDistance": -8.0, "endDistance": 48.0 }
+			}
+		},
+		{
+			"id": "ash_shallows",
+			"displayName": "Ash Shallows",
+			"archetype": "OCEAN",
+			"slot": { "relief": "SHALLOW_WATER", "temperature": ["TEMPERATE", "HOT"] },
+			"behavior": { "temperature": 0.5, "downfall": 0.5, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:sand"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:clay"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:tuff"] }
+			},
+			"environment": {
+				"grassColor": "#6A6551",
+				"foliageColor": "#5E5947",
+				"waterColor": "#3A4239",
+				"skyColor": "#7A6E5C",
+				"fogColor": "#6E6656",
+				"fogEndDistance": 112.0,
+				"waterFog": { "color": "#1B241F", "startDistance": -8.0, "endDistance": 72.0 }
+			}
+		},
+		{
+			"id": "salt_shore",
+			"displayName": "Saltcrust Shore",
+			"archetype": "BEACH",
+			"slot": { "relief": "COAST", "humidity": ["ARID"] },
+			"behavior": { "temperature": 0.8, "downfall": 0.1, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:calcite"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:tuff"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:deepslate"] }
+			},
+			"environment": {
+				"grassColor": "#9A9382",
+				"foliageColor": "#8B8474",
+				"waterColor": "#43503F",
+				"skyColor": "#A79C86",
+				"fogColor": "#9C9280",
+				"fogEndDistance": 144.0
+			},
+			"features": [
+				{ "feature": "ash_scrub", "density": 0.1 }
+			]
+		},
+		{
+			"id": "cinder_shore",
+			"displayName": "Cinder Shore",
+			"archetype": "BEACH",
+			"slot": { "relief": "COAST", "humidity": ["HUMID"] },
+			"behavior": { "temperature": 0.7, "downfall": 0.4, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:sandstone"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:sand"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:tuff"] }
+			},
+			"environment": {
+				"grassColor": "#7A6C55",
+				"foliageColor": "#6B5F49",
+				"waterColor": "#3A4239",
+				"skyColor": "#8C7A63",
+				"fogColor": "#877B67",
+				"fogEndDistance": 128.0
+			},
+			"features": [
+				{ "feature": "ash_scrub", "density": 0.15 }
+			]
+		},
+		{
+			"id": "rime_peaks",
+			"displayName": "Rime Peaks",
+			"archetype": "MOUNTAIN",
+			"slot": { "relief": "PEAKS", "temperature": ["COLD"] },
+			"behavior": { "temperature": -0.3, "downfall": 0.5, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:snow_block"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:stone"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:deepslate"] },
+				"steepOverride": { "semanticRole": "exposed_rock", "preferredIds": ["minecraft:stone"] }
+			},
+			"environment": {
+				"grassColor": "#8C978F",
+				"foliageColor": "#7C877F",
+				"waterColor": "#3B4E52",
+				"skyColor": "#A3AFAA",
+				"fogColor": "#94A09B",
+				"fogEndDistance": 80.0,
+				"ambientParticles": [
+					{ "particle": "minecraft:white_ash", "probability": 0.1 }
+				]
+			},
+			"features": [
+				{ "feature": "rubble_boulder", "density": 0.4 }
+			]
+		},
+		{
+			"id": "slag_peaks",
+			"displayName": "Slag Peaks",
+			"archetype": "MOUNTAIN",
+			"slot": { "relief": "PEAKS", "temperature": ["TEMPERATE", "HOT"] },
+			"behavior": { "temperature": 0.4, "downfall": 0.3, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:smooth_basalt"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:basalt"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:deepslate"] },
+				"steepOverride": { "semanticRole": "exposed_rock", "preferredIds": ["minecraft:blackstone"] }
+			},
+			"environment": {
+				"grassColor": "#6E6656",
+				"foliageColor": "#5F594B",
+				"waterColor": "#39423B",
+				"skyColor": "#8A7B68",
+				"fogColor": "#7C7263",
+				"fogEndDistance": 64.0,
+				"ambientParticles": [
+					{ "particle": "minecraft:white_ash", "probability": 0.12 }
+				]
+			},
+			"features": [
+				{ "feature": "slag_boulder" }
+			]
+		},
+		{
+			"id": "frost_highland",
+			"displayName": "Frostbound Highland",
+			"archetype": "HILL",
+			"slot": { "relief": "HIGHLAND", "temperature": ["COLD"] },
+			"behavior": { "temperature": 0.0, "downfall": 0.4, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:packed_mud"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:dirt"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:tuff"] },
+				"steepOverride": { "semanticRole": "exposed_rock", "preferredIds": ["minecraft:stone"] }
+			},
+			"environment": {
+				"grassColor": "#787A6A",
+				"foliageColor": "#696B5C",
+				"waterColor": "#3E4C4A",
+				"skyColor": "#93968A",
+				"fogColor": "#85887C",
+				"fogEndDistance": 96.0
+			},
+			"features": [
+				{ "feature": "dead_spruce_trunk" },
+				{ "feature": "rubble_boulder", "density": 0.3 }
+			]
+		},
+		{
+			"id": "rust_highland",
+			"displayName": "Rust Highland",
+			"archetype": "HILL",
+			"slot": { "relief": "HIGHLAND", "temperature": ["TEMPERATE"] },
+			"behavior": { "temperature": 0.5, "downfall": 0.4, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:tuff"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:dirt"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:deepslate"] },
+				"steepOverride": { "semanticRole": "exposed_rock", "preferredIds": ["minecraft:andesite"] }
+			},
+			"environment": {
+				"grassColor": "#7F6F4E",
+				"foliageColor": "#71603F",
+				"waterColor": "#3D453A",
+				"skyColor": "#94765A",
+				"fogColor": "#8A7660",
+				"fogEndDistance": 112.0
+			},
+			"features": [
+				{ "feature": "ash_scrub", "density": 0.3 },
+				{ "feature": "rubble_boulder" }
+			]
+		},
+		{
+			"id": "scorch_highland",
+			"displayName": "Scorched Highland",
+			"archetype": "HILL",
+			"slot": { "relief": "HIGHLAND", "temperature": ["HOT"] },
+			"behavior": { "temperature": 1.2, "downfall": 0.0, "hasPrecipitation": false },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:terracotta"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:red_sandstone"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:deepslate"] },
+				"steepOverride": { "semanticRole": "exposed_rock", "preferredIds": ["minecraft:blackstone"] }
+			},
+			"environment": {
+				"grassColor": "#8E6A45",
+				"foliageColor": "#7F5D3B",
+				"waterColor": "#48472F",
+				"skyColor": "#A87550",
+				"fogColor": "#9B7154",
+				"fogEndDistance": 72.0,
+				"ambientParticles": [
+					{ "particle": "minecraft:ash", "probability": 0.1 }
+				]
+			},
+			"features": [
+				{ "feature": "slag_boulder", "density": 0.3 }
+			]
+		},
+		{
+			"id": "frostash_flats",
+			"displayName": "Frostash Flats",
+			"archetype": "LOWLAND",
+			"slot": { "relief": "FLATS", "temperature": ["COLD"], "humidity": ["ARID"] },
+			"behavior": { "temperature": 0.0, "downfall": 0.2, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:andesite"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:gravel"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:tuff"] }
+			},
+			"environment": {
+				"grassColor": "#6F6E60",
+				"foliageColor": "#63624F",
+				"waterColor": "#41504C",
+				"skyColor": "#8B8B7C",
+				"fogColor": "#7E7E70",
+				"fogEndDistance": 88.0
+			},
+			"features": [
+				{ "feature": "dead_spruce_trunk", "density": 0.15 }
+			]
+		},
+		{
+			"id": "rime_bog",
+			"displayName": "Rime Bog",
+			"archetype": "LOWLAND",
+			"slot": { "relief": "FLATS", "temperature": ["COLD"], "humidity": ["HUMID"] },
+			"behavior": { "temperature": 0.05, "downfall": 0.8, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:mud"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:packed_mud"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:tuff"] }
+			},
+			"environment": {
+				"grassColor": "#5F6B57",
+				"foliageColor": "#54604D",
+				"waterColor": "#3A4A45",
+				"skyColor": "#7E8A7C",
+				"fogColor": "#717D70",
+				"fogEndDistance": 64.0
+			},
+			"features": [
+				{ "feature": "dead_spruce_trunk", "density": 0.25 },
+				{ "feature": "ash_scrub", "density": 0.2 }
+			]
+		},
+		{
+			"id": "ashfall_plain",
+			"displayName": "Ashfall Plain",
+			"archetype": "LOWLAND",
+			"slot": { "relief": "FLATS", "temperature": ["TEMPERATE"], "humidity": ["ARID"] },
+			"behavior": { "temperature": 0.7, "downfall": 0.3, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:coarse_dirt"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:dirt"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:tuff"] }
+			},
+			"environment": {
+				"grassColor": "#7A6C55",
+				"foliageColor": "#6B5F49",
+				"waterColor": "#3D453A",
+				"skyColor": "#8C7A63",
+				"fogColor": "#877B67",
+				"fogEndDistance": 104.0,
+				"ambientParticles": [
+					{ "particle": "minecraft:ash", "probability": 0.05 }
+				]
+			},
+			"features": [
+				{ "feature": "ash_scrub" },
+				{ "feature": "dead_oak_trunk" }
+			]
+		},
+		{
+			"id": "tar_mire",
+			"displayName": "Tar Mire",
+			"archetype": "LOWLAND",
+			"slot": { "relief": "FLATS", "temperature": ["TEMPERATE"], "humidity": ["HUMID"] },
+			"behavior": { "temperature": 0.7, "downfall": 0.9, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:rooted_dirt"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:mud"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:tuff"] }
+			},
+			"environment": {
+				"grassColor": "#63603C",
+				"foliageColor": "#565334",
+				"waterColor": "#2B2F22",
+				"skyColor": "#7A7358",
+				"fogColor": "#6D674F",
+				"fogEndDistance": 56.0
+			},
+			"features": [
+				{ "feature": "dead_oak_trunk", "density": 0.4 },
+				{ "feature": "ash_scrub", "density": 0.25 }
+			]
+		},
+		{
+			"id": "scorched_pan",
+			"displayName": "Scorched Pan",
+			"archetype": "LOWLAND",
+			"slot": { "relief": "FLATS", "temperature": ["HOT"], "humidity": ["ARID"] },
+			"behavior": { "temperature": 1.6, "downfall": 0.0, "hasPrecipitation": false },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:red_sand"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:red_sandstone"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:terracotta"] }
+			},
+			"environment": {
+				"grassColor": "#8A6B42",
+				"foliageColor": "#7B5E38",
+				"waterColor": "#4A4A32",
+				"skyColor": "#A8764C",
+				"fogColor": "#9C7B58",
+				"fogEndDistance": 56.0,
+				"ambientParticles": [
+					{ "particle": "minecraft:ash", "probability": 0.14 }
+				]
+			},
+			"tags": {
+				"remove": ["minecraft:stronghold_biased_to"]
+			},
+			"features": [
+				{ "feature": "ash_scrub", "density": 0.25 }
+			]
+		},
+		{
+			"id": "sulfur_flats",
+			"displayName": "Sulfur Flats",
+			"archetype": "LOWLAND",
+			"slot": { "relief": "FLATS", "temperature": ["HOT"], "humidity": ["HUMID"] },
+			"behavior": { "temperature": 1.4, "downfall": 0.6, "hasPrecipitation": true },
+			"surface": {
+				"top": { "semanticRole": "surface_top", "preferredIds": ["minecraft:dripstone_block"] },
+				"under": { "semanticRole": "surface_under", "preferredIds": ["minecraft:tuff"] },
+				"deep": { "semanticRole": "surface_deep", "preferredIds": ["minecraft:deepslate"] }
+			},
+			"environment": {
+				"grassColor": "#9A8B3E",
+				"foliageColor": "#8A7C37",
+				"waterColor": "#5A5426",
+				"skyColor": "#B0913F",
+				"fogColor": "#A08749",
+				"fogEndDistance": 48.0,
+				"ambientParticles": [
+					{ "particle": "minecraft:ash", "probability": 0.1 }
+				]
+			},
+			"tags": {
+				"remove": ["minecraft:stronghold_biased_to"]
+			},
+			"features": [
+				{ "feature": "ash_scrub", "density": 0.2 },
+				{ "feature": "slag_boulder", "density": 0.25 }
+			]
+		}
+	]
+}

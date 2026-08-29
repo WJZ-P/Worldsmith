@@ -24,8 +24,8 @@ object WorldsmithHashUtil {
 
         listOf(
             "terrain" to manifest.files.terrain,
-            "biomeLayout" to manifest.files.biomeLayout,
-            "biomeSkins" to manifest.files.biomeSkins,
+            "biomes" to manifest.files.biomes,
+            "features" to manifest.files.features,
         ).forEach { (role, path) ->
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             val parsed = Json.parseToJsonElement(raw)

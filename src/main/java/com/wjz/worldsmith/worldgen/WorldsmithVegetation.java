@@ -1,10 +1,14 @@
 package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.Worldsmith;
-import com.wjz.worldsmith.core.model.BiomeSkin;
-import com.wjz.worldsmith.core.model.BiomeSkinSet;
-import com.wjz.worldsmith.core.model.VegetationSlot;
+import com.wjz.worldsmith.core.feature.VegetationBudget;
+import com.wjz.worldsmith.core.model.BiomeDefinition;
+import com.wjz.worldsmith.core.model.BiomeFeatureRef;
+import com.wjz.worldsmith.core.model.FeatureDefinition;
+import com.wjz.worldsmith.core.model.FeatureLibrary;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
@@ -30,64 +34,81 @@ import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 import net.minecraft.world.level.levelgen.placement.RarityFilter;
 
 /**
- * Expands the three vegetation recipes into configured and placed features.
+ * Expands the pack's feature library into configured and placed features.
  *
- * <p>The model picks a recipe name and a density; the shape of the feature and
+ * <p>A feature is declared once and compiled once, however many biomes use it.
+ * Only a biome that overrides the density needs its own placed feature, and that
+ * one is keyed by feature and biome rather than by list position, so reordering
+ * a biome's feature list cannot silently repoint it at something else.
+ *
+ * <p>The pack picks a recipe name and a density; the shape of the feature and
  * every placement modifier is decided here. Keeping the vocabulary closed is
- * what makes the output checkable: an unknown recipe cannot be serialised, so
- * it fails at compile time rather than producing a quietly empty world.
- *
- * <p>One feature pair is emitted per slot, keyed by skeleton id and slot index.
- * The index is positional and must stay aligned across the configured feature,
- * the placed feature, and the biome that references it.
+ * what makes the output checkable: an unknown recipe cannot be deserialised, so
+ * it fails while loading rather than producing a quietly empty world.
  */
 public final class WorldsmithVegetation {
-	private static final int MAX_PATCH_COUNT = 24;
-	private static final int MAX_RARITY = 32;
-
 	private WorldsmithVegetation() {
 	}
 
-	public static ResourceKey<ConfiguredFeature<?, ?>> configuredKey(String skeletonId, int index) {
-		return ResourceKey.create(Registries.CONFIGURED_FEATURE, Worldsmith.id("vegetation/" + skeletonId + "_" + index));
+	public static ResourceKey<ConfiguredFeature<?, ?>> configuredKey(String featureId) {
+		return ResourceKey.create(Registries.CONFIGURED_FEATURE, Worldsmith.id("vegetation/" + featureId));
 	}
 
-	public static ResourceKey<PlacedFeature> placedKey(String skeletonId, int index) {
-		return ResourceKey.create(Registries.PLACED_FEATURE, Worldsmith.id("vegetation/" + skeletonId + "_" + index));
+	public static ResourceKey<PlacedFeature> placedKey(String featureId) {
+		return ResourceKey.create(Registries.PLACED_FEATURE, Worldsmith.id("vegetation/" + featureId));
+	}
+
+	public static ResourceKey<PlacedFeature> placedKey(String featureId, String biomeId) {
+		return ResourceKey.create(Registries.PLACED_FEATURE, Worldsmith.id("vegetation/" + featureId + "/" + biomeId));
+	}
+
+	/** The placed feature a biome should reference for one of its entries. */
+	public static ResourceKey<PlacedFeature> placedKeyFor(BiomeDefinition biome, BiomeFeatureRef ref) {
+		return ref.getDensity() == null ? placedKey(ref.getFeature()) : placedKey(ref.getFeature(), biome.getId());
 	}
 
 	public static void bootstrapConfigured(BootstrapContext<ConfiguredFeature<?, ?>> context) {
-		BiomeSkinSet skins = WorldsmithPacks.builtin().getBiomeSkins();
+		FeatureLibrary library = WorldsmithPacks.builtin().getFeatures();
 		MaterialResolver resolver = new MaterialResolver();
 
-		for (BiomeSkin skin : skins.getSkins()) {
-			List<VegetationSlot> slots = skin.getVegetation();
-			for (int index = 0; index < slots.size(); index++) {
-				context.register(configuredKey(skin.getSkeletonId(), index), configure(slots.get(index), resolver));
-			}
+		for (FeatureDefinition feature : library.getFeatures()) {
+			context.register(configuredKey(feature.getId()), configure(feature, resolver));
 		}
 		resolver.report("vegetation");
 	}
 
 	public static void bootstrapPlaced(BootstrapContext<PlacedFeature> context) {
-		BiomeSkinSet skins = WorldsmithPacks.builtin().getBiomeSkins();
 		HolderGetter<ConfiguredFeature<?, ?>> configured = context.lookup(Registries.CONFIGURED_FEATURE);
+		Map<String, FeatureDefinition> library = byId(WorldsmithPacks.builtin().getFeatures());
 
-		for (BiomeSkin skin : skins.getSkins()) {
-			List<VegetationSlot> slots = skin.getVegetation();
-			for (int index = 0; index < slots.size(); index++) {
-				ResourceKey<ConfiguredFeature<?, ?>> source = configuredKey(skin.getSkeletonId(), index);
-				context.register(
-					placedKey(skin.getSkeletonId(), index),
-					new PlacedFeature(configured.getOrThrow(source), place(slots.get(index)))
+		// Several biomes may resolve to the same key when they all take the
+		// default density, so collect before registering.
+		Map<ResourceKey<PlacedFeature>, PlacedFeature> placed = new LinkedHashMap<>();
+		for (BiomeDefinition biome : WorldsmithPacks.builtin().getBiomes().getBiomes()) {
+			for (BiomeFeatureRef ref : biome.getFeatures()) {
+				FeatureDefinition definition = library.get(ref.getFeature());
+				if (definition == null) {
+					throw new IllegalStateException("Biome '" + biome.getId() + "' references unknown feature '" + ref.getFeature() + "'");
+				}
+				double density = ref.getDensity() == null ? definition.getDensity() : ref.getDensity();
+				placed.putIfAbsent(
+					placedKeyFor(biome, ref),
+					new PlacedFeature(configured.getOrThrow(configuredKey(definition.getId())), place(definition, density))
 				);
 			}
 		}
+		placed.forEach(context::register);
 	}
 
-	private static ConfiguredFeature<?, ?> configure(VegetationSlot slot, MaterialResolver resolver) {
-		BlockState state = resolver.resolve(slot.getBlock(), Blocks.DEAD_BUSH);
-		return switch (slot.getRecipe()) {
+	private static Map<String, FeatureDefinition> byId(FeatureLibrary library) {
+		Map<String, FeatureDefinition> byId = new LinkedHashMap<>();
+		library.getFeatures().forEach(feature -> byId.put(feature.getId(), feature));
+		return byId;
+	}
+
+	private static ConfiguredFeature<?, ?> configure(FeatureDefinition feature, MaterialResolver resolver) {
+		BlockState state = resolver.resolve(feature.getBlock(), Blocks.DEAD_BUSH);
+		return switch (feature.getRecipe()) {
 			case GROUND_PATCH -> new ConfiguredFeature<>(
 				Feature.SIMPLE_BLOCK,
 				new SimpleBlockConfiguration(BlockStateProvider.simple(state))
@@ -103,31 +124,21 @@ public final class WorldsmithVegetation {
 		};
 	}
 
-	private static List<PlacementModifier> place(VegetationSlot slot) {
-		return switch (slot.getRecipe()) {
+	private static List<PlacementModifier> place(FeatureDefinition feature, double density) {
+		return switch (feature.getRecipe()) {
 			case GROUND_PATCH -> List.of(
-				CountPlacement.of(count(slot.getDensity())),
+				CountPlacement.of(VegetationBudget.patchCount(density)),
 				InSquarePlacement.spread(),
 				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
 				BiomeFilter.biome(),
 				BlockPredicateFilter.forPredicate(BlockPredicate.ONLY_IN_AIR_PREDICATE)
 			);
 			case DEAD_TREE, BOULDER -> List.of(
-				RarityFilter.onAverageOnceEvery(rarity(slot.getDensity())),
+				RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density)),
 				InSquarePlacement.spread(),
 				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
 				BiomeFilter.biome()
 			);
 		};
-	}
-
-	/** Dense ground cover is a per-chunk count. */
-	private static int count(double density) {
-		return Math.max(1, (int) Math.round(density * MAX_PATCH_COUNT));
-	}
-
-	/** Sparse props are a rarity: denser means a smaller "once every N chunks". */
-	private static int rarity(double density) {
-		return Math.max(1, (int) Math.round((1.0 - density) * MAX_RARITY));
 	}
 }

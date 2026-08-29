@@ -5,8 +5,8 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class WorldsmithPackFiles(
     val terrain: String,
-    val biomeLayout: String,
-    val biomeSkins: String,
+    val biomes: String,
+    val features: String,
 )
 
 @Serializable
@@ -21,7 +21,7 @@ data class WorldsmithPackManifest(
 data class WorldsmithPack(
     val manifest: WorldsmithPackManifest,
     val terrain: TerrainPlan,
-    val biomeLayout: BiomeLayoutPlan,
-    val biomeSkins: BiomeSkinSet,
+    val biomes: BiomePlan,
+    val features: FeatureLibrary,
     val computedId: String,
 )

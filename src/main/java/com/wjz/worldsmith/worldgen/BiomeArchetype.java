@@ -1,14 +1,19 @@
 package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.core.model.BiomeArchetypeRole;
+import com.wjz.worldsmith.core.model.BiomeTagOverrides;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
 
 /**
- * Coarse role of a skeleton, used to decide which vanilla biome tags it joins.
+ * Coarse role of a biome, used to decide which vanilla biome tags it joins.
  *
  * <p>Tag membership is the only thing keeping vanilla content alive in a world
  * built entirely from custom biomes: {@code ChunkGeneratorStructureState} skips
@@ -48,5 +53,25 @@ public enum BiomeArchetype {
 
 	public static BiomeArchetype from(BiomeArchetypeRole role) {
 		return valueOf(role.name());
+	}
+
+	/**
+	 * The tags a biome actually joins: its archetype defaults, then the pack's
+	 * own adjustments.
+	 *
+	 * <p>Removal only subtracts from those defaults. A Worldsmith biome is never
+	 * in a vanilla tag unless this compiler put it there, so there is nothing
+	 * else for a pack to take it out of.
+	 */
+	public static List<TagKey<Biome>> tagsFor(CompiledBiome biome) {
+		Set<TagKey<Biome>> tags = new LinkedHashSet<>(biome.archetype().tags());
+		BiomeTagOverrides overrides = biome.definition().getTags();
+		overrides.getRemove().forEach(id -> tags.remove(tagKey(id)));
+		overrides.getAdd().forEach(id -> tags.add(tagKey(id)));
+		return List.copyOf(tags);
+	}
+
+	private static TagKey<Biome> tagKey(String id) {
+		return TagKey.create(Registries.BIOME, Identifier.parse(id));
 	}
 }

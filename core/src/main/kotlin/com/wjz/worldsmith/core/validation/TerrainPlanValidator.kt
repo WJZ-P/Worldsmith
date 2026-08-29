@@ -27,7 +27,7 @@ object TerrainPlanValidator {
             add(error("spawnTargets", "EMPTY_SPAWN_TARGETS", "At least one spawn target is required"))
         }
         plan.spawnTargets.forEachIndexed { index, target ->
-            addAll(BiomeLayoutValidator.validateClimate("spawnTargets[$index]", target))
+            addAll(BiomePlanValidator.validateClimate("spawnTargets[$index]", target))
         }
     }
 

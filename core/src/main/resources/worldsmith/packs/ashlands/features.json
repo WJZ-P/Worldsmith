@@ -1,0 +1,35 @@
+{
+	"schemaVersion": 1,
+	"features": [
+		{
+			"id": "ash_scrub",
+			"recipe": "GROUND_PATCH",
+			"block": { "semanticRole": "dry_scrub", "preferredIds": ["minecraft:dead_bush"] },
+			"density": 0.45
+		},
+		{
+			"id": "slag_boulder",
+			"recipe": "BOULDER",
+			"block": { "semanticRole": "rubble", "preferredIds": ["minecraft:blackstone"] },
+			"density": 0.5
+		},
+		{
+			"id": "rubble_boulder",
+			"recipe": "BOULDER",
+			"block": { "semanticRole": "rubble", "preferredIds": ["minecraft:cobblestone"] },
+			"density": 0.35
+		},
+		{
+			"id": "dead_spruce_trunk",
+			"recipe": "DEAD_TREE",
+			"block": { "semanticRole": "dead_wood", "preferredIds": ["minecraft:stripped_spruce_log"] },
+			"density": 0.2
+		},
+		{
+			"id": "dead_oak_trunk",
+			"recipe": "DEAD_TREE",
+			"block": { "semanticRole": "dead_wood", "preferredIds": ["minecraft:stripped_dark_oak_log"] },
+			"density": 0.3
+		}
+	]
+}

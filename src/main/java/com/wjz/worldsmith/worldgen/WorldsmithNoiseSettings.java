@@ -1,7 +1,6 @@
 package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.Worldsmith;
-import com.wjz.worldsmith.core.model.BiomeSkinSet;
 import com.wjz.worldsmith.core.model.NoiseTemplate;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import net.minecraft.core.HolderGetter;
@@ -39,9 +38,8 @@ public final class WorldsmithNoiseSettings {
 		HolderGetter<Biome> biomes = context.lookup(Registries.BIOME);
 
 		TerrainPlan terrain = WorldsmithPacks.builtin().getTerrain();
-		BiomeSkinSet skins = WorldsmithPacks.builtin().getBiomeSkins();
 		MaterialResolver resolver = new MaterialResolver();
-		SurfaceRules.RuleSource surfaceRule = WorldsmithSurfaceRules.build(skins, biomes, resolver);
+		SurfaceRules.RuleSource surfaceRule = WorldsmithSurfaceRules.build(biomes, resolver);
 		boolean largeBiomes = terrain.getNoiseTemplate() == NoiseTemplate.VANILLA_LARGE_BIOMES;
 		boolean amplified = terrain.getNoiseTemplate() == NoiseTemplate.VANILLA_AMPLIFIED;
 
@@ -53,7 +51,7 @@ public final class WorldsmithNoiseSettings {
 			resolver.resolve(terrain.getDefaultFluid(), Blocks.WATER),
 			NoiseRouterData.overworld(functions, noises, largeBiomes, amplified),
 			surfaceRule,
-			terrain.getSpawnTargets().stream().map(BiomeSkeletons::climate).toList(),
+			terrain.getSpawnTargets().stream().map(CompiledBiomes::climate).toList(),
 			terrain.getSeaLevel(),
 			false,
 			terrain.getAquifersEnabled(),

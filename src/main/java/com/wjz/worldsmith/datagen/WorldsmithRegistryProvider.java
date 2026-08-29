@@ -1,17 +1,22 @@
 package com.wjz.worldsmith.datagen;
 
-import com.wjz.worldsmith.core.model.BiomeSkin;
-import com.wjz.worldsmith.worldgen.BiomeSkeleton;
-import com.wjz.worldsmith.worldgen.BiomeSkeletons;
+import com.wjz.worldsmith.core.model.BiomeDefinition;
+import com.wjz.worldsmith.core.model.BiomeFeatureRef;
+import com.wjz.worldsmith.core.model.FeatureDefinition;
+import com.wjz.worldsmith.worldgen.CompiledBiome;
+import com.wjz.worldsmith.worldgen.CompiledBiomes;
 import com.wjz.worldsmith.worldgen.WorldsmithNoiseSettings;
 import com.wjz.worldsmith.worldgen.WorldsmithPacks;
 import com.wjz.worldsmith.worldgen.WorldsmithVegetation;
 import com.wjz.worldsmith.worldgen.WorldsmithWorldPresets;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import net.fabricmc.fabric.api.datagen.v1.FabricPackOutput;
 import net.fabricmc.fabric.api.datagen.v1.provider.FabricDynamicRegistryProvider;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
@@ -34,16 +39,23 @@ public final class WorldsmithRegistryProvider extends FabricDynamicRegistryProvi
 			registries.lookupOrThrow(Registries.CONFIGURED_FEATURE);
 		HolderLookup.RegistryLookup<PlacedFeature> placedFeatures = registries.lookupOrThrow(Registries.PLACED_FEATURE);
 
-		for (BiomeSkin skin : WorldsmithPacks.builtin().getBiomeSkins().getSkins()) {
-			for (int index = 0; index < skin.getVegetation().size(); index++) {
-				entries.add(configuredFeatures, WorldsmithVegetation.configuredKey(skin.getSkeletonId(), index));
-				entries.add(placedFeatures, WorldsmithVegetation.placedKey(skin.getSkeletonId(), index));
-			}
+		for (FeatureDefinition feature : WorldsmithPacks.builtin().getFeatures().getFeatures()) {
+			entries.add(configuredFeatures, WorldsmithVegetation.configuredKey(feature.getId()));
 		}
 
+		// Biomes that take a feature's default density share one placed feature,
+		// so collect the keys before emitting them.
+		Set<ResourceKey<PlacedFeature>> placed = new LinkedHashSet<>();
+		for (BiomeDefinition biome : WorldsmithPacks.builtin().getBiomes().getBiomes()) {
+			for (BiomeFeatureRef ref : biome.getFeatures()) {
+				placed.add(WorldsmithVegetation.placedKeyFor(biome, ref));
+			}
+		}
+		placed.forEach(key -> entries.add(placedFeatures, key));
+
 		HolderLookup.RegistryLookup<Biome> biomes = registries.lookupOrThrow(Registries.BIOME);
-		for (BiomeSkeleton skeleton : BiomeSkeletons.all()) {
-			entries.add(biomes, skeleton.biome());
+		for (CompiledBiome biome : CompiledBiomes.all()) {
+			entries.add(biomes, biome.key());
 		}
 
 		entries.add(registries.lookupOrThrow(Registries.NOISE_SETTINGS), WorldsmithNoiseSettings.WASTELAND);

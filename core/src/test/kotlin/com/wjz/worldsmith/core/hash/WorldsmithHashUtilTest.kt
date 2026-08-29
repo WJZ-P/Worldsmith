@@ -12,20 +12,20 @@ class WorldsmithHashUtilTest {
         id = "0".repeat(64),
         displayName = "Ignored metadata",
         description = "Ignored metadata",
-        files = WorldsmithPackFiles("terrain.json", "biomes/layout.json", "biomes/skins.json"),
+        files = WorldsmithPackFiles("terrain.json", "biomes.json", "features.json"),
     )
 
     @Test
     fun `whitespace and object key order do not change id`() {
         val compact = mapOf(
             "terrain.json" to "{\"height\":384,\"seaLevel\":63}",
-            "biomes/layout.json" to "{\"skeletons\":[{\"id\":\"a\",\"weight\":1}]}",
-            "biomes/skins.json" to "{\"colors\":{\"sky\":\"#ffffff\",\"fog\":\"#000000\"}}",
+            "biomes.json" to "{\"biomes\":[{\"id\":\"a\",\"weight\":1}]}",
+            "features.json" to "{\"features\":[{\"id\":\"x\",\"density\":0.5}]}",
         )
         val formatted = mapOf(
             "terrain.json" to "{ \"seaLevel\": 63, \"height\": 384 }",
-            "biomes/layout.json" to "{\n  \"skeletons\": [{\"weight\": 1, \"id\": \"a\"}]\n}",
-            "biomes/skins.json" to "{\"colors\": {\"fog\": \"#000000\", \"sky\": \"#ffffff\"}}",
+            "biomes.json" to "{\n  \"biomes\": [{\"weight\": 1, \"id\": \"a\"}]\n}",
+            "features.json" to "{\"features\": [{\"density\": 0.5, \"id\": \"x\"}]}",
         )
 
         assertEquals(
@@ -56,7 +56,7 @@ class WorldsmithHashUtilTest {
 
     private fun contents(terrain: String) = mapOf(
         "terrain.json" to terrain,
-        "biomes/layout.json" to "{\"skeletons\":[]}",
-        "biomes/skins.json" to "{\"skins\":[]}",
+        "biomes.json" to "{\"biomes\":[]}",
+        "features.json" to "{\"features\":[]}",
     )
 }

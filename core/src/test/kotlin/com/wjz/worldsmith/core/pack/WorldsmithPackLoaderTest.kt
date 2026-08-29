@@ -17,9 +17,19 @@ class WorldsmithPackLoaderTest {
         val pack = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
 
         assertEquals(pack.computedId, pack.manifest.id)
-        assertEquals(8, pack.biomeLayout.skeletons.size)
-        assertEquals(pack.biomeLayout.skeletons.map { it.id }, pack.biomeSkins.skins.map { it.skeletonId })
+        assertEquals(16, pack.biomes.biomes.size)
         assertTrue(WorldsmithPackValidator.validate(pack).isEmpty())
+    }
+
+    @Test
+    fun `every referenced feature is declared once in the library`() {
+        val pack = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
+        val declared = pack.features.features.map { it.id }
+        val referenced = pack.biomes.biomes.flatMap { biome -> biome.features.map { it.feature } }
+
+        assertEquals(declared.size, declared.toSet().size)
+        assertTrue(declared.containsAll(referenced))
+        assertTrue(referenced.size > declared.size, "the fixture should reuse at least one feature across biomes")
     }
 
     @Test
@@ -55,7 +65,7 @@ class WorldsmithPackLoaderTest {
     @Test
     fun `portable pack loads from a regular directory`() {
         val root = "worldsmith/packs/ashlands"
-        listOf("worldsmith.json", "terrain.json", "biomes/layout.json", "biomes/skins.json").forEach { relative ->
+        listOf("worldsmith.json", "terrain.json", "biomes.json", "features.json").forEach { relative ->
             val target = tempDir.resolve(relative)
             Files.createDirectories(target.parent)
             javaClass.classLoader.getResourceAsStream("$root/$relative").use { source ->

@@ -22,8 +22,8 @@ object WorldsmithPackValidator {
         }
         listOf(
             "terrain" to manifest.files.terrain,
-            "biomeLayout" to manifest.files.biomeLayout,
-            "biomeSkins" to manifest.files.biomeSkins,
+            "biomes" to manifest.files.biomes,
+            "features" to manifest.files.features,
         ).forEach { (name, path) ->
             if (path.startsWith('/') || path.split('/').any { it == ".." }) {
                 add(error("manifest.files.$name", "UNSAFE_PACK_PATH", "Pack content paths must stay inside the pack"))
@@ -31,8 +31,8 @@ object WorldsmithPackValidator {
         }
 
         addAll(TerrainPlanValidator.validate(pack.terrain).map { it.prefixed("terrain") })
-        addAll(BiomeLayoutValidator.validate(pack.biomeLayout).map { it.prefixed("biomeLayout") })
-        addAll(BiomeSkinValidator.validate(pack.biomeSkins, pack.biomeLayout).map { it.prefixed("biomeSkins") })
+        addAll(FeatureLibraryValidator.validate(pack.features).map { it.prefixed("features") })
+        addAll(BiomePlanValidator.validate(pack.biomes, pack.features).map { it.prefixed("biomes") })
     }
 
     private fun Diagnostic.prefixed(prefix: String) = copy(path = "$prefix.$path")

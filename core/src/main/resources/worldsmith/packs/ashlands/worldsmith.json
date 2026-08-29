@@ -1,11 +1,11 @@
 {
-  "formatVersion": 1,
-  "id": "d14ccc0d532d83c3e97c2b3ac33735fdccb8e80e4c3edd91c90890e185164ff8",
-  "displayName": "Ashlands",
-  "description": "A wind-scoured industrial wasteland used by the stage-one compiler fixture.",
-  "files": {
-    "terrain": "terrain.json",
-    "biomeLayout": "biomes/layout.json",
-    "biomeSkins": "biomes/skins.json"
-  }
+	"formatVersion": 1,
+	"id": "8f858570f5529cb222901d68a850dfc35a539281a1cc02b632c17c775a9967ea",
+	"displayName": "Ashlands",
+	"description": "A wind-scoured industrial wasteland used by the stage-one compiler fixture.",
+	"files": {
+		"terrain": "terrain.json",
+		"biomes": "biomes.json",
+		"features": "features.json"
+	}
 }
