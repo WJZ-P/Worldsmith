@@ -1,10 +1,10 @@
 {
   "attributes": {
-    "minecraft:visual/fog_color": "#5c5648",
-    "minecraft:visual/fog_end_distance": 72.0,
-    "minecraft:visual/sky_color": "#6b6152",
-    "minecraft:visual/water_fog_color": "#090c0d",
-    "minecraft:visual/water_fog_end_distance": 24.0,
+    "minecraft:visual/fog_color": "#6e6656",
+    "minecraft:visual/fog_end_distance": 112.0,
+    "minecraft:visual/sky_color": "#7a6e5c",
+    "minecraft:visual/water_fog_color": "#1b241f",
+    "minecraft:visual/water_fog_end_distance": 72.0,
     "minecraft:visual/water_fog_start_distance": -8.0
   },
   "carvers": [
@@ -14,9 +14,9 @@
   ],
   "downfall": 0.5,
   "effects": {
-    "foliage_color": "#4e4b3e",
-    "grass_color": "#5a5647",
-    "water_color": "#2e3a34"
+    "foliage_color": "#5e5947",
+    "grass_color": "#6a6551",
+    "water_color": "#3a4239"
   },
   "features": [
     [],

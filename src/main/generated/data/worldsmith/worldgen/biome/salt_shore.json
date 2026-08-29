@@ -1,22 +1,19 @@
 {
   "attributes": {
-    "minecraft:visual/fog_color": "#5c5648",
-    "minecraft:visual/fog_end_distance": 72.0,
-    "minecraft:visual/sky_color": "#6b6152",
-    "minecraft:visual/water_fog_color": "#090c0d",
-    "minecraft:visual/water_fog_end_distance": 24.0,
-    "minecraft:visual/water_fog_start_distance": -8.0
+    "minecraft:visual/fog_color": "#9c9280",
+    "minecraft:visual/fog_end_distance": 144.0,
+    "minecraft:visual/sky_color": "#a79c86"
   },
   "carvers": [
     "minecraft:cave",
     "minecraft:cave_extra_underground",
     "minecraft:canyon"
   ],
-  "downfall": 0.5,
+  "downfall": 0.1,
   "effects": {
-    "foliage_color": "#4e4b3e",
-    "grass_color": "#5a5647",
-    "water_color": "#2e3a34"
+    "foliage_color": "#8b8474",
+    "grass_color": "#9a9382",
+    "water_color": "#43503f"
   },
   "features": [
     [],
@@ -70,7 +67,8 @@
       "minecraft:spring_lava"
     ],
     [
-      "minecraft:glow_lichen"
+      "minecraft:glow_lichen",
+      "worldsmith:vegetation/ash_scrub/salt_shore"
     ]
   ],
   "has_precipitation": true,
@@ -85,7 +83,32 @@
       }
     ],
     "axolotls": [],
-    "creature": [],
+    "creature": [
+      {
+        "type": "minecraft:sheep",
+        "maxCount": 4,
+        "minCount": 4,
+        "weight": 12
+      },
+      {
+        "type": "minecraft:pig",
+        "maxCount": 4,
+        "minCount": 4,
+        "weight": 10
+      },
+      {
+        "type": "minecraft:chicken",
+        "maxCount": 4,
+        "minCount": 4,
+        "weight": 10
+      },
+      {
+        "type": "minecraft:cow",
+        "maxCount": 4,
+        "minCount": 4,
+        "weight": 8
+      }
+    ],
     "misc": [],
     "monster": [
       {
@@ -148,5 +171,5 @@
     "water_ambient": [],
     "water_creature": []
   },
-  "temperature": 0.5
+  "temperature": 0.8
 }

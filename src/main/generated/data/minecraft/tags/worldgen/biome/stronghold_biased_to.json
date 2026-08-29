@@ -1,9 +1,13 @@
 {
   "values": [
-    "worldsmith:peaks",
-    "worldsmith:highland",
-    "worldsmith:flats_cold",
-    "worldsmith:flats_temperate",
-    "worldsmith:flats_hot"
+    "worldsmith:rime_peaks",
+    "worldsmith:slag_peaks",
+    "worldsmith:frost_highland",
+    "worldsmith:rust_highland",
+    "worldsmith:scorch_highland",
+    "worldsmith:frostash_flats",
+    "worldsmith:rime_bog",
+    "worldsmith:ashfall_plain",
+    "worldsmith:tar_mire"
   ]
 }

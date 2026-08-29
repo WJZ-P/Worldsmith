@@ -1,9 +1,9 @@
 {
-  "feature": "worldsmith:vegetation/flats_hot_0",
+  "feature": "worldsmith:vegetation/ash_scrub",
   "placement": [
     {
       "type": "minecraft:count",
-      "count": 6
+      "count": 4
     },
     {
       "type": "minecraft:in_square"

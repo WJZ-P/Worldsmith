@@ -38,7 +38,7 @@
               }
             },
             {
-              "biome": "worldsmith:shallows",
+              "biome": "worldsmith:rime_shallows",
               "parameters": {
                 "continentalness": [
                   -0.455,
@@ -59,7 +59,7 @@
                 "offset": 0.0,
                 "temperature": [
                   -1.0,
-                  1.0
+                  -0.15
                 ],
                 "weirdness": [
                   -1.0,
@@ -68,11 +68,11 @@
               }
             },
             {
-              "biome": "worldsmith:shore",
+              "biome": "worldsmith:ash_shallows",
               "parameters": {
                 "continentalness": [
-                  -0.19,
-                  -0.11
+                  -0.455,
+                  -0.19
                 ],
                 "depth": [
                   -1.0,
@@ -88,6 +88,36 @@
                 ],
                 "offset": 0.0,
                 "temperature": [
+                  -0.15,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:salt_shore",
+              "parameters": {
+                "continentalness": [
+                  -0.19,
+                  -0.11
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  -1.0,
+                  1.0
+                ],
+                "humidity": [
+                  -1.0,
+                  -0.1
+                ],
+                "offset": 0.0,
+                "temperature": [
                   -1.0,
                   1.0
                 ],
@@ -98,7 +128,37 @@
               }
             },
             {
-              "biome": "worldsmith:peaks",
+              "biome": "worldsmith:cinder_shore",
+              "parameters": {
+                "continentalness": [
+                  -0.19,
+                  -0.11
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  -1.0,
+                  1.0
+                ],
+                "humidity": [
+                  -0.1,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -1.0,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:rime_peaks",
               "parameters": {
                 "continentalness": [
                   -0.11,
@@ -119,6 +179,36 @@
                 "offset": 0.0,
                 "temperature": [
                   -1.0,
+                  -0.15
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:slag_peaks",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  -1.0,
+                  -0.375
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -0.15,
                   1.0
                 ],
                 "weirdness": [
@@ -128,7 +218,7 @@
               }
             },
             {
-              "biome": "worldsmith:highland",
+              "biome": "worldsmith:frost_highland",
               "parameters": {
                 "continentalness": [
                   -0.11,
@@ -149,36 +239,6 @@
                 "offset": 0.0,
                 "temperature": [
                   -1.0,
-                  1.0
-                ],
-                "weirdness": [
-                  -1.0,
-                  1.0
-                ]
-              }
-            },
-            {
-              "biome": "worldsmith:flats_cold",
-              "parameters": {
-                "continentalness": [
-                  -0.11,
-                  1.0
-                ],
-                "depth": [
-                  -1.0,
-                  1.0
-                ],
-                "erosion": [
-                  0.05,
-                  1.0
-                ],
-                "humidity": [
-                  -1.0,
-                  1.0
-                ],
-                "offset": 0.0,
-                "temperature": [
-                  -1.0,
                   -0.15
                 ],
                 "weirdness": [
@@ -188,7 +248,7 @@
               }
             },
             {
-              "biome": "worldsmith:flats_temperate",
+              "biome": "worldsmith:rust_highland",
               "parameters": {
                 "continentalness": [
                   -0.11,
@@ -199,8 +259,8 @@
                   1.0
                 ],
                 "erosion": [
-                  0.05,
-                  1.0
+                  -0.375,
+                  0.05
                 ],
                 "humidity": [
                   -1.0,
@@ -218,7 +278,37 @@
               }
             },
             {
-              "biome": "worldsmith:flats_hot",
+              "biome": "worldsmith:scorch_highland",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  -0.375,
+                  0.05
+                ],
+                "humidity": [
+                  -1.0,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  0.55,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:frostash_flats",
               "parameters": {
                 "continentalness": [
                   -0.11,
@@ -234,6 +324,156 @@
                 ],
                 "humidity": [
                   -1.0,
+                  -0.1
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -1.0,
+                  -0.15
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:rime_bog",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  0.05,
+                  1.0
+                ],
+                "humidity": [
+                  -0.1,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -1.0,
+                  -0.15
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:ashfall_plain",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  0.05,
+                  1.0
+                ],
+                "humidity": [
+                  -1.0,
+                  -0.1
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -0.15,
+                  0.55
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:tar_mire",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  0.05,
+                  1.0
+                ],
+                "humidity": [
+                  -0.1,
+                  1.0
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  -0.15,
+                  0.55
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:scorched_pan",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  0.05,
+                  1.0
+                ],
+                "humidity": [
+                  -1.0,
+                  -0.1
+                ],
+                "offset": 0.0,
+                "temperature": [
+                  0.55,
+                  1.0
+                ],
+                "weirdness": [
+                  -1.0,
+                  1.0
+                ]
+              }
+            },
+            {
+              "biome": "worldsmith:sulfur_flats",
+              "parameters": {
+                "continentalness": [
+                  -0.11,
+                  1.0
+                ],
+                "depth": [
+                  -1.0,
+                  1.0
+                ],
+                "erosion": [
+                  0.05,
+                  1.0
+                ],
+                "humidity": [
+                  -0.1,
                   1.0
                 ],
                 "offset": 0.0,

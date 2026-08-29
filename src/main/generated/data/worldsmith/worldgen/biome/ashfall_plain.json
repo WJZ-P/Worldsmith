@@ -1,18 +1,26 @@
 {
   "attributes": {
-    "minecraft:visual/fog_color": "#8a7660",
-    "minecraft:visual/fog_end_distance": 112.0,
-    "minecraft:visual/sky_color": "#94765a"
+    "minecraft:visual/ambient_particles": [
+      {
+        "particle": {
+          "type": "minecraft:ash"
+        },
+        "probability": 0.05
+      }
+    ],
+    "minecraft:visual/fog_color": "#877b67",
+    "minecraft:visual/fog_end_distance": 104.0,
+    "minecraft:visual/sky_color": "#8c7a63"
   },
   "carvers": [
     "minecraft:cave",
     "minecraft:cave_extra_underground",
     "minecraft:canyon"
   ],
-  "downfall": 0.4,
+  "downfall": 0.3,
   "effects": {
-    "foliage_color": "#71603f",
-    "grass_color": "#7f6f4e",
+    "foliage_color": "#6b5f49",
+    "grass_color": "#7a6c55",
     "water_color": "#3d453a"
   },
   "features": [
@@ -68,8 +76,8 @@
     ],
     [
       "minecraft:glow_lichen",
-      "worldsmith:vegetation/highland_0",
-      "worldsmith:vegetation/highland_1"
+      "worldsmith:vegetation/ash_scrub",
+      "worldsmith:vegetation/dead_oak_trunk"
     ]
   ],
   "has_precipitation": true,
@@ -172,5 +180,5 @@
     "water_ambient": [],
     "water_creature": []
   },
-  "temperature": 0.5
+  "temperature": 0.7
 }

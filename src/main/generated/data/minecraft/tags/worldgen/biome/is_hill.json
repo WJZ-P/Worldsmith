@@ -1,6 +1,9 @@
 {
   "values": [
-    "worldsmith:peaks",
-    "worldsmith:highland"
+    "worldsmith:rime_peaks",
+    "worldsmith:slag_peaks",
+    "worldsmith:frost_highland",
+    "worldsmith:rust_highland",
+    "worldsmith:scorch_highland"
   ]
 }

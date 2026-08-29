@@ -1,19 +1,27 @@
 {
   "attributes": {
-    "minecraft:visual/fog_color": "#7e7e70",
-    "minecraft:visual/fog_end_distance": 88.0,
-    "minecraft:visual/sky_color": "#8b8b7c"
+    "minecraft:visual/ambient_particles": [
+      {
+        "particle": {
+          "type": "minecraft:ash"
+        },
+        "probability": 0.1
+      }
+    ],
+    "minecraft:visual/fog_color": "#a08749",
+    "minecraft:visual/fog_end_distance": 48.0,
+    "minecraft:visual/sky_color": "#b0913f"
   },
   "carvers": [
     "minecraft:cave",
     "minecraft:cave_extra_underground",
     "minecraft:canyon"
   ],
-  "downfall": 0.4,
+  "downfall": 0.6,
   "effects": {
-    "foliage_color": "#63624f",
-    "grass_color": "#6f6e60",
-    "water_color": "#41504c"
+    "foliage_color": "#8a7c37",
+    "grass_color": "#9a8b3e",
+    "water_color": "#5a5426"
   },
   "features": [
     [],
@@ -68,10 +76,8 @@
     ],
     [
       "minecraft:glow_lichen",
-      "worldsmith:vegetation/flats_cold_0"
-    ],
-    [
-      "minecraft:freeze_top_layer"
+      "worldsmith:vegetation/ash_scrub/sulfur_flats",
+      "worldsmith:vegetation/slag_boulder/sulfur_flats"
     ]
   ],
   "has_precipitation": true,
@@ -174,5 +180,5 @@
     "water_ambient": [],
     "water_creature": []
   },
-  "temperature": 0.0
+  "temperature": 1.4
 }

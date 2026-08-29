@@ -1,9 +1,9 @@
 {
-  "feature": "worldsmith:vegetation/shore_0",
+  "feature": "worldsmith:vegetation/ash_scrub",
   "placement": [
     {
       "type": "minecraft:count",
-      "count": 4
+      "count": 2
     },
     {
       "type": "minecraft:in_square"

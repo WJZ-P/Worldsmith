@@ -1,9 +1,9 @@
 {
-  "feature": "worldsmith:vegetation/peaks_0",
+  "feature": "worldsmith:vegetation/dead_oak_trunk",
   "placement": [
     {
       "type": "minecraft:rarity_filter",
-      "chance": 16
+      "chance": 22
     },
     {
       "type": "minecraft:in_square"
