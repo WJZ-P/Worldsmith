@@ -77,6 +77,12 @@ overlapping boxes because their tie would make one biome effectively hidden.
   never fall below) deliberately, not on every biome.
 - Do not restate a vanilla default. A pack that writes the value Minecraft
   already uses has made the world no different and the document harder to read.
+- Write `displayName` and `description` in the language the player wrote their
+  prompt in. These strings are shown to that one player and to nobody else, so a
+  Chinese prompt gets Chinese names; do not translate them to English.
+- `id` is the opposite: always lowercase ASCII with underscores, whatever
+  language the names are in. Ids are keys - they end up in registry paths, file
+  names and diagnostics, and they have to stay typeable and greppable.
 - Use semantic material roles first; preferred Minecraft IDs are hints only.
 - Build every biome's `surface` as one required `base` stack plus an ordered
   `rules` list. Earlier rules have higher priority; all fields inside one
