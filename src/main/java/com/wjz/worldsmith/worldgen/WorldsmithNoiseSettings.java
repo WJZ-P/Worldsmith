@@ -472,7 +472,7 @@ public final class WorldsmithNoiseSettings {
 			window = DensityFunctions.min(
 				window,
 				DensityFunctions.add(
-					DensityFunctions.mul(influence, DensityFunctions.constant(2.0)),
+					influence,
 					DensityFunctions.constant(-ANCHOR_BAND_THRESHOLD)
 				)
 			);

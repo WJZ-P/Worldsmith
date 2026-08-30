@@ -16,6 +16,7 @@ import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.ReliefBand
 import com.wjz.worldsmith.core.model.SurfaceAltitude
+import com.wjz.worldsmith.core.model.SurfaceAnchorBand
 import com.wjz.worldsmith.core.model.SurfaceConditions
 import com.wjz.worldsmith.core.model.SurfaceDefinition
 import com.wjz.worldsmith.core.model.SurfaceLayer
@@ -223,6 +224,25 @@ class BiomePlanValidatorTest {
         assertTrue("INVALID_SURFACE_RULE_ID" in codes)
         assertTrue("REVERSED_RANGE" in codes)
         assertTrue("LAYER_DEPTH_OUT_OF_RANGE" in codes)
+    }
+
+    @Test
+    fun `an anchor is a complete surface condition by itself`() {
+        val original = plan()
+        val anchorRule = SurfaceRuleDefinition(
+            id = "summit",
+            conditions = SurfaceConditions(anchor = SurfaceAnchorBand("holy_peak", min = 0.7, max = 1.0)),
+            stack = original.biomes.first().surface.base,
+        )
+        val anchored = original.copy(
+            biomes = original.biomes.mapIndexed { index, biome ->
+                if (index == 0) biome.copy(surface = biome.surface.copy(rules = listOf(anchorRule))) else biome
+            },
+        )
+
+        val diagnostics = BiomePlanValidator.validate(anchored, library())
+
+        assertTrue(diagnostics.none { it.code == "EMPTY_SURFACE_CONDITIONS" }, diagnostics.toString())
     }
 
     private fun library() = FeatureLibrary(

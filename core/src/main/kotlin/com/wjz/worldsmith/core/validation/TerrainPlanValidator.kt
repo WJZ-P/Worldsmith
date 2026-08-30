@@ -204,9 +204,6 @@ object TerrainPlanValidator {
             if (anchor.falloff !in 0.05..8.0) {
                 add(error("$path.falloff", "ANCHOR_FALLOFF_OUT_OF_RANGE", "Anchor falloff must be between 0.05 and 8"))
             }
-            if (anchor.amplitude == 0.0) {
-                add(warning(path, "ANCHOR_HAS_NO_EFFECT", "An anchor with zero amplitude changes nothing"))
-            }
             when (val placement = anchor.placement) {
                 is AnchorPlacement.Fixed -> {
                     val reach = maxOf(kotlin.math.abs(placement.x), kotlin.math.abs(placement.z))

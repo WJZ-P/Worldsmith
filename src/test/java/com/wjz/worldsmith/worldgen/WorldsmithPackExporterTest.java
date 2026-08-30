@@ -33,6 +33,7 @@ import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.levelgen.SurfaceRules;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -117,6 +118,21 @@ final class WorldsmithPackExporterTest {
 		assertNotEquals(builtin.worldPresetKey(), runtime.worldPresetKey());
 		assertTrue(runtime.worldPresetKey().identifier().getPath().startsWith(prefix));
 		assertTrue(runtime.biomes().stream().allMatch(biome -> biome.key().identifier().getPath().startsWith(prefix)));
+	}
+
+	@Test
+	void anchorSurfaceConditionCodecRoundTrips() {
+		WorldsmithAnchorConditionSource source = new WorldsmithAnchorConditionSource(
+			0.7, 1.0, 600, 1.2, false, 120, -80, 0, 0.0
+		);
+
+		JsonElement encoded = SurfaceRules.ConditionSource.CODEC.encodeStart(JsonOps.INSTANCE, source)
+			.getOrThrow(message -> new IllegalStateException("Could not encode anchor condition: " + message));
+		SurfaceRules.ConditionSource decoded = SurfaceRules.ConditionSource.CODEC.parse(JsonOps.INSTANCE, encoded)
+			.getOrThrow(message -> new IllegalStateException("Could not decode anchor condition: " + message));
+
+		assertTrue(encoded.toString().contains("worldsmith:anchor"));
+		assertEquals(source, decoded);
 	}
 
 	@Test

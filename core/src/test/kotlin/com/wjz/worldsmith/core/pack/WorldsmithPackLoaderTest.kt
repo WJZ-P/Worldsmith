@@ -1,6 +1,14 @@
 package com.wjz.worldsmith.core.pack
 
+import com.wjz.worldsmith.core.model.Anchor
+import com.wjz.worldsmith.core.model.AnchorPlacement
+import com.wjz.worldsmith.core.model.BandEffect
+import com.wjz.worldsmith.core.model.BandRegion
 import com.wjz.worldsmith.core.model.RiverFill
+import com.wjz.worldsmith.core.model.SurfaceAnchorBand
+import com.wjz.worldsmith.core.model.SurfaceConditions
+import com.wjz.worldsmith.core.model.SurfaceRuleDefinition
+import com.wjz.worldsmith.core.model.TerrainBand
 import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.validation.WorldsmithPackValidator
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -67,6 +75,39 @@ class WorldsmithPackLoaderTest {
         val diagnostics = WorldsmithPackValidator.validate(mismatched)
 
         assertTrue(diagnostics.any { it.code == "UNREACHABLE_HYDROLOGY_SIGNAL" })
+    }
+
+    @Test
+    fun `anchor references are validated across terrain bands and biome surfaces`() {
+        val original = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
+        val shape = original.terrain.shape as TerrainShape.Procedural
+        val anchor = Anchor("holy_peak", AnchorPlacement.Fixed(0, 0), radius = 600, amplitude = 0.0, falloff = 1.0)
+        val firstBiome = original.biomes.biomes.first()
+        val surfaceRule = SurfaceRuleDefinition(
+            id = "summit",
+            conditions = SurfaceConditions(anchor = SurfaceAnchorBand("missing", min = 0.7, max = 1.0)),
+            stack = firstBiome.surface.base,
+        )
+        val pack = original.copy(
+            terrain = original.terrain.copy(
+                shape = shape.copy(
+                    anchors = listOf(anchor),
+                    bands = listOf(
+                        TerrainBand(0.2, 180, 230, BandEffect.ADD, BandRegion.ANYWHERE, "missing", 1.0, 1.0),
+                    ),
+                ),
+            ),
+            biomes = original.biomes.copy(
+                biomes = original.biomes.biomes.mapIndexed { index, biome ->
+                    if (index == 0) biome.copy(surface = biome.surface.copy(rules = listOf(surfaceRule))) else biome
+                },
+            ),
+        )
+
+        val diagnostics = WorldsmithPackValidator.validate(pack)
+
+        assertEquals(2, diagnostics.count { it.code == "UNKNOWN_ANCHOR" })
+        assertTrue(diagnostics.none { it.code == "ANCHOR_HAS_NO_EFFECT" })
     }
 
     @Test

@@ -260,7 +260,8 @@ object BiomePlanValidator {
             conditions.water == null &&
             conditions.temperature == null &&
             conditions.noise == null &&
-            conditions.hydrology == null
+            conditions.hydrology == null &&
+            conditions.anchor == null
         ) {
             add(error(path, "EMPTY_SURFACE_CONDITIONS", "A surface override must declare at least one condition"))
         }

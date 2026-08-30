@@ -250,6 +250,20 @@ final class WorldsmithTerrainSamplingTest {
 		assertTrue(gap < lower / 2.0, () -> "the sky between layers should stay open, was " + gap);
 	}
 
+	@Test
+	void anAnchorBoundBandStaysInsideTheLandmark() {
+		Anchor anchor = new Anchor("sky_focus", new AnchorPlacement.Fixed(0, 0), 700, 0.0, 1.0);
+		TerrainBand band = new TerrainBand(
+			0.45, 180, 240, BandEffect.ADD, BandRegion.ANYWHERE, "sky_focus", 1.4, 1.0
+		);
+		RandomState focused = state(anchoredBandShape(anchor, band), '1');
+
+		double near = localBandSolidShare(focused, 180, 240, 0, 0, 450, 2_000);
+		double far = localBandSolidShare(focused, 180, 240, 3_000, 0, 450, 2_000);
+
+		assertTrue(near > far + 0.08, () -> "anchor-bound band leaked: near=" + near + ", far=" + far);
+	}
+
 	/**
 	 * Noise says "this kind of thing, everywhere, in this proportion". An anchor
 	 * says "here". The test for that is not that a mountain exists but that it
@@ -424,6 +438,44 @@ final class WorldsmithTerrainSamplingTest {
 			List.of(bands),
 			List.of()
 		);
+	}
+
+	private static TerrainShape.Procedural anchoredBandShape(Anchor anchor, TerrainBand band) {
+		TerrainShape.Procedural flat = shape(0.82, 1.0, 0.3, 0.9, 0.08, 0.02, 0.6, 0.0);
+		return new TerrainShape.Procedural(
+			flat.getLandRatio(),
+			flat.getContinentScale(),
+			flat.getCoastRoughness(),
+			flat.getRelief(),
+			flat.getVerticalScale(),
+			flat.getCaveDensity(),
+			flat.getHydrology(),
+			List.of(band),
+			List.of(anchor)
+		);
+	}
+
+	private static double localBandSolidShare(
+		RandomState state,
+		int minY,
+		int maxY,
+		int centreX,
+		int centreZ,
+		int radius,
+		int samples
+	) {
+		DensityFunction density = state.router().finalDensity();
+		Random random = new Random(0xA11C0FL + centreX);
+		int solid = 0;
+		for (int sample = 0; sample < samples; sample++) {
+			int x = centreX + random.nextInt(-radius, radius + 1);
+			int y = random.nextInt(minY, maxY + 1);
+			int z = centreZ + random.nextInt(-radius, radius + 1);
+			if (density.compute(new DensityFunction.SinglePointContext(x, y, z)) > 0.0) {
+				solid++;
+			}
+		}
+		return (double)solid / samples;
 	}
 
 	/**

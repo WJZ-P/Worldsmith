@@ -37,6 +37,8 @@ final class WorldsmithTestBootstrap {
 			bindValue.setAccessible(true);
 			bind(materialConditions, Registries.MATERIAL_CONDITION, "hydrology",
 				WorldsmithHydrologyConditionSource.CODEC, bindValue);
+			bind(materialConditions, Registries.MATERIAL_CONDITION, "anchor",
+				WorldsmithAnchorConditionSource.CODEC, bindValue);
 			bind(densityFunctions, Registries.DENSITY_FUNCTION_TYPE, "anchor_point",
 				WorldsmithAnchorFields.Point.CODEC.codec(), bindValue);
 			bind(densityFunctions, Registries.DENSITY_FUNCTION_TYPE, "anchor_grid",
