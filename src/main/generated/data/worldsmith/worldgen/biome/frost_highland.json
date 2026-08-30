@@ -4,11 +4,7 @@
     "minecraft:visual/fog_end_distance": 96.0,
     "minecraft:visual/sky_color": "#93968a"
   },
-  "carvers": [
-    "minecraft:cave",
-    "minecraft:cave_extra_underground",
-    "minecraft:canyon"
-  ],
+  "carvers": [],
   "downfall": 0.4,
   "effects": {
     "foliage_color": "#696b5c",

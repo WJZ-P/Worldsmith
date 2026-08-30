@@ -7,11 +7,7 @@
     "minecraft:visual/water_fog_end_distance": 72.0,
     "minecraft:visual/water_fog_start_distance": -8.0
   },
-  "carvers": [
-    "minecraft:cave",
-    "minecraft:cave_extra_underground",
-    "minecraft:canyon"
-  ],
+  "carvers": [],
   "downfall": 0.5,
   "effects": {
     "foliage_color": "#5e5947",
