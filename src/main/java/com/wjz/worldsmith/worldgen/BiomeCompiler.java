@@ -4,6 +4,9 @@ import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.AmbientParticleSpec;
 import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeEnvironment;
+import com.wjz.worldsmith.core.model.BiomeFog;
+import com.wjz.worldsmith.core.model.BiomeLight;
+import com.wjz.worldsmith.core.model.BiomeSky;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WaterFog;
@@ -102,22 +105,15 @@ public final class BiomeCompiler {
 			.downfall(definition.getBehavior().getDownfall())
 			.specialEffects(
 				new BiomeSpecialEffects.Builder()
-					.waterColor(rgb(environment.getWaterColor()))
-					.grassColorOverride(rgb(environment.getGrassColor()))
-					.foliageColorOverride(rgb(environment.getFoliageColor()))
+					.waterColor(rgb(environment.getTint().getWater()))
+					.grassColorOverride(rgb(environment.getTint().getGrass()))
+					.foliageColorOverride(rgb(environment.getTint().getFoliage()))
 					.build()
-			)
-			.setAttribute(EnvironmentAttributes.SKY_COLOR, rgb(environment.getSkyColor()))
-			.setAttribute(EnvironmentAttributes.FOG_COLOR, rgb(environment.getFogColor()))
-			.setAttribute(EnvironmentAttributes.FOG_END_DISTANCE, environment.getFogEndDistance());
+			);
 
-		WaterFog waterFog = environment.getWaterFog();
-		if (waterFog != null) {
-			builder = builder
-				.setAttribute(EnvironmentAttributes.WATER_FOG_COLOR, rgb(waterFog.getColor()))
-				.setAttribute(EnvironmentAttributes.WATER_FOG_START_DISTANCE, waterFog.getStartDistance())
-				.setAttribute(EnvironmentAttributes.WATER_FOG_END_DISTANCE, waterFog.getEndDistance());
-		}
+		builder = fog(builder, environment.getFog());
+		builder = sky(builder, environment.getSky());
+		builder = light(builder, environment.getLight());
 
 		List<AmbientParticle> particles = particles(definition, environment);
 		if (!particles.isEmpty()) {
@@ -128,6 +124,71 @@ public final class BiomeCompiler {
 			.mobSpawnSettings(mobs.build())
 			.generationSettings(generation.build())
 			.build();
+	}
+
+	private static Biome.BiomeBuilder fog(Biome.BiomeBuilder builder, BiomeFog fog) {
+		builder = builder
+			.setAttribute(EnvironmentAttributes.FOG_COLOR, rgb(fog.getColor()))
+			.setAttribute(EnvironmentAttributes.FOG_START_DISTANCE, fog.getStartDistance())
+			.setAttribute(EnvironmentAttributes.FOG_END_DISTANCE, fog.getEndDistance());
+		if (fog.getSkyEndDistance() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.SKY_FOG_END_DISTANCE, fog.getSkyEndDistance());
+		}
+		if (fog.getCloudEndDistance() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.CLOUD_FOG_END_DISTANCE, fog.getCloudEndDistance());
+		}
+
+		WaterFog water = fog.getWater();
+		if (water != null) {
+			builder = builder
+				.setAttribute(EnvironmentAttributes.WATER_FOG_COLOR, rgb(water.getColor()))
+				.setAttribute(EnvironmentAttributes.WATER_FOG_START_DISTANCE, water.getStartDistance())
+				.setAttribute(EnvironmentAttributes.WATER_FOG_END_DISTANCE, water.getEndDistance());
+		}
+		return builder;
+	}
+
+	private static Biome.BiomeBuilder sky(Biome.BiomeBuilder builder, BiomeSky sky) {
+		builder = builder.setAttribute(EnvironmentAttributes.SKY_COLOR, rgb(sky.getColor()));
+		if (sky.getCloudColor() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.CLOUD_COLOR, argb(sky.getCloudColor()));
+		}
+		if (sky.getCloudHeight() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.CLOUD_HEIGHT, sky.getCloudHeight());
+		}
+		if (sky.getSunriseSunsetColor() != null) {
+			builder = builder.setAttribute(
+				EnvironmentAttributes.SUNRISE_SUNSET_COLOR,
+				argb(sky.getSunriseSunsetColor())
+			);
+		}
+		if (sky.getStarBrightness() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.STAR_BRIGHTNESS, sky.getStarBrightness());
+		}
+		return builder;
+	}
+
+	/**
+	 * Light is left entirely to Minecraft unless a pack asks otherwise.
+	 *
+	 * <p>Every field here has a sensible vanilla default, and overriding one
+	 * changes how every block in the biome reads, so silence is the right
+	 * default rather than writing the vanilla value back.
+	 */
+	private static Biome.BiomeBuilder light(Biome.BiomeBuilder builder, BiomeLight light) {
+		if (light.getSkyColor() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.SKY_LIGHT_COLOR, rgb(light.getSkyColor()));
+		}
+		if (light.getAmbientColor() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.AMBIENT_LIGHT_COLOR, rgb(light.getAmbientColor()));
+		}
+		if (light.getBlockTint() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.BLOCK_LIGHT_TINT, rgb(light.getBlockTint()));
+		}
+		if (light.getSkyFactor() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.SKY_LIGHT_FACTOR, light.getSkyFactor());
+		}
+		return builder;
 	}
 
 	/**
@@ -159,5 +220,13 @@ public final class BiomeCompiler {
 	 */
 	private static int rgb(String hex) {
 		return Integer.parseInt(hex.substring(1), 16);
+	}
+
+	/**
+	 * Parses {@code #AARRGGBB}. Alpha puts the value past Integer.MAX_VALUE, so
+	 * it is read as a long first and then narrowed; parseInt would reject it.
+	 */
+	private static int argb(String hex) {
+		return (int) Long.parseLong(hex.substring(1), 16);
 	}
 }

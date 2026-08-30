@@ -160,6 +160,72 @@ data class WaterFog(
     val endDistance: Float,
 )
 
+/**
+ * Colours Minecraft applies to blocks rather than to the air.
+ *
+ * <p>These are the only part of a biome's look that is not an environment
+ * attribute: they become `BiomeSpecialEffects` overrides, so they neither
+ * interpolate across a border nor respond to weather.
+ */
+@Serializable
+data class BiomeTint(
+    val grass: String,
+    val foliage: String,
+    val water: String,
+)
+
+/**
+ * How far the player can see, and in what colour.
+ *
+ * <p>[skyEndDistance] and [cloudEndDistance] are separate on purpose: a world
+ * can be clear at ground level and still have a sky that fades to nothing.
+ */
+@Serializable
+data class BiomeFog(
+    val color: String,
+    val startDistance: Float = 0.0f,
+    val endDistance: Float = DEFAULT_END_DISTANCE,
+    val skyEndDistance: Float? = null,
+    val cloudEndDistance: Float? = null,
+    val water: WaterFog? = null,
+) {
+    companion object {
+        const val DEFAULT_END_DISTANCE: Float = 192.0f
+    }
+}
+
+/**
+ * What is overhead.
+ *
+ * <p>Cloud and sunrise colours carry alpha, so they are `#AARRGGBB` while every
+ * other colour in a pack is `#RRGGBB`. A fully transparent cloud colour is how
+ * a world gets no clouds at all.
+ */
+@Serializable
+data class BiomeSky(
+    val color: String,
+    val cloudColor: String? = null,
+    val cloudHeight: Float? = null,
+    val sunriseSunsetColor: String? = null,
+    val starBrightness: Float? = null,
+)
+
+/**
+ * The colour and strength of light itself.
+ *
+ * <p>This group is what makes a place feel wrong rather than merely look
+ * different: [blockTint] recolours torchlight, [skyFactor] decides how much of
+ * the sky's light actually arrives, and [ambientColor] sets the floor that
+ * unlit corners never fall below.
+ */
+@Serializable
+data class BiomeLight(
+    val skyColor: String? = null,
+    val ambientColor: String? = null,
+    val blockTint: String? = null,
+    val skyFactor: Float? = null,
+)
+
 @Serializable
 data class AmbientParticleSpec(
     val particle: String,
@@ -169,26 +235,23 @@ data class AmbientParticleSpec(
 /**
  * How a biome looks.
  *
- * <p>These fields land in two different places in Minecraft: the grass, foliage
- * and water colours become `BiomeSpecialEffects` overrides, while everything
- * fog, particle and sky related becomes an environment attribute. Authors do not
- * need to care, but the compiler does.
+ * <p>Grouped by what a person would change together rather than by where the
+ * value lands in Minecraft. [tint] becomes `BiomeSpecialEffects`; everything
+ * else becomes an environment attribute, which means it interpolates across
+ * biome borders and stacks with the day-night and weather layers instead of
+ * replacing them.
+ *
+ * <p>Every optional field left null keeps Minecraft's own value, so a pack only
+ * describes what it wants to be different.
  */
 @Serializable
 data class BiomeEnvironment(
-    val grassColor: String,
-    val foliageColor: String,
-    val waterColor: String,
-    val skyColor: String,
-    val fogColor: String,
-    val fogEndDistance: Float = DEFAULT_FOG_END_DISTANCE,
-    val waterFog: WaterFog? = null,
+    val tint: BiomeTint,
+    val fog: BiomeFog,
+    val sky: BiomeSky,
+    val light: BiomeLight = BiomeLight(),
     val ambientParticles: List<AmbientParticleSpec> = emptyList(),
-) {
-    companion object {
-        const val DEFAULT_FOG_END_DISTANCE: Float = 192.0f
-    }
-}
+)
 
 /**
  * Adjustments to the tag set the archetype already implies.

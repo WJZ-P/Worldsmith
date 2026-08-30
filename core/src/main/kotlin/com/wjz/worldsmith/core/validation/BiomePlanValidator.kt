@@ -3,7 +3,12 @@ package com.wjz.worldsmith.core.validation
 import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.feature.VegetationBudget
 import com.wjz.worldsmith.core.model.BiomeDefinition
+import com.wjz.worldsmith.core.model.AmbientParticleSpec
 import com.wjz.worldsmith.core.model.BiomeEnvironment
+import com.wjz.worldsmith.core.model.BiomeFog
+import com.wjz.worldsmith.core.model.BiomeLight
+import com.wjz.worldsmith.core.model.BiomeSky
+import com.wjz.worldsmith.core.model.BiomeTint
 import com.wjz.worldsmith.core.model.BiomePlan
 import com.wjz.worldsmith.core.model.ClimateBands
 import com.wjz.worldsmith.core.model.ClimateBox
@@ -23,9 +28,12 @@ import com.wjz.worldsmith.core.model.SurfaceStack
 object BiomePlanValidator {
     private val ID = Regex("^[a-z0-9_.-]+$")
     private val HEX_COLOR = Regex("^#[0-9A-Fa-f]{6}$")
+    private val ARGB_COLOR = Regex("^#[0-9A-Fa-f]{8}$")
     private val RESOURCE_ID = Regex("^[a-z0-9_.-]+:[a-z0-9/._-]+$")
     private const val MIN_FOG_END_DISTANCE = 16.0f
     private const val MAX_FOG_END_DISTANCE = 4096.0f
+    private const val MIN_CLOUD_HEIGHT = -64.0f
+    private const val MAX_CLOUD_HEIGHT = 1024.0f
 
     fun validate(plan: BiomePlan, features: FeatureLibrary): List<Diagnostic> = buildList {
         if (plan.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
@@ -138,65 +146,88 @@ object BiomePlanValidator {
     }
 
     private fun validateEnvironment(path: String, environment: BiomeEnvironment): List<Diagnostic> = buildList {
-        listOf(
-            "grassColor" to environment.grassColor,
-            "foliageColor" to environment.foliageColor,
-            "waterColor" to environment.waterColor,
-            "skyColor" to environment.skyColor,
-            "fogColor" to environment.fogColor,
-        ).forEach { (field, value) ->
-            if (!HEX_COLOR.matches(value)) {
-                add(error(path + "." + field, "INVALID_COLOR", "Color must be #RRGGBB but was " + value))
-            }
-        }
-        if (environment.fogEndDistance !in MIN_FOG_END_DISTANCE..MAX_FOG_END_DISTANCE) {
-            add(
-                error(
-                    path + ".fogEndDistance",
-                    "FOG_DISTANCE_OUT_OF_RANGE",
-                    "Fog end distance must be between " + MIN_FOG_END_DISTANCE + " and " + MAX_FOG_END_DISTANCE,
-                ),
-            )
-        }
+        addAll(validateTint("$path.tint", environment.tint))
+        addAll(validateFog("$path.fog", environment.fog))
+        addAll(validateSky("$path.sky", environment.sky))
+        addAll(validateLight("$path.light", environment.light))
+        addAll(validateParticles("$path.ambientParticles", environment.ambientParticles))
+    }
 
-        environment.waterFog?.let { fog ->
-            if (!HEX_COLOR.matches(fog.color)) {
-                add(error(path + ".waterFog.color", "INVALID_COLOR", "Color must be #RRGGBB but was " + fog.color))
-            }
-            if (fog.endDistance <= 0.0f || fog.endDistance > MAX_FOG_END_DISTANCE) {
-                add(
-                    error(
-                        path + ".waterFog.endDistance",
-                        "FOG_DISTANCE_OUT_OF_RANGE",
-                        "Water fog must end within 0 and " + MAX_FOG_END_DISTANCE,
-                    ),
-                )
-            }
-            if (fog.startDistance > fog.endDistance) {
-                add(error(path + ".waterFog", "REVERSED_RANGE", "Water fog must not start after it ends"))
+    private fun validateTint(path: String, tint: BiomeTint): List<Diagnostic> = buildList {
+        addAll(rgb("$path.grass", tint.grass))
+        addAll(rgb("$path.foliage", tint.foliage))
+        addAll(rgb("$path.water", tint.water))
+    }
+
+    private fun validateFog(path: String, fog: BiomeFog): List<Diagnostic> = buildList {
+        addAll(rgb("$path.color", fog.color))
+        if (fog.endDistance !in MIN_FOG_END_DISTANCE..MAX_FOG_END_DISTANCE) {
+            add(error("$path.endDistance", "FOG_DISTANCE_OUT_OF_RANGE", "Fog must end between $MIN_FOG_END_DISTANCE and $MAX_FOG_END_DISTANCE"))
+        }
+        if (fog.startDistance > fog.endDistance) {
+            add(error(path, "REVERSED_RANGE", "Fog must not start after it ends"))
+        }
+        listOf("skyEndDistance" to fog.skyEndDistance, "cloudEndDistance" to fog.cloudEndDistance).forEach { (field, value) ->
+            if (value != null && value !in 0.0f..MAX_FOG_END_DISTANCE) {
+                add(error("$path.$field", "FOG_DISTANCE_OUT_OF_RANGE", "Fog distance must be between 0 and $MAX_FOG_END_DISTANCE"))
             }
         }
+        fog.water?.let { water ->
+            addAll(rgb("$path.water.color", water.color))
+            if (water.endDistance <= 0.0f || water.endDistance > MAX_FOG_END_DISTANCE) {
+                add(error("$path.water.endDistance", "FOG_DISTANCE_OUT_OF_RANGE", "Water fog must end within 0 and $MAX_FOG_END_DISTANCE"))
+            }
+            if (water.startDistance > water.endDistance) {
+                add(error("$path.water", "REVERSED_RANGE", "Water fog must not start after it ends"))
+            }
+        }
+    }
 
-        environment.ambientParticles.forEachIndexed { index, particle ->
-            val particlePath = path + ".ambientParticles[" + index + "]"
+    private fun validateSky(path: String, sky: BiomeSky): List<Diagnostic> = buildList {
+        addAll(rgb("$path.color", sky.color))
+        addAll(argb("$path.cloudColor", sky.cloudColor))
+        addAll(argb("$path.sunriseSunsetColor", sky.sunriseSunsetColor))
+        addAll(unit("$path.starBrightness", sky.starBrightness))
+        val height = sky.cloudHeight
+        if (height != null && height !in MIN_CLOUD_HEIGHT..MAX_CLOUD_HEIGHT) {
+            add(error("$path.cloudHeight", "CLOUD_HEIGHT_OUT_OF_RANGE", "Cloud height must be between $MIN_CLOUD_HEIGHT and $MAX_CLOUD_HEIGHT"))
+        }
+    }
+
+    private fun validateLight(path: String, light: BiomeLight): List<Diagnostic> = buildList {
+        addAll(rgb("$path.skyColor", light.skyColor))
+        addAll(rgb("$path.ambientColor", light.ambientColor))
+        addAll(rgb("$path.blockTint", light.blockTint))
+        addAll(unit("$path.skyFactor", light.skyFactor))
+    }
+
+    private fun validateParticles(path: String, particles: List<AmbientParticleSpec>): List<Diagnostic> = buildList {
+        particles.forEachIndexed { index, particle ->
+            val particlePath = "$path[$index]"
             if (!RESOURCE_ID.matches(particle.particle)) {
-                add(
-                    error(
-                        particlePath + ".particle",
-                        "INVALID_PARTICLE_ID",
-                        "Particle must be a namespaced id but was " + particle.particle,
-                    ),
-                )
+                add(error("$particlePath.particle", "INVALID_PARTICLE_ID", "Particle must be a namespaced id but was " + particle.particle))
             }
-            if (particle.probability !in 0.0f..1.0f) {
-                add(
-                    error(
-                        particlePath + ".probability",
-                        "PROBABILITY_OUT_OF_RANGE",
-                        "Particle probability must be between 0 and 1",
-                    ),
-                )
-            }
+            addAll(unit("$particlePath.probability", particle.probability))
+        }
+    }
+
+    private fun rgb(path: String, value: String?): List<Diagnostic> = buildList {
+        if (value != null && !HEX_COLOR.matches(value)) {
+            add(error(path, "INVALID_COLOR", "Color must be #RRGGBB but was $value"))
+        }
+    }
+
+    /** Cloud and sunrise colours carry alpha, which is what lets a sky have no clouds. */
+    private fun argb(path: String, value: String?): List<Diagnostic> = buildList {
+        if (value != null && !ARGB_COLOR.matches(value)) {
+            add(error(path, "INVALID_COLOR", "Color must be #AARRGGBB but was $value"))
+        }
+    }
+
+    /** Minecraft clamps these to 0..1 silently, so a pack out of range is a typo worth reporting. */
+    private fun unit(path: String, value: Float?): List<Diagnostic> = buildList {
+        if (value != null && value !in 0.0f..1.0f) {
+            add(error(path, "UNIT_RANGE_OUT_OF_BOUNDS", "Value must be between 0 and 1 but was $value"))
         }
     }
 

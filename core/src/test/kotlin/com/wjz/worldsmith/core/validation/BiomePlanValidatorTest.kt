@@ -4,6 +4,9 @@ import com.wjz.worldsmith.core.model.BiomeArchetypeRole
 import com.wjz.worldsmith.core.model.BiomeBehavior
 import com.wjz.worldsmith.core.model.BiomeDefinition
 import com.wjz.worldsmith.core.model.BiomeEnvironment
+import com.wjz.worldsmith.core.model.BiomeFog
+import com.wjz.worldsmith.core.model.BiomeSky
+import com.wjz.worldsmith.core.model.BiomeTint
 import com.wjz.worldsmith.core.model.BiomeFeatureRef
 import com.wjz.worldsmith.core.model.BiomePlan
 import com.wjz.worldsmith.core.model.ClimateBox
@@ -143,8 +146,15 @@ class BiomePlanValidatorTest {
                     if (biome.id == "abyss") {
                         biome.copy(
                             environment = biome.environment.copy(
-                                skyColor = "8C7A63",
-                                waterFog = WaterFog("#090C0D", 40.0f, 10.0f),
+                                sky = biome.environment.sky.copy(
+                                    color = "8C7A63",
+                                    cloudColor = "#C0A090",
+                                    starBrightness = 1.4f,
+                                ),
+                                fog = biome.environment.fog.copy(
+                                    water = WaterFog("#090C0D", 40.0f, 10.0f),
+                                ),
+                                light = biome.environment.light.copy(skyFactor = -0.2f),
                             ),
                         )
                     } else {
@@ -156,8 +166,12 @@ class BiomePlanValidatorTest {
 
         val codes = BiomePlanValidator.validate(broken, library()).map { it.code }
 
-        assertTrue("INVALID_COLOR" in codes)
+        assertTrue("INVALID_COLOR" in codes, "a six-digit sky colour missing its hash is rejected")
         assertTrue("REVERSED_RANGE" in codes)
+        // Cloud colour carries alpha, so a plain #RRGGBB is wrong there even
+        // though the same string is valid everywhere else.
+        assertEquals(2, codes.count { it == "INVALID_COLOR" })
+        assertEquals(2, codes.count { it == "UNIT_RANGE_OUT_OF_BOUNDS" })
     }
 
     @Test
@@ -237,11 +251,9 @@ class BiomePlanValidatorTest {
             rules = emptyList(),
         ),
         environment = BiomeEnvironment(
-            grassColor = "#7A6C55",
-            foliageColor = "#6B5F49",
-            waterColor = "#4A5340",
-            skyColor = "#8C7A63",
-            fogColor = "#9C8A73",
+            tint = BiomeTint(grass = "#7A6C55", foliage = "#6B5F49", water = "#4A5340"),
+            fog = BiomeFog(color = "#9C8A73"),
+            sky = BiomeSky(color = "#8C7A63"),
         ),
     )
 

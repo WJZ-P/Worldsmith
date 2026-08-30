@@ -123,17 +123,35 @@
         ]
       },
       "environment": {
-        "grassColor": "#5A5647",
-        "foliageColor": "#4E4B3E",
-        "waterColor": "#2E3A34",
-        "skyColor": "#6B6152",
-        "fogColor": "#5C5648",
-        "fogEndDistance": 72.0,
-        "waterFog": {
-          "color": "#090C0D",
-          "startDistance": -8.0,
-          "endDistance": 24.0
-        }
+        "tint": {
+          "grass": "#5A5647",
+          "foliage": "#4E4B3E",
+          "water": "#2E3A34"
+        },
+        "fog": {
+          "color": "#5C5648",
+          "startDistance": 13.0,
+          "endDistance": 72.0,
+          "skyEndDistance": 180.0,
+          "water": {
+            "color": "#090C0D",
+            "startDistance": -8.0,
+            "endDistance": 24.0
+          }
+        },
+        "sky": {
+          "color": "#6B6152",
+          "cloudColor": "#C04A453A",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#907B705E",
+          "starBrightness": 0.15
+        },
+        "light": {
+          "blockTint": "#F0DFC4",
+          "ambientColor": "#141310",
+          "skyFactor": 0.73
+        },
+        "ambientParticles": []
       }
     },
     {
@@ -261,17 +279,35 @@
         ]
       },
       "environment": {
-        "grassColor": "#6E7568",
-        "foliageColor": "#5F6659",
-        "waterColor": "#33474A",
-        "skyColor": "#8E9791",
-        "fogColor": "#7E8781",
-        "fogEndDistance": 96.0,
-        "waterFog": {
-          "color": "#0E1A1E",
-          "startDistance": -8.0,
-          "endDistance": 48.0
-        }
+        "tint": {
+          "grass": "#6E7568",
+          "foliage": "#5F6659",
+          "water": "#33474A"
+        },
+        "fog": {
+          "color": "#7E8781",
+          "startDistance": 17.3,
+          "endDistance": 96.0,
+          "skyEndDistance": 240.0,
+          "water": {
+            "color": "#0E1A1E",
+            "startDistance": -8.0,
+            "endDistance": 48.0
+          }
+        },
+        "sky": {
+          "color": "#8E9791",
+          "cloudColor": "#C0656C67",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90A3AEA7",
+          "starBrightness": 0.15
+        },
+        "light": {
+          "blockTint": "#D6E2E8",
+          "ambientColor": "#1C1E1C",
+          "skyFactor": 0.79
+        },
+        "ambientParticles": []
       }
     },
     {
@@ -400,17 +436,35 @@
         ]
       },
       "environment": {
-        "grassColor": "#6A6551",
-        "foliageColor": "#5E5947",
-        "waterColor": "#3A4239",
-        "skyColor": "#7A6E5C",
-        "fogColor": "#6E6656",
-        "fogEndDistance": 112.0,
-        "waterFog": {
-          "color": "#1B241F",
-          "startDistance": -8.0,
-          "endDistance": 72.0
-        }
+        "tint": {
+          "grass": "#6A6551",
+          "foliage": "#5E5947",
+          "water": "#3A4239"
+        },
+        "fog": {
+          "color": "#6E6656",
+          "startDistance": 20.2,
+          "endDistance": 112.0,
+          "skyEndDistance": 280.0,
+          "water": {
+            "color": "#1B241F",
+            "startDistance": -8.0,
+            "endDistance": 72.0
+          }
+        },
+        "sky": {
+          "color": "#7A6E5C",
+          "cloudColor": "#C0585245",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#908C7E6A",
+          "starBrightness": 0.15
+        },
+        "light": {
+          "blockTint": "#F0DFC4",
+          "ambientColor": "#181613",
+          "skyFactor": 0.83
+        },
+        "ambientParticles": []
       }
     },
     {
@@ -534,12 +588,30 @@
         ]
       },
       "environment": {
-        "grassColor": "#9A9382",
-        "foliageColor": "#8B8474",
-        "waterColor": "#43503F",
-        "skyColor": "#A79C86",
-        "fogColor": "#9C9280",
-        "fogEndDistance": 144.0
+        "tint": {
+          "grass": "#9A9382",
+          "foliage": "#8B8474",
+          "water": "#43503F"
+        },
+        "fog": {
+          "color": "#9C9280",
+          "startDistance": 25.9,
+          "endDistance": 144.0,
+          "skyEndDistance": 360.0
+        },
+        "sky": {
+          "color": "#A79C86",
+          "cloudColor": "#C07D7566",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90C0B39A",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#F0DFC4",
+          "ambientColor": "#22201C",
+          "skyFactor": 0.91
+        },
+        "ambientParticles": []
       },
       "features": [
         {
@@ -669,12 +741,30 @@
         ]
       },
       "environment": {
-        "grassColor": "#7A6C55",
-        "foliageColor": "#6B5F49",
-        "waterColor": "#3A4239",
-        "skyColor": "#8C7A63",
-        "fogColor": "#877B67",
-        "fogEndDistance": 128.0
+        "tint": {
+          "grass": "#7A6C55",
+          "foliage": "#6B5F49",
+          "water": "#3A4239"
+        },
+        "fog": {
+          "color": "#877B67",
+          "startDistance": 23.0,
+          "endDistance": 128.0,
+          "skyEndDistance": 320.0
+        },
+        "sky": {
+          "color": "#8C7A63",
+          "cloudColor": "#C06C6252",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90A18C72",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#F0DFC4",
+          "ambientColor": "#1E1B17",
+          "skyFactor": 0.87
+        },
+        "ambientParticles": []
       },
       "features": [
         {
@@ -868,12 +958,29 @@
         ]
       },
       "environment": {
-        "grassColor": "#8C978F",
-        "foliageColor": "#7C877F",
-        "waterColor": "#3B4E52",
-        "skyColor": "#A3AFAA",
-        "fogColor": "#94A09B",
-        "fogEndDistance": 80.0,
+        "tint": {
+          "grass": "#8C978F",
+          "foliage": "#7C877F",
+          "water": "#3B4E52"
+        },
+        "fog": {
+          "color": "#94A09B",
+          "startDistance": 14.4,
+          "endDistance": 80.0,
+          "skyEndDistance": 200.0
+        },
+        "sky": {
+          "color": "#A3AFAA",
+          "cloudColor": "#C076807C",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90BBC9C3",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#D6E2E8",
+          "ambientColor": "#212322",
+          "skyFactor": 0.75
+        },
         "ambientParticles": [
           {
             "particle": "minecraft:white_ash",
@@ -1074,12 +1181,29 @@
         ]
       },
       "environment": {
-        "grassColor": "#6E6656",
-        "foliageColor": "#5F594B",
-        "waterColor": "#39423B",
-        "skyColor": "#8A7B68",
-        "fogColor": "#7C7263",
-        "fogEndDistance": 64.0,
+        "tint": {
+          "grass": "#6E6656",
+          "foliage": "#5F594B",
+          "water": "#39423B"
+        },
+        "fog": {
+          "color": "#7C7263",
+          "startDistance": 11.5,
+          "endDistance": 64.0,
+          "skyEndDistance": 160.0
+        },
+        "sky": {
+          "color": "#8A7B68",
+          "cloudColor": "#C0635B4F",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#909F8D78",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#F0DFC4",
+          "ambientColor": "#1B1916",
+          "skyFactor": 0.71
+        },
         "ambientParticles": [
           {
             "particle": "minecraft:white_ash",
@@ -1239,12 +1363,30 @@
         ]
       },
       "environment": {
-        "grassColor": "#787A6A",
-        "foliageColor": "#696B5C",
-        "waterColor": "#3E4C4A",
-        "skyColor": "#93968A",
-        "fogColor": "#85887C",
-        "fogEndDistance": 96.0
+        "tint": {
+          "grass": "#787A6A",
+          "foliage": "#696B5C",
+          "water": "#3E4C4A"
+        },
+        "fog": {
+          "color": "#85887C",
+          "startDistance": 17.3,
+          "endDistance": 96.0,
+          "skyEndDistance": 240.0
+        },
+        "sky": {
+          "color": "#93968A",
+          "cloudColor": "#C06A6D63",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90A9AC9F",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#D6E2E8",
+          "ambientColor": "#1D1E1B",
+          "skyFactor": 0.79
+        },
+        "ambientParticles": []
       },
       "features": [
         {
@@ -1402,12 +1544,30 @@
         ]
       },
       "environment": {
-        "grassColor": "#7F6F4E",
-        "foliageColor": "#71603F",
-        "waterColor": "#3D453A",
-        "skyColor": "#94765A",
-        "fogColor": "#8A7660",
-        "fogEndDistance": 112.0
+        "tint": {
+          "grass": "#7F6F4E",
+          "foliage": "#71603F",
+          "water": "#3D453A"
+        },
+        "fog": {
+          "color": "#8A7660",
+          "startDistance": 20.2,
+          "endDistance": 112.0,
+          "skyEndDistance": 280.0
+        },
+        "sky": {
+          "color": "#94765A",
+          "cloudColor": "#C06E5E4D",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90AA8867",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#F0DFC4",
+          "ambientColor": "#1E1A15",
+          "skyFactor": 0.83
+        },
+        "ambientParticles": []
       },
       "features": [
         {
@@ -1565,12 +1725,29 @@
         ]
       },
       "environment": {
-        "grassColor": "#8E6A45",
-        "foliageColor": "#7F5D3B",
-        "waterColor": "#48472F",
-        "skyColor": "#A87550",
-        "fogColor": "#9B7154",
-        "fogEndDistance": 72.0,
+        "tint": {
+          "grass": "#8E6A45",
+          "foliage": "#7F5D3B",
+          "water": "#48472F"
+        },
+        "fog": {
+          "color": "#9B7154",
+          "startDistance": 13.0,
+          "endDistance": 72.0,
+          "skyEndDistance": 180.0
+        },
+        "sky": {
+          "color": "#A87550",
+          "cloudColor": "#C07C5A43",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90C1875C",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#FFD9A8",
+          "ambientColor": "#221912",
+          "skyFactor": 0.73
+        },
         "ambientParticles": [
           {
             "particle": "minecraft:ash",
@@ -1749,12 +1926,30 @@
         ]
       },
       "environment": {
-        "grassColor": "#6F6E60",
-        "foliageColor": "#63624F",
-        "waterColor": "#41504C",
-        "skyColor": "#8B8B7C",
-        "fogColor": "#7E7E70",
-        "fogEndDistance": 88.0
+        "tint": {
+          "grass": "#6F6E60",
+          "foliage": "#63624F",
+          "water": "#41504C"
+        },
+        "fog": {
+          "color": "#7E7E70",
+          "startDistance": 15.8,
+          "endDistance": 88.0,
+          "skyEndDistance": 220.0
+        },
+        "sky": {
+          "color": "#8B8B7C",
+          "cloudColor": "#C065655A",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90A0A08F",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#D6E2E8",
+          "ambientColor": "#1C1C19",
+          "skyFactor": 0.77
+        },
+        "ambientParticles": []
       },
       "features": [
         {
@@ -1927,12 +2122,30 @@
         ]
       },
       "environment": {
-        "grassColor": "#5F6B57",
-        "foliageColor": "#54604D",
-        "waterColor": "#3A4A45",
-        "skyColor": "#7E8A7C",
-        "fogColor": "#717D70",
-        "fogEndDistance": 64.0
+        "tint": {
+          "grass": "#5F6B57",
+          "foliage": "#54604D",
+          "water": "#3A4A45"
+        },
+        "fog": {
+          "color": "#717D70",
+          "startDistance": 11.5,
+          "endDistance": 64.0,
+          "skyEndDistance": 160.0
+        },
+        "sky": {
+          "color": "#7E8A7C",
+          "cloudColor": "#C05A645A",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90919F8F",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#D6E2E8",
+          "ambientColor": "#191C19",
+          "skyFactor": 0.71
+        },
+        "ambientParticles": []
       },
       "features": [
         {
@@ -2109,12 +2322,29 @@
         ]
       },
       "environment": {
-        "grassColor": "#7A6C55",
-        "foliageColor": "#6B5F49",
-        "waterColor": "#3D453A",
-        "skyColor": "#8C7A63",
-        "fogColor": "#877B67",
-        "fogEndDistance": 104.0,
+        "tint": {
+          "grass": "#7A6C55",
+          "foliage": "#6B5F49",
+          "water": "#3D453A"
+        },
+        "fog": {
+          "color": "#877B67",
+          "startDistance": 18.7,
+          "endDistance": 104.0,
+          "skyEndDistance": 260.0
+        },
+        "sky": {
+          "color": "#8C7A63",
+          "cloudColor": "#C06C6252",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90A18C72",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#F0DFC4",
+          "ambientColor": "#1E1B17",
+          "skyFactor": 0.81
+        },
         "ambientParticles": [
           {
             "particle": "minecraft:ash",
@@ -2295,12 +2525,30 @@
         ]
       },
       "environment": {
-        "grassColor": "#63603C",
-        "foliageColor": "#565334",
-        "waterColor": "#2B2F22",
-        "skyColor": "#7A7358",
-        "fogColor": "#6D674F",
-        "fogEndDistance": 56.0
+        "tint": {
+          "grass": "#63603C",
+          "foliage": "#565334",
+          "water": "#2B2F22"
+        },
+        "fog": {
+          "color": "#6D674F",
+          "startDistance": 10.1,
+          "endDistance": 56.0,
+          "skyEndDistance": 140.0
+        },
+        "sky": {
+          "color": "#7A7358",
+          "cloudColor": "#C057523F",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#908C8465",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#F0DFC4",
+          "ambientColor": "#181711",
+          "skyFactor": 0.69
+        },
+        "ambientParticles": []
       },
       "features": [
         {
@@ -2477,12 +2725,29 @@
         ]
       },
       "environment": {
-        "grassColor": "#8A6B42",
-        "foliageColor": "#7B5E38",
-        "waterColor": "#4A4A32",
-        "skyColor": "#A8764C",
-        "fogColor": "#9C7B58",
-        "fogEndDistance": 56.0,
+        "tint": {
+          "grass": "#8A6B42",
+          "foliage": "#7B5E38",
+          "water": "#4A4A32"
+        },
+        "fog": {
+          "color": "#9C7B58",
+          "startDistance": 10.1,
+          "endDistance": 56.0,
+          "skyEndDistance": 140.0
+        },
+        "sky": {
+          "color": "#A8764C",
+          "cloudColor": "#C07D6246",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90C18857",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#FFD9A8",
+          "ambientColor": "#221B13",
+          "skyFactor": 0.69
+        },
         "ambientParticles": [
           {
             "particle": "minecraft:ash",
@@ -2666,12 +2931,29 @@
         ]
       },
       "environment": {
-        "grassColor": "#9A8B3E",
-        "foliageColor": "#8A7C37",
-        "waterColor": "#5A5426",
-        "skyColor": "#B0913F",
-        "fogColor": "#A08749",
-        "fogEndDistance": 48.0,
+        "tint": {
+          "grass": "#9A8B3E",
+          "foliage": "#8A7C37",
+          "water": "#5A5426"
+        },
+        "fog": {
+          "color": "#A08749",
+          "startDistance": 8.6,
+          "endDistance": 48.0,
+          "skyEndDistance": 120.0
+        },
+        "sky": {
+          "color": "#B0913F",
+          "cloudColor": "#C0806C3A",
+          "cloudHeight": 168.0,
+          "sunriseSunsetColor": "#90CAA748",
+          "starBrightness": 0.3
+        },
+        "light": {
+          "blockTint": "#FFD9A8",
+          "ambientColor": "#231E10",
+          "skyFactor": 0.67
+        },
         "ambientParticles": [
           {
             "particle": "minecraft:ash",

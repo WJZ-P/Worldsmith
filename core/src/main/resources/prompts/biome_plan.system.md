@@ -62,9 +62,21 @@ overlapping boxes because their tie would make one biome effectively hidden.
 - `behavior.temperature` is the in-world weather, separate from placement. It
   decides snow and freezing. Follow the prompt: a biome placed near the cold
   end may still be a dry, snow-free ash desert.
-- Colours are `#RRGGBB`. Read them as the mood of the place, not as realistic
-  pigment. Vary them: biomes that differ in height or temperature should not
-  resolve to the same palette.
+- Colours are `#RRGGBB`, except `sky.cloudColor` and `sky.sunriseSunsetColor`,
+  which carry alpha and are `#AARRGGBB`. Read them as the mood of the place, not
+  as realistic pigment. Vary them: biomes that differ in height or temperature
+  should not resolve to the same palette.
+- `environment` is grouped by what changes together. `tint` colours blocks;
+  `fog`, `sky` and `light` are environment attributes, which fade across biome
+  borders and stack with day, night and weather rather than replacing them.
+- Every field in `sky` and `light` is optional and every omitted one keeps
+  Minecraft's own value. Say only what should be different: overriding light is
+  what makes a place feel wrong rather than merely look different, so use
+  `light.blockTint` (the colour of torchlight), `light.skyFactor` (how much
+  daylight arrives, 0 to 1) and `light.ambientColor` (the floor unlit corners
+  never fall below) deliberately, not on every biome.
+- Do not restate a vanilla default. A pack that writes the value Minecraft
+  already uses has made the world no different and the document harder to read.
 - Use semantic material roles first; preferred Minecraft IDs are hints only.
 - Build every biome's `surface` as one required `base` stack plus an ordered
   `rules` list. Earlier rules have higher priority; all fields inside one
