@@ -20,10 +20,10 @@ public final class WorldsmithSurfaceRules {
 	private WorldsmithSurfaceRules() {
 	}
 
-	public static SurfaceRules.RuleSource build(HolderGetter<Biome> biomes, MaterialResolver resolver) {
+	public static SurfaceRules.RuleSource build(CompiledPack pack, HolderGetter<Biome> biomes, MaterialResolver resolver) {
 		List<SurfaceRules.RuleSource> perBiome = new ArrayList<>();
 
-		for (CompiledBiome biome : CompiledBiomes.all()) {
+		for (CompiledBiome biome : pack.biomes()) {
 			perBiome.add(SurfaceRules.ifTrue(
 				SurfaceRules.isBiome(biomes, biome.key()),
 				columnFor(biome.definition().getSurface(), resolver)

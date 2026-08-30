@@ -47,8 +47,8 @@ public final class BiomeCompiler {
 	private BiomeCompiler() {
 	}
 
-	public static void bootstrap(BootstrapContext<Biome> context) {
-		for (CompiledBiome biome : CompiledBiomes.all()) {
+	public static void bootstrap(CompiledPack pack, BootstrapContext<Biome> context) {
+		for (CompiledBiome biome : pack.biomes()) {
 			context.register(biome.key(), compile(biome, context));
 		}
 	}

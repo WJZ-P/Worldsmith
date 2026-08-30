@@ -11,12 +11,18 @@ import java.util.stream.Collectors;
 public final class WorldsmithPacks {
 	private static final String BUILTIN_PACK = "worldsmith/packs/ashlands";
 	private static final WorldsmithPack BUILTIN = loadBuiltin();
+	private static final CompiledPack BUILTIN_COMPILED = CompiledPack.of(BUILTIN);
 
 	private WorldsmithPacks() {
 	}
 
 	public static WorldsmithPack builtin() {
 		return BUILTIN;
+	}
+
+	/** The built-in pack compiled once, which is what datagen writes out. */
+	public static CompiledPack builtinCompiled() {
+		return BUILTIN_COMPILED;
 	}
 
 	private static WorldsmithPack loadBuiltin() {

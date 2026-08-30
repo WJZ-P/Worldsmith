@@ -34,14 +34,14 @@ public final class WorldsmithNoiseSettings {
 	private WorldsmithNoiseSettings() {
 	}
 
-	public static void bootstrap(BootstrapContext<NoiseGeneratorSettings> context) {
+	public static void bootstrap(CompiledPack pack, BootstrapContext<NoiseGeneratorSettings> context) {
 		HolderGetter<DensityFunction> functions = context.lookup(Registries.DENSITY_FUNCTION);
 		HolderGetter<NormalNoise.NoiseParameters> noises = context.lookup(Registries.NOISE);
 		HolderGetter<Biome> biomes = context.lookup(Registries.BIOME);
 
-		TerrainPlan terrain = WorldsmithPacks.builtin().getTerrain();
+		TerrainPlan terrain = pack.terrain();
 		MaterialResolver resolver = new MaterialResolver();
-		SurfaceRules.RuleSource surfaceRule = WorldsmithSurfaceRules.build(biomes, resolver);
+		SurfaceRules.RuleSource surfaceRule = WorldsmithSurfaceRules.build(pack, biomes, resolver);
 
 		context.register(WASTELAND, new NoiseGeneratorSettings(
 			NoiseSettings.create(

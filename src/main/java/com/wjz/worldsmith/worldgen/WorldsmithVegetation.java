@@ -67,8 +67,8 @@ public final class WorldsmithVegetation {
 		return ref.getDensity() == null ? placedKey(ref.getFeature()) : placedKey(ref.getFeature(), biome.getId());
 	}
 
-	public static void bootstrapConfigured(BootstrapContext<ConfiguredFeature<?, ?>> context) {
-		FeatureLibrary library = WorldsmithPacks.builtin().getFeatures();
+	public static void bootstrapConfigured(CompiledPack pack, BootstrapContext<ConfiguredFeature<?, ?>> context) {
+		FeatureLibrary library = pack.features();
 		MaterialResolver resolver = new MaterialResolver();
 
 		for (FeatureDefinition feature : library.getFeatures()) {
@@ -77,14 +77,14 @@ public final class WorldsmithVegetation {
 		resolver.report("vegetation");
 	}
 
-	public static void bootstrapPlaced(BootstrapContext<PlacedFeature> context) {
+	public static void bootstrapPlaced(CompiledPack pack, BootstrapContext<PlacedFeature> context) {
 		HolderGetter<ConfiguredFeature<?, ?>> configured = context.lookup(Registries.CONFIGURED_FEATURE);
-		Map<String, FeatureDefinition> library = byId(WorldsmithPacks.builtin().getFeatures());
+		Map<String, FeatureDefinition> library = byId(pack.features());
 
 		// Several biomes may resolve to the same key when they all take the
 		// default density, so collect before registering.
 		Map<ResourceKey<PlacedFeature>, PlacedFeature> placed = new LinkedHashMap<>();
-		for (BiomeDefinition biome : WorldsmithPacks.builtin().getBiomes().getBiomes()) {
+		for (BiomeDefinition biome : pack.definitions()) {
 			for (BiomeFeatureRef ref : biome.getFeatures()) {
 				FeatureDefinition definition = library.get(ref.getFeature());
 				if (definition == null) {

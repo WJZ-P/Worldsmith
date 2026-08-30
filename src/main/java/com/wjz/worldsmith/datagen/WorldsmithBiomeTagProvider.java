@@ -2,7 +2,7 @@ package com.wjz.worldsmith.datagen;
 
 import com.wjz.worldsmith.worldgen.BiomeArchetype;
 import com.wjz.worldsmith.worldgen.CompiledBiome;
-import com.wjz.worldsmith.worldgen.CompiledBiomes;
+import com.wjz.worldsmith.worldgen.WorldsmithPacks;
 import java.util.concurrent.CompletableFuture;
 import net.fabricmc.fabric.api.datagen.v1.FabricPackOutput;
 import net.fabricmc.fabric.api.datagen.v1.provider.FabricTagsProvider;
@@ -26,7 +26,7 @@ public final class WorldsmithBiomeTagProvider extends FabricTagsProvider<Biome> 
 
 	@Override
 	protected void addTags(HolderLookup.Provider registries) {
-		for (CompiledBiome biome : CompiledBiomes.all()) {
+		for (CompiledBiome biome : WorldsmithPacks.builtinCompiled().biomes()) {
 			for (TagKey<Biome> tag : BiomeArchetype.tagsFor(biome)) {
 				tag(tag).add(biome.key());
 			}

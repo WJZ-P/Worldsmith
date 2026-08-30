@@ -7,33 +7,19 @@ import com.wjz.worldsmith.core.model.ClimateBox;
 import com.wjz.worldsmith.core.model.ClimateSlot;
 import com.wjz.worldsmith.core.model.NumericRange;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import net.minecraft.world.level.biome.Climate;
 
-/** Compiles the biome plan inside a Worldsmith pack into Minecraft holders. */
+/**
+ * Compiles the biome plan inside a Worldsmith pack into Minecraft holders.
+ *
+ * <p>Stateless on purpose. The compiled biomes of a pack live in
+ * {@link CompiledPack}, so more than one pack can exist at a time.
+ */
 public final class CompiledBiomes {
-	private static final List<CompiledBiome> ALL = compile(WorldsmithPacks.builtin().getBiomes());
-	private static final Map<String, CompiledBiome> BY_ID =
-		ALL.stream().collect(Collectors.toUnmodifiableMap(CompiledBiome::id, Function.identity()));
-
 	private CompiledBiomes() {
 	}
 
-	public static List<CompiledBiome> all() {
-		return ALL;
-	}
-
-	public static CompiledBiome byId(String id) {
-		CompiledBiome biome = BY_ID.get(id);
-		if (biome == null) {
-			throw new IllegalArgumentException("Unknown biome '" + id + "'");
-		}
-		return biome;
-	}
-
-	private static List<CompiledBiome> compile(BiomePlan plan) {
+	public static List<CompiledBiome> compile(BiomePlan plan) {
 		return plan.getBiomes().stream().map(CompiledBiomes::compile).toList();
 	}
 

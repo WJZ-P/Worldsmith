@@ -38,14 +38,14 @@ public final class WorldsmithWorldPresets {
 	private WorldsmithWorldPresets() {
 	}
 
-	public static void bootstrap(BootstrapContext<WorldPreset> context) {
+	public static void bootstrap(CompiledPack pack, BootstrapContext<WorldPreset> context) {
 		HolderGetter<Biome> biomes = context.lookup(Registries.BIOME);
 		HolderGetter<NoiseGeneratorSettings> noiseSettings = context.lookup(Registries.NOISE_SETTINGS);
 		HolderGetter<DimensionType> dimensionTypes = context.lookup(Registries.DIMENSION_TYPE);
 		HolderGetter<MultiNoiseBiomeSourceParameterList> multiNoisePresets =
 			context.lookup(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST);
 
-		List<Pair<Climate.ParameterPoint, Holder<Biome>>> entries = CompiledBiomes.all().stream()
+		List<Pair<Climate.ParameterPoint, Holder<Biome>>> entries = pack.biomes().stream()
 			.map(biome -> Pair.of(biome.climate(), (Holder<Biome>) biomes.getOrThrow(biome.key())))
 			.toList();
 
