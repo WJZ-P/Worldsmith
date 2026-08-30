@@ -43,3 +43,6 @@ replay_*.log
 
 # local React world-generation atlas
 /test/
+
+# Minecraft log output from running worldgen outside the game
+/logs/
