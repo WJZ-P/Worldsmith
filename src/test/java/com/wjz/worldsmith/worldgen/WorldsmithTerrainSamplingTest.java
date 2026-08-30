@@ -369,6 +369,38 @@ final class WorldsmithTerrainSamplingTest {
 	}
 
 	@Test
+	void skyIslandEdgesDoNotShareOneHorizontalCutPlane() {
+		RandomState floating = state(bandShape(island(0.55, 160, 240, BandRegion.ANYWHERE)), '0');
+		DensityFunction density = floating.router().finalDensity();
+		Set<Integer> lowerEdges = new HashSet<>();
+		int columns = 0;
+
+		for (int z = -3_000; z <= 3_000; z += 64) {
+			for (int x = -3_000; x <= 3_000; x += 64) {
+				if (density.compute(new DensityFunction.SinglePointContext(x, 152, z)) > 0.0
+					|| density.compute(new DensityFunction.SinglePointContext(x, 200, z)) <= 0.0) {
+					continue;
+				}
+				for (int y = 160; y <= 200; y++) {
+					if (density.compute(new DensityFunction.SinglePointContext(x, y, z)) > 0.0) {
+						lowerEdges.add(y);
+						columns++;
+						break;
+					}
+				}
+			}
+		}
+
+		assertTrue(columns > 20, "fixture found only " + columns + " detached island columns");
+		int range = lowerEdges.stream().mapToInt(Integer::intValue).max().orElseThrow()
+			- lowerEdges.stream().mapToInt(Integer::intValue).min().orElseThrow();
+		assertTrue(
+			lowerEdges.size() >= 6 && range >= 8,
+			() -> "island bottoms still share a plane: edges=" + lowerEdges + ", range=" + range
+		);
+	}
+
+	@Test
 	void geometryAloneDoesNotInventABiomeMeaning() {
 		RandomState plain = state(anchorShape(), 'a');
 		RandomState mound = state(

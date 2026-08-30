@@ -42,8 +42,12 @@ public final class WorldsmithNoiseSettings {
 	public static final ResourceKey<NoiseGeneratorSettings> WASTELAND =
 		ResourceKey.create(Registries.NOISE_SETTINGS, Worldsmith.id("wasteland"));
 
-	/** Blocks of vertical fade at each edge of a band. */
-	private static final int BAND_FADE = 12;
+	/** Maximum blocks of vertical fade at each edge of a band. */
+	private static final int BAND_FADE = 24;
+	/** Distorts a band's top and bottom without allowing either to leave its declared height range. */
+	private static final double BAND_EDGE_WARP = 0.75;
+	/** Low-frequency edge shape; divided by band scale so large islands undulate broadly. */
+	private static final double BAND_EDGE_FREQUENCY = 0.18;
 	/** Scales a carving band so the branch that is not carving cannot win a min. */
 	private static final double CARVE_STRENGTH = 8.0;
 	/** Turns the soft continentalness signal into a decisive region boundary. */
@@ -459,14 +463,41 @@ public final class WorldsmithNoiseSettings {
 			return null;
 		}
 
-		// A plateau over the band rather than a peak: full strength through the
-		// middle, fading only near the edges so shapes thin out instead of being
-		// sliced flat. A tent shape here would quietly redefine coverage as
-		// "coverage at one exact height" and produce almost nothing.
+		double shapeScale = Math.max(0.05, band.getScale());
+		// Keep a full-strength middle, but distort the two signed zero surfaces
+		// independently. A flat y-gradient crosses zero at one world-wide height;
+		// min(window, blobs) then exposes that plane on every island. Low-frequency
+		// 2D warp moves each crossing while its bounded amplitude keeps both edges
+		// strictly inside minY..maxY.
 		int fade = Math.min(BAND_FADE, Math.max(1, (band.getMaxY() - band.getMinY()) / 3));
+		double edgeFrequency = BAND_EDGE_FREQUENCY / shapeScale;
+		DensityFunction lowerWarp = DensityFunctions.mul(
+			DensityFunctions.shiftedNoise2d(
+				DensityFunctions.zero(),
+				DensityFunctions.zero(),
+				edgeFrequency,
+				noises.getOrThrow(Noises.SURFACE)
+			).clamp(-1.0, 1.0),
+			DensityFunctions.constant(BAND_EDGE_WARP)
+		);
+		DensityFunction upperWarp = DensityFunctions.mul(
+			DensityFunctions.shiftedNoise2d(
+				DensityFunctions.zero(),
+				DensityFunctions.zero(),
+				edgeFrequency,
+				noises.getOrThrow(Noises.SURFACE_SECONDARY)
+			).clamp(-1.0, 1.0),
+			DensityFunctions.constant(BAND_EDGE_WARP)
+		);
 		DensityFunction window = DensityFunctions.min(
-			DensityFunctions.yClampedGradient(band.getMinY(), band.getMinY() + fade, -1.0, 1.0),
-			DensityFunctions.yClampedGradient(band.getMaxY() - fade, band.getMaxY(), 1.0, -1.0)
+			DensityFunctions.add(
+				DensityFunctions.yClampedGradient(band.getMinY(), band.getMinY() + fade, -1.0, 1.0),
+				lowerWarp
+			),
+			DensityFunctions.add(
+				DensityFunctions.yClampedGradient(band.getMaxY() - fade, band.getMaxY(), 1.0, -1.0),
+				upperWarp
+			)
 		);
 
 		DensityFunction region = regionMask(band.getRegion(), continents);
@@ -492,7 +523,6 @@ public final class WorldsmithNoiseSettings {
 		// Larger shapes mean lower frequency. Thickness squashes the vertical
 		// axis independently, which is the difference between boulders and flat
 		// shards.
-		double shapeScale = Math.max(0.05, band.getScale());
 		double xzFrequency = 1.0 / shapeScale;
 		double yFrequency = xzFrequency / Math.max(0.05, band.getThickness());
 		DensityFunction blobs = DensityFunctions.noise(

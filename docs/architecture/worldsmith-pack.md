@@ -108,6 +108,11 @@ for temperature, humidity, continentalness, erosion and weirdness. This lets a
 mountain raised from ocean bias itself toward inland peak climate, while a small
 ritual mound can change geometry without silently becoming a mountain biome.
 
+Terrain-band `minY` and `maxY` are hard safety bounds, not flat surfaces. Their
+signed top and bottom windows are independently warped by low-frequency noise
+inside those limits before intersecting the three-dimensional blob field, which
+prevents a whole island layer from exposing one shared horizontal cut plane.
+
 ## Placing a biome
 
 A biome says where it generates in one of two ways.

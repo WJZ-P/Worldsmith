@@ -66,7 +66,8 @@ replace `shape` with a `procedural` terrain intent:
     into a continuous layer.
   - `minY` and `maxY` bound it. An `ADD` band below sea level merges into the
     ground and the sea instead of floating over them. Under 24 blocks tall gives
-    slivers rather than shapes.
+    slivers rather than shapes. The compiler warps the top and bottom inside
+    these bounds, so they remain height limits rather than visible cut planes.
   - `region` ties the band to the world's geography: `ANYWHERE`, `OVER_LAND`,
     `OVER_OCEAN`, `INLAND` or `COASTAL`. This is what separates a band that
     looks designed from one that looks scattered - islands only over the
