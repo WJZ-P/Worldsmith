@@ -74,6 +74,28 @@ data class HydrologyIntent(
  * unchanged Mojang router. The closed tagged set also leaves room for future
  * terrain models.
  */
+/**
+ * Land that floats free of the ground.
+ *
+ * Everything else in [TerrainShape.Procedural] describes a height field: for any
+ * column there is one height, solid below and air above, which is why tall
+ * spires and deep caves can imply islands but never actually detach one. This
+ * block is the exception. It adds a second body of rock that is combined with
+ * the ground by union rather than by sum, so a column may pass through air,
+ * stone, air and stone again.
+ *
+ * [coverage] at zero means no islands, which is what almost every world wants
+ * and therefore the default.
+ */
+@Serializable
+data class SkyIntent(
+    val coverage: Double = 0.0,
+    val minY: Int = 160,
+    val maxY: Int = 240,
+    val scale: Double = 1.0,
+    val thickness: Double = 1.0,
+)
+
 @Serializable
 sealed interface TerrainShape {
     /** Borrow a vanilla router unchanged. */
@@ -99,6 +121,7 @@ sealed interface TerrainShape {
         val verticalScale: Double,
         val caveDensity: Double,
         val hydrology: HydrologyIntent,
+        val sky: SkyIntent = SkyIntent(),
     ) : TerrainShape
 }
 

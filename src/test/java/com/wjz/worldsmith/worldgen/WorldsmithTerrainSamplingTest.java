@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.wjz.worldsmith.core.model.HydrologyIntent;
 import com.wjz.worldsmith.core.model.ReliefDistribution;
 import com.wjz.worldsmith.core.model.RiverFill;
+import com.wjz.worldsmith.core.model.SkyIntent;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
@@ -103,6 +104,65 @@ final class WorldsmithTerrainSamplingTest {
 		);
 	}
 
+	/**
+	 * The ground field is a height function, so no combination of the other
+	 * knobs can put stone in the air with nothing beneath it. This is the test
+	 * that separates real islands from tall spires that merely look like them.
+	 */
+	@Test
+	void skyIslandsPutSolidGroundWithNothingBeneathIt() {
+		RandomState grounded = state(skyShape(new SkyIntent()), '0');
+		RandomState floating = state(
+			skyShape(new SkyIntent(0.35, 180, 250, 1.4, 1.0)), '8'
+		);
+
+		int groundedIslands = detachedColumns(grounded, 180, 250, 40);
+		int floatingIslands = detachedColumns(floating, 180, 250, 40);
+
+		assertTrue(
+			groundedIslands == 0,
+			() -> "a height field cannot detach anything, yet found " + groundedIslands
+		);
+		assertTrue(
+			floatingIslands > 10,
+			() -> "sky coverage should float real ground, found " + floatingIslands
+		);
+
+		double groundedFill = bandSolidShare(grounded, 180, 250);
+		double floatingFill = bandSolidShare(floating, 180, 250);
+		assertTrue(
+			floatingFill > groundedFill + 0.10,
+			() -> "the band should gain real volume: grounded=" + groundedFill + ", floating=" + floatingFill
+		);
+	}
+
+	/** Fraction of sampled points inside the band that are solid. */
+	private static double bandSolidShare(RandomState state, int bandMin, int bandMax) {
+		DensityFunction density = state.router().finalDensity();
+		Random random = new Random(0xBA5EL);
+		int solid = 0;
+		int samples = 4_000;
+		for (int i = 0; i < samples; i++) {
+			int x = random.nextInt(-4_000, 4_001);
+			int y = random.nextInt(bandMin, bandMax + 1);
+			int z = random.nextInt(-4_000, 4_001);
+			if (density.compute(new DensityFunction.SinglePointContext(x, y, z)) > 0.0) {
+				solid++;
+			}
+		}
+		return (double) solid / samples;
+	}
+
+	@Test
+	void skyIslandsStayInsideTheirBand() {
+		RandomState floating = state(skyShape(new SkyIntent(0.35, 180, 250, 1.4, 1.0)), '9');
+
+		assertTrue(
+			detachedColumns(floating, 260, 310, 40) == 0,
+			"nothing should float above the band it was given"
+		);
+	}
+
 	@Test
 	void caveDensityChangesHowMuchSolidTerrainIsCarved() {
 		TerrainShape.Procedural solidShape = shape(0.82, 1.0, 0.3, 0.5, 0.35, 0.15, 1.0, 0.0);
@@ -132,8 +192,56 @@ final class WorldsmithTerrainSamplingTest {
 			new ReliefDistribution(flats, highlands, peaks),
 			verticalScale,
 			caveDensity,
-			new HydrologyIntent(0.0, 1.0, 0.8, 0.65, RiverFill.FLUID, 0.0, 1.0, 0.8, 1.0)
+			new HydrologyIntent(0.0, 1.0, 0.8, 0.65, RiverFill.FLUID, 0.0, 1.0, 0.8, 1.0),
+			new SkyIntent()
 		);
+	}
+
+	private static TerrainShape.Procedural skyShape(SkyIntent sky) {
+		TerrainShape.Procedural flat = shape(0.82, 1.0, 0.3, 0.9, 0.08, 0.02, 0.6, 0.0);
+		return new TerrainShape.Procedural(
+			flat.getLandRatio(),
+			flat.getContinentScale(),
+			flat.getCoastRoughness(),
+			flat.getRelief(),
+			flat.getVerticalScale(),
+			flat.getCaveDensity(),
+			flat.getHydrology(),
+			sky
+		);
+	}
+
+	/**
+	 * Columns holding solid ground inside the band with a clear drop beneath it.
+	 *
+	 * <p>This is the whole claim: not that the band contains stone, which a tall
+	 * mountain would also satisfy, but that the stone has nothing under it.
+	 */
+	private static int detachedColumns(RandomState state, int bandMin, int bandMax, int gap) {
+		DensityFunction density = state.router().finalDensity();
+		Random random = new Random(0x15A4D5L);
+		int detached = 0;
+		for (int sample = 0; sample < 400; sample++) {
+			int x = random.nextInt(-4_000, 4_001);
+			int z = random.nextInt(-4_000, 4_001);
+			for (int y = bandMax; y >= bandMin; y -= 2) {
+				if (density.compute(new DensityFunction.SinglePointContext(x, y, z)) <= 0.0) {
+					continue;
+				}
+				boolean clearBelow = true;
+				for (int below = y - 4; below >= y - 4 - gap; below -= 2) {
+					if (density.compute(new DensityFunction.SinglePointContext(x, below, z)) > 0.0) {
+						clearBelow = false;
+						break;
+					}
+				}
+				if (clearBelow) {
+					detached++;
+				}
+				break;
+			}
+		}
+		return detached;
 	}
 
 	private static RandomState state(TerrainShape.Procedural shape, char idCharacter) {

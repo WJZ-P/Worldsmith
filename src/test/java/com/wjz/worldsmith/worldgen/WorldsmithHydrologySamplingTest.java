@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.wjz.worldsmith.core.model.HydrologyIntent;
 import com.wjz.worldsmith.core.model.ReliefDistribution;
 import com.wjz.worldsmith.core.model.RiverFill;
+import com.wjz.worldsmith.core.model.SkyIntent;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
@@ -154,7 +155,8 @@ final class WorldsmithHydrologySamplingTest {
 			new ReliefDistribution(1.0, 0.0, 0.0),
 			1.0,
 			0.0,
-			hydrology
+			hydrology,
+			new SkyIntent()
 		);
 		TerrainPlan terrain = new TerrainPlan(
 			template.getSchemaVersion(),

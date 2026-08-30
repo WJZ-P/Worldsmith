@@ -2,10 +2,12 @@ package com.wjz.worldsmith.core.validation
 
 import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.model.MaterialSelector
+import com.wjz.worldsmith.core.model.SkyIntent
 import com.wjz.worldsmith.core.model.TerrainPlan
 import com.wjz.worldsmith.core.model.TerrainShape
 
 object TerrainPlanValidator {
+    private const val MIN_SKY_BAND = 24
     fun validate(plan: TerrainPlan): List<Diagnostic> = buildList {
         if (plan.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
             add(error("schemaVersion", "UNSUPPORTED_SCHEMA", "Unsupported terrain schema ${plan.schemaVersion}"))
@@ -58,6 +60,7 @@ object TerrainPlanValidator {
                 if (shape.caveDensity !in 0.0..1.0) {
                     add(error("shape.caveDensity", "CAVE_DENSITY_OUT_OF_RANGE", "Cave density must be between 0 and 1"))
                 }
+                addAll(validateSky(shape.sky, plan))
                 val hydrology = shape.hydrology
                 if (hydrology.riverCoverage !in 0.0..0.35) {
                     add(error("shape.hydrology.riverCoverage", "RIVER_COVERAGE_OUT_OF_RANGE", "River coverage must be between 0 and 0.35"))
@@ -103,6 +106,61 @@ object TerrainPlanValidator {
             add(error(path, "EMPTY_MATERIAL", "Material selector must list preferred ids or required tags"))
         }
     }
+
+    /**
+     * Islands only exist between [SkyIntent.minY] and [SkyIntent.maxY], so a
+     * band outside the world, or inverted, or under the sea would silently
+     * produce nothing at all rather than the world the prompt asked for.
+     */
+    private fun validateSky(sky: SkyIntent, plan: TerrainPlan): List<Diagnostic> = buildList {
+        if (sky.coverage !in 0.0..1.0) {
+            add(error("shape.sky.coverage", "SKY_COVERAGE_OUT_OF_RANGE", "Sky coverage must be between 0 and 1"))
+        }
+        if (sky.scale !in 0.1..8.0) {
+            add(error("shape.sky.scale", "SKY_SCALE_OUT_OF_RANGE", "Sky island scale must be between 0.1 and 8"))
+        }
+        if (sky.thickness !in 0.1..8.0) {
+            add(error("shape.sky.thickness", "SKY_THICKNESS_OUT_OF_RANGE", "Sky island thickness must be between 0.1 and 8"))
+        }
+        if (sky.coverage <= 0.0) {
+            return@buildList
+        }
+
+        val worldTop = plan.minY + plan.height
+        if (sky.minY >= sky.maxY) {
+            add(error("shape.sky", "REVERSED_SKY_BAND", "Sky islands must start below where they end"))
+        }
+        if (sky.minY < plan.minY || sky.maxY > worldTop) {
+            add(
+                error(
+                    "shape.sky",
+                    "SKY_BAND_OUTSIDE_WORLD",
+                    "Sky band " + sky.minY + ".." + sky.maxY + " leaves the world height " + plan.minY + ".." + worldTop,
+                ),
+            )
+        }
+        if (sky.maxY - sky.minY < MIN_SKY_BAND) {
+            add(
+                warning(
+                    "shape.sky",
+                    "SKY_BAND_TOO_THIN",
+                    "A band under " + MIN_SKY_BAND + " blocks tall leaves room for slivers rather than islands",
+                ),
+            )
+        }
+        if (sky.minY < plan.seaLevel) {
+            add(
+                warning(
+                    "shape.sky",
+                    "SKY_BAND_BELOW_SEA_LEVEL",
+                    "Islands starting below sea level " + plan.seaLevel + " will merge into the ground and the sea",
+                ),
+            )
+        }
+    }
+
+    private fun warning(path: String, code: String, message: String) =
+        Diagnostic(path, code, DiagnosticSeverity.WARNING, message)
 
     private fun error(path: String, code: String, message: String) = Diagnostic(path, code, DiagnosticSeverity.ERROR, message)
 }

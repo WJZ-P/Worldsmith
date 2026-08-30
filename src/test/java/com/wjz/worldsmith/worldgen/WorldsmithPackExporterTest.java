@@ -11,6 +11,7 @@ import com.mojang.serialization.JsonOps;
 import com.wjz.worldsmith.core.model.ReliefDistribution;
 import com.wjz.worldsmith.core.model.HydrologyIntent;
 import com.wjz.worldsmith.core.model.RiverFill;
+import com.wjz.worldsmith.core.model.SkyIntent;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
@@ -168,7 +169,10 @@ final class WorldsmithPackExporterTest {
 				new ReliefDistribution(0.0, 0.0, 1.0),
 				1.6,
 				0.3,
-				new HydrologyIntent(0.06, 1.4, 1.1, 0.8, RiverFill.FLUID, 0.07, 1.6, 0.9, 1.5)
+				new HydrologyIntent(0.06, 1.4, 1.1, 0.8, RiverFill.FLUID, 0.07, 1.6, 0.9, 1.5),
+				// Non-default so the round trip covers a sky band rather than
+				// the branch that compiles islands away entirely.
+				new SkyIntent(0.28, 176, 244, 1.3, 0.9)
 			),
 			template.getAquifersEnabled(),
 			template.getOreVeinsEnabled(),
