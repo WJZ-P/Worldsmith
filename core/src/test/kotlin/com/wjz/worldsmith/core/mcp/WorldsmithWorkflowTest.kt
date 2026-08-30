@@ -97,6 +97,7 @@ class WorldsmithWorkflowTest {
         assertFalse(result.isError)
         assertTrue(done.bool("complete"))
         assertEquals(written.text("id"), done.text("packId"))
+        assertEquals("worldsmith:generated/${written.text("id")}/wasteland", done.text("worldPresetId"))
         assertEquals(16, done.getValue("biomeCount").jsonPrimitive.int)
         assertEquals(JsonNull, done.getValue("nextTool"))
 
@@ -133,6 +134,35 @@ class WorldsmithWorkflowTest {
 
         assertTrue(finish(sessionId).structuredContent.bool("complete"))
         assertTrue(finish(sessionId).structuredContent.bool("complete"))
+    }
+
+    @Test
+    fun `finishing queues the validated pack for Minecraft exactly once`() {
+        val activated = mutableListOf<String>()
+        val tools = WorldsmithMcpTools(packDirectory, packFinished = activated::add)
+        fun invoke(name: String, arguments: JsonObject = JsonObject(emptyMap())) =
+            tools.all().single { it.name == name }.handler(arguments)
+        val session = invoke(
+            WorldsmithWorkflow.BEGIN_TOOL,
+            buildJsonObject { put("prompt", "a quiet salt world") },
+        ).structuredContent.text("sessionId")
+        val template = invoke(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
+        val written = invoke(
+            WorldsmithWorkflow.WRITE_TOOL,
+            buildJsonObject {
+                put("sessionId", session)
+                put("displayName", "Activated World")
+                put("terrain", template.getValue("terrain"))
+                put("biomes", template.getValue("biomes"))
+                put("features", template.getValue("features"))
+            },
+        ).structuredContent
+
+        assertTrue(invoke(WorldsmithWorkflow.FINISH_TOOL, buildJsonObject { put("sessionId", session) })
+            .structuredContent.bool("complete"))
+        assertTrue(invoke(WorldsmithWorkflow.FINISH_TOOL, buildJsonObject { put("sessionId", session) })
+            .structuredContent.bool("complete"))
+        assertEquals(listOf(written.text("id")), activated)
     }
 
     @Test

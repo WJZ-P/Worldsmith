@@ -9,6 +9,8 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -26,6 +28,7 @@ public final class WorldsmithMcpService {
 
 	private static McpHttpServer server;
 	private static int runningPort;
+	private static Consumer<String> packFinished = id -> { };
 
 	private WorldsmithMcpService() {
 	}
@@ -51,6 +54,8 @@ public final class WorldsmithMcpService {
 
 	public static synchronized void stop() {
 		if (server == null) {
+			runningPort = 0;
+			clearDiscovery();
 			return;
 		}
 		try {
@@ -91,9 +96,14 @@ public final class WorldsmithMcpService {
 		return FabricLoader.getInstance().getConfigDir().resolve(PACK_DIRECTORY);
 	}
 
+	/** Installs the client-side action performed after a guided MCP run finishes. */
+	public static synchronized void setPackFinishedListener(Consumer<String> listener) {
+		packFinished = Objects.requireNonNull(listener, "listener");
+	}
+
 	private static void start(int port) {
 		try {
-			WorldsmithMcpTools tools = new WorldsmithMcpTools(packDirectory(), runtimeInfo());
+			WorldsmithMcpTools tools = new WorldsmithMcpTools(packDirectory(), runtimeInfo(), packFinished);
 			McpHttpServer started = new McpHttpServer(tools.all(), modVersion());
 			URI endpoint = started.start(port);
 			server = started;
@@ -106,6 +116,7 @@ public final class WorldsmithMcpService {
 			// still miss it at runtime. A busy port must not stop the game.
 			server = null;
 			runningPort = 0;
+			clearDiscovery();
 			Worldsmith.LOGGER.error("Worldsmith MCP bridge could not start on port {}", port, e);
 		}
 	}

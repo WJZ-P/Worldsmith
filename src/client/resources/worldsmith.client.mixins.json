@@ -2,7 +2,10 @@
 	"required": true,
 	"package": "com.wjz.worldsmith.mixin.client",
 	"compatibilityLevel": "JAVA_25",
-	"client": [],
+	"client": [
+		"CreateWorldScreenAccessor",
+		"WorldTypeEntryMixin"
+	],
 	"injectors": {
 		"defaultRequire": 1
 	},

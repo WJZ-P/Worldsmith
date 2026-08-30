@@ -40,6 +40,7 @@ import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.util.function.Consumer
 import java.util.function.Supplier
 
 /**
@@ -53,6 +54,7 @@ import java.util.function.Supplier
 class WorldsmithMcpTools @JvmOverloads constructor(
     packDirectory: Path,
     private val runtimeInfo: Supplier<Map<String, String>> = Supplier { emptyMap() },
+    private val packFinished: Consumer<String> = Consumer { },
     private val templates: PromptTemplateRepository = ClasspathPromptTemplateRepository(),
     private val sessions: WorkflowSessions = WorkflowSessions(),
 ) {
@@ -382,18 +384,30 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             return McpToolResult.error("Pack '$packId' no longer passes validation", failed)
         }
 
+        val activationQueued = !session.finished
+        if (activationQueued) {
+            runCatching { packFinished.accept(packId) }.getOrElse { failure ->
+                return incomplete(
+                    sessionId,
+                    WorldsmithWorkflow.FINISH_TOOL,
+                    "Pack '$packId' is valid, but the Minecraft activation request failed: " +
+                        (failure.message ?: "unknown error"),
+                )
+            }
+        }
         sessions.finish(sessionId)
         val covered = coveredCells(pack)
         val report = "Worldsmith pack '${pack.manifest.displayName}' is saved and valid: " +
             "${pack.biomes.biomes.size} biomes and ${pack.features.features.size} features claiming " +
             "$covered of ${ClimateBands.ALL_CELLS.size} climate cells, stored at $directory. " +
-            "Nothing further is required from you."
+            "It has been selected for Minecraft's world-creation screen. Nothing further is required from you."
         val structured = buildJsonObject {
             put("sessionId", sessionId)
             put("complete", true)
             put("packId", pack.manifest.id)
             put("displayName", pack.manifest.displayName)
             put("description", pack.manifest.description)
+            put("worldPresetId", "worldsmith:generated/$packId/wasteland")
             put("path", directory.toString())
             put("biomeCount", pack.biomes.biomes.size)
             put("featureCount", pack.features.features.size)
@@ -402,6 +416,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 put("total", ClimateBands.ALL_CELLS.size)
             }
             put("diagnostics", diagnosticsJson(diagnostics))
+            put("activationQueued", activationQueued)
             put("nextTool", JsonNull)
             put("report", report)
         }

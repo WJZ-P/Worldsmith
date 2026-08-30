@@ -49,9 +49,10 @@ object WorldsmithWorkflow {
             "reports exactly what is wrong, so a rejected pack is a repair job rather than a restart: change " +
             "only what the diagnostics name and send the whole document again.\n\n" +
             "complete=true means exactly this much: the pack is saved in Worldsmith's pack directory, reads " +
-            "back from disk and passes every Worldsmith validator. Claim nothing beyond that to the player - " +
-            "not that a world was created, loaded or is playable. When you are done, tell them the pack name, " +
-            "how many biomes it has and where it was saved."
+            "back from disk, passes every Worldsmith validator and has been selected for Minecraft's " +
+            "world-creation screen. Claim nothing beyond that to the player - not that a world was already " +
+            "created or played. When you are done, tell them the pack name, how many biomes it has and where it " +
+            "was saved."
 
     val PROCEDURE: List<WorkflowStep> = listOf(
         WorkflowStep(

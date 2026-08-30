@@ -32,6 +32,7 @@ Player prompt
 
 See [the prompt pipeline architecture](docs/architecture/prompt-pipeline.md).
 See [the portable Worldsmith Pack format](docs/architecture/worldsmith-pack.md).
+See [the local MCP-to-Create-World workflow](docs/mcp-world-creation.md).
 
 ## Build
 
