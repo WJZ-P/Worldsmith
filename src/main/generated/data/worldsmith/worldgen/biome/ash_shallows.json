@@ -1,8 +1,17 @@
 {
   "attributes": {
+    "minecraft:visual/ambient_light_color": "#181613",
+    "minecraft:visual/block_light_tint": "#f0dfc4",
+    "minecraft:visual/cloud_color": "#c0585245",
+    "minecraft:visual/cloud_height": 168.0,
     "minecraft:visual/fog_color": "#6e6656",
     "minecraft:visual/fog_end_distance": 112.0,
+    "minecraft:visual/fog_start_distance": 20.2,
     "minecraft:visual/sky_color": "#7a6e5c",
+    "minecraft:visual/sky_fog_end_distance": 280.0,
+    "minecraft:visual/sky_light_factor": 0.83,
+    "minecraft:visual/star_brightness": 0.15,
+    "minecraft:visual/sunrise_sunset_color": "#908c7e6a",
     "minecraft:visual/water_fog_color": "#1b241f",
     "minecraft:visual/water_fog_end_distance": 72.0,
     "minecraft:visual/water_fog_start_distance": -8.0

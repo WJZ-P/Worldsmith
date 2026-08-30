@@ -1,5 +1,6 @@
 {
   "attributes": {
+    "minecraft:visual/ambient_light_color": "#231e10",
     "minecraft:visual/ambient_particles": [
       {
         "particle": {
@@ -8,9 +9,17 @@
         "probability": 0.1
       }
     ],
+    "minecraft:visual/block_light_tint": "#ffd9a8",
+    "minecraft:visual/cloud_color": "#c0806c3a",
+    "minecraft:visual/cloud_height": 168.0,
     "minecraft:visual/fog_color": "#a08749",
     "minecraft:visual/fog_end_distance": 48.0,
-    "minecraft:visual/sky_color": "#b0913f"
+    "minecraft:visual/fog_start_distance": 8.6,
+    "minecraft:visual/sky_color": "#b0913f",
+    "minecraft:visual/sky_fog_end_distance": 120.0,
+    "minecraft:visual/sky_light_factor": 0.67,
+    "minecraft:visual/star_brightness": 0.3,
+    "minecraft:visual/sunrise_sunset_color": "#90caa748"
   },
   "carvers": [],
   "downfall": 0.6,
