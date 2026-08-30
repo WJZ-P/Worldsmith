@@ -6,6 +6,7 @@ import com.wjz.worldsmith.core.model.HydrologyIntent;
 import com.wjz.worldsmith.core.model.ReliefDistribution;
 import com.wjz.worldsmith.core.model.RiverFill;
 import com.wjz.worldsmith.core.model.Anchor;
+import com.wjz.worldsmith.core.model.AnchorClimateBias;
 import com.wjz.worldsmith.core.model.AnchorPlacement;
 import com.wjz.worldsmith.core.model.BandEffect;
 import com.wjz.worldsmith.core.model.BandRegion;
@@ -252,7 +253,7 @@ final class WorldsmithTerrainSamplingTest {
 
 	@Test
 	void anAnchorBoundBandStaysInsideTheLandmark() {
-		Anchor anchor = new Anchor("sky_focus", new AnchorPlacement.Fixed(0, 0), 700, 0.0, 1.0);
+		Anchor anchor = new Anchor("sky_focus", new AnchorPlacement.Fixed(0, 0), 700, 0.0, 1.0, null);
 		TerrainBand band = new TerrainBand(
 			0.45, 180, 240, BandEffect.ADD, BandRegion.ANYWHERE, "sky_focus", 1.4, 1.0
 		);
@@ -273,7 +274,7 @@ final class WorldsmithTerrainSamplingTest {
 	void aFixedAnchorRaisesGroundOnlyWhereItWasPlaced() {
 		RandomState plain = state(anchorShape(), '2');
 		RandomState peaked = state(
-			anchorShape(new Anchor("holy_peak", new AnchorPlacement.Fixed(600, -400), 500, 150.0, 1.0)),
+			anchorShape(new Anchor("holy_peak", new AnchorPlacement.Fixed(600, -400), 500, 150.0, 1.0, null)),
 			'3'
 		);
 
@@ -291,7 +292,7 @@ final class WorldsmithTerrainSamplingTest {
 	void aNegativeAnchorSinksGroundIntoACrater() {
 		RandomState plain = state(anchorShape(), '4');
 		RandomState cratered = state(
-			anchorShape(new Anchor("basin", new AnchorPlacement.Fixed(0, 0), 400, -120.0, 1.0)),
+			anchorShape(new Anchor("basin", new AnchorPlacement.Fixed(0, 0), 400, -120.0, 1.0, null)),
 			'5'
 		);
 
@@ -308,7 +309,7 @@ final class WorldsmithTerrainSamplingTest {
 	void aScatteredAnchorRecursAcrossTheWorld() {
 		RandomState plain = state(anchorShape(), '6');
 		RandomState spires = state(
-			anchorShape(new Anchor("spires", new AnchorPlacement.Scattered(4_000, 0.7), 500, 140.0, 1.0)),
+			anchorShape(new Anchor("spires", new AnchorPlacement.Scattered(4_000, 0.7), 500, 140.0, 1.0, null)),
 			'7'
 		);
 
@@ -341,7 +342,14 @@ final class WorldsmithTerrainSamplingTest {
 	void anAnchorPullsBiomeSelectionTowardItsOwnLandform() {
 		RandomState plain = state(anchorShape(), '8');
 		RandomState peaked = state(
-			anchorShape(new Anchor("peak", new AnchorPlacement.Fixed(0, 0), 500, 150.0, 1.0)),
+			anchorShape(new Anchor(
+				"peak",
+				new AnchorPlacement.Fixed(0, 0),
+				500,
+				150.0,
+				1.0,
+				new AnchorClimateBias(1.0, null, null, 0.55, -0.8, null)
+			)),
 			'9'
 		);
 
@@ -358,6 +366,62 @@ final class WorldsmithTerrainSamplingTest {
 			Math.abs(faraway - plainFaraway) < 0.001,
 			() -> "biome selection away from the anchor must be untouched, moved " + (faraway - plainFaraway)
 		);
+	}
+
+	@Test
+	void geometryAloneDoesNotInventABiomeMeaning() {
+		RandomState plain = state(anchorShape(), 'a');
+		RandomState mound = state(
+			anchorShape(new Anchor("mound", new AnchorPlacement.Fixed(0, 0), 300, 1.0, 1.0, null)),
+			'b'
+		);
+
+		double plainErosion = plain.router().erosion().compute(new DensityFunction.SinglePointContext(0, 0, 0));
+		double moundErosion = mound.router().erosion().compute(new DensityFunction.SinglePointContext(0, 0, 0));
+
+		assertTrue(
+			Math.abs(moundErosion - plainErosion) < 0.001,
+			() -> "an unlabelled one-block mound changed biome erosion by " + (moundErosion - plainErosion)
+		);
+	}
+
+	@Test
+	void anOceanLandmarkCanAuthorItsOwnContinentalClimate() {
+		RandomState ocean = state(anchorShape(0.05), 'c');
+		int[] point = findOceanPoint(ocean);
+		Anchor islandPeak = new Anchor(
+			"island_peak",
+			new AnchorPlacement.Fixed(point[0], point[1]),
+			600,
+			180.0,
+			1.0,
+			new AnchorClimateBias(1.0, null, null, 0.45, -0.8, null)
+		);
+		RandomState raised = state(anchorShape(0.05, islandPeak), 'd');
+		DensityFunction.SinglePointContext centre = new DensityFunction.SinglePointContext(point[0], 0, point[1]);
+
+		double before = ocean.router().continents().compute(centre);
+		double after = raised.router().continents().compute(centre);
+
+		assertTrue(before < -0.19, () -> "fixture should start in ocean, got " + before);
+		assertTrue(after > -0.11, () -> "landmark should publish an inland climate, got " + after);
+	}
+
+	@Test
+	void climateBiasTargetsAllBiomeAxesWithOneStrength() {
+		RandomState plain = state(anchorShape(), 'e');
+		AnchorClimateBias bias = new AnchorClimateBias(0.5, 1.0, -0.8, 0.45, -0.7, 0.6);
+		RandomState authored = state(
+			anchorShape(new Anchor("climate", new AnchorPlacement.Fixed(0, 0), 400, 0.0, 1.0, bias)),
+			'f'
+		);
+		DensityFunction.SinglePointContext centre = new DensityFunction.SinglePointContext(0, 0, 0);
+
+		assertHalfway(plain.router().temperature(), authored.router().temperature(), centre, 1.0, "temperature");
+		assertHalfway(plain.router().vegetation(), authored.router().vegetation(), centre, -0.8, "humidity");
+		assertHalfway(plain.router().continents(), authored.router().continents(), centre, 0.45, "continentalness");
+		assertHalfway(plain.router().erosion(), authored.router().erosion(), centre, -0.7, "erosion");
+		assertHalfway(plain.router().ridges(), authored.router().ridges(), centre, 0.6, "weirdness");
 	}
 
 	@Test
@@ -396,7 +460,11 @@ final class WorldsmithTerrainSamplingTest {
 	}
 
 	private static TerrainShape.Procedural anchorShape(Anchor... anchors) {
-		TerrainShape.Procedural flat = shape(0.95, 1.0, 0.2, 1.0, 0.0, 0.0, 0.4, 0.0);
+		return anchorShape(0.95, anchors);
+	}
+
+	private static TerrainShape.Procedural anchorShape(double landRatio, Anchor... anchors) {
+		TerrainShape.Procedural flat = shape(landRatio, 1.0, 0.2, 1.0, 0.0, 0.0, 0.4, 0.0);
 		return new TerrainShape.Procedural(
 			flat.getLandRatio(),
 			flat.getContinentScale(),
@@ -407,6 +475,34 @@ final class WorldsmithTerrainSamplingTest {
 			flat.getHydrology(),
 			List.of(),
 			List.of(anchors)
+		);
+	}
+
+	private static int[] findOceanPoint(RandomState state) {
+		DensityFunction continents = state.router().continents();
+		for (int z = -8_000; z <= 8_000; z += 128) {
+			for (int x = -8_000; x <= 8_000; x += 128) {
+				if (continents.compute(new DensityFunction.SinglePointContext(x, 0, z)) < -0.55) {
+					return new int[] {x, z};
+				}
+			}
+		}
+		throw new AssertionError("ocean fixture contained no deep-water point");
+	}
+
+	private static void assertHalfway(
+		DensityFunction before,
+		DensityFunction after,
+		DensityFunction.FunctionContext point,
+		double target,
+		String axis
+	) {
+		double initial = before.compute(point);
+		double expected = (initial + target) * 0.5;
+		double actual = after.compute(point);
+		assertTrue(
+			Math.abs(actual - expected) < 1.0E-6,
+			() -> axis + " expected " + expected + " but was " + actual
 		);
 	}
 

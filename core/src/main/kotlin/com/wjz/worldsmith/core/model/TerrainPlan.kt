@@ -108,6 +108,25 @@ sealed interface AnchorPlacement {
 }
 
 /**
+ * Optional climate targets inside an anchor's influence.
+ *
+ * Geometry and biome identity are separate decisions: a one-block ritual mound
+ * need not become a mountain biome, while a peak raised from the sea needs both
+ * inland continentalness and peak erosion. Null axes keep the surrounding
+ * climate untouched; [strength] scales every declared target by the shared
+ * anchor influence.
+ */
+@Serializable
+data class AnchorClimateBias(
+    val strength: Double = 1.0,
+    val temperature: Double? = null,
+    val humidity: Double? = null,
+    val continentalness: Double? = null,
+    val erosion: Double? = null,
+    val weirdness: Double? = null,
+)
+
+/**
  * A place the world is built around.
  *
  * <p>Noise can only say "this kind of thing, everywhere, in this proportion".
@@ -125,6 +144,7 @@ data class Anchor(
     val radius: Int,
     val amplitude: Double,
     val falloff: Double = 1.0,
+    val climateBias: AnchorClimateBias? = null,
 )
 
 /** Whether a band puts rock where there was none, or takes it away. */

@@ -204,6 +204,26 @@ object TerrainPlanValidator {
             if (anchor.falloff !in 0.05..8.0) {
                 add(error("$path.falloff", "ANCHOR_FALLOFF_OUT_OF_RANGE", "Anchor falloff must be between 0.05 and 8"))
             }
+            anchor.climateBias?.let { bias ->
+                if (bias.strength !in 0.0..1.0) {
+                    add(error("$path.climateBias.strength", "ANCHOR_CLIMATE_STRENGTH_OUT_OF_RANGE", "Climate strength must be between 0 and 1"))
+                }
+                val axes = listOf(
+                    "temperature" to bias.temperature,
+                    "humidity" to bias.humidity,
+                    "continentalness" to bias.continentalness,
+                    "erosion" to bias.erosion,
+                    "weirdness" to bias.weirdness,
+                )
+                if (axes.all { it.second == null }) {
+                    add(error("$path.climateBias", "EMPTY_ANCHOR_CLIMATE_BIAS", "Climate bias must target at least one axis"))
+                }
+                axes.forEach { (axis, target) ->
+                    if (target != null && target !in -2.0..2.0) {
+                        add(error("$path.climateBias.$axis", "ANCHOR_CLIMATE_TARGET_OUT_OF_RANGE", "Climate targets must remain between -2 and 2"))
+                    }
+                }
+            }
             when (val placement = anchor.placement) {
                 is AnchorPlacement.Fixed -> {
                     val reach = maxOf(kotlin.math.abs(placement.x), kotlin.math.abs(placement.z))

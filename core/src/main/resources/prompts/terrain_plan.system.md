@@ -84,7 +84,14 @@ replace `shape` with a `procedural` terrain intent:
   an anchor.
   - `radius` is how far the influence reaches and `amplitude` is how many blocks
     it moves the ground at the centre. Positive raises a peak, negative sinks a
-    crater; one field covers both.
+    crater; one field covers both. Geometry does not silently choose a biome.
+  - `climateBias` is optional and explicitly gives a landmark its biome meaning.
+    It has `strength` (`0..1`) plus any subset of `temperature`, `humidity`,
+    `continentalness`, `erosion`, and `weirdness` targets (`-2..2`). A holy
+    mountain raised from the sea might use
+    `{"strength":1,"continentalness":0.55,"erosion":-0.8}`; a one-block
+    ritual mound may omit the object and leave climate untouched. This is
+    independent from `amplitude`, so changing height never invents a biome rule.
   - `falloff` (`0.05..8`) shapes the slope. Below one is a plateau with steep
     sides, one is a dome, above one is a spire standing in a wide skirt.
   - `placement` chooses how instances are positioned, and the two forms need
@@ -100,9 +107,10 @@ replace `shape` with a `procedural` terrain intent:
       seen.
   - `spacing` must be at least twice the `radius`, or instances would run into
     one another.
-  - An anchor does more than raise ground. It also pulls biome selection toward
-    the landform it built, so a peak reads as a peak rather than as the plain it
-    grew out of, and it can be referenced by name from two other places:
+  - An anchor does more than raise ground. With `climateBias` it also pulls biome
+    selection toward the authored identity, so a peak reads as a peak rather
+    than as the plain it grew out of. It can also be referenced by name from two
+    other places:
     a band may set `"anchor": "<id>"` to act only within that anchor's reach,
     and a biome's surface rule may set
     `"anchor": {"anchor": "<id>", "min": 0.7, "max": 1.0}` to paint one ring of

@@ -98,6 +98,16 @@ The `vanilla` shape variant is a deliberate passthrough mode for worlds that
 explicitly request an unchanged `OVERWORLD`, `LARGE_BIOMES` or `AMPLIFIED`
 router; prompt-guided generation uses `procedural`.
 
+### Landmark anchors
+
+An anchor is a fixed point or a scattered lattice of points with a radius and a
+0–1 influence field. Height amplitude, terrain-band masks and surface rings all
+consume that field independently. Biome identity is explicit rather than
+inferred from height: an optional `climateBias` supplies a strength plus targets
+for temperature, humidity, continentalness, erosion and weirdness. This lets a
+mountain raised from ocean bias itself toward inland peak climate, while a small
+ritual mound can change geometry without silently becoming a mountain biome.
+
 ## Placing a biome
 
 A biome says where it generates in one of two ways.

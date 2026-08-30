@@ -1,5 +1,8 @@
 package com.wjz.worldsmith.core.validation
 
+import com.wjz.worldsmith.core.model.Anchor
+import com.wjz.worldsmith.core.model.AnchorClimateBias
+import com.wjz.worldsmith.core.model.AnchorPlacement
 import com.wjz.worldsmith.core.model.ReliefDistribution
 import com.wjz.worldsmith.core.model.HydrologyIntent
 import com.wjz.worldsmith.core.model.RiverFill
@@ -80,5 +83,36 @@ class TerrainPlanValidatorTest {
         assertTrue("LAKE_SCALE_OUT_OF_RANGE" in codes)
         assertTrue("LAKE_DEPTH_OUT_OF_RANGE" in codes)
         assertTrue("OCEAN_DEPTH_OUT_OF_RANGE" in codes)
+    }
+
+    @Test
+    fun `anchor climate bias is explicit and bounded`() {
+        val shape = template.shape as TerrainShape.Procedural
+        val plan = template.copy(
+            shape = shape.copy(
+                anchors = listOf(
+                    Anchor(
+                        id = "empty_bias",
+                        placement = AnchorPlacement.Fixed(0, 0),
+                        radius = 200,
+                        amplitude = 0.0,
+                        climateBias = AnchorClimateBias(strength = 1.2),
+                    ),
+                    Anchor(
+                        id = "bad_target",
+                        placement = AnchorPlacement.Fixed(400, 0),
+                        radius = 200,
+                        amplitude = 20.0,
+                        climateBias = AnchorClimateBias(erosion = -3.0),
+                    ),
+                ),
+            ),
+        )
+
+        val codes = TerrainPlanValidator.validate(plan).map { it.code }.toSet()
+
+        assertTrue("ANCHOR_CLIMATE_STRENGTH_OUT_OF_RANGE" in codes)
+        assertTrue("EMPTY_ANCHOR_CLIMATE_BIAS" in codes)
+        assertTrue("ANCHOR_CLIMATE_TARGET_OUT_OF_RANGE" in codes)
     }
 }

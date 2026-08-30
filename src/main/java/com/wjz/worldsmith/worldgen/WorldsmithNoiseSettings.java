@@ -2,6 +2,7 @@ package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.Anchor;
+import com.wjz.worldsmith.core.model.AnchorClimateBias;
 import com.wjz.worldsmith.core.model.AnchorPlacement;
 import com.wjz.worldsmith.core.model.BandEffect;
 import com.wjz.worldsmith.core.model.BandRegion;
@@ -13,6 +14,7 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
@@ -46,9 +48,6 @@ public final class WorldsmithNoiseSettings {
 	private static final double CARVE_STRENGTH = 8.0;
 	/** Turns the soft continentalness signal into a decisive region boundary. */
 	private static final double REGION_EDGE = 6.0;
-	/** Erosion the relief bands read as peaks, and as flats. */
-	private static final double PEAK_EROSION = -0.8;
-	private static final double BASIN_EROSION = 0.6;
 	/** How much anchor influence a band needs before it may act there. */
 	private static final double ANCHOR_BAND_THRESHOLD = 0.2;
 	/** How narrow the coastal strip is; larger keeps it closer to the shoreline. */
@@ -214,9 +213,9 @@ public final class WorldsmithNoiseSettings {
 		);
 		horizontalHeightBlocks = hydrology.horizontalHeightBlocks();
 
-		// One influence field per anchor, built once and consumed four ways:
-		// it raises the ground, biases which biome is chosen, tells the surface
-		// rules which ring they are painting, and bounds where a band may act.
+		// One influence field per anchor, built once and available four ways:
+		// it raises the ground, carries any explicit climate bias, tells the
+		// surface rules which ring they are painting, and bounds where a band acts.
 		// Behind cache2d because it depends only on X and Z.
 		Map<String, DensityFunction> anchorInfluence = new LinkedHashMap<>();
 		for (Anchor anchor : shape.getAnchors()) {
@@ -234,7 +233,19 @@ public final class WorldsmithNoiseSettings {
 				)
 			);
 		}
-		erosion = biasErosion(erosion, shape.getAnchors(), anchorInfluence);
+		DensityFunction temperature = biasClimate(
+			vanilla.temperature(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getTemperature
+		);
+		DensityFunction humidity = biasClimate(
+			vanilla.vegetation(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getHumidity
+		);
+		DensityFunction biomeContinents = biasClimate(
+			hydrology.continents(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getContinentalness
+		);
+		erosion = biasClimate(erosion, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getErosion);
+		DensityFunction weirdness = biasClimate(
+			reliefSelector, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getWeirdness
+		);
 
 		int minY = terrain.getMinY();
 		int maxY = minY + terrain.getHeight();
@@ -292,7 +303,7 @@ public final class WorldsmithNoiseSettings {
 		// squeezes the field, which islands need as much as the ground does.
 		DensityFunction banded = slidTerrain;
 		for (TerrainBand band : shape.getBands()) {
-			banded = applyBand(banded, band, shiftX, shiftZ, continents, anchorInfluence, noises);
+			banded = applyBand(banded, band, shiftX, shiftZ, biomeContinents, anchorInfluence, noises);
 		}
 		DensityFunction finalDensity = NoiseRouterData.postProcess(banded);
 		if (shape.getCaveDensity() > 0.0) {
@@ -323,12 +334,12 @@ public final class WorldsmithNoiseSettings {
 			vanilla.fluidLevelFloodednessNoise(),
 			vanilla.fluidLevelSpreadNoise(),
 			vanilla.lavaNoise(),
-			vanilla.temperature(),
-			vanilla.vegetation(),
-			hydrology.continents(),
+			temperature,
+			humidity,
+			biomeContinents,
 			erosion,
 			depth,
-			reliefSelector,
+			weirdness,
 			preliminarySurface,
 			finalDensity,
 			vanilla.veinToggle(),
@@ -337,31 +348,31 @@ public final class WorldsmithNoiseSettings {
 		);
 	}
 
-	/**
-	 * Pulls erosion toward the value the anchor's shape implies.
-	 *
-	 * <p>Raising the ground is not enough on its own. Biomes are chosen from
-	 * climate parameters, not from how high the ground turned out, so a mountain
-	 * built by an anchor and nothing else keeps whatever biome the surrounding
-	 * plain had. Erosion is the axis the relief bands are cut along, so pulling
-	 * it toward the peak end under a rising anchor, and the flat end under a
-	 * sinking one, is what makes a summit read as a summit.
-	 */
-	private static DensityFunction biasErosion(
-		DensityFunction erosion,
+	/** Applies one explicitly authored climate target through the shared influence field. */
+	private static DensityFunction biasClimate(
+		DensityFunction source,
 		List<Anchor> anchors,
-		Map<String, DensityFunction> influence
+		Map<String, DensityFunction> influence,
+		Function<AnchorClimateBias, Double> target
 	) {
-		DensityFunction biased = erosion;
+		DensityFunction biased = source;
 		for (Anchor anchor : anchors) {
-			if (anchor.getAmplitude() == 0.0) {
+			AnchorClimateBias climate = anchor.getClimateBias();
+			if (climate == null || climate.getStrength() <= 0.0) {
 				continue;
 			}
-			double target = anchor.getAmplitude() > 0.0 ? PEAK_EROSION : BASIN_EROSION;
-			biased = DensityFunctions.lerp(
+			Double targetValue = target.apply(climate);
+			if (targetValue == null) {
+				continue;
+			}
+			DensityFunction strength = DensityFunctions.mul(
 				influence.get(anchor.getId()),
+				DensityFunctions.constant(climate.getStrength())
+			);
+			biased = DensityFunctions.lerp(
+				strength,
 				biased,
-				DensityFunctions.constant(target)
+				DensityFunctions.constant(targetValue)
 			);
 		}
 		return biased;
