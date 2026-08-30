@@ -18,13 +18,7 @@ replace `shape` with a `procedural` terrain intent:
   "relief": { "flats": 0.65, "highlands": 0.25, "peaks": 0.10 },
   "verticalScale": 1.0,
   "caveDensity": 0.65,
-  "sky": {
-    "coverage": 0.0,
-    "minY": 160,
-    "maxY": 240,
-    "scale": 1.0,
-    "thickness": 1.0
-  },
+  "bands": [],
   "hydrology": {
     "riverCoverage": 0.06,
     "riverWidth": 1.0,
@@ -54,22 +48,34 @@ replace `shape` with a `procedural` terrain intent:
   These are shares, not a mandatory grid: set an unwanted landform to zero.
 - `verticalScale` (`0.1..4`) controls height amplitude. It affects both the
   inland rise and relief height; use it independently from relief shares.
-- `sky` adds land that floats free of the ground, and is the only control that
-  can. Every other field describes a height field: one surface per column, solid
-  below and air above. Tall `peaks` with high `caveDensity` can look like
-  floating islands from a distance, but every spire stays joined to the ground.
-  Use `sky` when the prompt asks for islands in the air.
-  - `coverage` (`0..1`) is the share of the band that becomes rock. Zero, the
-    default, means no islands at all and costs nothing. `0.1` gives sparse
-    islands with wide empty sky; `0.4` gives a crowded archipelago; above `0.6`
-    the band closes into a ceiling.
-  - `minY` and `maxY` bound the band. Keep it above sea level, or the islands
-    merge into the ground and the sea instead of floating over them. A band
-    under 24 blocks tall produces slivers rather than islands.
-  - `scale` (`0.1..8`) is island size and `thickness` (`0.1..8`) squashes them
-    vertically: low thickness gives flat shards, high gives boulders.
-  - `caveDensity` carves the islands too. Above roughly `0.7` it will hollow
-    small islands into shells, so pair heavy caves with a larger `scale`.
+- `bands` is a list, empty by default, and the only control that can break the
+  height field. Every other field describes one surface per column: solid below,
+  air above. Tall `peaks` with heavy `caveDensity` can look like floating islands
+  from a distance, but every spire stays joined to the ground, and a canyon can
+  only ever be a low place in that surface. A band is an independent body of
+  rock, or an independent absence of one, so a column may read air, stone, air,
+  stone. Reach for a band when the prompt asks for something the surface cannot
+  be bent into.
+  - `effect` is `ADD` to place rock or `CARVE` to remove it. `ADD` above the
+    ground gives floating islands; `ADD` with high coverage gives a sky ceiling
+    with a covered world beneath. `CARVE` underground gives hollow worlds and
+    real chasms rather than valleys.
+  - `coverage` (`0..1`) is the share of the band that the effect claims. `0.1`
+    is sparse with wide gaps; `0.4` is crowded; above `0.6` an `ADD` band closes
+    into a continuous layer.
+  - `minY` and `maxY` bound it. An `ADD` band below sea level merges into the
+    ground and the sea instead of floating over them. Under 24 blocks tall gives
+    slivers rather than shapes.
+  - `region` ties the band to the world's geography: `ANYWHERE`, `OVER_LAND`,
+    `OVER_OCEAN`, `INLAND` or `COASTAL`. This is what separates a band that
+    looks designed from one that looks scattered - islands only over the
+    continents, chasms only inland.
+  - `scale` (`0.1..8`) is shape size and `thickness` (`0.1..8`) squashes them
+    vertically: low thickness gives flat shards, high gives boulders or pillars.
+  - Bands stack; at most six. Later ones apply after earlier ones, so a `CARVE`
+    band listed after an `ADD` band will hollow out the islands it made.
+  - `caveDensity` carves bands too. Above roughly `0.7` it hollows small shapes
+    into shells, so pair heavy caves with a larger `scale`.
 - `caveDensity` (`0..1`) blends from solid terrain to the full overworld cave
   system. Zero suppresses cave carving; one uses all supported cave families.
 

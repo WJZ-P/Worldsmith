@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.wjz.worldsmith.core.model.HydrologyIntent;
 import com.wjz.worldsmith.core.model.ReliefDistribution;
 import com.wjz.worldsmith.core.model.RiverFill;
-import com.wjz.worldsmith.core.model.SkyIntent;
+import com.wjz.worldsmith.core.model.BandEffect;
+import com.wjz.worldsmith.core.model.BandRegion;
+import com.wjz.worldsmith.core.model.TerrainBand;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
@@ -111,9 +113,9 @@ final class WorldsmithTerrainSamplingTest {
 	 */
 	@Test
 	void skyIslandsPutSolidGroundWithNothingBeneathIt() {
-		RandomState grounded = state(skyShape(new SkyIntent()), '0');
+		RandomState grounded = state(bandShape(), '0');
 		RandomState floating = state(
-			skyShape(new SkyIntent(0.35, 180, 250, 1.4, 1.0)), '8'
+			bandShape(island(0.35, 180, 250, BandRegion.ANYWHERE)), '8'
 		);
 
 		int groundedIslands = detachedColumns(grounded, 180, 250, 40);
@@ -136,6 +138,29 @@ final class WorldsmithTerrainSamplingTest {
 		);
 	}
 
+	/** Fraction of sampled points inside the band that are solid, over land or over ocean. */
+	private static double bandSolidShare(RandomState state, int bandMin, int bandMax, boolean overLand) {
+		DensityFunction density = state.router().finalDensity();
+		DensityFunction continents = state.router().continents();
+		Random random = new Random(0xC0A57L);
+		int solid = 0;
+		int counted = 0;
+		while (counted < 2_000) {
+			int x = random.nextInt(-4_000, 4_001);
+			int z = random.nextInt(-4_000, 4_001);
+			boolean land = continents.compute(new DensityFunction.SinglePointContext(x, 0, z)) > -0.11;
+			if (land != overLand) {
+				continue;
+			}
+			int y = random.nextInt(bandMin, bandMax + 1);
+			if (density.compute(new DensityFunction.SinglePointContext(x, y, z)) > 0.0) {
+				solid++;
+			}
+			counted++;
+		}
+		return (double) solid / counted;
+	}
+
 	/** Fraction of sampled points inside the band that are solid. */
 	private static double bandSolidShare(RandomState state, int bandMin, int bandMax) {
 		DensityFunction density = state.router().finalDensity();
@@ -155,12 +180,70 @@ final class WorldsmithTerrainSamplingTest {
 
 	@Test
 	void skyIslandsStayInsideTheirBand() {
-		RandomState floating = state(skyShape(new SkyIntent(0.35, 180, 250, 1.4, 1.0)), '9');
+		RandomState floating = state(bandShape(island(0.35, 180, 250, BandRegion.ANYWHERE)), '9');
 
 		assertTrue(
 			detachedColumns(floating, 260, 310, 40) == 0,
 			"nothing should float above the band it was given"
 		);
+	}
+
+	/**
+	 * Union has a mirror. Without subtraction a band can only add rock, so a
+	 * hollowed world or a canyon that is not merely a low surface is
+	 * unreachable no matter how the other knobs are set.
+	 */
+	@Test
+	void aCarvingBandRemovesGroundThatWasThere() {
+		RandomState solid = state(bandShape(), '4');
+		RandomState hollowed = state(
+			bandShape(new TerrainBand(0.45, -40, 30, BandEffect.CARVE, BandRegion.ANYWHERE, 2.0, 1.2)),
+			'5'
+		);
+
+		double solidFill = bandSolidShare(solid, -40, 30);
+		double hollowedFill = bandSolidShare(hollowed, -40, 30);
+
+		assertTrue(
+			hollowedFill < solidFill - 0.15,
+			() -> "a carving band should remove real volume: solid=" + solidFill + ", hollowed=" + hollowedFill
+		);
+	}
+
+	/**
+	 * A band that ignores geography spreads evenly over ocean and continent
+	 * alike, which reads as scattered rather than designed.
+	 */
+	@Test
+	void aRegionBoundBandFollowsTheCoastline() {
+		RandomState overLand = state(bandShape(island(0.40, 180, 250, BandRegion.OVER_LAND)), 'd');
+
+		double aboveLand = bandSolidShare(overLand, 180, 250, true);
+		double aboveOcean = bandSolidShare(overLand, 180, 250, false);
+
+		assertTrue(
+			aboveLand > aboveOcean * 4.0 + 0.05,
+			() -> "an OVER_LAND band should stay over land: land=" + aboveLand + ", ocean=" + aboveOcean
+		);
+	}
+
+	@Test
+	void bandsStackIntoSeparateLayers() {
+		RandomState twoLayers = state(
+			bandShape(
+				island(0.40, 150, 190, BandRegion.ANYWHERE),
+				island(0.40, 240, 280, BandRegion.ANYWHERE)
+			),
+			'e'
+		);
+
+		double lower = bandSolidShare(twoLayers, 150, 190);
+		double gap = bandSolidShare(twoLayers, 205, 225);
+		double upper = bandSolidShare(twoLayers, 240, 280);
+
+		assertTrue(lower > 0.10, () -> "lower layer was " + lower);
+		assertTrue(upper > 0.10, () -> "upper layer was " + upper);
+		assertTrue(gap < lower / 2.0, () -> "the sky between layers should stay open, was " + gap);
 	}
 
 	@Test
@@ -193,11 +276,15 @@ final class WorldsmithTerrainSamplingTest {
 			verticalScale,
 			caveDensity,
 			new HydrologyIntent(0.0, 1.0, 0.8, 0.65, RiverFill.FLUID, 0.0, 1.0, 0.8, 1.0),
-			new SkyIntent()
+			List.of()
 		);
 	}
 
-	private static TerrainShape.Procedural skyShape(SkyIntent sky) {
+	private static TerrainBand island(double coverage, int minY, int maxY, BandRegion region) {
+		return new TerrainBand(coverage, minY, maxY, BandEffect.ADD, region, 1.4, 1.0);
+	}
+
+	private static TerrainShape.Procedural bandShape(TerrainBand... bands) {
 		TerrainShape.Procedural flat = shape(0.82, 1.0, 0.3, 0.9, 0.08, 0.02, 0.6, 0.0);
 		return new TerrainShape.Procedural(
 			flat.getLandRatio(),
@@ -207,7 +294,7 @@ final class WorldsmithTerrainSamplingTest {
 			flat.getVerticalScale(),
 			flat.getCaveDensity(),
 			flat.getHydrology(),
-			sky
+			List.of(bands)
 		);
 	}
 

@@ -1,7 +1,9 @@
 package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.Worldsmith;
-import com.wjz.worldsmith.core.model.SkyIntent;
+import com.wjz.worldsmith.core.model.BandEffect;
+import com.wjz.worldsmith.core.model.BandRegion;
+import com.wjz.worldsmith.core.model.TerrainBand;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.VanillaNoisePreset;
@@ -34,8 +36,14 @@ public final class WorldsmithNoiseSettings {
 	public static final ResourceKey<NoiseGeneratorSettings> WASTELAND =
 		ResourceKey.create(Registries.NOISE_SETTINGS, Worldsmith.id("wasteland"));
 
-	/** Blocks of vertical fade at each edge of a sky band. */
-	private static final int SKY_FADE = 12;
+	/** Blocks of vertical fade at each edge of a band. */
+	private static final int BAND_FADE = 12;
+	/** Scales a carving band so the branch that is not carving cannot win a min. */
+	private static final double CARVE_STRENGTH = 8.0;
+	/** Turns the soft continentalness signal into a decisive region boundary. */
+	private static final double REGION_EDGE = 6.0;
+	/** How narrow the coastal strip is; larger keeps it closer to the shoreline. */
+	private static final double COASTAL_EDGE = 8.0;
 
 	private WorldsmithNoiseSettings() {
 	}
@@ -251,11 +259,11 @@ public final class WorldsmithNoiseSettings {
 		// pushes density negative near the world ceiling, which would erase
 		// anything floating up there; post-processing is what interpolates and
 		// squeezes the field, which islands need as much as the ground does.
-		DensityFunction islands = skyIslands(shape.getSky(), shiftX, shiftZ, noises);
-		DensityFunction withSky = islands == null
-			? slidTerrain
-			: DensityFunctions.max(slidTerrain, islands);
-		DensityFunction finalDensity = NoiseRouterData.postProcess(withSky);
+		DensityFunction banded = slidTerrain;
+		for (TerrainBand band : shape.getBands()) {
+			banded = applyBand(banded, band, shiftX, shiftZ, continents, noises);
+		}
+		DensityFunction finalDensity = NoiseRouterData.postProcess(banded);
 		if (shape.getCaveDensity() > 0.0) {
 			DensityFunction noodleCarved = DensityFunctions.min(
 				finalDensity,
@@ -299,58 +307,119 @@ public final class WorldsmithNoiseSettings {
 	}
 
 	/**
-	 * A second body of rock, disconnected from the ground.
+	 * Joins one band to the terrain, by union or by subtraction.
 	 *
-	 * The ground field is {@code f(y) + g(x, z)} with f strictly decreasing, so
-	 * its density crosses zero exactly once per column: solid below, air above,
-	 * and no arrangement of the other knobs can produce a floating island. This
-	 * builds an independent field and the caller takes the union, which is what
-	 * lets a column read air, stone, air, stone.
-	 *
-	 * <p>Returns null when a world has no islands, so the emitted density graph
-	 * is byte for byte what it was before this existed rather than carrying a
-	 * union against a constant that can never win.
+	 * <p>A band with no coverage emits nothing at all, so a world that does not
+	 * use them has exactly the density graph it had before bands existed.
 	 */
-	private static DensityFunction skyIslands(
-		SkyIntent sky,
+	private static DensityFunction applyBand(
+		DensityFunction terrain,
+		TerrainBand band,
 		DensityFunction shiftX,
 		DensityFunction shiftZ,
+		DensityFunction continents,
 		HolderGetter<NormalNoise.NoiseParameters> noises
 	) {
-		if (sky.getCoverage() <= 0.0 || sky.getMinY() >= sky.getMaxY()) {
+		DensityFunction field = bandField(band, shiftX, shiftZ, continents, noises);
+		if (field == null) {
+			return terrain;
+		}
+		if (band.getEffect() == BandEffect.ADD) {
+			return DensityFunctions.max(terrain, field);
+		}
+		// Subtraction is the mirror of union, but the inactive branch has to be
+		// unable to win. The field saturates near -1.5 outside the band and the
+		// slid terrain stays well inside +-5, so scaling by -CARVE_STRENGTH puts
+		// "not carving here" far above any terrain value and "carving here" far
+		// below zero.
+		return DensityFunctions.min(
+			terrain,
+			DensityFunctions.mul(field, DensityFunctions.constant(-CARVE_STRENGTH))
+		);
+	}
+
+	/**
+	 * The three-dimensional field one band describes.
+	 *
+	 * <p>The ground field is {@code f(y) + g(x, z)} with f strictly decreasing,
+	 * so its density crosses zero exactly once per column: solid below, air
+	 * above, and no arrangement of the other knobs can float an island or hollow
+	 * out a world. This field is genuinely three-dimensional, which is what lets
+	 * the caller build a column that reads air, stone, air, stone.
+	 */
+	private static DensityFunction bandField(
+		TerrainBand band,
+		DensityFunction shiftX,
+		DensityFunction shiftZ,
+		DensityFunction continents,
+		HolderGetter<NormalNoise.NoiseParameters> noises
+	) {
+		if (band.getCoverage() <= 0.0 || band.getMinY() >= band.getMaxY()) {
 			return null;
 		}
 
 		// A plateau over the band rather than a peak: full strength through the
-		// middle, fading only near the edges so islands thin out instead of
-		// being sliced flat. A tent shape here would quietly redefine coverage
-		// as "coverage at one exact height" and produce almost nothing.
-		int fade = Math.min(SKY_FADE, Math.max(1, (sky.getMaxY() - sky.getMinY()) / 3));
-		DensityFunction band = DensityFunctions.min(
-			DensityFunctions.yClampedGradient(sky.getMinY(), sky.getMinY() + fade, -1.0, 1.0),
-			DensityFunctions.yClampedGradient(sky.getMaxY() - fade, sky.getMaxY(), 1.0, -1.0)
+		// middle, fading only near the edges so shapes thin out instead of being
+		// sliced flat. A tent shape here would quietly redefine coverage as
+		// "coverage at one exact height" and produce almost nothing.
+		int fade = Math.min(BAND_FADE, Math.max(1, (band.getMaxY() - band.getMinY()) / 3));
+		DensityFunction window = DensityFunctions.min(
+			DensityFunctions.yClampedGradient(band.getMinY(), band.getMinY() + fade, -1.0, 1.0),
+			DensityFunctions.yClampedGradient(band.getMaxY() - fade, band.getMaxY(), 1.0, -1.0)
 		);
 
-		// Larger islands mean lower frequency. Thickness squashes the vertical
-		// axis independently, which is the difference between boulders and
-		// flat shards.
-		double islandScale = Math.max(0.05, sky.getScale());
-		double xzFrequency = 1.0 / islandScale;
-		double yFrequency = xzFrequency / Math.max(0.05, sky.getThickness());
+		DensityFunction region = regionMask(band.getRegion(), continents);
+		if (region != null) {
+			window = DensityFunctions.min(window, region);
+		}
+
+		// Larger shapes mean lower frequency. Thickness squashes the vertical
+		// axis independently, which is the difference between boulders and flat
+		// shards.
+		double shapeScale = Math.max(0.05, band.getScale());
+		double xzFrequency = 1.0 / shapeScale;
+		double yFrequency = xzFrequency / Math.max(0.05, band.getThickness());
 		DensityFunction blobs = DensityFunctions.noise(
 			noises.getOrThrow(Noises.CAVE_CHEESE), xzFrequency, yFrequency
 		);
 
-		// Solid where the blob field clears the coverage threshold AND the
-		// column is inside the band: min is the intersection of the two.
-		DensityFunction solidEnough = DensityFunctions.add(
+		// Active where the blob field clears the coverage threshold AND the
+		// column is inside the window: min is the intersection of the two.
+		DensityFunction dense = DensityFunctions.add(
 			blobs,
-			DensityFunctions.constant(-skyThreshold(sky.getCoverage()))
+			DensityFunctions.constant(-skyThreshold(band.getCoverage()))
 		);
 		return DensityFunctions.mul(
-			DensityFunctions.min(band, solidEnough),
+			DensityFunctions.min(window, dense),
 			DensityFunctions.constant(1.5)
 		);
+	}
+
+	/**
+	 * A mask that is positive inside the named region and negative outside it.
+	 *
+	 * <p>Built from the same continentalness the biome source reads, so a band
+	 * tied to land really does follow the coastline the player sees rather than
+	 * an independently drawn one. The multipliers turn a soft signal into a
+	 * decisive edge; without them the mask would only weight the band instead of
+	 * bounding it.
+	 */
+	private static DensityFunction regionMask(BandRegion region, DensityFunction continents) {
+		DensityFunction landInput = DensityFunctions.add(continents, DensityFunctions.constant(0.11));
+		return switch (region) {
+			case ANYWHERE -> null;
+			case OVER_LAND -> DensityFunctions.mul(landInput, DensityFunctions.constant(REGION_EDGE));
+			case OVER_OCEAN -> DensityFunctions.mul(landInput, DensityFunctions.constant(-REGION_EDGE));
+			case INLAND -> DensityFunctions.mul(
+				DensityFunctions.add(continents, DensityFunctions.constant(-0.3)),
+				DensityFunctions.constant(REGION_EDGE)
+			);
+			// Positive only in the narrow strip where land meets water.
+			case COASTAL -> DensityFunctions.add(
+				DensityFunctions.constant(1.0),
+				DensityFunctions.mul(landInput.abs(), DensityFunctions.constant(-COASTAL_EDGE))
+			);
+		};
 	}
 
 	/**

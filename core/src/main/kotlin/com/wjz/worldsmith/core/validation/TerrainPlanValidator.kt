@@ -2,12 +2,14 @@ package com.wjz.worldsmith.core.validation
 
 import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.model.MaterialSelector
-import com.wjz.worldsmith.core.model.SkyIntent
+import com.wjz.worldsmith.core.model.BandEffect
+import com.wjz.worldsmith.core.model.TerrainBand
 import com.wjz.worldsmith.core.model.TerrainPlan
 import com.wjz.worldsmith.core.model.TerrainShape
 
 object TerrainPlanValidator {
-    private const val MIN_SKY_BAND = 24
+    private const val MIN_BAND_HEIGHT = 24
+    private const val MAX_BANDS = 6
     fun validate(plan: TerrainPlan): List<Diagnostic> = buildList {
         if (plan.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
             add(error("schemaVersion", "UNSUPPORTED_SCHEMA", "Unsupported terrain schema ${plan.schemaVersion}"))
@@ -60,7 +62,7 @@ object TerrainPlanValidator {
                 if (shape.caveDensity !in 0.0..1.0) {
                     add(error("shape.caveDensity", "CAVE_DENSITY_OUT_OF_RANGE", "Cave density must be between 0 and 1"))
                 }
-                addAll(validateSky(shape.sky, plan))
+                addAll(validateBands(shape.bands, plan))
                 val hydrology = shape.hydrology
                 if (hydrology.riverCoverage !in 0.0..0.35) {
                     add(error("shape.hydrology.riverCoverage", "RIVER_COVERAGE_OUT_OF_RANGE", "River coverage must be between 0 and 0.35"))
@@ -108,54 +110,64 @@ object TerrainPlanValidator {
     }
 
     /**
-     * Islands only exist between [SkyIntent.minY] and [SkyIntent.maxY], so a
-     * band outside the world, or inverted, or under the sea would silently
-     * produce nothing at all rather than the world the prompt asked for.
+     * A band that can never do anything is worth catching here.
+     *
+     * Bands only act between their two heights, so one outside the world, or
+     * inverted, or buried under the sea produces silence rather than the world
+     * the prompt described - and silence is exactly what cannot be debugged
+     * from in-game.
      */
-    private fun validateSky(sky: SkyIntent, plan: TerrainPlan): List<Diagnostic> = buildList {
-        if (sky.coverage !in 0.0..1.0) {
-            add(error("shape.sky.coverage", "SKY_COVERAGE_OUT_OF_RANGE", "Sky coverage must be between 0 and 1"))
+    private fun validateBands(bands: List<TerrainBand>, plan: TerrainPlan): List<Diagnostic> = buildList {
+        if (bands.size > MAX_BANDS) {
+            add(error("shape.bands", "TOO_MANY_BANDS", "A world may layer at most $MAX_BANDS terrain bands"))
         }
-        if (sky.scale !in 0.1..8.0) {
-            add(error("shape.sky.scale", "SKY_SCALE_OUT_OF_RANGE", "Sky island scale must be between 0.1 and 8"))
-        }
-        if (sky.thickness !in 0.1..8.0) {
-            add(error("shape.sky.thickness", "SKY_THICKNESS_OUT_OF_RANGE", "Sky island thickness must be between 0.1 and 8"))
-        }
-        if (sky.coverage <= 0.0) {
-            return@buildList
-        }
-
         val worldTop = plan.minY + plan.height
-        if (sky.minY >= sky.maxY) {
-            add(error("shape.sky", "REVERSED_SKY_BAND", "Sky islands must start below where they end"))
-        }
-        if (sky.minY < plan.minY || sky.maxY > worldTop) {
-            add(
-                error(
-                    "shape.sky",
-                    "SKY_BAND_OUTSIDE_WORLD",
-                    "Sky band " + sky.minY + ".." + sky.maxY + " leaves the world height " + plan.minY + ".." + worldTop,
-                ),
-            )
-        }
-        if (sky.maxY - sky.minY < MIN_SKY_BAND) {
-            add(
-                warning(
-                    "shape.sky",
-                    "SKY_BAND_TOO_THIN",
-                    "A band under " + MIN_SKY_BAND + " blocks tall leaves room for slivers rather than islands",
-                ),
-            )
-        }
-        if (sky.minY < plan.seaLevel) {
-            add(
-                warning(
-                    "shape.sky",
-                    "SKY_BAND_BELOW_SEA_LEVEL",
-                    "Islands starting below sea level " + plan.seaLevel + " will merge into the ground and the sea",
-                ),
-            )
+        bands.forEachIndexed { index, band ->
+            val path = "shape.bands[$index]"
+            if (band.coverage !in 0.0..1.0) {
+                add(error("$path.coverage", "BAND_COVERAGE_OUT_OF_RANGE", "Band coverage must be between 0 and 1"))
+            }
+            if (band.scale !in 0.1..8.0) {
+                add(error("$path.scale", "BAND_SCALE_OUT_OF_RANGE", "Band scale must be between 0.1 and 8"))
+            }
+            if (band.thickness !in 0.1..8.0) {
+                add(error("$path.thickness", "BAND_THICKNESS_OUT_OF_RANGE", "Band thickness must be between 0.1 and 8"))
+            }
+            if (band.minY >= band.maxY) {
+                add(error(path, "REVERSED_BAND", "A band must start below where it ends"))
+            }
+            if (band.minY < plan.minY || band.maxY > worldTop) {
+                add(
+                    error(
+                        path,
+                        "BAND_OUTSIDE_WORLD",
+                        "Band " + band.minY + ".." + band.maxY + " leaves the world height " + plan.minY + ".." + worldTop,
+                    ),
+                )
+            }
+            if (band.coverage <= 0.0) {
+                add(warning(path, "BAND_HAS_NO_EFFECT", "A band with zero coverage changes nothing"))
+                return@forEachIndexed
+            }
+            if (band.maxY - band.minY < MIN_BAND_HEIGHT) {
+                add(
+                    warning(
+                        path,
+                        "BAND_TOO_THIN",
+                        "A band under " + MIN_BAND_HEIGHT + " blocks tall leaves room for slivers rather than shapes",
+                    ),
+                )
+            }
+            if (band.effect == BandEffect.ADD && band.minY < plan.seaLevel) {
+                add(
+                    warning(
+                        path,
+                        "BAND_MERGES_WITH_GROUND",
+                        "An additive band starting below sea level " + plan.seaLevel +
+                            " will merge into the ground and the sea rather than float over them",
+                    ),
+                )
+            }
         }
     }
 

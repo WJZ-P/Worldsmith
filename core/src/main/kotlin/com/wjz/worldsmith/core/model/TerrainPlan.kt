@@ -74,24 +74,50 @@ data class HydrologyIntent(
  * unchanged Mojang router. The closed tagged set also leaves room for future
  * terrain models.
  */
+/** Whether a band puts rock where there was none, or takes it away. */
+@Serializable
+enum class BandEffect {
+    ADD,
+    CARVE,
+}
+
 /**
- * Land that floats free of the ground.
+ * Where a band applies, named in terms of the world's own geography.
  *
- * Everything else in [TerrainShape.Procedural] describes a height field: for any
- * column there is one height, solid below and air above, which is why tall
- * spires and deep caves can imply islands but never actually detach one. This
- * block is the exception. It adds a second body of rock that is combined with
- * the ground by union rather than by sum, so a column may pass through air,
- * stone, air and stone again.
- *
- * [coverage] at zero means no islands, which is what almost every world wants
- * and therefore the default.
+ * A band that ignores geography spreads evenly over ocean and continent alike,
+ * which reads as scattered rather than designed. Tying it to the same
+ * continentalness signal that decides land and sea is what makes it look like
+ * part of the world instead of a layer laid on top.
  */
 @Serializable
-data class SkyIntent(
-    val coverage: Double = 0.0,
-    val minY: Int = 160,
-    val maxY: Int = 240,
+enum class BandRegion {
+    ANYWHERE,
+    OVER_LAND,
+    OVER_OCEAN,
+    INLAND,
+    COASTAL,
+}
+
+/**
+ * One body of rock, or one absence of it, layered onto the height field.
+ *
+ * Everything else in [TerrainShape.Procedural] describes a height field: the
+ * density is a decreasing function of Y plus a function of X and Z, so it
+ * crosses zero exactly once per column - solid below, air above. No combination
+ * of those controls can float an island, hollow out a world, or cut a canyon
+ * that is not simply a low place in the surface.
+ *
+ * A band is the exception. It is an independent three-dimensional field joined
+ * to the ground by union or subtraction rather than by sum, which is what lets
+ * a column read air, stone, air, stone.
+ */
+@Serializable
+data class TerrainBand(
+    val coverage: Double,
+    val minY: Int,
+    val maxY: Int,
+    val effect: BandEffect = BandEffect.ADD,
+    val region: BandRegion = BandRegion.ANYWHERE,
     val scale: Double = 1.0,
     val thickness: Double = 1.0,
 )
@@ -121,7 +147,7 @@ sealed interface TerrainShape {
         val verticalScale: Double,
         val caveDensity: Double,
         val hydrology: HydrologyIntent,
-        val sky: SkyIntent = SkyIntent(),
+        val bands: List<TerrainBand> = emptyList(),
     ) : TerrainShape
 }
 
