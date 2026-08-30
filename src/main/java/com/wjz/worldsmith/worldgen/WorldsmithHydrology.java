@@ -185,8 +185,50 @@ final class WorldsmithHydrology {
 		return normalQuantile(1.0 - Math.max(probability, 0.000_001), sigma);
 	}
 
+	static double riverEffectAt(
+		double coverage,
+		double width,
+		double meander,
+		NormalNoise routeNoise,
+		NormalNoise bendNoise,
+		int blockX,
+		int blockZ
+	) {
+		if (coverage <= 0.0) {
+			return 0.0;
+		}
+		double scale = RIVER_ROUTE_SCALE / width;
+		double bendWeight = meander * 0.55;
+		double route = routeNoise.getValue(blockX * scale, 0.0, blockZ * scale)
+			+ bendNoise.getValue(blockX * scale * 0.47, 0.0, blockZ * scale * 0.47) * bendWeight;
+		double sigma = HORIZONTAL_NOISE_SIGMA * Math.sqrt(1.0 + bendWeight * bendWeight);
+		double threshold = centralProbabilityThreshold(coverage, sigma);
+		double raw = clamp((threshold - Math.abs(route)) / threshold, 0.0, 1.0);
+		return clamp(raw * 3.0, 0.0, 1.0);
+	}
+
+	static double lakeEffectAt(
+		double density,
+		double scale,
+		NormalNoise lakeNoise,
+		int blockX,
+		int blockZ
+	) {
+		if (density <= 0.0) {
+			return 0.0;
+		}
+		double value = lakeNoise.getValue(blockX * LAKE_FIELD_SCALE / scale, 0.0, blockZ * LAKE_FIELD_SCALE / scale);
+		double threshold = upperTailThreshold(density, HORIZONTAL_NOISE_SIGMA);
+		double raw = clamp((value - threshold) / 0.18, 0.0, 1.0);
+		return clamp(raw * 3.0, 0.0, 1.0);
+	}
+
 	private static double normalQuantile(double cumulative, double sigma) {
 		double bounded = Math.max(0.000_001, Math.min(0.999_999, cumulative));
 		return (sigma / LOGISTIC_NORMAL_SCALE) * Math.log(bounded / (1.0 - bounded));
+	}
+
+	private static double clamp(double value, double min, double max) {
+		return Math.max(min, Math.min(max, value));
 	}
 }

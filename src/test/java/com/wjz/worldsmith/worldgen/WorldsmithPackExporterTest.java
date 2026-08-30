@@ -22,7 +22,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import net.minecraft.SharedConstants;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistrySetBuilder;
@@ -31,7 +30,6 @@ import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,8 +51,7 @@ final class WorldsmithPackExporterTest {
 
 	@BeforeAll
 	static void bootstrapMinecraft() {
-		SharedConstants.tryDetectVersion();
-		Bootstrap.bootStrap();
+		WorldsmithTestBootstrap.bootStrap();
 		vanilla = VanillaRegistries.createLookup();
 	}
 
@@ -88,6 +85,14 @@ final class WorldsmithPackExporterTest {
 		Path output = this.tempDirectory.resolve("readback");
 		WorldsmithPackExporter.write(pack, compiled.patches(), output);
 		RegistryOps<JsonElement> ops = compiled.full().createSerializationContext(JsonOps.INSTANCE);
+		String surfaceGrammar = readJson(
+			output.resolve("data/worldsmith/worldgen/noise_settings/wasteland.json")
+		).toString();
+		assertTrue(surfaceGrammar.contains("worldsmith:hydrology"));
+		assertTrue(surfaceGrammar.contains("dry_riverbed"));
+		assertTrue(surfaceGrammar.contains("minecraft:stone_depth"));
+		assertTrue(surfaceGrammar.contains("minecraft:noise_threshold"));
+		assertTrue(surfaceGrammar.contains("minecraft:y_above"));
 
 		int decoded = 0;
 		for (RegistryDataLoader.RegistryData<?> data : RegistryDataLoader.WORLDGEN_REGISTRIES) {

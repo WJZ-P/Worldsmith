@@ -12,10 +12,8 @@ import com.wjz.worldsmith.core.model.WorldsmithPackManifest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import net.minecraft.SharedConstants;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.registries.VanillaRegistries;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.RandomState;
 import org.junit.jupiter.api.BeforeAll;
@@ -29,8 +27,7 @@ final class WorldsmithHydrologySamplingTest {
 
 	@BeforeAll
 	static void bootstrapMinecraft() {
-		SharedConstants.tryDetectVersion();
-		Bootstrap.bootStrap();
+		WorldsmithTestBootstrap.bootStrap();
 		activeWorldgen = WorldsmithPackExporter.compilePatch(
 			WorldsmithPacks.builtinCompiled(),
 			VanillaRegistries.createLookup()

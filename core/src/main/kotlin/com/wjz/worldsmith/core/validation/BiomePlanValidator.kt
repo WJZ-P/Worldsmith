@@ -9,6 +9,9 @@ import com.wjz.worldsmith.core.model.ClimateBands
 import com.wjz.worldsmith.core.model.ClimateBox
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.NumericRange
+import com.wjz.worldsmith.core.model.SurfaceConditions
+import com.wjz.worldsmith.core.model.SurfaceDefinition
+import com.wjz.worldsmith.core.model.SurfaceStack
 
 /**
  * Deterministic checks for a merged biome plan.
@@ -95,12 +98,7 @@ object BiomePlanValidator {
 
         addAll(validateEnvironment(path + ".environment", biome.environment))
 
-        addAll(FeatureLibraryValidator.validateMaterial(path + ".surface.top", biome.surface.top))
-        addAll(FeatureLibraryValidator.validateMaterial(path + ".surface.under", biome.surface.under))
-        addAll(FeatureLibraryValidator.validateMaterial(path + ".surface.deep", biome.surface.deep))
-        biome.surface.steepOverride?.let {
-            addAll(FeatureLibraryValidator.validateMaterial(path + ".surface.steepOverride", it))
-        }
+        addAll(validateSurface(path + ".surface", biome.surface))
 
         (biome.tags.add + biome.tags.remove).forEachIndexed { index, tag ->
             if (!RESOURCE_ID.matches(tag)) {
@@ -202,6 +200,77 @@ object BiomePlanValidator {
         }
     }
 
+    private fun validateSurface(path: String, surface: SurfaceDefinition): List<Diagnostic> = buildList {
+        addAll(validateStack("$path.base", surface.base))
+        if (surface.rules.size > MAX_SURFACE_RULES) {
+            add(error("$path.rules", "TOO_MANY_SURFACE_RULES", "A biome may define at most $MAX_SURFACE_RULES surface rules"))
+        }
+        surface.rules.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys.sorted().forEach { id ->
+            add(error("$path.rules[$id]", "DUPLICATE_SURFACE_RULE", "Surface rule id must be unique inside its biome"))
+        }
+        surface.rules.forEachIndexed { index, rule ->
+            val rulePath = "$path.rules[$index]"
+            if (!ID.matches(rule.id)) {
+                add(error("$rulePath.id", "INVALID_SURFACE_RULE_ID", "Surface rule id must match ${ID.pattern}"))
+            }
+            addAll(validateConditions("$rulePath.conditions", rule.conditions))
+            addAll(validateStack("$rulePath.stack", rule.stack))
+        }
+    }
+
+    private fun validateConditions(path: String, conditions: SurfaceConditions): List<Diagnostic> = buildList {
+        if (
+            conditions.altitude == null &&
+            conditions.slope == null &&
+            conditions.water == null &&
+            conditions.temperature == null &&
+            conditions.noise == null &&
+            conditions.hydrology == null
+        ) {
+            add(error(path, "EMPTY_SURFACE_CONDITIONS", "A surface override must declare at least one condition"))
+        }
+        conditions.altitude?.let { altitude ->
+            if (altitude.min == null && altitude.max == null) {
+                add(error("$path.altitude", "EMPTY_ALTITUDE_RANGE", "Altitude must declare min, max or both"))
+            }
+            if (altitude.min != null && altitude.max != null && altitude.min > altitude.max) {
+                add(error("$path.altitude", "REVERSED_RANGE", "Altitude minimum must not exceed its maximum"))
+            }
+            listOfNotNull(altitude.min, altitude.max).forEach { value ->
+                if (value !in MIN_SURFACE_Y..MAX_SURFACE_Y) {
+                    add(error("$path.altitude", "ALTITUDE_OUT_OF_RANGE", "Altitude must remain between $MIN_SURFACE_Y and $MAX_SURFACE_Y"))
+                }
+            }
+        }
+        conditions.noise?.let { noise ->
+            if (noise.min > noise.max) {
+                add(error("$path.noise", "REVERSED_RANGE", "Noise minimum must not exceed its maximum"))
+            }
+            if (noise.min !in -2.0..2.0 || noise.max !in -2.0..2.0) {
+                add(error("$path.noise", "NOISE_RANGE_OUT_OF_BOUNDS", "Surface noise ranges must remain between -2 and 2"))
+            }
+        }
+    }
+
+    private fun validateStack(path: String, stack: SurfaceStack): List<Diagnostic> = buildList {
+        if (stack.layers.isEmpty()) {
+            add(error("$path.layers", "EMPTY_SURFACE_STACK", "A surface stack must contain at least one exposed layer"))
+        }
+        var totalDepth = 0
+        stack.layers.forEachIndexed { index, layer ->
+            if (layer.depth !in 1..MAX_LAYER_DEPTH) {
+                add(error("$path.layers[$index].depth", "LAYER_DEPTH_OUT_OF_RANGE", "Layer depth must be between 1 and $MAX_LAYER_DEPTH"))
+            } else {
+                totalDepth += layer.depth
+            }
+            addAll(FeatureLibraryValidator.validateMaterial("$path.layers[$index].material", layer.material))
+        }
+        if (totalDepth > MAX_SURFACE_DEPTH) {
+            add(error("$path.layers", "SURFACE_STACK_TOO_DEEP", "Combined surface layer depth must not exceed $MAX_SURFACE_DEPTH"))
+        }
+        addAll(FeatureLibraryValidator.validateMaterial("$path.foundation", stack.foundation))
+    }
+
     fun validateClimate(path: String, climate: ClimateBox): List<Diagnostic> = buildList {
         listOf(
             "temperature" to climate.temperature,
@@ -227,5 +296,11 @@ object BiomePlanValidator {
 
     private fun error(path: String, code: String, message: String) =
         Diagnostic(path, code, DiagnosticSeverity.ERROR, message)
+
+    private const val MAX_SURFACE_RULES = 32
+    private const val MAX_LAYER_DEPTH = 8
+    private const val MAX_SURFACE_DEPTH = 8
+    private const val MIN_SURFACE_Y = -2048
+    private const val MAX_SURFACE_Y = 2048
 
 }

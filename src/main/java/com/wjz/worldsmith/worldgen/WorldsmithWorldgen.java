@@ -8,6 +8,6 @@ public final class WorldsmithWorldgen {
 	}
 
 	public static void initialize() {
-		// World presets, codecs, and dynamic-registry hooks will be registered here.
+		WorldsmithSurfaceConditionTypes.initialize();
 	}
 }

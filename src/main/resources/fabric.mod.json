@@ -9,6 +9,7 @@
 	],
 	"license": "All-Rights-Reserved",
 	"environment": "*",
+	"accessWidener": "worldsmith.accesswidener",
 	"entrypoints": {
 		"main": [
 			"com.wjz.worldsmith.Worldsmith"

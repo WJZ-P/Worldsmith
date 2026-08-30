@@ -80,6 +80,9 @@ class WorldsmithWorkflowTest {
         // generator uses, so this fails if the two ever drift apart.
         val contract = brief.text("designContract")
         assertTrue("only standard" in contract.lowercase(), "the contract should make the prompt authoritative")
+        assertTrue("Surface grammar" in contract)
+        assertTrue("DRY_RIVERBED" in contract)
+        assertTrue("Earlier rules have higher priority" in contract)
         val terrainContract = brief.text("terrainContract")
         assertTrue("landRatio" in terrainContract)
         assertTrue("continentScale" in terrainContract)

@@ -66,12 +66,61 @@ overlapping boxes because their tie would make one biome effectively hidden.
   pigment. Vary them: biomes that differ in height or temperature should not
   resolve to the same palette.
 - Use semantic material roles first; preferred Minecraft IDs are hints only.
+- Build every biome's `surface` as one required `base` stack plus an ordered
+  `rules` list. Earlier rules have higher priority; all fields inside one
+  `conditions` object are ANDed.
 - Declare each feature once in the feature library and reference it by id from
   every biome that wants it. Override `density` on the reference only when a
   biome genuinely needs a different amount.
 - `features` may be empty. Prefer empty over inventing life a dead world would
   not support.
 - Keep every biome recognisably part of the same world as the world bible.
+
+## Surface grammar
+
+A stack lists fixed-thickness layers from the exposed block downward, followed
+by a foundation material:
+
+```json
+"surface": {
+  "base": {
+    "layers": [
+      { "material": { "semanticRole": "ash_crust", "preferredIds": ["minecraft:gravel"] }, "depth": 1 },
+      { "material": { "semanticRole": "ash_subsoil", "preferredIds": ["minecraft:tuff"] }, "depth": 3 }
+    ],
+    "foundation": { "semanticRole": "bedrock_mass", "preferredIds": ["minecraft:deepslate"] }
+  },
+  "rules": [
+    {
+      "id": "dry_riverbed",
+      "conditions": { "water": "ABOVE_WATER", "hydrology": "DRY_RIVERBED" },
+      "stack": {
+        "layers": [
+          { "material": { "semanticRole": "river_rubble", "preferredIds": ["minecraft:gravel"] }, "depth": 3 }
+        ],
+        "foundation": { "semanticRole": "bedrock_mass", "preferredIds": ["minecraft:deepslate"] }
+      }
+    }
+  ]
+}
+```
+
+Each layer depth is `1..8`; one stack totals at most 8 blocks. Every rule has
+a unique lowercase id and at least one condition. Available conditions are:
+
+- `altitude`: `{ "min": Y }`, `{ "max": Y }`, or both;
+- `slope`: `STEEP` or `GENTLE`;
+- `water`: `ABOVE_WATER` or `UNDERWATER`;
+- `temperature`: `FREEZING` or `NON_FREEZING`;
+- `noise`: a band with `noise`, `min`, `max`; noise is one of `PATCH`,
+  `GRAVEL`, `CALCITE`, `SURFACE`, `SECONDARY`, `RUGGED`;
+- `hydrology`: `DRY_RIVERBED`, `WET_RIVERBED`, `RIVER_BANK`, or `LAKEBED`.
+
+Hydrology conditions must agree with the terrain document: a dry-river rule
+requires non-zero `DRY` rivers, a wet-river rule requires non-zero `FLUID`
+rivers, and a lakebed rule requires non-zero lake density. Use altitude plus
+temperature for snow lines, water plus noise for seabed patches, and slope for
+cliffs. Return this semantic grammar rather than Minecraft SurfaceRules nodes.
 
 ## Output
 

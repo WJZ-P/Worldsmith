@@ -1,5 +1,7 @@
 package com.wjz.worldsmith.core.pack
 
+import com.wjz.worldsmith.core.model.RiverFill
+import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.validation.WorldsmithPackValidator
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -50,6 +52,21 @@ class WorldsmithPackLoaderTest {
         val diagnostics = WorldsmithPackValidator.validate(pack)
 
         assertTrue(diagnostics.any { it.path == "terrain.seaLevel" && it.code == "SEA_LEVEL_OUT_OF_RANGE" })
+    }
+
+    @Test
+    fun `surface hydrology rules must be reachable from terrain intent`() {
+        val original = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
+        val shape = original.terrain.shape as TerrainShape.Procedural
+        val mismatched = original.copy(
+            terrain = original.terrain.copy(
+                shape = shape.copy(hydrology = shape.hydrology.copy(riverFill = RiverFill.FLUID)),
+            ),
+        )
+
+        val diagnostics = WorldsmithPackValidator.validate(mismatched)
+
+        assertTrue(diagnostics.any { it.code == "UNREACHABLE_HYDROLOGY_SIGNAL" })
     }
 
     @Test

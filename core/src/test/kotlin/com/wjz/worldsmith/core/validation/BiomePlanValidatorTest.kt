@@ -12,7 +12,14 @@ import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.ReliefBand
-import com.wjz.worldsmith.core.model.SurfaceLayers
+import com.wjz.worldsmith.core.model.SurfaceAltitude
+import com.wjz.worldsmith.core.model.SurfaceConditions
+import com.wjz.worldsmith.core.model.SurfaceDefinition
+import com.wjz.worldsmith.core.model.SurfaceLayer
+import com.wjz.worldsmith.core.model.SurfaceNoise
+import com.wjz.worldsmith.core.model.SurfaceNoiseBand
+import com.wjz.worldsmith.core.model.SurfaceRuleDefinition
+import com.wjz.worldsmith.core.model.SurfaceStack
 import com.wjz.worldsmith.core.model.TemperatureBand
 import com.wjz.worldsmith.core.model.VegetationRecipe
 import com.wjz.worldsmith.core.model.WaterFog
@@ -153,6 +160,45 @@ class BiomePlanValidatorTest {
         assertTrue("REVERSED_RANGE" in codes)
     }
 
+    @Test
+    fun `surface grammar reports invalid layers and conditions`() {
+        val brokenRule = SurfaceRuleDefinition(
+            id = "BAD RULE",
+            conditions = SurfaceConditions(
+                altitude = SurfaceAltitude(min = 200, max = 100),
+                noise = SurfaceNoiseBand(SurfaceNoise.PATCH, min = 0.8, max = -0.8),
+            ),
+            stack = SurfaceStack(
+                layers = listOf(SurfaceLayer(material("bad_layer", "minecraft:gravel"), 17)),
+                foundation = material("foundation", "minecraft:stone"),
+            ),
+        )
+        val broken = plan().let { plan ->
+            plan.copy(
+                biomes = plan.biomes.mapIndexed { index, biome ->
+                    if (index == 0) {
+                        biome.copy(
+                            surface = SurfaceDefinition(
+                                base = SurfaceStack(emptyList(), material("foundation", "minecraft:stone")),
+                                rules = listOf(brokenRule, brokenRule),
+                            ),
+                        )
+                    } else {
+                        biome
+                    }
+                },
+            )
+        }
+
+        val codes = BiomePlanValidator.validate(broken, library()).map { it.code }.toSet()
+
+        assertTrue("EMPTY_SURFACE_STACK" in codes)
+        assertTrue("DUPLICATE_SURFACE_RULE" in codes)
+        assertTrue("INVALID_SURFACE_RULE_ID" in codes)
+        assertTrue("REVERSED_RANGE" in codes)
+        assertTrue("LAYER_DEPTH_OUT_OF_RANGE" in codes)
+    }
+
     private fun library() = FeatureLibrary(
         features = listOf(
             FeatureDefinition("ash_scrub", VegetationRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), 0.45),
@@ -180,10 +226,15 @@ class BiomePlanValidatorTest {
         archetype = archetype,
         slot = slot,
         behavior = BiomeBehavior(temperature = 0.5f, downfall = 0.4f, hasPrecipitation = true),
-        surface = SurfaceLayers(
-            top = material("surface_top", "minecraft:coarse_dirt"),
-            under = material("surface_under", "minecraft:dirt"),
-            deep = material("surface_deep", "minecraft:tuff"),
+        surface = SurfaceDefinition(
+            base = SurfaceStack(
+                layers = listOf(
+                    SurfaceLayer(material("surface_top", "minecraft:coarse_dirt"), 1),
+                    SurfaceLayer(material("surface_under", "minecraft:dirt"), 3),
+                ),
+                foundation = material("surface_deep", "minecraft:tuff"),
+            ),
+            rules = emptyList(),
         ),
         environment = BiomeEnvironment(
             grassColor = "#7A6C55",

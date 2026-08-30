@@ -286,7 +286,7 @@ public final class WorldsmithNoiseSettings {
 		);
 	}
 
-	private static double landBias(double landRatio) {
+	static double landBias(double landRatio) {
 		if (landRatio <= 0.0) {
 			return -2.0;
 		}

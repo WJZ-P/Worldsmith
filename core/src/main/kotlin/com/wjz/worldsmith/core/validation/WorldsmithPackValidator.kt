@@ -1,6 +1,9 @@
 package com.wjz.worldsmith.core.validation
 
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
+import com.wjz.worldsmith.core.model.RiverFill
+import com.wjz.worldsmith.core.model.SurfaceHydrology
+import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.WorldsmithPack
 
 object WorldsmithPackValidator {
@@ -33,6 +36,51 @@ object WorldsmithPackValidator {
         addAll(TerrainPlanValidator.validate(pack.terrain).map { it.prefixed("terrain") })
         addAll(FeatureLibraryValidator.validate(pack.features).map { it.prefixed("features") })
         addAll(BiomePlanValidator.validate(pack.biomes, pack.features).map { it.prefixed("biomes") })
+        addAll(validateSurfaceTerrainLinks(pack))
+    }
+
+    private fun validateSurfaceTerrainLinks(pack: WorldsmithPack): List<Diagnostic> = buildList {
+        val shape = pack.terrain.shape
+        val minY = pack.terrain.minY
+        val maxY = minY + pack.terrain.height - 1
+        pack.biomes.biomes.forEachIndexed { biomeIndex, biome ->
+            biome.surface.rules.forEachIndexed { ruleIndex, rule ->
+                val path = "biomes.biomes[$biomeIndex].surface.rules[$ruleIndex].conditions"
+                rule.conditions.altitude?.let { altitude ->
+                    if (altitude.min != null && altitude.min > maxY || altitude.max != null && altitude.max < minY) {
+                        add(error("$path.altitude", "UNREACHABLE_ALTITUDE", "Altitude range does not intersect terrain height $minY..$maxY"))
+                    }
+                }
+                val signal = rule.conditions.hydrology ?: return@forEachIndexed
+                if (shape !is TerrainShape.Procedural) {
+                    add(error("$path.hydrology", "HYDROLOGY_REQUIRES_PROCEDURAL_TERRAIN", "Hydrology surface conditions require procedural terrain"))
+                    return@forEachIndexed
+                }
+                val hydrology = shape.hydrology
+                when (signal) {
+                    SurfaceHydrology.DRY_RIVERBED -> {
+                        if (hydrology.riverCoverage == 0.0 || hydrology.riverFill != RiverFill.DRY) {
+                            add(error("$path.hydrology", "UNREACHABLE_HYDROLOGY_SIGNAL", "DRY_RIVERBED requires non-zero DRY rivers"))
+                        }
+                    }
+                    SurfaceHydrology.WET_RIVERBED -> {
+                        if (hydrology.riverCoverage == 0.0 || hydrology.riverFill != RiverFill.FLUID) {
+                            add(error("$path.hydrology", "UNREACHABLE_HYDROLOGY_SIGNAL", "WET_RIVERBED requires non-zero FLUID rivers"))
+                        }
+                    }
+                    SurfaceHydrology.RIVER_BANK -> {
+                        if (hydrology.riverCoverage == 0.0) {
+                            add(error("$path.hydrology", "UNREACHABLE_HYDROLOGY_SIGNAL", "RIVER_BANK requires non-zero river coverage"))
+                        }
+                    }
+                    SurfaceHydrology.LAKEBED -> {
+                        if (hydrology.lakeDensity == 0.0) {
+                            add(error("$path.hydrology", "UNREACHABLE_HYDROLOGY_SIGNAL", "LAKEBED requires non-zero lake density"))
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun Diagnostic.prefixed(prefix: String) = copy(path = "$prefix.$path")

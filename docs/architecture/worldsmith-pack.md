@@ -143,6 +143,56 @@ zero at ground level and approaching one deep underground.
 Worldsmith imposes no required biome count, distribution symmetry or coverage
 quota. Those decisions come from the player prompt.
 
+## Surface grammar
+
+Each biome owns one base stack and an ordered list of conditional overrides.
+Stacks are fixed-thickness layers from the exposed block downward plus a
+foundation material:
+
+```json
+"surface": {
+  "base": {
+    "layers": [
+      { "material": { "semanticRole": "dust", "preferredIds": ["minecraft:gravel"] }, "depth": 1 },
+      { "material": { "semanticRole": "subsoil", "preferredIds": ["minecraft:tuff"] }, "depth": 3 }
+    ],
+    "foundation": { "semanticRole": "deep_rock", "preferredIds": ["minecraft:deepslate"] }
+  },
+  "rules": [
+    {
+      "id": "high_cliff",
+      "conditions": {
+        "altitude": { "min": 150 },
+        "slope": "STEEP",
+        "temperature": "FREEZING"
+      },
+      "stack": {
+        "layers": [
+          { "material": { "semanticRole": "frozen_cliff", "preferredIds": ["minecraft:calcite"] }, "depth": 4 }
+        ],
+        "foundation": { "semanticRole": "deep_rock", "preferredIds": ["minecraft:deepslate"] }
+      }
+    }
+  ]
+}
+```
+
+Rules are evaluated in array order and the first matching stack wins. Fields in
+one conditions object are ANDed. Conditions cover absolute altitude, steep or
+gentle slopes, above-water or underwater surfaces, freezing state, semantic
+noise bands and Worldsmith hydrology signals. The hydrology material condition
+samples the same route and basin masks used by terrain density, so a
+`DRY_RIVERBED` surface follows the generated dry valley rather than an unrelated
+decorative noise.
+
+One layer is 1–8 blocks thick and one stack totals at most eight blocks, matching
+the surface-building window around Minecraft's preliminary surface. The
+foundation fills the remainder of that window and exposed deep floor material.
+
+The target compiler turns the grammar into one dimension-wide Minecraft
+`SurfaceRules` tree. AI documents remain independent of Minecraft's nested
+material-condition codec.
+
 ## Tags
 
 An archetype supplies a default tag set, and `tags.add` / `tags.remove` adjust
