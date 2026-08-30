@@ -15,6 +15,8 @@ class TerrainShapeTest {
         val shape = assertInstanceOf(TerrainShape.Procedural::class.java, terrain.shape)
         assertEquals(0.55, shape.landRatio)
         assertEquals(ReliefDistribution(0.65, 0.25, 0.10), shape.relief)
+        assertEquals(RiverFill.DRY, shape.hydrology.riverFill)
+        assertEquals(1.25, shape.hydrology.oceanDepth)
     }
 
     /**
@@ -41,13 +43,47 @@ class TerrainShapeTest {
             relief = ReliefDistribution(flats = 0.2, highlands = 0.3, peaks = 0.5),
             verticalScale = 1.8,
             caveDensity = 0.15,
+            hydrology = HydrologyIntent(
+                riverCoverage = 0.08,
+                riverWidth = 1.7,
+                riverDepth = 1.2,
+                riverMeander = 0.9,
+                riverFill = RiverFill.DRY,
+                lakeDensity = 0.05,
+                lakeScale = 2.0,
+                lakeDepth = 0.6,
+                oceanDepth = 1.4,
+            ),
         )
 
         val encoded = WorldsmithJson.encode<TerrainShape>(shape)
 
         assertTrue("\"kind\": \"procedural\"" in encoded)
+        assertTrue("\"riverFill\": \"DRY\"" in encoded)
         assertTrue("NoiseRouter" !in encoded)
         assertEquals(shape, WorldsmithJson.decode<TerrainShape>(encoded))
+    }
+
+    @Test
+    fun `terrain v2 documents decode with neutral hydrology`() {
+        val legacy = """
+            {
+              "kind": "procedural",
+              "landRatio": 0.7,
+              "continentScale": 1.4,
+              "coastRoughness": 0.2,
+              "relief": { "flats": 0.8, "highlands": 0.15, "peaks": 0.05 },
+              "verticalScale": 0.9,
+              "caveDensity": 0.3
+            }
+        """.trimIndent()
+
+        val decoded = assertInstanceOf(
+            TerrainShape.Procedural::class.java,
+            WorldsmithJson.decode<TerrainShape>(legacy),
+        )
+
+        assertEquals(HydrologyIntent(), decoded.hydrology)
     }
 
     @Test

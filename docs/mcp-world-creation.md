@@ -39,9 +39,9 @@ The guided MCP contract requires this sequence:
 
 The first tool returns both a biome contract and a terrain contract. The terrain
 contract tells the client to derive land/ocean balance, continent size,
-coastline roughness, flat/highland/peak shares, vertical scale and cave density
-from the player's prompt. The template supplies the technical envelope; it is
-not a fixed terrain design.
+coastline roughness, flat/highland/peak shares, vertical scale, cave density,
+river routing, lake basins and ocean depth from the player's prompt. The
+template supplies the technical envelope; it is not a fixed terrain design.
 
 `complete=true` means the pack was read back, validated and selected for the
 Minecraft world-creation screen. The final pack remains in:

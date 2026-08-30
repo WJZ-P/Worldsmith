@@ -50,7 +50,18 @@ embedding Minecraft density-function JSON:
   "coastRoughness": 0.45,
   "relief": { "flats": 0.65, "highlands": 0.25, "peaks": 0.10 },
   "verticalScale": 1.0,
-  "caveDensity": 0.65
+  "caveDensity": 0.65,
+  "hydrology": {
+    "riverCoverage": 0.06,
+    "riverWidth": 1.0,
+    "riverDepth": 0.8,
+    "riverMeander": 0.65,
+    "riverFill": "FLUID",
+    "lakeDensity": 0.08,
+    "lakeScale": 1.0,
+    "lakeDepth": 0.8,
+    "oceanDepth": 1.0
+  }
 }
 ```
 
@@ -62,12 +73,26 @@ landform the prompt excludes may have weight zero. `verticalScale` changes the
 height amplitude, and `caveDensity` blends from no cave carving to the complete
 supported overworld cave system.
 
+Hydrology is part of the same immutable terrain intent. River coverage and lake
+density are statistical area targets rather than required counts. Width and
+scale change the physical correlation length, depth changes the solid floor,
+and meander changes river routing. `riverFill: FLUID` publishes matching coast
+and shallow-water continentalness so biome selection follows the water;
+`riverFill: DRY` cuts a valley above sea level while retaining its land biome.
+`oceanDepth` scales only the ocean-floor side of the continental boundary.
+
+Hydrology defaults are neutral for compatibility with Terrain V2 packs: no
+inland water is added and ocean depth remains one. Prompt-generated packs write
+the full block explicitly, so changing any water-system decision changes the
+pack content hash.
+
 The Minecraft 26.2 target adapter compiles those outcomes into a `NoiseRouter`.
 It retains vanilla aquifer, climate and ore-noise plumbing, but owns the
-continentalness, relief, vertical-density and cave-carving functions. Sampling
-tests wire the real Minecraft noises with a fixed seed and check each control's
-direction and magnitude. The resulting land share remains a seeded statistical
-target rather than an exact per-map-area quota.
+continentalness, relief, hydrology, vertical-density and cave-carving
+functions. Sampling tests wire the real Minecraft noises with a fixed seed and
+check each control's direction and magnitude. The resulting land and inland
+water shares remain seeded statistical targets rather than exact per-map-area
+quotas.
 
 The `vanilla` shape variant remains available for compatibility packs that
 explicitly request an unchanged `OVERWORLD`, `LARGE_BIOMES` or `AMPLIFIED`

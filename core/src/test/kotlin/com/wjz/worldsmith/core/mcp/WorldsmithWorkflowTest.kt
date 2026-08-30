@@ -86,6 +86,10 @@ class WorldsmithWorkflowTest {
         assertTrue("coastRoughness" in terrainContract)
         assertTrue("verticalScale" in terrainContract)
         assertTrue("caveDensity" in terrainContract)
+        assertTrue("riverCoverage" in terrainContract)
+        assertTrue("riverFill" in terrainContract)
+        assertTrue("lakeDensity" in terrainContract)
+        assertTrue("oceanDepth" in terrainContract)
         assertTrue("set an unwanted landform to zero" in terrainContract)
 
         val placement = brief.getValue("climatePlacement").jsonObject
@@ -175,6 +179,32 @@ class WorldsmithWorkflowTest {
             .map { it.jsonObject }
             .map { it.getValue("code").jsonPrimitive.content }
         assertTrue("PROMPT_TERRAIN_REQUIRED" in codes)
+    }
+
+    @Test
+    fun `a guided prompt run must make an explicit hydrology decision`() {
+        val sessionId = begin("a bone-dry world with no inland water").text("sessionId")
+        val template = call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
+        val terrain = template.getValue("terrain").jsonObject
+        val shape = terrain.getValue("shape").jsonObject
+        val withoutHydrology = JsonObject(
+            terrain + ("shape" to JsonObject(shape - "hydrology")),
+        )
+        val result = call(
+            WorldsmithWorkflow.WRITE_TOOL,
+            buildJsonObject {
+                put("sessionId", sessionId)
+                put("displayName", "Missing hydrology decision")
+                put("terrain", withoutHydrology)
+                put("biomes", template.getValue("biomes"))
+                put("features", template.getValue("features"))
+            },
+        )
+
+        assertTrue(result.isError)
+        val codes = result.structuredContent.getValue("diagnostics").jsonArray
+            .map { it.jsonObject.getValue("code").jsonPrimitive.content }
+        assertTrue("PROMPT_HYDROLOGY_REQUIRED" in codes)
     }
 
     @Test

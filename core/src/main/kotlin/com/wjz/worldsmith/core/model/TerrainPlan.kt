@@ -41,6 +41,32 @@ data class ReliefDistribution(
     val peaks: Double = 0.10,
 )
 
+/** Whether a generated river channel is flooded to sea level or remains a dry valley. */
+@Serializable
+enum class RiverFill {
+    FLUID,
+    DRY,
+}
+
+/**
+ * Version-independent inland-water and ocean-floor intent.
+ *
+ * Defaults preserve Terrain V2 exactly: no generated inland water and the
+ * original ocean depth. Prompt-generated packs write the fields explicitly.
+ */
+@Serializable
+data class HydrologyIntent(
+    val riverCoverage: Double = 0.0,
+    val riverWidth: Double = 1.0,
+    val riverDepth: Double = 0.8,
+    val riverMeander: Double = 0.65,
+    val riverFill: RiverFill = RiverFill.FLUID,
+    val lakeDensity: Double = 0.0,
+    val lakeScale: Double = 1.0,
+    val lakeDepth: Double = 0.8,
+    val oceanDepth: Double = 1.0,
+)
+
 /**
  * How the shape of the land is decided.
  *
@@ -74,6 +100,7 @@ sealed interface TerrainShape {
         val relief: ReliefDistribution = ReliefDistribution(),
         val verticalScale: Double = 1.0,
         val caveDensity: Double = 0.65,
+        val hydrology: HydrologyIntent = HydrologyIntent(),
     ) : TerrainShape
 }
 

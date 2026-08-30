@@ -297,7 +297,11 @@ class WorldsmithMcpTools @JvmOverloads constructor(
 
         val sessionId = optionalString(arguments, "sessionId").trim()
         val guidedSession = sessionId.isNotEmpty() && sessions.find(sessionId) != null
-        val terrain = decode<TerrainPlan>(requiredObject(arguments, "terrain"))
+        val terrainDocument = requiredObject(arguments, "terrain")
+        val declaresHydrology = terrainDocument["shape"]
+            ?.let { runCatching { it.jsonObject.containsKey("hydrology") }.getOrDefault(false) }
+            ?: false
+        val terrain = decode<TerrainPlan>(terrainDocument)
         val biomes = decode<BiomePlan>(requiredObject(arguments, "biomes"))
         val features = decode<FeatureLibrary>(requiredObject(arguments, "features"))
         val files = WorldsmithPackFiles(TERRAIN_FILE, BIOMES_FILE, FEATURES_FILE)
@@ -322,6 +326,14 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 code = "PROMPT_TERRAIN_REQUIRED",
                 severity = DiagnosticSeverity.ERROR,
                 message = "A guided prompt run must provide a procedural terrain shape derived from its terrain contract",
+            )
+        }
+        if (guidedSession && terrain.shape is TerrainShape.Procedural && !declaresHydrology) {
+            diagnostics += Diagnostic(
+                path = "terrain.shape.hydrology",
+                code = "PROMPT_HYDROLOGY_REQUIRED",
+                severity = DiagnosticSeverity.ERROR,
+                message = "A guided prompt run must explicitly choose hydrology values, including zeros for absent water systems",
             )
         }
         val structured = buildJsonObject {
@@ -590,7 +602,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 put("maxLength", MAX_DESCRIPTION_LENGTH)
             },
             "terrain" to documentSchema(
-                "A TerrainPlan matching the template, with a procedural shape whose six controls come from the player's prompt.",
+                "A TerrainPlan matching the template, with procedural terrain and hydrology controls derived from the player's prompt.",
             ),
             "biomes" to documentSchema("A BiomePlan object matching the template."),
             "features" to documentSchema("A FeatureLibrary object matching the template."),

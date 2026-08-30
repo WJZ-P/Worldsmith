@@ -170,10 +170,28 @@ public final class WorldsmithNoiseSettings {
 			landInput.clamp(0.0, 0.35),
 			DensityFunctions.constant(1.0 / 0.35)
 		);
+		DensityFunction continentalHeight = DensityFunctions.rangeChoice(
+			landInput,
+			-1_000_000.0,
+			0.0,
+			DensityFunctions.mul(
+				landInput,
+				DensityFunctions.constant(42.0 * verticalScale * shape.getHydrology().getOceanDepth())
+			),
+			DensityFunctions.mul(landInput, DensityFunctions.constant(42.0 * verticalScale))
+		);
 		DensityFunction horizontalHeightBlocks = DensityFunctions.add(
-			DensityFunctions.mul(landInput, DensityFunctions.constant(42.0 * verticalScale)),
+			continentalHeight,
 			DensityFunctions.mul(reliefHeight, inlandRamp)
 		);
+		WorldsmithHydrology.Fields hydrology = WorldsmithHydrology.compile(
+			shape.getHydrology(),
+			continents,
+			landInput,
+			horizontalHeightBlocks,
+			noises
+		);
+		horizontalHeightBlocks = hydrology.horizontalHeightBlocks();
 
 		int minY = terrain.getMinY();
 		int maxY = minY + terrain.getHeight();
@@ -256,7 +274,7 @@ public final class WorldsmithNoiseSettings {
 			vanilla.lavaNoise(),
 			vanilla.temperature(),
 			vanilla.vegetation(),
-			continents,
+			hydrology.continents(),
 			erosion,
 			depth,
 			reliefSelector,

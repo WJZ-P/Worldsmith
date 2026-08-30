@@ -9,6 +9,8 @@ import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import com.wjz.worldsmith.core.model.ReliefDistribution;
+import com.wjz.worldsmith.core.model.HydrologyIntent;
+import com.wjz.worldsmith.core.model.RiverFill;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
@@ -160,7 +162,8 @@ final class WorldsmithPackExporterTest {
 				0.8,
 				new ReliefDistribution(0.0, 0.0, 1.0),
 				1.6,
-				0.3
+				0.3,
+				new HydrologyIntent(0.06, 1.4, 1.1, 0.8, RiverFill.FLUID, 0.07, 1.6, 0.9, 1.5)
 			),
 			template.getAquifersEnabled(),
 			template.getOreVeinsEnabled(),

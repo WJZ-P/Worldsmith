@@ -45,8 +45,8 @@ object WorldsmithWorkflow {
         "You are designing one Minecraft world from the player's description. Work through `procedure` in " +
             "order and do not stop until $FINISH_TOOL answers complete=true.\n\n" +
             "Design both the terrain and the biomes yourself. The player's prompt is the only standard for " +
-            "land/ocean balance, scale, relief, height, caves, biome count and biome distribution. " +
-            "`terrainContract` defines the six semantic terrain controls; `designContract` holds the biome " +
+            "land/ocean balance, scale, relief, height, caves, rivers, lakes, ocean depth, biome count and biome distribution. " +
+            "`terrainContract` defines the semantic terrain and hydrology controls; `designContract` holds the biome " +
             "rules; and `climatePlacement` describes optional semantic presets plus exact raw axes. " +
             "Worldsmith validates what you send and " +
             "reports exactly what is wrong, so a rejected pack is a repair job rather than a restart: change " +

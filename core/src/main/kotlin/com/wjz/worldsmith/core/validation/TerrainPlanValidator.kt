@@ -58,6 +58,31 @@ object TerrainPlanValidator {
                 if (shape.caveDensity !in 0.0..1.0) {
                     add(error("shape.caveDensity", "CAVE_DENSITY_OUT_OF_RANGE", "Cave density must be between 0 and 1"))
                 }
+                val hydrology = shape.hydrology
+                if (hydrology.riverCoverage !in 0.0..0.35) {
+                    add(error("shape.hydrology.riverCoverage", "RIVER_COVERAGE_OUT_OF_RANGE", "River coverage must be between 0 and 0.35"))
+                }
+                if (hydrology.riverWidth !in 0.25..4.0) {
+                    add(error("shape.hydrology.riverWidth", "RIVER_WIDTH_OUT_OF_RANGE", "River width must be between 0.25 and 4"))
+                }
+                if (hydrology.riverDepth !in 0.0..4.0) {
+                    add(error("shape.hydrology.riverDepth", "RIVER_DEPTH_OUT_OF_RANGE", "River depth must be between 0 and 4"))
+                }
+                if (hydrology.riverMeander !in 0.0..1.0) {
+                    add(error("shape.hydrology.riverMeander", "RIVER_MEANDER_OUT_OF_RANGE", "River meander must be between 0 and 1"))
+                }
+                if (hydrology.lakeDensity !in 0.0..0.35) {
+                    add(error("shape.hydrology.lakeDensity", "LAKE_DENSITY_OUT_OF_RANGE", "Lake density must be between 0 and 0.35"))
+                }
+                if (hydrology.lakeScale !in 0.25..8.0) {
+                    add(error("shape.hydrology.lakeScale", "LAKE_SCALE_OUT_OF_RANGE", "Lake scale must be between 0.25 and 8"))
+                }
+                if (hydrology.lakeDepth !in 0.0..4.0) {
+                    add(error("shape.hydrology.lakeDepth", "LAKE_DEPTH_OUT_OF_RANGE", "Lake depth must be between 0 and 4"))
+                }
+                if (hydrology.oceanDepth !in 0.25..4.0) {
+                    add(error("shape.hydrology.oceanDepth", "OCEAN_DEPTH_OUT_OF_RANGE", "Ocean depth must be between 0.25 and 4"))
+                }
             }
         }
         addAll(validateMaterial("defaultBlock", plan.defaultBlock))

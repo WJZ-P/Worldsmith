@@ -3,6 +3,7 @@ package com.wjz.worldsmith.worldgen;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.wjz.worldsmith.core.model.ReliefDistribution;
+import com.wjz.worldsmith.core.model.HydrologyIntent;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
@@ -132,7 +133,8 @@ final class WorldsmithTerrainSamplingTest {
 			coastRoughness,
 			new ReliefDistribution(flats, highlands, peaks),
 			verticalScale,
-			caveDensity
+			caveDensity,
+			new HydrologyIntent()
 		);
 	}
 
