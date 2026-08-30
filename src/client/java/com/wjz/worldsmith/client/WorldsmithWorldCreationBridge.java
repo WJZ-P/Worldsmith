@@ -35,6 +35,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.world.level.WorldDataConfiguration;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.presets.WorldPreset;
 
 /**
@@ -50,12 +51,15 @@ public final class WorldsmithWorldCreationBridge {
 	private static final Pattern PACK_ID = Pattern.compile("[0-9a-f]{64}");
 	private static final Pattern GENERATED_PRESET =
 		Pattern.compile("generated/([0-9a-f]{64})/wasteland");
+	private static final Pattern GENERATED_BIOME =
+		Pattern.compile("generated/([0-9a-f]{64})/([a-z0-9_.-]+)");
 	private static final String GENERATED_FOLDER_PREFIX = "worldsmith-generated-";
 	private static final String REPOSITORY_PREFIX = "file/" + GENERATED_FOLDER_PREFIX;
 	private static final String ACTIVE_FILE_NAME = "active-pack.txt";
 
 	private static final Map<CreateWorldScreen, ScreenState> SCREENS = new WeakHashMap<>();
 	private static final Map<String, String> DISPLAY_NAMES = new ConcurrentHashMap<>();
+	private static final Map<String, String> BIOME_NAMES = new ConcurrentHashMap<>();
 	private static volatile String activePackId;
 
 	private WorldsmithWorldCreationBridge() {
@@ -125,6 +129,36 @@ public final class WorldsmithWorldCreationBridge {
 			}
 		});
 		return Component.literal(name);
+	}
+
+	/** Friendly F3 label for a generated biome, or null for every normal biome. */
+	public static String debugBiomeName(Holder<Biome> biome) {
+		if (biome == null) {
+			return null;
+		}
+		Optional<ResourceKey<Biome>> key = biome.unwrapKey();
+		if (key.isEmpty() || !key.get().identifier().getNamespace().equals(Worldsmith.MOD_ID)) {
+			return null;
+		}
+		Matcher matcher = GENERATED_BIOME.matcher(key.get().identifier().getPath());
+		if (!matcher.matches()) {
+			return null;
+		}
+		String packId = matcher.group(1);
+		String biomeId = matcher.group(2);
+		return BIOME_NAMES.computeIfAbsent(packId + "/" + biomeId, ignored -> {
+			try {
+				WorldsmithPack pack = loadManagedPack(packId);
+				String biomeName = pack.getBiomes().getBiomes().stream()
+					.filter(definition -> definition.getId().equals(biomeId))
+					.map(definition -> definition.getDisplayName())
+					.findFirst()
+					.orElse(biomeId);
+				return pack.getManifest().getDisplayName() + " / " + biomeName;
+			} catch (RuntimeException failure) {
+				return null;
+			}
+		});
 	}
 
 	private static void applyPack(CreateWorldScreen screen, ScreenState state, String packId) {
