@@ -1,6 +1,5 @@
 package com.wjz.worldsmith.worldgen;
 
-import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.feature.VegetationBudget;
 import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
@@ -50,21 +49,23 @@ public final class WorldsmithVegetation {
 	private WorldsmithVegetation() {
 	}
 
-	public static ResourceKey<ConfiguredFeature<?, ?>> configuredKey(String featureId) {
-		return ResourceKey.create(Registries.CONFIGURED_FEATURE, Worldsmith.id("vegetation/" + featureId));
+	public static ResourceKey<ConfiguredFeature<?, ?>> configuredKey(CompiledPack pack, String featureId) {
+		return pack.configuredFeatureKey(featureId);
 	}
 
-	public static ResourceKey<PlacedFeature> placedKey(String featureId) {
-		return ResourceKey.create(Registries.PLACED_FEATURE, Worldsmith.id("vegetation/" + featureId));
+	public static ResourceKey<PlacedFeature> placedKey(CompiledPack pack, String featureId) {
+		return pack.placedFeatureKey(featureId);
 	}
 
-	public static ResourceKey<PlacedFeature> placedKey(String featureId, String biomeId) {
-		return ResourceKey.create(Registries.PLACED_FEATURE, Worldsmith.id("vegetation/" + featureId + "/" + biomeId));
+	public static ResourceKey<PlacedFeature> placedKey(CompiledPack pack, String featureId, String biomeId) {
+		return pack.placedFeatureKey(featureId, biomeId);
 	}
 
 	/** The placed feature a biome should reference for one of its entries. */
-	public static ResourceKey<PlacedFeature> placedKeyFor(BiomeDefinition biome, BiomeFeatureRef ref) {
-		return ref.getDensity() == null ? placedKey(ref.getFeature()) : placedKey(ref.getFeature(), biome.getId());
+	public static ResourceKey<PlacedFeature> placedKeyFor(CompiledPack pack, BiomeDefinition biome, BiomeFeatureRef ref) {
+		return ref.getDensity() == null
+			? placedKey(pack, ref.getFeature())
+			: placedKey(pack, ref.getFeature(), biome.getId());
 	}
 
 	public static void bootstrapConfigured(CompiledPack pack, BootstrapContext<ConfiguredFeature<?, ?>> context) {
@@ -72,7 +73,7 @@ public final class WorldsmithVegetation {
 		MaterialResolver resolver = new MaterialResolver();
 
 		for (FeatureDefinition feature : library.getFeatures()) {
-			context.register(configuredKey(feature.getId()), configure(feature, resolver));
+			context.register(configuredKey(pack, feature.getId()), configure(feature, resolver));
 		}
 		resolver.report("vegetation");
 	}
@@ -92,8 +93,8 @@ public final class WorldsmithVegetation {
 				}
 				double density = ref.getDensity() == null ? definition.getDensity() : ref.getDensity();
 				placed.putIfAbsent(
-					placedKeyFor(biome, ref),
-					new PlacedFeature(configured.getOrThrow(configuredKey(definition.getId())), place(definition, density))
+					placedKeyFor(pack, biome, ref),
+					new PlacedFeature(configured.getOrThrow(configuredKey(pack, definition.getId())), place(definition, density))
 				);
 			}
 		}

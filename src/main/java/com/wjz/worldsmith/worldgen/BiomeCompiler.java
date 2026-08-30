@@ -49,11 +49,11 @@ public final class BiomeCompiler {
 
 	public static void bootstrap(CompiledPack pack, BootstrapContext<Biome> context) {
 		for (CompiledBiome biome : pack.biomes()) {
-			context.register(biome.key(), compile(biome, context));
+			context.register(biome.key(), compile(pack, biome, context));
 		}
 	}
 
-	private static Biome compile(CompiledBiome biome, BootstrapContext<Biome> context) {
+	private static Biome compile(CompiledPack pack, CompiledBiome biome, BootstrapContext<Biome> context) {
 		BiomeDefinition definition = biome.definition();
 		HolderGetter<PlacedFeature> placedFeatures = context.lookup(Registries.PLACED_FEATURE);
 		HolderGetter<ConfiguredWorldCarver<?>> carvers = context.lookup(Registries.CONFIGURED_CARVER);
@@ -77,7 +77,7 @@ public final class BiomeCompiler {
 		for (BiomeFeatureRef ref : definition.getFeatures()) {
 			generation.addFeature(
 				GenerationStep.Decoration.VEGETAL_DECORATION,
-				WorldsmithVegetation.placedKeyFor(definition, ref)
+				WorldsmithVegetation.placedKeyFor(pack, definition, ref)
 			);
 		}
 

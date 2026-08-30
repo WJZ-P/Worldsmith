@@ -19,11 +19,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.Cloner;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.RegistrySetBuilder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -99,10 +101,31 @@ public final class WorldsmithPackExporter {
 	 *                   which the pack's biomes need for vanilla ores, carvers
 	 *                   and noise parameters
 	 */
-	public static HolderLookup.Provider compile(CompiledPack pack, RegistryAccess registries) {
+	public static HolderLookup.Provider compile(CompiledPack pack, HolderLookup.Provider registries) {
+		return compilePatch(pack, registries).patches();
+	}
+
+	/**
+	 * Builds the pack as a patch over the active worldgen registries.
+	 *
+	 * <p>{@link RegistrySetBuilder#build} is deliberately not used here. Its
+	 * context may only contain registries outside the ones being built; a real
+	 * world-creation context already contains biome, feature, noise-settings and
+	 * preset registries, so {@code build} sees duplicate registry keys. With a
+	 * static-only context it has the opposite problem: every vanilla holder our
+	 * biomes reference remains unclaimed. {@code buildPatch} is the vanilla
+	 * mechanism for exactly this operation: build only our entries while using
+	 * the active provider as the fallback for cross-registry references.
+	 */
+	public static RegistrySetBuilder.PatchedRegistries compilePatch(CompiledPack pack, HolderLookup.Provider registries) {
 		RegistrySetBuilder builder = new RegistrySetBuilder();
 		addTo(builder, pack);
-		return builder.build(registries);
+
+		RegistryAccess.Frozen staticRegistries =
+			RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+		Cloner.Factory cloner = new Cloner.Factory();
+		RegistryDataLoader.WORLDGEN_REGISTRIES.forEach(data -> data.runWithArguments(cloner::addCodec));
+		return builder.buildPatch(staticRegistries, registries, cloner);
 	}
 
 	/**
@@ -110,7 +133,7 @@ public final class WorldsmithPackExporter {
 	 *
 	 * @return the number of files written
 	 */
-	public static int export(CompiledPack pack, RegistryAccess registries, Path root) throws IOException {
+	public static int export(CompiledPack pack, HolderLookup.Provider registries, Path root) throws IOException {
 		return write(pack, compile(pack, registries), root);
 	}
 
@@ -206,7 +229,7 @@ public final class WorldsmithPackExporter {
 		TagKey<WorldPreset> normal = WorldPresetTags.NORMAL;
 		writeJson(
 			elementPath(root, normal.location(), Registries.tagsDirPath(Registries.WORLD_PRESET)),
-			tagFile(Set.of(WorldsmithWorldPresets.WASTELAND.identifier()))
+			tagFile(Set.of(pack.worldPresetKey().identifier()))
 		);
 		return written + 1;
 	}
@@ -270,7 +293,7 @@ public final class WorldsmithPackExporter {
 	}
 
 	/** Convenience for callers that cannot declare {@link IOException}. */
-	public static int exportUnchecked(CompiledPack pack, RegistryAccess registries, Path root) {
+	public static int exportUnchecked(CompiledPack pack, HolderLookup.Provider registries, Path root) {
 		try {
 			return export(pack, registries, root);
 		} catch (IOException failure) {

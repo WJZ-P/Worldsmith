@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.worldgen;
 
+import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.FeatureLibrary;
 import com.wjz.worldsmith.core.model.TerrainPlan;
@@ -7,6 +8,14 @@ import com.wjz.worldsmith.core.model.WorldsmithPack;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
+import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
+import net.minecraft.world.level.levelgen.placement.PlacedFeature;
+import net.minecraft.world.level.levelgen.presets.WorldPreset;
 
 /**
  * One Worldsmith pack with its biomes already resolved against Minecraft types.
@@ -20,19 +29,39 @@ import java.util.Map;
  */
 public final class CompiledPack {
 	private final WorldsmithPack pack;
+	private final String resourcePrefix;
 	private final List<CompiledBiome> biomes;
 	private final Map<String, CompiledBiome> byId;
 
-	private CompiledPack(WorldsmithPack pack, List<CompiledBiome> biomes) {
+	private CompiledPack(WorldsmithPack pack, String resourcePrefix) {
 		this.pack = pack;
-		this.biomes = biomes;
+		this.resourcePrefix = resourcePrefix;
+		this.biomes = CompiledBiomes.compile(pack.getBiomes(), this::biomeKey);
 		Map<String, CompiledBiome> index = new LinkedHashMap<>();
-		biomes.forEach(biome -> index.put(biome.id(), biome));
+		this.biomes.forEach(biome -> index.put(biome.id(), biome));
 		this.byId = Map.copyOf(index);
 	}
 
+	/** Built-in compilation preserves the historic resource ids used by datagen. */
 	public static CompiledPack of(WorldsmithPack pack) {
-		return new CompiledPack(pack, CompiledBiomes.compile(pack.getBiomes()));
+		return new CompiledPack(pack, "");
+	}
+
+	/**
+	 * Runtime packs receive a hash-qualified resource scope.
+	 *
+	 * <p>The built-in data pack remains enabled while the temporary generated
+	 * pack is loaded. Reusing {@code worldsmith:abyss} would therefore leave old
+	 * tag membership behind when a generated pack also named a biome "abyss".
+	 * The immutable pack id makes every generated biome, feature, noise setting
+	 * and preset distinct without asking the model to invent globally unique ids.
+	 */
+	public static CompiledPack scoped(WorldsmithPack pack) {
+		String id = pack.getManifest().getId();
+		if (!id.matches("[0-9a-f]{64}")) {
+			throw new IllegalArgumentException("A scoped pack needs a lowercase SHA-256 id");
+		}
+		return new CompiledPack(pack, "generated/" + id + "/");
 	}
 
 	public WorldsmithPack pack() {
@@ -69,5 +98,37 @@ public final class CompiledPack {
 
 	public String displayName() {
 		return this.pack.getManifest().getDisplayName();
+	}
+
+	public boolean scoped() {
+		return !this.resourcePrefix.isEmpty();
+	}
+
+	public ResourceKey<Biome> biomeKey(String biomeId) {
+		return ResourceKey.create(Registries.BIOME, resourceId(biomeId));
+	}
+
+	public ResourceKey<ConfiguredFeature<?, ?>> configuredFeatureKey(String featureId) {
+		return ResourceKey.create(Registries.CONFIGURED_FEATURE, resourceId("vegetation/" + featureId));
+	}
+
+	public ResourceKey<PlacedFeature> placedFeatureKey(String featureId) {
+		return ResourceKey.create(Registries.PLACED_FEATURE, resourceId("vegetation/" + featureId));
+	}
+
+	public ResourceKey<PlacedFeature> placedFeatureKey(String featureId, String biomeId) {
+		return ResourceKey.create(Registries.PLACED_FEATURE, resourceId("vegetation/" + featureId + "/" + biomeId));
+	}
+
+	public ResourceKey<NoiseGeneratorSettings> noiseSettingsKey() {
+		return ResourceKey.create(Registries.NOISE_SETTINGS, resourceId("wasteland"));
+	}
+
+	public ResourceKey<WorldPreset> worldPresetKey() {
+		return ResourceKey.create(Registries.WORLD_PRESET, resourceId("wasteland"));
+	}
+
+	private Identifier resourceId(String legacyPath) {
+		return Worldsmith.id(this.resourcePrefix + legacyPath);
 	}
 }

@@ -7,6 +7,9 @@ import com.wjz.worldsmith.core.model.ClimateBox;
 import com.wjz.worldsmith.core.model.ClimateSlot;
 import com.wjz.worldsmith.core.model.NumericRange;
 import java.util.List;
+import java.util.function.Function;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Climate;
 
 /**
@@ -19,14 +22,14 @@ public final class CompiledBiomes {
 	private CompiledBiomes() {
 	}
 
-	public static List<CompiledBiome> compile(BiomePlan plan) {
-		return plan.getBiomes().stream().map(CompiledBiomes::compile).toList();
+	public static List<CompiledBiome> compile(BiomePlan plan, Function<String, ResourceKey<Biome>> keyFactory) {
+		return plan.getBiomes().stream().map(definition -> compile(definition, keyFactory)).toList();
 	}
 
-	private static CompiledBiome compile(BiomeDefinition definition) {
+	private static CompiledBiome compile(BiomeDefinition definition, Function<String, ResourceKey<Biome>> keyFactory) {
 		return new CompiledBiome(
 			definition,
-			WorldsmithBiomes.key(definition.getId()),
+			keyFactory.apply(definition.getId()),
 			BiomeArchetype.from(definition.getArchetype()),
 			climate(resolveBox(definition))
 		);

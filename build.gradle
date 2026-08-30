@@ -6,6 +6,8 @@ plugins {
 }
 
 repositories {
+	mavenCentral()
+
 	// Only needed for the optional Mod Menu and Cloth Config integrations.
 	maven {
 		name = 'TerraformersMC'
@@ -55,6 +57,10 @@ dependencies {
 	clientImplementation("me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}") {
 		exclude(group: 'net.fabricmc.fabric-api')
 	}
+
+	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 processResources {
@@ -73,6 +79,10 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
+}
+
+tasks.withType(Test).configureEach {
+	useJUnitPlatform()
 }
 
 java {

@@ -53,7 +53,7 @@ public final class WorldsmithWorldPresets {
 			dimensionTypes.getOrThrow(BuiltinDimensionTypes.OVERWORLD),
 			new NoiseBasedChunkGenerator(
 				MultiNoiseBiomeSource.createFromList(new Climate.ParameterList<>(entries)),
-				noiseSettings.getOrThrow(WorldsmithNoiseSettings.WASTELAND)
+				noiseSettings.getOrThrow(pack.noiseSettingsKey())
 			)
 		);
 
@@ -73,7 +73,7 @@ public final class WorldsmithWorldPresets {
 			)
 		);
 
-		context.register(WASTELAND, new WorldPreset(Map.of(
+		context.register(pack.worldPresetKey(), new WorldPreset(Map.of(
 			LevelStem.OVERWORLD, overworld,
 			LevelStem.NETHER, nether,
 			LevelStem.END, end

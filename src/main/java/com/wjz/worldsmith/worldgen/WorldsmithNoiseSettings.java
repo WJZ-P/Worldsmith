@@ -43,7 +43,7 @@ public final class WorldsmithNoiseSettings {
 		MaterialResolver resolver = new MaterialResolver();
 		SurfaceRules.RuleSource surfaceRule = WorldsmithSurfaceRules.build(pack, biomes, resolver);
 
-		context.register(WASTELAND, new NoiseGeneratorSettings(
+		context.register(pack.noiseSettingsKey(), new NoiseGeneratorSettings(
 			NoiseSettings.create(
 				terrain.getMinY(), terrain.getHeight(), terrain.getHorizontalNoiseSize(), terrain.getVerticalNoiseSize()
 			),

@@ -4,6 +4,7 @@ import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
 import com.wjz.worldsmith.core.model.FeatureDefinition;
 import com.wjz.worldsmith.worldgen.CompiledBiome;
+import com.wjz.worldsmith.worldgen.CompiledPack;
 import com.wjz.worldsmith.worldgen.WorldsmithNoiseSettings;
 import com.wjz.worldsmith.worldgen.WorldsmithPacks;
 import com.wjz.worldsmith.worldgen.WorldsmithVegetation;
@@ -34,31 +35,32 @@ public final class WorldsmithRegistryProvider extends FabricDynamicRegistryProvi
 
 	@Override
 	protected void configure(HolderLookup.Provider registries, Entries entries) {
+		CompiledPack pack = WorldsmithPacks.builtinCompiled();
 		HolderLookup.RegistryLookup<ConfiguredFeature<?, ?>> configuredFeatures =
 			registries.lookupOrThrow(Registries.CONFIGURED_FEATURE);
 		HolderLookup.RegistryLookup<PlacedFeature> placedFeatures = registries.lookupOrThrow(Registries.PLACED_FEATURE);
 
-		for (FeatureDefinition feature : WorldsmithPacks.builtinCompiled().features().getFeatures()) {
-			entries.add(configuredFeatures, WorldsmithVegetation.configuredKey(feature.getId()));
+		for (FeatureDefinition feature : pack.features().getFeatures()) {
+			entries.add(configuredFeatures, WorldsmithVegetation.configuredKey(pack, feature.getId()));
 		}
 
 		// Biomes that take a feature's default density share one placed feature,
 		// so collect the keys before emitting them.
 		Set<ResourceKey<PlacedFeature>> placed = new LinkedHashSet<>();
-		for (BiomeDefinition biome : WorldsmithPacks.builtinCompiled().definitions()) {
+		for (BiomeDefinition biome : pack.definitions()) {
 			for (BiomeFeatureRef ref : biome.getFeatures()) {
-				placed.add(WorldsmithVegetation.placedKeyFor(biome, ref));
+				placed.add(WorldsmithVegetation.placedKeyFor(pack, biome, ref));
 			}
 		}
 		placed.forEach(key -> entries.add(placedFeatures, key));
 
 		HolderLookup.RegistryLookup<Biome> biomes = registries.lookupOrThrow(Registries.BIOME);
-		for (CompiledBiome biome : WorldsmithPacks.builtinCompiled().biomes()) {
+		for (CompiledBiome biome : pack.biomes()) {
 			entries.add(biomes, biome.key());
 		}
 
-		entries.add(registries.lookupOrThrow(Registries.NOISE_SETTINGS), WorldsmithNoiseSettings.WASTELAND);
-		entries.add(registries.lookupOrThrow(Registries.WORLD_PRESET), WorldsmithWorldPresets.WASTELAND);
+		entries.add(registries.lookupOrThrow(Registries.NOISE_SETTINGS), pack.noiseSettingsKey());
+		entries.add(registries.lookupOrThrow(Registries.WORLD_PRESET), pack.worldPresetKey());
 	}
 
 	@Override
