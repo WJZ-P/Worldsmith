@@ -1,8 +1,9 @@
 package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.Worldsmith;
-import com.wjz.worldsmith.core.model.NoiseTemplate;
 import com.wjz.worldsmith.core.model.TerrainPlan;
+import com.wjz.worldsmith.core.model.TerrainShape;
+import com.wjz.worldsmith.core.model.VanillaNoisePreset;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
@@ -11,6 +12,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
+import net.minecraft.world.level.levelgen.NoiseRouter;
 import net.minecraft.world.level.levelgen.NoiseRouterData;
 import net.minecraft.world.level.levelgen.NoiseSettings;
 import net.minecraft.world.level.levelgen.SurfaceRules;
@@ -40,8 +42,6 @@ public final class WorldsmithNoiseSettings {
 		TerrainPlan terrain = WorldsmithPacks.builtin().getTerrain();
 		MaterialResolver resolver = new MaterialResolver();
 		SurfaceRules.RuleSource surfaceRule = WorldsmithSurfaceRules.build(biomes, resolver);
-		boolean largeBiomes = terrain.getNoiseTemplate() == NoiseTemplate.VANILLA_LARGE_BIOMES;
-		boolean amplified = terrain.getNoiseTemplate() == NoiseTemplate.VANILLA_AMPLIFIED;
 
 		context.register(WASTELAND, new NoiseGeneratorSettings(
 			NoiseSettings.create(
@@ -49,7 +49,7 @@ public final class WorldsmithNoiseSettings {
 			),
 			resolver.resolve(terrain.getDefaultBlock(), Blocks.STONE),
 			resolver.resolve(terrain.getDefaultFluid(), Blocks.WATER),
-			NoiseRouterData.overworld(functions, noises, largeBiomes, amplified),
+			router(terrain.getShape(), functions, noises),
 			surfaceRule,
 			terrain.getSpawnTargets().stream().map(CompiledBiomes::climate).toList(),
 			terrain.getSeaLevel(),
@@ -59,5 +59,32 @@ public final class WorldsmithNoiseSettings {
 			terrain.getLegacyRandomSource()
 		));
 		resolver.report("noise settings");
+	}
+
+	/**
+	 * Builds the noise router the pack asked for.
+	 *
+	 * <p>The format can describe terrain shapes this compiler cannot build yet.
+	 * Failing loudly on one is deliberate: quietly falling back to vanilla
+	 * terrain would produce a world that looks finished and is not the one the
+	 * pack describes.
+	 */
+	private static NoiseRouter router(
+		TerrainShape shape,
+		HolderGetter<DensityFunction> functions,
+		HolderGetter<NormalNoise.NoiseParameters> noises
+	) {
+		if (shape instanceof TerrainShape.Vanilla vanilla) {
+			VanillaNoisePreset preset = vanilla.getPreset();
+			return NoiseRouterData.overworld(
+				functions,
+				noises,
+				preset == VanillaNoisePreset.LARGE_BIOMES,
+				preset == VanillaNoisePreset.AMPLIFIED
+			);
+		}
+		throw new IllegalStateException(
+			"Worldsmith cannot compile terrain shape " + shape.getClass().getSimpleName() + " yet"
+		);
 	}
 }

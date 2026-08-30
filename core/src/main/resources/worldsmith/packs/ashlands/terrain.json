@@ -13,7 +13,10 @@
     "semanticRole": "terrain_fluid",
     "preferredIds": ["minecraft:water"]
   },
-  "noiseTemplate": "VANILLA_OVERWORLD",
+  "shape": {
+    "kind": "vanilla",
+    "preset": "OVERWORLD"
+  },
   "aquifersEnabled": true,
   "oreVeinsEnabled": true,
   "legacyRandomSource": false,
