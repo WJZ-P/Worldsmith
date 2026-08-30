@@ -31,6 +31,15 @@ class McpHttpServerTest {
                 McpHttpServer.PROTOCOL_VERSION,
                 initialized.getValue("result").jsonObject.getValue("protocolVersion").jsonPrimitive.content,
             )
+            val unsupportedProposal = post(
+                endpoint,
+                """{"jsonrpc":"2.0","id":4,"method":"initialize","params":{"protocolVersion":"draft-obsolete","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}""",
+            )
+            assertEquals(
+                McpHttpServer.PROTOCOL_VERSION,
+                unsupportedProposal.getValue("result").jsonObject.getValue("protocolVersion").jsonPrimitive.content,
+                "the server publishes one current protocol rather than negotiating older variants",
+            )
 
             val listed = post(endpoint, """{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}""")
             val names = listed.getValue("result").jsonObject.getValue("tools").jsonArray

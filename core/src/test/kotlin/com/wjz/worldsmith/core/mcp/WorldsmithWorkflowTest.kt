@@ -157,7 +157,7 @@ class WorldsmithWorkflowTest {
     }
 
     @Test
-    fun `a guided prompt run must replace compatibility terrain with procedural intent`() {
+    fun `a guided prompt run must replace passthrough terrain with procedural intent`() {
         val sessionId = begin().text("sessionId")
         val template = call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
         val terrain = WorldsmithJson.format.decodeFromJsonElement<TerrainPlan>(template.getValue("terrain"))
@@ -166,7 +166,7 @@ class WorldsmithWorkflowTest {
             WorldsmithWorkflow.WRITE_TOOL,
             buildJsonObject {
                 put("sessionId", sessionId)
-                put("displayName", "Rejected compatibility terrain")
+                put("displayName", "Rejected passthrough terrain")
                 put("terrain", WorldsmithJson.format.encodeToJsonElement(terrain))
                 put("biomes", template.getValue("biomes"))
                 put("features", template.getValue("features"))
@@ -182,7 +182,7 @@ class WorldsmithWorkflowTest {
     }
 
     @Test
-    fun `a guided prompt run must make an explicit hydrology decision`() {
+    fun `every procedural document must make an explicit hydrology decision`() {
         val sessionId = begin("a bone-dry world with no inland water").text("sessionId")
         val template = call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
         val terrain = template.getValue("terrain").jsonObject
@@ -204,7 +204,7 @@ class WorldsmithWorkflowTest {
         assertTrue(result.isError)
         val codes = result.structuredContent.getValue("diagnostics").jsonArray
             .map { it.jsonObject.getValue("code").jsonPrimitive.content }
-        assertTrue("PROMPT_HYDROLOGY_REQUIRED" in codes)
+        assertTrue("MISSING_HYDROLOGY" in codes)
     }
 
     @Test

@@ -25,7 +25,7 @@ import net.minecraft.world.level.levelgen.synth.NormalNoise;
 /**
  * The single noise settings entry for a Worldsmith world.
  *
- * <p>Vanilla shapes remain available as compatibility presets. Procedural
+ * <p>Vanilla shapes are explicit passthrough presets. Procedural
  * shapes are compiled from version-independent, prompt-facing terrain intent
  * into the density functions used by this Minecraft version.
  */

@@ -6,7 +6,7 @@ copy the example pack's terrain merely because it is present in the template.
 
 Keep the template's technical envelope (`minY`, `height`, noise cell sizes,
 materials, sea level, aquifer/ore toggles and spawn targets) unless the prompt
-specifically needs a compatible change. For every prompt-generated world,
+specifically needs a coherent change. For every prompt-generated world,
 replace `shape` with a `procedural` terrain intent:
 
 ```json

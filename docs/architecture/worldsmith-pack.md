@@ -81,10 +81,10 @@ and shallow-water continentalness so biome selection follows the water;
 `riverFill: DRY` cuts a valley above sea level while retaining its land biome.
 `oceanDepth` scales only the ocean-floor side of the continental boundary.
 
-Hydrology defaults are neutral for compatibility with Terrain V2 packs: no
-inland water is added and ocean depth remains one. Prompt-generated packs write
-the full block explicitly, so changing any water-system decision changes the
-pack content hash.
+Every hydrology field is required. A world with no inland water expresses that
+decision with zero river coverage and zero lake density; it still chooses its
+ocean depth explicitly. Consequently every water-system decision participates
+in the pack content hash.
 
 The Minecraft 26.2 target adapter compiles those outcomes into a `NoiseRouter`.
 It retains vanilla aquifer, climate and ore-noise plumbing, but owns the
@@ -94,9 +94,9 @@ check each control's direction and magnitude. The resulting land and inland
 water shares remain seeded statistical targets rather than exact per-map-area
 quotas.
 
-The `vanilla` shape variant remains available for compatibility packs that
+The `vanilla` shape variant is a deliberate passthrough mode for worlds that
 explicitly request an unchanged `OVERWORLD`, `LARGE_BIOMES` or `AMPLIFIED`
-router.
+router; prompt-guided generation uses `procedural`.
 
 ## Placing a biome
 

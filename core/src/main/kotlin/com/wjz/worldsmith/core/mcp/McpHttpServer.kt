@@ -119,7 +119,7 @@ class McpHttpServer(
         }
 
         val result = when (method) {
-            "initialize" -> initializeResult(request)
+            "initialize" -> initializeResult()
             "ping" -> buildJsonObject { }
             "tools/list" -> toolsListResult()
             "tools/call" -> toolCallResult(request)
@@ -131,14 +131,9 @@ class McpHttpServer(
         respondJson(exchange, 200, successResponse(id, result))
     }
 
-    private fun initializeResult(request: JsonObject): JsonObject {
-        val requestedVersion = runCatching {
-            request["params"]?.jsonObject?.get("protocolVersion")?.jsonPrimitive?.contentOrNull
-        }.getOrNull()
-        val negotiatedVersion = requestedVersion?.takeIf(SUPPORTED_PROTOCOL_VERSIONS::contains) ?: PROTOCOL_VERSION
-
+    private fun initializeResult(): JsonObject {
         return buildJsonObject {
-            put("protocolVersion", negotiatedVersion)
+            put("protocolVersion", PROTOCOL_VERSION)
             putJsonObject("capabilities") {
                 putJsonObject("tools") { put("listChanged", false) }
             }
@@ -272,7 +267,6 @@ class McpHttpServer(
         private const val SERVER_TITLE = "Worldsmith MCP Bridge"
         private const val MAX_REQUEST_BYTES = 4 * 1024 * 1024
         private val JSON = Json { ignoreUnknownKeys = true }
-        private val SUPPORTED_PROTOCOL_VERSIONS = setOf(PROTOCOL_VERSION, "2025-06-18", "2024-11-05")
         private val ALLOWED_ORIGIN_HOSTS = setOf(LOOPBACK_HOST, "localhost", "::1")
         private const val SERVER_INSTRUCTIONS =
             "Worldsmith creates portable Minecraft world-generation packs. Call " +

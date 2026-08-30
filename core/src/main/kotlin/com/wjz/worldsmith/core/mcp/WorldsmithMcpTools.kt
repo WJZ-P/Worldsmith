@@ -298,9 +298,23 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val sessionId = optionalString(arguments, "sessionId").trim()
         val guidedSession = sessionId.isNotEmpty() && sessions.find(sessionId) != null
         val terrainDocument = requiredObject(arguments, "terrain")
-        val declaresHydrology = terrainDocument["shape"]
-            ?.let { runCatching { it.jsonObject.containsKey("hydrology") }.getOrDefault(false) }
-            ?: false
+        val shapeDocument = terrainDocument["shape"]?.let { runCatching { it.jsonObject }.getOrNull() }
+        val shapeKind = shapeDocument?.get("kind")?.jsonPrimitive?.contentOrNull
+        if (shapeKind == "procedural" && shapeDocument["hydrology"] == null) {
+            val diagnostics = listOf(
+                Diagnostic(
+                    path = "terrain.shape.hydrology",
+                    code = "MISSING_HYDROLOGY",
+                    severity = DiagnosticSeverity.ERROR,
+                    message = "Every procedural terrain shape must explicitly define its complete hydrology block",
+                ),
+            )
+            val structured = buildJsonObject {
+                put("valid", false)
+                put("diagnostics", diagnosticsJson(diagnostics))
+            }
+            return McpToolResult.error("Generated pack is missing required terrain fields", structured)
+        }
         val terrain = decode<TerrainPlan>(terrainDocument)
         val biomes = decode<BiomePlan>(requiredObject(arguments, "biomes"))
         val features = decode<FeatureLibrary>(requiredObject(arguments, "features"))
@@ -326,14 +340,6 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 code = "PROMPT_TERRAIN_REQUIRED",
                 severity = DiagnosticSeverity.ERROR,
                 message = "A guided prompt run must provide a procedural terrain shape derived from its terrain contract",
-            )
-        }
-        if (guidedSession && terrain.shape is TerrainShape.Procedural && !declaresHydrology) {
-            diagnostics += Diagnostic(
-                path = "terrain.shape.hydrology",
-                code = "PROMPT_HYDROLOGY_REQUIRED",
-                severity = DiagnosticSeverity.ERROR,
-                message = "A guided prompt run must explicitly choose hydrology values, including zeros for absent water systems",
             )
         }
         val structured = buildJsonObject {

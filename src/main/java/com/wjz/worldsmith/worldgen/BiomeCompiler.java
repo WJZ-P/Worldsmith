@@ -64,7 +64,7 @@ public final class BiomeCompiler {
 
 		// Procedural terrain owns cave density in its NoiseRouter. Adding the
 		// legacy configured carvers as well would punch full-strength caves even
-		// when caveDensity is zero. Compatibility shapes retain vanilla's carvers;
+		// when caveDensity is zero. Vanilla passthrough shapes retain those carvers;
 		// both paths keep the ordinary underground and surface lava lakes.
 		if (pack.terrain().getShape() instanceof TerrainShape.Vanilla) {
 			BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);

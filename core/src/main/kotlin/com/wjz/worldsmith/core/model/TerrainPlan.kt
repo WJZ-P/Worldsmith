@@ -36,9 +36,9 @@ enum class VanillaNoisePreset {
 /** Relative share of inland terrain characters; values are normalized by the compiler. */
 @Serializable
 data class ReliefDistribution(
-    val flats: Double = 0.65,
-    val highlands: Double = 0.25,
-    val peaks: Double = 0.10,
+    val flats: Double,
+    val highlands: Double,
+    val peaks: Double,
 )
 
 /** Whether a generated river channel is flooded to sea level or remains a dry valley. */
@@ -49,22 +49,20 @@ enum class RiverFill {
 }
 
 /**
- * Version-independent inland-water and ocean-floor intent.
- *
- * Defaults preserve Terrain V2 exactly: no generated inland water and the
- * original ocean depth. Prompt-generated packs write the fields explicitly.
+ * Version-independent inland-water and ocean-floor intent. Every field is
+ * required so a generated pack records an explicit design decision.
  */
 @Serializable
 data class HydrologyIntent(
-    val riverCoverage: Double = 0.0,
-    val riverWidth: Double = 1.0,
-    val riverDepth: Double = 0.8,
-    val riverMeander: Double = 0.65,
-    val riverFill: RiverFill = RiverFill.FLUID,
-    val lakeDensity: Double = 0.0,
-    val lakeScale: Double = 1.0,
-    val lakeDepth: Double = 0.8,
-    val oceanDepth: Double = 1.0,
+    val riverCoverage: Double,
+    val riverWidth: Double,
+    val riverDepth: Double,
+    val riverMeander: Double,
+    val riverFill: RiverFill,
+    val lakeDensity: Double,
+    val lakeScale: Double,
+    val lakeDepth: Double,
+    val oceanDepth: Double,
 )
 
 /**
@@ -72,9 +70,9 @@ data class HydrologyIntent(
  *
  * Prompt-generated packs use semantic [Procedural] intent; the target adapter
  * turns it into the density-function graph of its Minecraft version. [Vanilla]
- * remains as a compatibility escape hatch for packs that intentionally want an
- * unchanged router. Keeping both as a closed tagged set lets future terrain
- * models be added without changing the meaning of either existing variant.
+ * is an explicit passthrough mode for worlds that intentionally want an
+ * unchanged Mojang router. The closed tagged set also leaves room for future
+ * terrain models.
  */
 @Serializable
 sealed interface TerrainShape {
@@ -94,13 +92,13 @@ sealed interface TerrainShape {
     @Serializable
     @SerialName("procedural")
     data class Procedural(
-        val landRatio: Double = 0.55,
-        val continentScale: Double = 1.0,
-        val coastRoughness: Double = 0.45,
-        val relief: ReliefDistribution = ReliefDistribution(),
-        val verticalScale: Double = 1.0,
-        val caveDensity: Double = 0.65,
-        val hydrology: HydrologyIntent = HydrologyIntent(),
+        val landRatio: Double,
+        val continentScale: Double,
+        val coastRoughness: Double,
+        val relief: ReliefDistribution,
+        val verticalScale: Double,
+        val caveDensity: Double,
+        val hydrology: HydrologyIntent,
     ) : TerrainShape
 }
 

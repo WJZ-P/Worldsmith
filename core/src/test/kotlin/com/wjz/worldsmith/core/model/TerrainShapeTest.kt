@@ -2,8 +2,10 @@ package com.wjz.worldsmith.core.model
 
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
+import kotlinx.serialization.SerializationException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -21,8 +23,8 @@ class TerrainShapeTest {
 
     /**
      * The discriminator is the whole point of the shape being a closed set
-     * rather than an enum. Without it on disk, adding a second variant later
-     * would make every pack written before that day unreadable.
+     * rather than an enum: each current terrain model has an unambiguous JSON
+     * contract and future models can receive their own contract.
      */
     @Test
     fun `a shape is written with the tag that lets a second variant be added later`() {
@@ -65,8 +67,8 @@ class TerrainShapeTest {
     }
 
     @Test
-    fun `terrain v2 documents decode with neutral hydrology`() {
-        val legacy = """
+    fun `procedural terrain rejects an omitted hydrology block`() {
+        val incomplete = """
             {
               "kind": "procedural",
               "landRatio": 0.7,
@@ -78,12 +80,9 @@ class TerrainShapeTest {
             }
         """.trimIndent()
 
-        val decoded = assertInstanceOf(
-            TerrainShape.Procedural::class.java,
-            WorldsmithJson.decode<TerrainShape>(legacy),
-        )
-
-        assertEquals(HydrologyIntent(), decoded.hydrology)
+        assertThrows(SerializationException::class.java) {
+            WorldsmithJson.decode<TerrainShape>(incomplete)
+        }
     }
 
     @Test

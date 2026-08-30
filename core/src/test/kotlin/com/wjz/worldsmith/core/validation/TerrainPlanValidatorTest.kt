@@ -54,6 +54,7 @@ class TerrainPlanValidatorTest {
                     riverWidth = 0.24,
                     riverDepth = -0.1,
                     riverMeander = 1.1,
+                    riverFill = RiverFill.FLUID,
                     lakeDensity = 0.36,
                     lakeScale = 0.24,
                     lakeDepth = -0.1,

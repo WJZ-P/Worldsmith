@@ -42,7 +42,7 @@ public final class CompiledPack {
 		this.byId = Map.copyOf(index);
 	}
 
-	/** Built-in compilation preserves the historic resource ids used by datagen. */
+	/** Built-in compilation uses the stable unscoped resource ids written by datagen. */
 	public static CompiledPack of(WorldsmithPack pack) {
 		return new CompiledPack(pack, "");
 	}
@@ -128,7 +128,7 @@ public final class CompiledPack {
 		return ResourceKey.create(Registries.WORLD_PRESET, resourceId("wasteland"));
 	}
 
-	private Identifier resourceId(String legacyPath) {
-		return Worldsmith.id(this.resourcePrefix + legacyPath);
+	private Identifier resourceId(String resourcePath) {
+		return Worldsmith.id(this.resourcePrefix + resourcePath);
 	}
 }
