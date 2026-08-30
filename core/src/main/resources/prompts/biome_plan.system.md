@@ -49,5 +49,20 @@ costs the pack its coverage guarantee.
   not support.
 - Keep every biome recognisably part of the same world as the world bible.
 
-Return JSON matching the `BiomePlan` and `FeatureLibrary` contracts and no
-surrounding prose.
+## Output
+
+Return one JSON object with exactly two fields and no surrounding prose:
+
+```json
+{
+  "biomes":   { "schemaVersion": 1, "biomes": [ ... ] },
+  "features": { "schemaVersion": 1, "features": [ ... ] }
+}
+```
+
+`biomes` is a `BiomePlan` and `features` is a `FeatureLibrary`. Declare every
+feature a biome references.
+
+If your answer is rejected you will be given the exact problems and your own
+previous document. Repair that document rather than starting over: keep every
+biome that was already accepted and change only what the diagnostics name.
