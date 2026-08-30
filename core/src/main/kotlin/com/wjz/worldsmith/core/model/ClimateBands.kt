@@ -17,8 +17,40 @@ package com.wjz.worldsmith.core.model
  * exact control over dominance and rarity. Unnamed parameter regions are
  * intentionally resolved by Minecraft's nearest-neighbour biome search.
  */
+/** One indivisible square of the semantic grid. */
+data class ClimateCell(
+    val relief: ReliefBand,
+    val temperature: TemperatureBand,
+    val humidity: HumidityBand,
+) {
+    override fun toString(): String = "$relief/$temperature/$humidity"
+}
+
 object ClimateBands {
     private val FULL = NumericRange(-1.0f, 1.0f)
+
+    /**
+     * Every square the semantic presets can name.
+     *
+     * A pack is free to leave squares unclaimed; this exists so the validator
+     * can say which ones, because Minecraft resolves an unclaimed square to
+     * whichever biome is nearest rather than leaving a hole, and that is a
+     * decision the pack did not make and cannot see.
+     */
+    val ALL_CELLS: Set<ClimateCell> = ReliefBand.entries.flatMap { relief ->
+        TemperatureBand.entries.flatMap { temperature ->
+            HumidityBand.entries.map { ClimateCell(relief, temperature, it) }
+        }
+    }.toSet()
+
+    /** The squares one slot claims. */
+    fun cells(slot: ClimateSlot): Set<ClimateCell> = buildSet {
+        temperatureBands(slot).forEach { temperature ->
+            humidityBands(slot).forEach { humidity ->
+                add(ClimateCell(slot.relief, temperature, humidity))
+            }
+        }
+    }
 
     /** Continentalness and erosion spans per relief band. */
     private val RELIEF: Map<ReliefBand, Pair<NumericRange, NumericRange>> = mapOf(

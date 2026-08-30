@@ -40,7 +40,10 @@ class BiomePlanValidatorTest {
     fun `a prompt may intentionally leave semantic bands undeclared`() {
         val incomplete = plan().let { it.copy(biomes = it.biomes.filterNot { biome -> biome.id == "flats_hot" }) }
 
-        assertTrue(BiomePlanValidator.validate(incomplete, library()).isEmpty())
+        val diagnostics = BiomePlanValidator.validate(incomplete, library())
+
+        assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+        assertTrue(diagnostics.any { it.code == "UNCLAIMED_CLIMATE_CELL" }, "the gap should still be reported")
     }
 
     @Test
@@ -49,7 +52,10 @@ class BiomePlanValidatorTest {
             it.copy(biomes = it.biomes + biome("second_shore", ClimateSlot(ReliefBand.COAST), BiomeArchetypeRole.BEACH))
         }
 
-        assertTrue(BiomePlanValidator.validate(overlapping, library()).isEmpty())
+        val diagnostics = BiomePlanValidator.validate(overlapping, library())
+
+        assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+        assertTrue(diagnostics.any { it.code == "OVERLAPPING_CLIMATE_CELL" }, "the clash should still be reported")
     }
 
     @Test
@@ -62,7 +68,13 @@ class BiomePlanValidatorTest {
             )
         }
 
-        assertTrue(BiomePlanValidator.validate(raw, library()).isEmpty())
+        val diagnostics = BiomePlanValidator.validate(raw, library())
+
+        assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+        assertTrue(
+            diagnostics.any { it.code == "CLIMATE_COVERAGE_UNPROVEN" },
+            "a raw box means coverage cannot be checked, which the author should know",
+        )
     }
 
     @Test
@@ -256,6 +268,37 @@ class BiomePlanValidatorTest {
             sky = BiomeSky(color = "#8C7A63"),
         ),
     )
+
+    /**
+     * Coverage is reported, never enforced: a prompt asking for three biomes is
+     * not wrong, but the author still has to know that everything else is
+     * resolved by nearest neighbour rather than by them.
+     */
+    @Test
+    fun `unclaimed climate squares are reported without blocking the pack`() {
+        val sparse = plan().let { it.copy(biomes = it.biomes.take(1)) }
+
+        val diagnostics = BiomePlanValidator.validate(sparse, library())
+        val unclaimed = diagnostics.single { it.code == "UNCLAIMED_CLIMATE_CELL" }
+
+        assertEquals(DiagnosticSeverity.WARNING, unclaimed.severity)
+        assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+        assertTrue("30 of 36" in unclaimed.message, unclaimed.message)
+    }
+
+    @Test
+    fun `two biomes claiming one square are named`() {
+        val clashing = plan().let { source ->
+            val first = source.biomes.first()
+            source.copy(biomes = source.biomes + first.copy(id = "abyss_twin", displayName = "Twin"))
+        }
+
+        val overlap = BiomePlanValidator.validate(clashing, library()).filter { it.code == "OVERLAPPING_CLIMATE_CELL" }
+
+        assertTrue(overlap.isNotEmpty())
+        assertTrue(overlap.all { it.severity == DiagnosticSeverity.WARNING })
+        assertTrue(overlap.first().message.contains("abyss_twin"), overlap.first().message)
+    }
 
     private fun material(role: String, id: String) = MaterialSelector(semanticRole = role, preferredIds = listOf(id))
 }

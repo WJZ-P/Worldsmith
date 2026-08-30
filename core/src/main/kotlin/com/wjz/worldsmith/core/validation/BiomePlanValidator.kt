@@ -12,6 +12,7 @@ import com.wjz.worldsmith.core.model.BiomeTint
 import com.wjz.worldsmith.core.model.BiomePlan
 import com.wjz.worldsmith.core.model.ClimateBands
 import com.wjz.worldsmith.core.model.ClimateBox
+import com.wjz.worldsmith.core.model.ClimateCell
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.NumericRange
 import com.wjz.worldsmith.core.model.SurfaceConditions
@@ -30,6 +31,7 @@ object BiomePlanValidator {
     private val HEX_COLOR = Regex("^#[0-9A-Fa-f]{6}$")
     private val ARGB_COLOR = Regex("^#[0-9A-Fa-f]{8}$")
     private val RESOURCE_ID = Regex("^[a-z0-9_.-]+:[a-z0-9/._-]+$")
+    private const val MAX_REPORTED_CELLS = 6
     private const val MIN_FOG_END_DISTANCE = 16.0f
     private const val MAX_FOG_END_DISTANCE = 4096.0f
     private const val MIN_CLOUD_HEIGHT = -64.0f
@@ -51,6 +53,8 @@ object BiomePlanValidator {
         plan.biomes.forEachIndexed { index, biome ->
             addAll(validateBiome("biomes[" + index + "]", biome, features, featureIds))
         }
+
+        addAll(reportCoverage(plan))
     }
 
     private fun validateBiome(
@@ -302,6 +306,64 @@ object BiomePlanValidator {
         addAll(FeatureLibraryValidator.validateMaterial("$path.foundation", stack.foundation))
     }
 
+    /**
+     * Reports what the semantic grid does and does not cover.
+     *
+     * None of this blocks. A pack may deliberately name three biomes and let
+     * Minecraft's nearest-neighbour search fill everything else, and a prompt
+     * asking for that is not wrong. What would be wrong is not knowing: an
+     * unclaimed square is silently handed to whichever biome is closest, which
+     * looks in-game like a region that was never designed rather than like a
+     * gap, so it is reported and left to the author.
+     */
+    private fun reportCoverage(plan: BiomePlan): List<Diagnostic> = buildList {
+        val rawBoxes = plan.biomes.filter { it.slot == null && it.climate != null }
+        if (rawBoxes.isNotEmpty()) {
+            add(
+                warning(
+                    "biomes",
+                    "CLIMATE_COVERAGE_UNPROVEN",
+                    rawBoxes.size.toString() + " biome(s) place themselves with a raw climate box, so which " +
+                        "semantic squares are covered cannot be determined here",
+                ),
+            )
+            return@buildList
+        }
+
+        val owners = linkedMapOf<ClimateCell, MutableList<String>>()
+        plan.biomes.forEach { biome ->
+            val slot = biome.slot ?: return@forEach
+            ClimateBands.cells(slot).forEach { cell ->
+                owners.getOrPut(cell) { mutableListOf() }.add(biome.id)
+            }
+        }
+
+        owners.filterValues { it.size > 1 }.forEach { (cell, claimants) ->
+            add(
+                warning(
+                    "biomes",
+                    "OVERLAPPING_CLIMATE_CELL",
+                    "Square " + cell + " is claimed by " + claimants.joinToString(", ") +
+                        "; the last one wins and the others never generate there",
+                ),
+            )
+        }
+
+        val unclaimed = ClimateBands.ALL_CELLS.filterNot(owners::containsKey)
+        if (unclaimed.isNotEmpty()) {
+            val shown = unclaimed.take(MAX_REPORTED_CELLS).joinToString(", ")
+            val rest = if (unclaimed.size > MAX_REPORTED_CELLS) " and " + (unclaimed.size - MAX_REPORTED_CELLS) + " more" else ""
+            add(
+                warning(
+                    "biomes",
+                    "UNCLAIMED_CLIMATE_CELL",
+                    unclaimed.size.toString() + " of " + ClimateBands.ALL_CELLS.size + " semantic squares are " +
+                        "claimed by no biome and will be filled by the nearest one instead: " + shown + rest,
+                ),
+            )
+        }
+    }
+
     fun validateClimate(path: String, climate: ClimateBox): List<Diagnostic> = buildList {
         listOf(
             "temperature" to climate.temperature,
@@ -324,6 +386,9 @@ object BiomePlanValidator {
             add(error(path, "CLIMATE_RANGE_OUT_OF_BOUNDS", "Climate ranges must remain between -2 and 2"))
         }
     }
+
+    private fun warning(path: String, code: String, message: String) =
+        Diagnostic(path, code, DiagnosticSeverity.WARNING, message)
 
     private fun error(path: String, code: String, message: String) =
         Diagnostic(path, code, DiagnosticSeverity.ERROR, message)
