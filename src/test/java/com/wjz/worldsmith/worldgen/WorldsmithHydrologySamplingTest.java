@@ -158,6 +158,7 @@ final class WorldsmithHydrologySamplingTest {
 			1.0,
 			0.0,
 			hydrology,
+			List.of(),
 			List.of()
 		);
 		TerrainPlan terrain = new TerrainPlan(

@@ -9,5 +9,6 @@ public final class WorldsmithWorldgen {
 
 	public static void initialize() {
 		WorldsmithSurfaceConditionTypes.initialize();
+		WorldsmithDensityFunctionTypes.initialize();
 	}
 }

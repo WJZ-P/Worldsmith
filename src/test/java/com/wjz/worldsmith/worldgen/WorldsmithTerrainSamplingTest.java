@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.wjz.worldsmith.core.model.HydrologyIntent;
 import com.wjz.worldsmith.core.model.ReliefDistribution;
 import com.wjz.worldsmith.core.model.RiverFill;
+import com.wjz.worldsmith.core.model.Anchor;
+import com.wjz.worldsmith.core.model.AnchorPlacement;
 import com.wjz.worldsmith.core.model.BandEffect;
 import com.wjz.worldsmith.core.model.BandRegion;
 import com.wjz.worldsmith.core.model.TerrainBand;
@@ -14,7 +16,9 @@ import com.wjz.worldsmith.core.model.WorldsmithPack;
 import com.wjz.worldsmith.core.model.WorldsmithPackManifest;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Random;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.registries.VanillaRegistries;
@@ -246,6 +250,74 @@ final class WorldsmithTerrainSamplingTest {
 		assertTrue(gap < lower / 2.0, () -> "the sky between layers should stay open, was " + gap);
 	}
 
+	/**
+	 * Noise says "this kind of thing, everywhere, in this proportion". An anchor
+	 * says "here". The test for that is not that a mountain exists but that it
+	 * exists in one place and leaves the rest of the world alone.
+	 */
+	@Test
+	void aFixedAnchorRaisesGroundOnlyWhereItWasPlaced() {
+		RandomState plain = state(anchorShape(), '2');
+		RandomState peaked = state(
+			anchorShape(new Anchor("holy_peak", new AnchorPlacement.Fixed(600, -400), 500, 150.0, 1.0)),
+			'3'
+		);
+
+		double atCentre = surfaceHeight(peaked, 600, -400) - surfaceHeight(plain, 600, -400);
+		double atRim = surfaceHeight(peaked, 600 + 480, -400) - surfaceHeight(plain, 600 + 480, -400);
+		double faraway = surfaceHeight(peaked, 600 + 3_000, -400) - surfaceHeight(plain, 600 + 3_000, -400);
+
+		assertTrue(atCentre > 100.0, () -> "the anchor should raise its centre, gained " + atCentre);
+		assertTrue(atRim < atCentre / 3.0, () -> "the rise should fall off by the rim, rim=" + atRim);
+		assertTrue(Math.abs(faraway) < 1.0, () -> "distant terrain must be untouched, moved " + faraway);
+	}
+
+	/** A negative amplitude is the same field, sunk instead of raised. */
+	@Test
+	void aNegativeAnchorSinksGroundIntoACrater() {
+		RandomState plain = state(anchorShape(), '4');
+		RandomState cratered = state(
+			anchorShape(new Anchor("basin", new AnchorPlacement.Fixed(0, 0), 400, -120.0, 1.0)),
+			'5'
+		);
+
+		double atCentre = surfaceHeight(cratered, 0, 0) - surfaceHeight(plain, 0, 0);
+
+		assertTrue(atCentre < -80.0, () -> "a negative amplitude should sink the ground, moved " + atCentre);
+	}
+
+	/**
+	 * Nothing is unique in an endless world, so rarity is a spacing rather than
+	 * a promise: instances have to recur, and recur far apart.
+	 */
+	@Test
+	void aScatteredAnchorRecursAcrossTheWorld() {
+		RandomState plain = state(anchorShape(), '6');
+		RandomState spires = state(
+			anchorShape(new Anchor("spires", new AnchorPlacement.Scattered(4_000, 0.7), 500, 140.0, 1.0)),
+			'7'
+		);
+
+		// Instances jitter on both axes, so a single transect can miss every one
+		// of them by construction. What "recurs" means is that raised ground
+		// turns up in many different lattice cells, which is what this counts.
+		// Sampled at random rather than on a grid. A regular scan whose step
+		// divides the spacing lands on the same relative position in every cell,
+		// so it can miss every instance in the world and report nothing.
+		Set<Long> cellsHit = new HashSet<>();
+		Random random = new Random(0xA9C40FL);
+		for (int sample = 0; sample < 2_000; sample++) {
+			int x = random.nextInt(-20_000, 20_001);
+			int z = random.nextInt(-20_000, 20_001);
+			if (surfaceHeight(spires, x, z) - surfaceHeight(plain, x, z) > 60.0) {
+				cellsHit.add(((long) Math.floorDiv(x, 4_000) << 32) ^ (Math.floorDiv(z, 4_000) & 0xFFFFFFFFL));
+			}
+		}
+		int distinctCells = cellsHit.size();
+
+		assertTrue(distinctCells > 8, () -> "a scattered anchor should recur, distinct cells hit " + distinctCells);
+	}
+
 	@Test
 	void caveDensityChangesHowMuchSolidTerrainIsCarved() {
 		TerrainShape.Procedural solidShape = shape(0.82, 1.0, 0.3, 0.5, 0.35, 0.15, 1.0, 0.0);
@@ -276,8 +348,35 @@ final class WorldsmithTerrainSamplingTest {
 			verticalScale,
 			caveDensity,
 			new HydrologyIntent(0.0, 1.0, 0.8, 0.65, RiverFill.FLUID, 0.0, 1.0, 0.8, 1.0),
+			List.of(),
 			List.of()
 		);
+	}
+
+	private static TerrainShape.Procedural anchorShape(Anchor... anchors) {
+		TerrainShape.Procedural flat = shape(0.95, 1.0, 0.2, 1.0, 0.0, 0.0, 0.4, 0.0);
+		return new TerrainShape.Procedural(
+			flat.getLandRatio(),
+			flat.getContinentScale(),
+			flat.getCoastRoughness(),
+			flat.getRelief(),
+			flat.getVerticalScale(),
+			flat.getCaveDensity(),
+			flat.getHydrology(),
+			List.of(),
+			List.of(anchors)
+		);
+	}
+
+	/** Highest Y whose density is still solid, which is the ground the player walks. */
+	private static double surfaceHeight(RandomState state, int x, int z) {
+		DensityFunction density = state.router().finalDensity();
+		for (int y = 300; y >= -64; y -= 1) {
+			if (density.compute(new DensityFunction.SinglePointContext(x, y, z)) > 0.0) {
+				return y;
+			}
+		}
+		return -64;
 	}
 
 	private static TerrainBand island(double coverage, int minY, int maxY, BandRegion region) {
@@ -294,7 +393,8 @@ final class WorldsmithTerrainSamplingTest {
 			flat.getVerticalScale(),
 			flat.getCaveDensity(),
 			flat.getHydrology(),
-			List.of(bands)
+			List.of(bands),
+			List.of()
 		);
 	}
 

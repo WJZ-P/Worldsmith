@@ -2,6 +2,8 @@ package com.wjz.worldsmith.core.validation
 
 import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.model.MaterialSelector
+import com.wjz.worldsmith.core.model.Anchor
+import com.wjz.worldsmith.core.model.AnchorPlacement
 import com.wjz.worldsmith.core.model.BandEffect
 import com.wjz.worldsmith.core.model.TerrainBand
 import com.wjz.worldsmith.core.model.TerrainPlan
@@ -9,6 +11,12 @@ import com.wjz.worldsmith.core.model.TerrainShape
 
 object TerrainPlanValidator {
     private const val MIN_BAND_HEIGHT = 24
+    private const val MAX_ANCHORS = 8
+    private const val MIN_ANCHOR_RADIUS = 32
+    private const val MAX_ANCHOR_RADIUS = 100_000
+    /** Beyond this a lone anchor is designed and never seen. */
+    private const val MAX_REACHABLE_DISTANCE = 20_000
+    private val ANCHOR_ID = Regex("^[a-z0-9_]+$")
     private const val MAX_BANDS = 6
     fun validate(plan: TerrainPlan): List<Diagnostic> = buildList {
         if (plan.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
@@ -63,6 +71,7 @@ object TerrainPlanValidator {
                     add(error("shape.caveDensity", "CAVE_DENSITY_OUT_OF_RANGE", "Cave density must be between 0 and 1"))
                 }
                 addAll(validateBands(shape.bands, plan))
+                addAll(validateAnchors(shape.anchors))
                 val hydrology = shape.hydrology
                 if (hydrology.riverCoverage !in 0.0..0.35) {
                     add(error("shape.hydrology.riverCoverage", "RIVER_COVERAGE_OUT_OF_RANGE", "River coverage must be between 0 and 0.35"))
@@ -167,6 +176,71 @@ object TerrainPlanValidator {
                             " will merge into the ground and the sea rather than float over them",
                     ),
                 )
+            }
+        }
+    }
+
+    private fun validateAnchors(anchors: List<Anchor>): List<Diagnostic> = buildList {
+        if (anchors.size > MAX_ANCHORS) {
+            add(error("shape.anchors", "TOO_MANY_ANCHORS", "A world may define at most $MAX_ANCHORS anchors"))
+        }
+        anchors.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys.sorted().forEach { id ->
+            add(error("shape.anchors[$id]", "DUPLICATE_ANCHOR", "Anchor id must be unique"))
+        }
+        anchors.forEachIndexed { index, anchor ->
+            val path = "shape.anchors[$index]"
+            if (!ANCHOR_ID.matches(anchor.id)) {
+                add(error("$path.id", "INVALID_ANCHOR_ID", "Anchor id must match ${ANCHOR_ID.pattern}"))
+            }
+            if (anchor.radius !in MIN_ANCHOR_RADIUS..MAX_ANCHOR_RADIUS) {
+                add(
+                    error(
+                        "$path.radius",
+                        "ANCHOR_RADIUS_OUT_OF_RANGE",
+                        "Anchor radius must be between $MIN_ANCHOR_RADIUS and $MAX_ANCHOR_RADIUS",
+                    ),
+                )
+            }
+            if (anchor.falloff !in 0.05..8.0) {
+                add(error("$path.falloff", "ANCHOR_FALLOFF_OUT_OF_RANGE", "Anchor falloff must be between 0.05 and 8"))
+            }
+            if (anchor.amplitude == 0.0) {
+                add(warning(path, "ANCHOR_HAS_NO_EFFECT", "An anchor with zero amplitude changes nothing"))
+            }
+            when (val placement = anchor.placement) {
+                is AnchorPlacement.Fixed -> {
+                    val reach = maxOf(kotlin.math.abs(placement.x), kotlin.math.abs(placement.z))
+                    if (reach > MAX_REACHABLE_DISTANCE) {
+                        add(
+                            warning(
+                                "$path.placement",
+                                "ANCHOR_UNREACHABLE",
+                                "Anchor '" + anchor.id + "' sits " + reach + " blocks from the origin. The world is " +
+                                    "endless but the player is not, so a single instance this far away will not be " +
+                                    "found; move it nearer spawn or make it scattered.",
+                            ),
+                        )
+                    }
+                }
+
+                is AnchorPlacement.Scattered -> {
+                    if (placement.jitter !in 0.0..1.0) {
+                        add(error("$path.placement.jitter", "ANCHOR_JITTER_OUT_OF_RANGE", "Jitter must be between 0 and 1"))
+                    }
+                    // The compiler only searches the nine lattice cells around a
+                    // point, which is exact while instances cannot reach past a
+                    // neighbouring cell.
+                    if (placement.spacing < anchor.radius * 2) {
+                        add(
+                            error(
+                                "$path.placement.spacing",
+                                "ANCHOR_SPACING_TOO_TIGHT",
+                                "Spacing " + placement.spacing + " must be at least twice the radius " +
+                                    anchor.radius + ", or instances would merge into each other",
+                            ),
+                        )
+                    }
+                }
             }
         }
     }

@@ -19,6 +19,7 @@ replace `shape` with a `procedural` terrain intent:
   "verticalScale": 1.0,
   "caveDensity": 0.65,
   "bands": [],
+  "anchors": [],
   "hydrology": {
     "riverCoverage": 0.06,
     "riverWidth": 1.0,
@@ -76,6 +77,29 @@ replace `shape` with a `procedural` terrain intent:
     band listed after an `ADD` band will hollow out the islands it made.
   - `caveDensity` carves bands too. Above roughly `0.7` it hollows small shapes
     into shells, so pair heavy caves with a larger `scale`.
+- `anchors` is a list, empty by default, and the only control that can put
+  something *in a place*. Everything else is statistical: noise gives the same
+  kind of world everywhere, so it can say "there are craters" but never "the
+  crater". Any part of a prompt that uses the word *the* about a location needs
+  an anchor.
+  - `radius` is how far the influence reaches and `amplitude` is how many blocks
+    it moves the ground at the centre. Positive raises a peak, negative sinks a
+    crater; one field covers both.
+  - `falloff` (`0.05..8`) shapes the slope. Below one is a plateau with steep
+    sides, one is a dome, above one is a spire standing in a wide skirt.
+  - `placement` chooses how instances are positioned, and the two forms need
+    different information, so each carries only its own:
+    - `{"kind": "scattered", "spacing": 6000, "jitter": 0.7}` repeats forever on
+      a lattice. `spacing` is the rarity knob in blocks between instances.
+      **Prefer this.** The world has no edge, so a feature that occurs once is a
+      feature almost no player will ever reach; write a large spacing for
+      "rare" rather than promising a singleton.
+    - `{"kind": "fixed", "x": 0, "z": 0}` places exactly one instance. Use it
+      only for something the player is meant to find, and keep it within a few
+      thousand blocks of the origin, or it has been designed and will not be
+      seen.
+  - `spacing` must be at least twice the `radius`, or instances would run into
+    one another.
 - `caveDensity` (`0..1`) blends from solid terrain to the full overworld cave
   system. Zero suppresses cave carving; one uses all supported cave families.
 

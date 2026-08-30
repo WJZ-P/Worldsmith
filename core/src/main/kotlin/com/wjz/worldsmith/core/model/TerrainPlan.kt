@@ -74,6 +74,59 @@ data class HydrologyIntent(
  * unchanged Mojang router. The closed tagged set also leaves room for future
  * terrain models.
  */
+/**
+ * How the instances of one anchor are positioned.
+ *
+ * <p>A closed set rather than a number with a magic value, because the two
+ * cases genuinely need different data: a fixed anchor must say where it is and
+ * a scattered one must not.
+ */
+@Serializable
+sealed interface AnchorPlacement {
+    /**
+     * One instance, at an authored position.
+     *
+     * <p>Use it for the place the player is meant to find. In a world with no
+     * edges, a feature that occurs once and far away has been designed and will
+     * never be seen, so the validator says so when this lands far from spawn.
+     */
+    @Serializable
+    @SerialName("fixed")
+    data class Fixed(val x: Int, val z: Int) : AnchorPlacement
+
+    /**
+     * Instances repeating forever on a jittered lattice.
+     *
+     * <p>[spacing] is the rarity knob, in blocks between instances: nothing is
+     * truly unique in an endless world, and a large spacing expresses "rare"
+     * without promising a singleton the player will never reach. [jitter] at
+     * zero leaves a visible grid; near one, instances wander their whole cell.
+     */
+    @Serializable
+    @SerialName("scattered")
+    data class Scattered(val spacing: Int, val jitter: Double = 0.6) : AnchorPlacement
+}
+
+/**
+ * A place the world is built around.
+ *
+ * <p>Noise can only say "this kind of thing, everywhere, in this proportion".
+ * An anchor says "here". Everything a prompt expresses with the word *the* -
+ * the great crater, the shattered spires - needs one, and until now none of it
+ * could be written down.
+ *
+ * <p>[amplitude] carries the sign: positive raises ground into a peak, negative
+ * sinks it into a crater, so one field covers both without a second mode.
+ */
+@Serializable
+data class Anchor(
+    val id: String,
+    val placement: AnchorPlacement,
+    val radius: Int,
+    val amplitude: Double,
+    val falloff: Double = 1.0,
+)
+
 /** Whether a band puts rock where there was none, or takes it away. */
 @Serializable
 enum class BandEffect {
@@ -148,6 +201,7 @@ sealed interface TerrainShape {
         val caveDensity: Double,
         val hydrology: HydrologyIntent,
         val bands: List<TerrainBand> = emptyList(),
+        val anchors: List<Anchor> = emptyList(),
     ) : TerrainShape
 }
 

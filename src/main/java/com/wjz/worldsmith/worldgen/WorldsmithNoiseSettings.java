@@ -1,6 +1,8 @@
 package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.Worldsmith;
+import com.wjz.worldsmith.core.model.Anchor;
+import com.wjz.worldsmith.core.model.AnchorPlacement;
 import com.wjz.worldsmith.core.model.BandEffect;
 import com.wjz.worldsmith.core.model.BandRegion;
 import com.wjz.worldsmith.core.model.TerrainBand;
@@ -204,6 +206,10 @@ public final class WorldsmithNoiseSettings {
 			noises
 		);
 		horizontalHeightBlocks = hydrology.horizontalHeightBlocks();
+		// Anchors land after hydrology so a river cannot cut a landmark in half,
+		// and before baseTerrain so the preliminary surface level and the biome
+		// depth parameter both see the ground that was actually built.
+		horizontalHeightBlocks = withAnchors(horizontalHeightBlocks, shape.getAnchors(), noises);
 
 		int minY = terrain.getMinY();
 		int maxY = minY + terrain.getHeight();
@@ -303,6 +309,58 @@ public final class WorldsmithNoiseSettings {
 			vanilla.veinToggle(),
 			vanilla.veinRidged(),
 			vanilla.veinGap()
+		);
+	}
+
+	/**
+	 * Adds every anchor's height contribution to the horizontal field.
+	 *
+	 * <p>An anchor field depends only on X and Z, so {@code cache2d} evaluates
+	 * it once per column instead of once per block. That is the reason a linear
+	 * scan over a handful of anchors costs nothing and no spatial index is
+	 * wanted: the expensive axis was never the count.
+	 */
+	private static DensityFunction withAnchors(
+		DensityFunction horizontalHeightBlocks,
+		List<Anchor> anchors,
+		HolderGetter<NormalNoise.NoiseParameters> noises
+	) {
+		if (anchors.isEmpty()) {
+			return horizontalHeightBlocks;
+		}
+		DensityFunction combined = horizontalHeightBlocks;
+		for (Anchor anchor : anchors) {
+			combined = DensityFunctions.add(combined, anchorField(anchor, noises));
+		}
+		return DensityFunctions.cache2d(combined);
+	}
+
+	private static DensityFunction anchorField(
+		Anchor anchor,
+		HolderGetter<NormalNoise.NoiseParameters> noises
+	) {
+		AnchorPlacement placement = anchor.getPlacement();
+		if (placement instanceof AnchorPlacement.Fixed fixed) {
+			return new WorldsmithAnchorFields.Point(
+				fixed.getX(),
+				fixed.getZ(),
+				anchor.getRadius(),
+				anchor.getAmplitude(),
+				anchor.getFalloff()
+			);
+		}
+		if (placement instanceof AnchorPlacement.Scattered scattered) {
+			return new WorldsmithAnchorFields.Grid(
+				scattered.getSpacing(),
+				scattered.getJitter(),
+				anchor.getRadius(),
+				anchor.getAmplitude(),
+				anchor.getFalloff(),
+				new DensityFunction.NoiseHolder(noises.getOrThrow(Noises.SPAGHETTI_3D_RARITY))
+			);
+		}
+		throw new IllegalStateException(
+			"Worldsmith cannot compile anchor placement " + placement.getClass().getSimpleName() + " yet"
 		);
 	}
 
