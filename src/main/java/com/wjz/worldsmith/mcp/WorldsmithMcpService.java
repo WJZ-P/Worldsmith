@@ -27,7 +27,15 @@ public final class WorldsmithMcpService {
 	private static final String PACK_DIRECTORY = "worldsmith/packs";
 
 	private static McpHttpServer server;
-	private static int runningPort;
+	/**
+	 * The port that was asked for, which is not always the one that bound.
+	 *
+	 * The bridge walks forward from the preferred port when it is busy, so
+	 * comparing settings against the live port would restart the server on every
+	 * save. What decides whether a restart is needed is whether the request
+	 * changed.
+	 */
+	private static int requestedPort;
 	private static Consumer<String> packFinished = id -> { };
 
 	private WorldsmithMcpService() {
@@ -45,7 +53,7 @@ public final class WorldsmithMcpService {
 			stop();
 			return;
 		}
-		if (server != null && runningPort == settings.getPort()) {
+		if (server != null && requestedPort == settings.getPort()) {
 			return;
 		}
 		stop();
@@ -54,7 +62,7 @@ public final class WorldsmithMcpService {
 
 	public static synchronized void stop() {
 		if (server == null) {
-			runningPort = 0;
+			requestedPort = 0;
 			clearDiscovery();
 			return;
 		}
@@ -65,7 +73,7 @@ public final class WorldsmithMcpService {
 			Worldsmith.LOGGER.warn("Worldsmith MCP bridge did not stop cleanly", e);
 		} finally {
 			server = null;
-			runningPort = 0;
+			requestedPort = 0;
 			clearDiscovery();
 		}
 	}
@@ -107,7 +115,7 @@ public final class WorldsmithMcpService {
 			McpHttpServer started = new McpHttpServer(tools.all(), modVersion());
 			URI endpoint = started.start(port);
 			server = started;
-			runningPort = port;
+			requestedPort = port;
 			McpDiscovery.write(discoveryFile(), endpoint, runtimeInfo().get());
 			Worldsmith.LOGGER.info("Worldsmith MCP bridge listening on {}, announced in {}", endpoint, discoveryFile());
 		} catch (Exception e) {
@@ -115,7 +123,7 @@ public final class WorldsmithMcpService {
 			// does not declare, so a narrower catch would not compile and would
 			// still miss it at runtime. A busy port must not stop the game.
 			server = null;
-			runningPort = 0;
+			requestedPort = 0;
 			clearDiscovery();
 			Worldsmith.LOGGER.error("Worldsmith MCP bridge could not start on port {}", port, e);
 		}

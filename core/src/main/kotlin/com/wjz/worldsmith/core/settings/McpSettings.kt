@@ -9,7 +9,7 @@ data class McpSettings(
     val port: Int = DEFAULT_PORT,
 ) {
     companion object {
-        const val DEFAULT_PORT: Int = 47631
+        const val DEFAULT_PORT: Int = 40821
         const val MIN_PORT: Int = 1024
         const val MAX_PORT: Int = 65535
     }

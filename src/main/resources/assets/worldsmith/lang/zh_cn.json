@@ -22,5 +22,13 @@
   "worldsmith.config.api_secret": "API Secret",
   "worldsmith.config.api_secret.tooltip": "仅供 AWS Bedrock 使用，对应 Secret Access Key。",
   "worldsmith.config.region": "AWS 区域",
-  "worldsmith.config.region.tooltip": "仅供 AWS Bedrock 使用，其他服务商会忽略它。"
+  "worldsmith.config.region.tooltip": "仅供 AWS Bedrock 使用，其他服务商会忽略它。",
+  "worldsmith.config.category.mcp": "MCP 桥接",
+  "worldsmith.config.mcp.about": "让外部助手在游戏运行时读写 Worldsmith 世界包。只监听本机，网络上无法访问。",
+  "worldsmith.config.mcp.enabled": "启用桥接",
+  "worldsmith.config.mcp.enabled.tooltip": "默认关闭。开启后会在游戏运行期间占用一个本地端口。",
+  "worldsmith.config.mcp.port": "端口",
+  "worldsmith.config.mcp.port.tooltip": "希望使用的端口。若被占用，桥接会依次顺延到下一个可用端口，因此下方地址才是实际绑定的端口。保存后桥接会重启。",
+  "worldsmith.config.mcp.endpoint": "地址：%s",
+  "worldsmith.config.mcp.discovery": "运行中的桥接会把地址写入 %s，agent 可以直接从这个文件读取，不必有人转述。桥接停止时该文件会被删除。"
 }

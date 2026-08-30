@@ -79,7 +79,7 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 			"Off by default. Turning this on opens a local port for as long as the game is running.");
 		builder.add("worldsmith.config.mcp.port", "Port");
 		builder.add("worldsmith.config.mcp.port.tooltip",
-			"Change this if something else already uses the default. The bridge restarts when you save.");
+			"The port to prefer. If it is busy the bridge takes the next free one, so the address below is what actually bound. The bridge restarts when you save.");
 		builder.add("worldsmith.config.mcp.endpoint", "Address: %s");
 		builder.add("worldsmith.config.mcp.discovery",
 			"Running bridges announce themselves in %s, so an agent can read the address from there "

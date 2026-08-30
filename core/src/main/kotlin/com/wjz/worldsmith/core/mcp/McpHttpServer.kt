@@ -13,6 +13,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import java.io.IOException
+import java.net.BindException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URI
@@ -43,11 +45,47 @@ class McpHttpServer(
     val endpoint: URI?
         get() = httpServer?.address?.port?.let { URI.create("http://$LOOPBACK_HOST:$it$MCP_PATH") }
 
+    /**
+     * Binds [preferredPort], or the first free port after it.
+     *
+     * A fixed port is what makes the bridge findable, and it is also what makes
+     * it collide; a collision must not be the difference between the game
+     * starting and not. Nothing outside should assume the preferred port was
+     * the one taken - the returned URI and the discovery file both carry the
+     * port that actually bound.
+     *
+     * Port 0 already means "any free port" to the OS, so it is bound once and
+     * never walked.
+     */
     @Synchronized
-    fun start(port: Int): URI {
+    @JvmOverloads
+    fun start(preferredPort: Int, attempts: Int = DEFAULT_BIND_ATTEMPTS): URI {
         check(httpServer == null) { "MCP server is already running" }
-        require(port in 0..65535) { "MCP port must be between 0 and 65535" }
+        require(preferredPort in 0..65535) { "MCP port must be between 0 and 65535" }
+        require(attempts >= 1) { "MCP bind attempts must be at least 1" }
+        if (preferredPort == 0) {
+            return bind(0)
+        }
 
+        var lastFailure: BindException? = null
+        for (offset in 0 until attempts) {
+            val port = preferredPort + offset
+            if (port > 65535) {
+                break
+            }
+            try {
+                return bind(port)
+            } catch (busy: BindException) {
+                lastFailure = busy
+            }
+        }
+        throw IOException(
+            "No free port between $preferredPort and ${minOf(preferredPort + attempts - 1, 65535)}",
+            lastFailure,
+        )
+    }
+
+    private fun bind(port: Int): URI {
         val workerPool = Executors.newVirtualThreadPerTaskExecutor()
         val candidate = try {
             HttpServer.create(InetSocketAddress(InetAddress.getByName(LOOPBACK_HOST), port), 0)
@@ -263,6 +301,9 @@ class McpHttpServer(
         const val PROTOCOL_VERSION: String = "2025-11-25"
         const val MCP_PATH: String = "/mcp"
         const val LOOPBACK_HOST: String = "127.0.0.1"
+        /** How far past the preferred port to walk before giving up. */
+        const val DEFAULT_BIND_ATTEMPTS: Int = 16
+
         private const val SERVER_NAME = "worldsmith"
         private const val SERVER_TITLE = "Worldsmith MCP Bridge"
         private const val MAX_REQUEST_BYTES = 4 * 1024 * 1024

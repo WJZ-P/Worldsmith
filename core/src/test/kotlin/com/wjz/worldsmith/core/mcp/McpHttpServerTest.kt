@@ -5,9 +5,11 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.io.IOException
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -18,6 +20,40 @@ import java.time.Duration
 class McpHttpServerTest {
     @TempDir
     lateinit var packDirectory: Path
+
+    /**
+     * A fixed port is what makes the bridge findable and also what makes it
+     * collide, so a busy port must move the server rather than stop the game.
+     */
+    @Test
+    fun `a busy preferred port moves the bridge to the next free one`() {
+        McpHttpServer(WorldsmithMcpTools(packDirectory).all(), "test").use { squatter ->
+            val taken = squatter.start(0)
+            val busyPort = taken.port
+
+            McpHttpServer(WorldsmithMcpTools(packDirectory).all(), "test").use { moved ->
+                val endpoint = moved.start(busyPort)
+
+                assertTrue(endpoint.port > busyPort, "expected a port past $busyPort, got ${endpoint.port}")
+                assertTrue(endpoint.port <= busyPort + McpHttpServer.DEFAULT_BIND_ATTEMPTS)
+                // The caller must be able to learn where it actually landed.
+                assertEquals(endpoint, moved.endpoint)
+            }
+        }
+    }
+
+    @Test
+    fun `giving up on every candidate port reports the range it tried`() {
+        McpHttpServer(WorldsmithMcpTools(packDirectory).all(), "test").use { squatter ->
+            val busyPort = squatter.start(0).port
+
+            McpHttpServer(WorldsmithMcpTools(packDirectory).all(), "test").use { crowded ->
+                val failure = assertThrows(IOException::class.java) { crowded.start(busyPort, 1) }
+
+                assertTrue(busyPort.toString() in failure.message.orEmpty(), failure.message.orEmpty())
+            }
+        }
+    }
 
     @Test
     fun `streamable http exposes the guided Worldsmith workflow`() {
