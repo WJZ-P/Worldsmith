@@ -10,7 +10,9 @@ import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.VanillaNoisePreset;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
@@ -44,6 +46,11 @@ public final class WorldsmithNoiseSettings {
 	private static final double CARVE_STRENGTH = 8.0;
 	/** Turns the soft continentalness signal into a decisive region boundary. */
 	private static final double REGION_EDGE = 6.0;
+	/** Erosion the relief bands read as peaks, and as flats. */
+	private static final double PEAK_EROSION = -0.8;
+	private static final double BASIN_EROSION = 0.6;
+	/** How much anchor influence a band needs before it may act there. */
+	private static final double ANCHOR_BAND_THRESHOLD = 0.2;
 	/** How narrow the coastal strip is; larger keeps it closer to the shoreline. */
 	private static final double COASTAL_EDGE = 8.0;
 
@@ -206,10 +213,28 @@ public final class WorldsmithNoiseSettings {
 			noises
 		);
 		horizontalHeightBlocks = hydrology.horizontalHeightBlocks();
+
+		// One influence field per anchor, built once and consumed four ways:
+		// it raises the ground, biases which biome is chosen, tells the surface
+		// rules which ring they are painting, and bounds where a band may act.
+		// Behind cache2d because it depends only on X and Z.
+		Map<String, DensityFunction> anchorInfluence = new LinkedHashMap<>();
+		for (Anchor anchor : shape.getAnchors()) {
+			anchorInfluence.put(anchor.getId(), DensityFunctions.cache2d(anchorField(anchor, noises)));
+		}
 		// Anchors land after hydrology so a river cannot cut a landmark in half,
 		// and before baseTerrain so the preliminary surface level and the biome
 		// depth parameter both see the ground that was actually built.
-		horizontalHeightBlocks = withAnchors(horizontalHeightBlocks, shape.getAnchors(), noises);
+		for (Anchor anchor : shape.getAnchors()) {
+			horizontalHeightBlocks = DensityFunctions.add(
+				horizontalHeightBlocks,
+				DensityFunctions.mul(
+					anchorInfluence.get(anchor.getId()),
+					DensityFunctions.constant(anchor.getAmplitude())
+				)
+			);
+		}
+		erosion = biasErosion(erosion, shape.getAnchors(), anchorInfluence);
 
 		int minY = terrain.getMinY();
 		int maxY = minY + terrain.getHeight();
@@ -267,7 +292,7 @@ public final class WorldsmithNoiseSettings {
 		// squeezes the field, which islands need as much as the ground does.
 		DensityFunction banded = slidTerrain;
 		for (TerrainBand band : shape.getBands()) {
-			banded = applyBand(banded, band, shiftX, shiftZ, continents, noises);
+			banded = applyBand(banded, band, shiftX, shiftZ, continents, anchorInfluence, noises);
 		}
 		DensityFunction finalDensity = NoiseRouterData.postProcess(banded);
 		if (shape.getCaveDensity() > 0.0) {
@@ -313,26 +338,33 @@ public final class WorldsmithNoiseSettings {
 	}
 
 	/**
-	 * Adds every anchor's height contribution to the horizontal field.
+	 * Pulls erosion toward the value the anchor's shape implies.
 	 *
-	 * <p>An anchor field depends only on X and Z, so {@code cache2d} evaluates
-	 * it once per column instead of once per block. That is the reason a linear
-	 * scan over a handful of anchors costs nothing and no spatial index is
-	 * wanted: the expensive axis was never the count.
+	 * <p>Raising the ground is not enough on its own. Biomes are chosen from
+	 * climate parameters, not from how high the ground turned out, so a mountain
+	 * built by an anchor and nothing else keeps whatever biome the surrounding
+	 * plain had. Erosion is the axis the relief bands are cut along, so pulling
+	 * it toward the peak end under a rising anchor, and the flat end under a
+	 * sinking one, is what makes a summit read as a summit.
 	 */
-	private static DensityFunction withAnchors(
-		DensityFunction horizontalHeightBlocks,
+	private static DensityFunction biasErosion(
+		DensityFunction erosion,
 		List<Anchor> anchors,
-		HolderGetter<NormalNoise.NoiseParameters> noises
+		Map<String, DensityFunction> influence
 	) {
-		if (anchors.isEmpty()) {
-			return horizontalHeightBlocks;
-		}
-		DensityFunction combined = horizontalHeightBlocks;
+		DensityFunction biased = erosion;
 		for (Anchor anchor : anchors) {
-			combined = DensityFunctions.add(combined, anchorField(anchor, noises));
+			if (anchor.getAmplitude() == 0.0) {
+				continue;
+			}
+			double target = anchor.getAmplitude() > 0.0 ? PEAK_EROSION : BASIN_EROSION;
+			biased = DensityFunctions.lerp(
+				influence.get(anchor.getId()),
+				biased,
+				DensityFunctions.constant(target)
+			);
 		}
-		return DensityFunctions.cache2d(combined);
+		return biased;
 	}
 
 	private static DensityFunction anchorField(
@@ -345,7 +377,6 @@ public final class WorldsmithNoiseSettings {
 				fixed.getX(),
 				fixed.getZ(),
 				anchor.getRadius(),
-				anchor.getAmplitude(),
 				anchor.getFalloff()
 			);
 		}
@@ -354,7 +385,6 @@ public final class WorldsmithNoiseSettings {
 				scattered.getSpacing(),
 				scattered.getJitter(),
 				anchor.getRadius(),
-				anchor.getAmplitude(),
 				anchor.getFalloff(),
 				new DensityFunction.NoiseHolder(noises.getOrThrow(Noises.SPAGHETTI_3D_RARITY))
 			);
@@ -376,9 +406,10 @@ public final class WorldsmithNoiseSettings {
 		DensityFunction shiftX,
 		DensityFunction shiftZ,
 		DensityFunction continents,
+		Map<String, DensityFunction> anchorInfluence,
 		HolderGetter<NormalNoise.NoiseParameters> noises
 	) {
-		DensityFunction field = bandField(band, shiftX, shiftZ, continents, noises);
+		DensityFunction field = bandField(band, shiftX, shiftZ, continents, anchorInfluence, noises);
 		if (field == null) {
 			return terrain;
 		}
@@ -410,6 +441,7 @@ public final class WorldsmithNoiseSettings {
 		DensityFunction shiftX,
 		DensityFunction shiftZ,
 		DensityFunction continents,
+		Map<String, DensityFunction> anchorInfluence,
 		HolderGetter<NormalNoise.NoiseParameters> noises
 	) {
 		if (band.getCoverage() <= 0.0 || band.getMinY() >= band.getMaxY()) {
@@ -429,6 +461,21 @@ public final class WorldsmithNoiseSettings {
 		DensityFunction region = regionMask(band.getRegion(), continents);
 		if (region != null) {
 			window = DensityFunctions.min(window, region);
+		}
+		// An anchor bound is ANDed with the region, so a band can be told to act
+		// only near a landmark instead of everywhere that landform occurs.
+		if (band.getAnchor() != null) {
+			DensityFunction influence = anchorInfluence.get(band.getAnchor());
+			if (influence == null) {
+				throw new IllegalStateException("Band references unknown anchor '" + band.getAnchor() + "'");
+			}
+			window = DensityFunctions.min(
+				window,
+				DensityFunctions.add(
+					DensityFunctions.mul(influence, DensityFunctions.constant(2.0)),
+					DensityFunctions.constant(-ANCHOR_BAND_THRESHOLD)
+				)
+			);
 		}
 
 		// Larger shapes mean lower frequency. Thickness squashes the vertical

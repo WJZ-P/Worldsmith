@@ -21,19 +21,23 @@ import net.minecraft.world.level.levelgen.DensityFunction;
  * split vanilla already makes for structures between a fixed set of positions
  * and a jittered lattice that repeats forever.
  *
- * <p>Both return a height contribution in blocks, so the caller adds them to the
- * horizontal height field rather than to the final density. Folding them in
- * upstream is what keeps the surface rules, the preliminary surface level and
- * the biome depth parameter in agreement with the ground that was actually
- * built; adding a mountain to the final density alone produces a mountain whose
- * summit still thinks it is at sea level.
+ * <p>Both return an influence from zero to one rather than a height. The same
+ * field decides how far the ground rises, which biome is chosen, which surface
+ * materials are painted and where a band may act, so it cannot carry a height
+ * inside it; the caller scales it where a height is what is wanted.
+ *
+ * <p>That caller adds the scaled field to the horizontal height field rather
+ * than to the final density. Folding it in upstream is what keeps the surface
+ * rules, the preliminary surface level and the biome depth parameter in
+ * agreement with the ground that was actually built; adding a mountain to the
+ * final density alone produces a summit that still thinks it is at sea level.
  */
 public final class WorldsmithAnchorFields {
 	private WorldsmithAnchorFields() {
 	}
 
 	/**
-	 * Height added at a distance, as a fraction of the anchor's amplitude.
+	 * Influence at a distance, one at the centre and zero past the radius.
 	 *
 	 * <p>{@code falloff} is the single shape knob: below one gives a plateau
 	 * with steep sides, one gives a dome, above one gives a spire standing in a
@@ -50,15 +54,64 @@ public final class WorldsmithAnchorFields {
 		return Math.pow(1.0 - t * t, falloff);
 	}
 
+	/** Reads a noise field; lets the lattice be shared by a density function and a surface rule. */
+	public interface NoiseSampler {
+		double get(double x, double y, double z);
+	}
+
+	/**
+	 * Distance to the nearest anchor of a jittered lattice.
+	 *
+	 * <p>Shared rather than written twice because the terrain compiler and the
+	 * surface condition both have to place every instance in exactly the same
+	 * spot; two copies of this arithmetic would be two chances to disagree, and
+	 * the symptom would be summit materials painted beside the summit.
+	 */
+	public static double latticeDistance(int x, int z, int spacing, double jitter, NoiseSampler noise) {
+		int cellX = Math.floorDiv(x, spacing);
+		int cellZ = Math.floorDiv(z, spacing);
+		double nearest = Double.MAX_VALUE;
+
+		for (int offsetX = -1; offsetX <= 1; offsetX++) {
+			for (int offsetZ = -1; offsetZ <= 1; offsetZ++) {
+				int neighbourX = cellX + offsetX;
+				int neighbourZ = cellZ + offsetZ;
+				// Sampled at the cell's world coordinates, not its index. Cell
+				// indices differ by one, which lands adjacent cells on almost the
+				// same point of a low-frequency noise and translates the whole
+				// lattice instead of jittering each cell of it.
+				double sampleX = neighbourX * (double) spacing;
+				double sampleZ = neighbourZ * (double) spacing;
+				// Two samples of one noise, separated on the unused Y axis, stand
+				// in for two independent offsets.
+				double shiftX = noise.get(sampleX, 0.0, sampleZ);
+				double shiftZ = noise.get(sampleX, 640.0, sampleZ);
+				double reach = jitter * spacing * 0.5;
+				double centreX = (neighbourX + 0.5) * spacing + Mth.clamp(shiftX, -1.0, 1.0) * reach;
+				double centreZ = (neighbourZ + 0.5) * spacing + Mth.clamp(shiftZ, -1.0, 1.0) * reach;
+				double dx = x - centreX;
+				double dz = z - centreZ;
+				nearest = Math.min(nearest, Math.sqrt(dx * dx + dz * dz));
+			}
+		}
+		return nearest;
+	}
+
+	/** Distance to a single anchor at an authored position. */
+	public static double pointDistance(int x, int z, int anchorX, int anchorZ) {
+		double dx = x - (double) anchorX;
+		double dz = z - (double) anchorZ;
+		return Math.sqrt(dx * dx + dz * dz);
+	}
+
 	/** One anchor at an authored position, for the place a player should be able to find. */
-	public record Point(int x, int z, int radius, double amplitude, double falloff)
+	public record Point(int x, int z, int radius, double falloff)
 		implements DensityFunction.SimpleFunction {
 		private static final MapCodec<Point> DATA_CODEC = RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
 					Codec.INT.fieldOf("x").forGetter(Point::x),
 					Codec.INT.fieldOf("z").forGetter(Point::z),
 					Codec.intRange(1, 100_000).fieldOf("radius").forGetter(Point::radius),
-					Codec.DOUBLE.fieldOf("amplitude").forGetter(Point::amplitude),
 					Codec.doubleRange(0.05, 8.0).fieldOf("falloff").forGetter(Point::falloff)
 				)
 				.apply(instance, Point::new)
@@ -67,19 +120,21 @@ public final class WorldsmithAnchorFields {
 
 		@Override
 		public double compute(DensityFunction.FunctionContext context) {
-			double dx = context.blockX() - (double) this.x;
-			double dz = context.blockZ() - (double) this.z;
-			return this.amplitude * profile(Math.sqrt(dx * dx + dz * dz), this.radius, this.falloff);
+			return profile(
+				pointDistance(context.blockX(), context.blockZ(), this.x, this.z),
+				this.radius,
+				this.falloff
+			);
 		}
 
 		@Override
 		public double minValue() {
-			return Math.min(0.0, this.amplitude);
+			return 0.0;
 		}
 
 		@Override
 		public double maxValue() {
-			return Math.max(0.0, this.amplitude);
+			return 1.0;
 		}
 
 		@Override
@@ -106,7 +161,6 @@ public final class WorldsmithAnchorFields {
 		int spacing,
 		double jitter,
 		int radius,
-		double amplitude,
 		double falloff,
 		DensityFunction.NoiseHolder offsetNoise
 	) implements DensityFunction {
@@ -115,7 +169,6 @@ public final class WorldsmithAnchorFields {
 					Codec.intRange(64, 1_000_000).fieldOf("spacing").forGetter(Grid::spacing),
 					Codec.doubleRange(0.0, 1.0).fieldOf("jitter").forGetter(Grid::jitter),
 					Codec.intRange(1, 100_000).fieldOf("radius").forGetter(Grid::radius),
-					Codec.DOUBLE.fieldOf("amplitude").forGetter(Grid::amplitude),
 					Codec.doubleRange(0.05, 8.0).fieldOf("falloff").forGetter(Grid::falloff),
 					DensityFunction.NoiseHolder.CODEC.fieldOf("offset_noise").forGetter(Grid::offsetNoise)
 				)
@@ -127,33 +180,11 @@ public final class WorldsmithAnchorFields {
 		public double compute(DensityFunction.FunctionContext context) {
 			int x = context.blockX();
 			int z = context.blockZ();
-			int cellX = Math.floorDiv(x, this.spacing);
-			int cellZ = Math.floorDiv(z, this.spacing);
-			double nearest = Double.MAX_VALUE;
-
-			for (int offsetX = -1; offsetX <= 1; offsetX++) {
-				for (int offsetZ = -1; offsetZ <= 1; offsetZ++) {
-					int neighbourX = cellX + offsetX;
-					int neighbourZ = cellZ + offsetZ;
-					// Sampled at the cell's world coordinates, not its index. Cell
-					// indices differ by one, which lands adjacent cells on almost
-					// the same point of a low-frequency noise and translates the
-					// whole lattice instead of jittering each cell of it.
-					double sampleX = neighbourX * (double) this.spacing;
-					double sampleZ = neighbourZ * (double) this.spacing;
-					// Two samples of one noise, separated on the unused Y axis,
-					// stand in for two independent offsets.
-					double shiftX = this.offsetNoise.getValue(sampleX, 0.0, sampleZ);
-					double shiftZ = this.offsetNoise.getValue(sampleX, 640.0, sampleZ);
-					double reach = this.jitter * this.spacing * 0.5;
-					double centreX = (neighbourX + 0.5) * this.spacing + Mth.clamp(shiftX, -1.0, 1.0) * reach;
-					double centreZ = (neighbourZ + 0.5) * this.spacing + Mth.clamp(shiftZ, -1.0, 1.0) * reach;
-					double dx = x - centreX;
-					double dz = z - centreZ;
-					nearest = Math.min(nearest, Math.sqrt(dx * dx + dz * dz));
-				}
-			}
-			return this.amplitude * profile(nearest, this.radius, this.falloff);
+			return profile(
+				latticeDistance(x, z, this.spacing, this.jitter, this.offsetNoise::getValue),
+				this.radius,
+				this.falloff
+			);
 		}
 
 		@Override
@@ -167,7 +198,6 @@ public final class WorldsmithAnchorFields {
 				this.spacing,
 				this.jitter,
 				this.radius,
-				this.amplitude,
 				this.falloff,
 				visitor.visitNoise(this.offsetNoise)
 			);
@@ -175,12 +205,12 @@ public final class WorldsmithAnchorFields {
 
 		@Override
 		public double minValue() {
-			return Math.min(0.0, this.amplitude);
+			return 0.0;
 		}
 
 		@Override
 		public double maxValue() {
-			return Math.max(0.0, this.amplitude);
+			return 1.0;
 		}
 
 		@Override

@@ -100,6 +100,15 @@ replace `shape` with a `procedural` terrain intent:
       seen.
   - `spacing` must be at least twice the `radius`, or instances would run into
     one another.
+  - An anchor does more than raise ground. It also pulls biome selection toward
+    the landform it built, so a peak reads as a peak rather than as the plain it
+    grew out of, and it can be referenced by name from two other places:
+    a band may set `"anchor": "<id>"` to act only within that anchor's reach,
+    and a biome's surface rule may set
+    `"anchor": {"anchor": "<id>", "min": 0.7, "max": 1.0}` to paint one ring of
+    it - summit, flank and foot in different materials. Reach for those; a
+    landmark that only changes the height reads as the ground pushed upward
+    rather than as a place.
 - `caveDensity` (`0..1`) blends from solid terrain to the full overworld cave
   system. Zero suppresses cave carving; one uses all supported cave families.
 

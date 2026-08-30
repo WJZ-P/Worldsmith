@@ -22,6 +22,11 @@ final class WorldsmithSurfaceConditionTypes {
 			Worldsmith.id("hydrology"),
 			(MapCodec<? extends SurfaceRules.ConditionSource>)WorldsmithHydrologyConditionSource.CODEC
 		);
+		Registry.register(
+			BuiltInRegistries.MATERIAL_CONDITION,
+			Worldsmith.id("anchor"),
+			(MapCodec<? extends SurfaceRules.ConditionSource>)WorldsmithAnchorConditionSource.CODEC
+		);
 		initialized = true;
 	}
 }

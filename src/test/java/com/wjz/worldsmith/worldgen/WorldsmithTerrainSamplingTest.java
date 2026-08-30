@@ -201,7 +201,7 @@ final class WorldsmithTerrainSamplingTest {
 	void aCarvingBandRemovesGroundThatWasThere() {
 		RandomState solid = state(bandShape(), '4');
 		RandomState hollowed = state(
-			bandShape(new TerrainBand(0.45, -40, 30, BandEffect.CARVE, BandRegion.ANYWHERE, 2.0, 1.2)),
+			bandShape(new TerrainBand(0.45, -40, 30, BandEffect.CARVE, BandRegion.ANYWHERE, null, 2.0, 1.2)),
 			'5'
 		);
 
@@ -318,6 +318,34 @@ final class WorldsmithTerrainSamplingTest {
 		assertTrue(distinctCells > 8, () -> "a scattered anchor should recur, distinct cells hit " + distinctCells);
 	}
 
+	/**
+	 * Raising the ground is not enough. Biomes are chosen from climate
+	 * parameters rather than from how high the ground turned out, so without
+	 * this an anchor builds a mountain that still carries the plain's biome.
+	 */
+	@Test
+	void anAnchorPullsBiomeSelectionTowardItsOwnLandform() {
+		RandomState plain = state(anchorShape(), '8');
+		RandomState peaked = state(
+			anchorShape(new Anchor("peak", new AnchorPlacement.Fixed(0, 0), 500, 150.0, 1.0)),
+			'9'
+		);
+
+		double plainErosion = plain.router().erosion().compute(new DensityFunction.SinglePointContext(0, 0, 0));
+		double peakErosion = peaked.router().erosion().compute(new DensityFunction.SinglePointContext(0, 0, 0));
+		double faraway = peaked.router().erosion().compute(new DensityFunction.SinglePointContext(9_000, 0, 0));
+		double plainFaraway = plain.router().erosion().compute(new DensityFunction.SinglePointContext(9_000, 0, 0));
+
+		assertTrue(
+			peakErosion < plainErosion - 0.3,
+			() -> "erosion should be pulled toward peaks: plain=" + plainErosion + ", peak=" + peakErosion
+		);
+		assertTrue(
+			Math.abs(faraway - plainFaraway) < 0.001,
+			() -> "biome selection away from the anchor must be untouched, moved " + (faraway - plainFaraway)
+		);
+	}
+
 	@Test
 	void caveDensityChangesHowMuchSolidTerrainIsCarved() {
 		TerrainShape.Procedural solidShape = shape(0.82, 1.0, 0.3, 0.5, 0.35, 0.15, 1.0, 0.0);
@@ -380,7 +408,7 @@ final class WorldsmithTerrainSamplingTest {
 	}
 
 	private static TerrainBand island(double coverage, int minY, int maxY, BandRegion region) {
-		return new TerrainBand(coverage, minY, maxY, BandEffect.ADD, region, 1.4, 1.0);
+		return new TerrainBand(coverage, minY, maxY, BandEffect.ADD, region, null, 1.4, 1.0);
 	}
 
 	private static TerrainShape.Procedural bandShape(TerrainBand... bands) {

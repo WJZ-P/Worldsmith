@@ -30,4 +30,5 @@ final class WorldsmithDensityFunctionTypes {
 		);
 		initialized = true;
 	}
+
 }

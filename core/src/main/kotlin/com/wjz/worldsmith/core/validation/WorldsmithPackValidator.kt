@@ -37,6 +37,57 @@ object WorldsmithPackValidator {
         addAll(FeatureLibraryValidator.validate(pack.features).map { it.prefixed("features") })
         addAll(BiomePlanValidator.validate(pack.biomes, pack.features).map { it.prefixed("biomes") })
         addAll(validateSurfaceTerrainLinks(pack))
+        addAll(validateAnchorReferences(pack))
+    }
+
+    /**
+     * Anchor references are resolved by name at compile time and throw when a
+     * name is wrong, so an unknown one has to be caught here or it becomes a
+     * crash while a world is being created.
+     */
+    private fun validateAnchorReferences(pack: WorldsmithPack): List<Diagnostic> = buildList {
+        val shape = pack.terrain.shape
+        val known = if (shape is TerrainShape.Procedural) shape.anchors.mapTo(mutableSetOf()) { it.id } else emptySet()
+
+        if (shape is TerrainShape.Procedural) {
+            shape.bands.forEachIndexed { index, band ->
+                val name = band.anchor ?: return@forEachIndexed
+                if (name !in known) {
+                    add(
+                        error(
+                            "terrain.shape.bands[$index].anchor",
+                            "UNKNOWN_ANCHOR",
+                            "Band references anchor '" + name + "', which the terrain does not define",
+                        ),
+                    )
+                }
+            }
+        }
+
+        pack.biomes.biomes.forEachIndexed { biomeIndex, biome ->
+            biome.surface.rules.forEachIndexed { ruleIndex, rule ->
+                val band = rule.conditions.anchor ?: return@forEachIndexed
+                val path = "biomes.biomes[$biomeIndex].surface.rules[$ruleIndex].conditions.anchor"
+                if (shape !is TerrainShape.Procedural) {
+                    add(error(path, "ANCHOR_REQUIRES_PROCEDURAL_TERRAIN", "Anchor surface conditions require procedural terrain"))
+                    return@forEachIndexed
+                }
+                if (band.anchor !in known) {
+                    add(
+                        error(
+                            path,
+                            "UNKNOWN_ANCHOR",
+                            "Surface rule references anchor '" + band.anchor + "', which the terrain does not define",
+                        ),
+                    )
+                }
+                if (band.min !in 0.0..1.0 || band.max !in 0.0..1.0) {
+                    add(error(path, "ANCHOR_BAND_OUT_OF_RANGE", "Anchor influence bounds must be between 0 and 1"))
+                } else if (band.min >= band.max) {
+                    add(error(path, "REVERSED_RANGE", "Anchor influence must start below where it ends"))
+                }
+            }
+        }
     }
 
     private fun validateSurfaceTerrainLinks(pack: WorldsmithPack): List<Diagnostic> = buildList {

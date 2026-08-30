@@ -175,8 +175,8 @@ final class WorldsmithPackExporterTest {
 				// Non-default so the round trip covers real bands rather than
 				// the branch that compiles them away entirely.
 				List.of(
-					new TerrainBand(0.28, 176, 244, BandEffect.ADD, BandRegion.OVER_LAND, 1.3, 0.9),
-					new TerrainBand(0.30, -40, 20, BandEffect.CARVE, BandRegion.INLAND, 2.0, 1.2)
+					new TerrainBand(0.28, 176, 244, BandEffect.ADD, BandRegion.OVER_LAND, null, 1.3, 0.9),
+					new TerrainBand(0.30, -40, 20, BandEffect.CARVE, BandRegion.INLAND, null, 2.0, 1.2)
 				),
 				List.of()
 			),

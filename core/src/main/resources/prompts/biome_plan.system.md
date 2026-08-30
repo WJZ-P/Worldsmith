@@ -133,6 +133,10 @@ a unique lowercase id and at least one condition. Available conditions are:
 - `noise`: a band with `noise`, `min`, `max`; noise is one of `PATCH`,
   `GRAVEL`, `CALCITE`, `SURFACE`, `SECONDARY`, `RUGGED`;
 - `hydrology`: `DRY_RIVERBED`, `WET_RIVERBED`, `RIVER_BANK`, or `LAKEBED`.
+- `anchor` restricts a rule to one ring of a named terrain anchor, as
+  `{"anchor": "holy_peak", "min": 0.7, "max": 1.0}`. Influence is one at the
+  anchor's centre and zero at its edge, so a high band is its summit and a low
+  one its foot. The terrain document must define that anchor.
 
 Hydrology conditions must agree with the terrain document: a dry-river rule
 requires non-zero `DRY` rivers, a wet-river rule requires non-zero `FLUID`

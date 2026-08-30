@@ -171,6 +171,8 @@ data class TerrainBand(
     val maxY: Int,
     val effect: BandEffect = BandEffect.ADD,
     val region: BandRegion = BandRegion.ANYWHERE,
+    /** Restrict the band to one anchor's reach; ANDed with [region]. */
+    val anchor: String? = null,
     val scale: Double = 1.0,
     val thickness: Double = 1.0,
 )

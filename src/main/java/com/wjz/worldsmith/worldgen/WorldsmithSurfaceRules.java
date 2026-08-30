@@ -1,7 +1,10 @@
 package com.wjz.worldsmith.worldgen;
 
+import com.wjz.worldsmith.core.model.Anchor;
+import com.wjz.worldsmith.core.model.AnchorPlacement;
 import com.wjz.worldsmith.core.model.HydrologyIntent;
 import com.wjz.worldsmith.core.model.SurfaceAltitude;
+import com.wjz.worldsmith.core.model.SurfaceAnchorBand;
 import com.wjz.worldsmith.core.model.SurfaceConditions;
 import com.wjz.worldsmith.core.model.SurfaceDefinition;
 import com.wjz.worldsmith.core.model.SurfaceHydrology;
@@ -105,6 +108,10 @@ public final class WorldsmithSurfaceRules {
 		if (hydrology != null) {
 			compiled.add(hydrology(pack, hydrology));
 		}
+		SurfaceAnchorBand anchorBand = conditions.getAnchor();
+		if (anchorBand != null) {
+			compiled.add(anchor(pack, anchorBand));
+		}
 
 		SurfaceRules.RuleSource nested = result;
 		for (int index = compiled.size() - 1; index >= 0; index--) {
@@ -129,6 +136,37 @@ public final class WorldsmithSurfaceRules {
 			intent.getRiverFill(),
 			intent.getLakeDensity(),
 			intent.getLakeScale()
+		);
+	}
+
+	/**
+	 * A ring of one anchor's influence.
+	 *
+	 * <p>The anchor's geometry is copied into the condition because surface
+	 * rules see a position and nothing else. Both sides read the same anchor
+	 * from the same pack and share the lattice arithmetic, so the ring the
+	 * materials are painted in cannot drift away from the ground that rose.
+	 */
+	private static SurfaceRules.ConditionSource anchor(CompiledPack pack, SurfaceAnchorBand band) {
+		if (!(pack.terrain().getShape() instanceof TerrainShape.Procedural procedural)) {
+			throw new IllegalStateException("Anchor surface conditions require procedural terrain");
+		}
+		Anchor anchor = procedural.getAnchors().stream()
+			.filter(candidate -> candidate.getId().equals(band.getAnchor()))
+			.findFirst()
+			.orElseThrow(() -> new IllegalStateException("Unknown anchor '" + band.getAnchor() + "'"));
+
+		AnchorPlacement placement = anchor.getPlacement();
+		if (placement instanceof AnchorPlacement.Fixed fixed) {
+			return new WorldsmithAnchorConditionSource(
+				band.getMin(), band.getMax(), anchor.getRadius(), anchor.getFalloff(),
+				false, fixed.getX(), fixed.getZ(), 0, 0.0
+			);
+		}
+		AnchorPlacement.Scattered scattered = (AnchorPlacement.Scattered) placement;
+		return new WorldsmithAnchorConditionSource(
+			band.getMin(), band.getMax(), anchor.getRadius(), anchor.getFalloff(),
+			true, 0, 0, scattered.getSpacing(), scattered.getJitter()
 		);
 	}
 
