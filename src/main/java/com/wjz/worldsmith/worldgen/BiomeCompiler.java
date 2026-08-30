@@ -5,6 +5,7 @@ import com.wjz.worldsmith.core.model.AmbientParticleSpec;
 import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeEnvironment;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
+import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WaterFog;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +17,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BiomeDefaultFeatures;
 import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.data.worldgen.placement.MiscOverworldPlacements;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.attribute.AmbientParticle;
 import net.minecraft.world.attribute.EnvironmentAttributes;
@@ -60,10 +62,16 @@ public final class BiomeCompiler {
 
 		BiomeGenerationSettings.Builder generation = new BiomeGenerationSettings.Builder(placedFeatures, carvers);
 
-		// Stage one keeps vanilla's underground content. A world with no ores and
-		// no caves is not playable, and none of it is visible from the surface, so
-		// there is nothing for the theme to clash with yet.
-		BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
+		// Procedural terrain owns cave density in its NoiseRouter. Adding the
+		// legacy configured carvers as well would punch full-strength caves even
+		// when caveDensity is zero. Compatibility shapes retain vanilla's carvers;
+		// both paths keep the ordinary underground and surface lava lakes.
+		if (pack.terrain().getShape() instanceof TerrainShape.Vanilla) {
+			BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
+		} else {
+			generation.addFeature(GenerationStep.Decoration.LAKES, MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND);
+			generation.addFeature(GenerationStep.Decoration.LAKES, MiscOverworldPlacements.LAKE_LAVA_SURFACE);
+		}
 		BiomeDefaultFeatures.addDefaultCrystalFormations(generation);
 		BiomeDefaultFeatures.addDefaultMonsterRoom(generation);
 		BiomeDefaultFeatures.addDefaultUndergroundVariety(generation);

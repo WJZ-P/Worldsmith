@@ -9,11 +9,12 @@ import org.junit.jupiter.api.Test
 
 class TerrainShapeTest {
     @Test
-    fun `the built in pack borrows vanilla's overworld router`() {
+    fun `the built in pack demonstrates prompt-facing procedural terrain`() {
         val terrain = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands").terrain
 
-        val shape = assertInstanceOf(TerrainShape.Vanilla::class.java, terrain.shape)
-        assertEquals(VanillaNoisePreset.OVERWORLD, shape.preset)
+        val shape = assertInstanceOf(TerrainShape.Procedural::class.java, terrain.shape)
+        assertEquals(0.55, shape.landRatio)
+        assertEquals(ReliefDistribution(0.65, 0.25, 0.10), shape.relief)
     }
 
     /**
@@ -29,6 +30,24 @@ class TerrainShapeTest {
 
         val decoded = WorldsmithJson.decode<TerrainShape>(encoded)
         assertEquals(TerrainShape.Vanilla(VanillaNoisePreset.AMPLIFIED), decoded)
+    }
+
+    @Test
+    fun `procedural terrain intent round trips without Minecraft implementation details`() {
+        val shape = TerrainShape.Procedural(
+            landRatio = 0.82,
+            continentScale = 2.4,
+            coastRoughness = 0.7,
+            relief = ReliefDistribution(flats = 0.2, highlands = 0.3, peaks = 0.5),
+            verticalScale = 1.8,
+            caveDensity = 0.15,
+        )
+
+        val encoded = WorldsmithJson.encode<TerrainShape>(shape)
+
+        assertTrue("\"kind\": \"procedural\"" in encoded)
+        assertTrue("NoiseRouter" !in encoded)
+        assertEquals(shape, WorldsmithJson.decode<TerrainShape>(encoded))
     }
 
     @Test

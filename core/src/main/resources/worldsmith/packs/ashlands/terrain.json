@@ -14,8 +14,17 @@
     "preferredIds": ["minecraft:water"]
   },
   "shape": {
-    "kind": "vanilla",
-    "preset": "OVERWORLD"
+    "kind": "procedural",
+    "landRatio": 0.55,
+    "continentScale": 1.0,
+    "coastRoughness": 0.45,
+    "relief": {
+      "flats": 0.65,
+      "highlands": 0.25,
+      "peaks": 0.10
+    },
+    "verticalScale": 1.0,
+    "caveDensity": 0.65
   },
   "aquifersEnabled": true,
   "oreVeinsEnabled": true,

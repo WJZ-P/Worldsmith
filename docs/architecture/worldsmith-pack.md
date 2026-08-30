@@ -12,8 +12,8 @@ ashlands/
 ```
 
 - `worldsmith.json` identifies the pack and points to its content files.
-- `terrain.json` describes dimension bounds, sea level, noise template, base
-  material, fluid, aquifers, ore veins, and spawn climate targets.
+- `terrain.json` describes dimension bounds, sea level, semantic terrain shape,
+  base material, fluid, aquifers, ore veins, and spawn climate targets.
 - `biomes.json` defines every biome: where it generates, what it is made of,
   how it looks, which tags it joins, and which features grow on it.
 - `features.json` declares the reusable generated features biomes refer to by
@@ -36,6 +36,42 @@ version.
 
 Packs contain data only: no JARs, scripts, or executable code. Paths are
 resolved inside the pack root and schema validation runs before compilation.
+
+## Shaping the terrain
+
+Prompt-generated packs use a version-independent `procedural` shape rather than
+embedding Minecraft density-function JSON:
+
+```json
+"shape": {
+  "kind": "procedural",
+  "landRatio": 0.55,
+  "continentScale": 1.0,
+  "coastRoughness": 0.45,
+  "relief": { "flats": 0.65, "highlands": 0.25, "peaks": 0.10 },
+  "verticalScale": 1.0,
+  "caveDensity": 0.65
+}
+```
+
+`landRatio` is the intended surface share above sea level. `continentScale`
+controls the horizontal size of land and ocean regions, while
+`coastRoughness` adds finer bays and peninsulas without changing that broad
+scale. The three `relief` values are relative weights and are normalized; a
+landform the prompt excludes may have weight zero. `verticalScale` changes the
+height amplitude, and `caveDensity` blends from no cave carving to the complete
+supported overworld cave system.
+
+The Minecraft 26.2 target adapter compiles those outcomes into a `NoiseRouter`.
+It retains vanilla aquifer, climate and ore-noise plumbing, but owns the
+continentalness, relief, vertical-density and cave-carving functions. Sampling
+tests wire the real Minecraft noises with a fixed seed and check each control's
+direction and magnitude. The resulting land share remains a seeded statistical
+target rather than an exact per-map-area quota.
+
+The `vanilla` shape variant remains available for compatibility packs that
+explicitly request an unchanged `OVERWORLD`, `LARGE_BIOMES` or `AMPLIFIED`
+router.
 
 ## Placing a biome
 

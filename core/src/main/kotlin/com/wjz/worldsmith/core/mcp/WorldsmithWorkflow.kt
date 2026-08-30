@@ -44,9 +44,11 @@ object WorldsmithWorkflow {
     const val OVERVIEW: String =
         "You are designing one Minecraft world from the player's description. Work through `procedure` in " +
             "order and do not stop until $FINISH_TOOL answers complete=true.\n\n" +
-            "Design the biomes yourself. The player's prompt is the only standard for their number and " +
-            "distribution. `designContract` holds the schema rules and `climatePlacement` describes optional " +
-            "semantic presets plus exact raw axes. Worldsmith validates what you send and " +
+            "Design both the terrain and the biomes yourself. The player's prompt is the only standard for " +
+            "land/ocean balance, scale, relief, height, caves, biome count and biome distribution. " +
+            "`terrainContract` defines the six semantic terrain controls; `designContract` holds the biome " +
+            "rules; and `climatePlacement` describes optional semantic presets plus exact raw axes. " +
+            "Worldsmith validates what you send and " +
             "reports exactly what is wrong, so a rejected pack is a repair job rather than a restart: change " +
             "only what the diagnostics name and send the whole document again.\n\n" +
             "complete=true means exactly this much: the pack is saved in Worldsmith's pack directory, reads " +
@@ -67,8 +69,9 @@ object WorldsmithWorkflow {
             order = 2,
             tool = WRITE_TOOL,
             instruction =
-                "Send the whole pack with this sessionId. Reuse the template's terrain unless the player asked " +
-                    "for different landforms; the biomes and features are yours to design. A reply carrying " +
+                "Send the whole pack with this sessionId. Preserve the template's technical terrain envelope, " +
+                    "but replace its shape with a procedural intent chosen from the player's prompt; design the " +
+                    "biomes and features to match it. A reply carrying " +
                     "error diagnostics means nothing was saved, so repair those exact problems and call it again.",
         ),
         WorkflowStep(

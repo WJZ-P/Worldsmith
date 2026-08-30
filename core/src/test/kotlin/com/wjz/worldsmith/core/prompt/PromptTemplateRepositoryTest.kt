@@ -10,7 +10,7 @@ class PromptTemplateRepositoryTest {
     fun `default prompt set resolves every system prompt`() {
         val repository = ClasspathPromptTemplateRepository()
         val refs = PromptSet.DEFAULT.let {
-            listOf(it.worldBible, it.structureCatalog, it.structureDetail, it.consistencyReview, it.biomePlan)
+            listOf(it.worldBible, it.structureCatalog, it.structureDetail, it.consistencyReview, it.terrainPlan, it.biomePlan)
         }
 
         val templates = refs.map(repository::load)

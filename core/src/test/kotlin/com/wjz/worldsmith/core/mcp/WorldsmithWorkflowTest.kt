@@ -1,9 +1,15 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.model.TerrainPlan
+import com.wjz.worldsmith.core.model.TerrainShape
+import com.wjz.worldsmith.core.model.VanillaNoisePreset
+import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -74,6 +80,13 @@ class WorldsmithWorkflowTest {
         // generator uses, so this fails if the two ever drift apart.
         val contract = brief.text("designContract")
         assertTrue("only standard" in contract.lowercase(), "the contract should make the prompt authoritative")
+        val terrainContract = brief.text("terrainContract")
+        assertTrue("landRatio" in terrainContract)
+        assertTrue("continentScale" in terrainContract)
+        assertTrue("coastRoughness" in terrainContract)
+        assertTrue("verticalScale" in terrainContract)
+        assertTrue("caveDensity" in terrainContract)
+        assertTrue("set an unwanted landform to zero" in terrainContract)
 
         val placement = brief.getValue("climatePlacement").jsonObject
         assertTrue("only distribution standard" in placement.getValue("principle").jsonPrimitive.content)
@@ -137,6 +150,31 @@ class WorldsmithWorkflowTest {
 
         assertTrue(finish(sessionId).structuredContent.bool("complete"))
         assertTrue(finish(sessionId).structuredContent.bool("complete"))
+    }
+
+    @Test
+    fun `a guided prompt run must replace compatibility terrain with procedural intent`() {
+        val sessionId = begin().text("sessionId")
+        val template = call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
+        val terrain = WorldsmithJson.format.decodeFromJsonElement<TerrainPlan>(template.getValue("terrain"))
+            .copy(shape = TerrainShape.Vanilla(VanillaNoisePreset.OVERWORLD))
+        val result = call(
+            WorldsmithWorkflow.WRITE_TOOL,
+            buildJsonObject {
+                put("sessionId", sessionId)
+                put("displayName", "Rejected compatibility terrain")
+                put("terrain", WorldsmithJson.format.encodeToJsonElement(terrain))
+                put("biomes", template.getValue("biomes"))
+                put("features", template.getValue("features"))
+            },
+        )
+
+        assertTrue(result.isError)
+        assertFalse(result.structuredContent.bool("valid"))
+        val codes = result.structuredContent.getValue("diagnostics").jsonArray
+            .map { it.jsonObject }
+            .map { it.getValue("code").jsonPrimitive.content }
+        assertTrue("PROMPT_TERRAIN_REQUIRED" in codes)
     }
 
     @Test

@@ -8,6 +8,11 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
+import com.wjz.worldsmith.core.model.ReliefDistribution;
+import com.wjz.worldsmith.core.model.TerrainPlan;
+import com.wjz.worldsmith.core.model.TerrainShape;
+import com.wjz.worldsmith.core.model.WorldsmithPack;
+import com.wjz.worldsmith.core.model.WorldsmithPackManifest;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
@@ -125,6 +130,77 @@ final class WorldsmithPackExporterTest {
 		);
 		assertTrue(normalTag.toString().contains(runtime.worldPresetKey().identifier().toString()));
 
+		RegistryOps<JsonElement> ops = compiled.full().createSerializationContext(JsonOps.INSTANCE);
+		int decoded = 0;
+		for (RegistryDataLoader.RegistryData<?> data : RegistryDataLoader.WORLDGEN_REGISTRIES) {
+			if (OWNED.contains(data.key())) {
+				decoded += decodeDirectory(data, ops, output);
+			}
+		}
+		assertEquals(42, decoded);
+	}
+
+	@Test
+	void proceduralTerrainExportsAndReadsBackWithMinecraftCodecs() throws IOException {
+		WorldsmithPack source = WorldsmithPacks.builtin();
+		TerrainPlan template = source.getTerrain();
+		TerrainPlan terrain = new TerrainPlan(
+			template.getSchemaVersion(),
+			template.getSeed(),
+			template.getMinY(),
+			template.getHeight(),
+			template.getHorizontalNoiseSize(),
+			template.getVerticalNoiseSize(),
+			template.getSeaLevel(),
+			template.getDefaultBlock(),
+			template.getDefaultFluid(),
+			new TerrainShape.Procedural(
+				0.72,
+				2.0,
+				0.8,
+				new ReliefDistribution(0.0, 0.0, 1.0),
+				1.6,
+				0.3
+			),
+			template.getAquifersEnabled(),
+			template.getOreVeinsEnabled(),
+			template.getLegacyRandomSource(),
+			template.getSpawnTargets()
+		);
+		String id = "a".repeat(64);
+		WorldsmithPackManifest oldManifest = source.getManifest();
+		WorldsmithPackManifest manifest = new WorldsmithPackManifest(
+			oldManifest.getFormatVersion(),
+			id,
+			"Procedural test",
+			"Compiler fixture",
+			oldManifest.getFiles()
+		);
+		CompiledPack runtime = CompiledPack.scoped(new WorldsmithPack(
+			manifest,
+			terrain,
+			source.getBiomes(),
+			source.getFeatures(),
+			id
+		));
+
+		HolderLookup.Provider activeWorldgen =
+			WorldsmithPackExporter.compilePatch(WorldsmithPacks.builtinCompiled(), vanilla).full();
+		RegistrySetBuilder.PatchedRegistries compiled = WorldsmithPackExporter.compilePatch(runtime, activeWorldgen);
+		Path output = this.tempDirectory.resolve("procedural");
+
+		assertEquals(52, WorldsmithPackExporter.write(runtime, compiled.patches(), output));
+		JsonElement proceduralBiome = readJson(
+			output.resolve("data/worldsmith/worldgen/biome/generated")
+				.resolve(id)
+				.resolve("abyss.json")
+		);
+		assertEquals(0, proceduralBiome.getAsJsonObject().getAsJsonArray("carvers").size());
+		assertEquals(
+			2,
+			proceduralBiome.getAsJsonObject().getAsJsonArray("features").get(1).getAsJsonArray().size(),
+			"lava lakes stay present when procedural terrain owns cave carving"
+		);
 		RegistryOps<JsonElement> ops = compiled.full().createSerializationContext(JsonOps.INSTANCE);
 		int decoded = 0;
 		for (RegistryDataLoader.RegistryData<?> data : RegistryDataLoader.WORLDGEN_REGISTRIES) {

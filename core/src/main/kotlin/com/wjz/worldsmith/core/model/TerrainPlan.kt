@@ -33,20 +33,22 @@ enum class VanillaNoisePreset {
     AMPLIFIED,
 }
 
+/** Relative share of inland terrain characters; values are normalized by the compiler. */
+@Serializable
+data class ReliefDistribution(
+    val flats: Double = 0.65,
+    val highlands: Double = 0.25,
+    val peaks: Double = 0.10,
+)
+
 /**
  * How the shape of the land is decided.
  *
- * This is the one part of a pack that is still described in Minecraft's terms
- * rather than Worldsmith's: today the only thing a pack can say is which vanilla
- * noise router to borrow. That is a deliberate limit on what the compiler
- * accepts, because density functions are the easiest part of world generation to
- * get wrong and the hardest to check automatically.
- *
- * It is written as a closed set with one member rather than as a bare enum so
- * that limit stays in the compiler instead of being burned into the format. A
- * pack's id is the hash of its generation content, so widening this field later
- * would rewrite the id of every pack in existence; widening the set of variants
- * does not.
+ * Prompt-generated packs use semantic [Procedural] intent; the target adapter
+ * turns it into the density-function graph of its Minecraft version. [Vanilla]
+ * remains as a compatibility escape hatch for packs that intentionally want an
+ * unchanged router. Keeping both as a closed tagged set lets future terrain
+ * models be added without changing the meaning of either existing variant.
  */
 @Serializable
 sealed interface TerrainShape {
@@ -55,6 +57,23 @@ sealed interface TerrainShape {
     @SerialName("vanilla")
     data class Vanilla(
         val preset: VanillaNoisePreset = VanillaNoisePreset.OVERWORLD,
+    ) : TerrainShape
+
+    /**
+     * Version-independent terrain intent produced from the player's prompt.
+     *
+     * Values describe outcomes rather than Minecraft density-function nodes.
+     * The target-version compiler owns the conversion into a NoiseRouter.
+     */
+    @Serializable
+    @SerialName("procedural")
+    data class Procedural(
+        val landRatio: Double = 0.55,
+        val continentScale: Double = 1.0,
+        val coastRoughness: Double = 0.45,
+        val relief: ReliefDistribution = ReliefDistribution(),
+        val verticalScale: Double = 1.0,
+        val caveDensity: Double = 0.65,
     ) : TerrainShape
 }
 

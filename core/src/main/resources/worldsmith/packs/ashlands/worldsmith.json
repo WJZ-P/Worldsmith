@@ -1,8 +1,8 @@
 {
 	"formatVersion": 1,
-	"id": "4c332fd36360b67e1df258c7987246e5e90a170899bf527cd916c508ac91360e",
+	"id": "48b201bdb4d5142f459e555899b854466da2ae569be9c5171bdb7d9b7258df87",
 	"displayName": "Ashlands",
-	"description": "A wind-scoured industrial wasteland used by the stage-one compiler fixture.",
+	"description": "A wind-scoured industrial wasteland used by the procedural terrain compiler fixture.",
 	"files": {
 		"terrain": "terrain.json",
 		"biomes": "biomes.json",

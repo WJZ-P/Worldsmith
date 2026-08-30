@@ -9,6 +9,7 @@ import com.wjz.worldsmith.core.model.PromptSet
 import com.wjz.worldsmith.core.model.ReliefBand
 import com.wjz.worldsmith.core.model.TemperatureBand
 import com.wjz.worldsmith.core.model.TerrainPlan
+import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.WorldsmithPack
 import com.wjz.worldsmith.core.model.WorldsmithPackFiles
 import com.wjz.worldsmith.core.model.WorldsmithPackManifest
@@ -159,6 +160,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             put("complete", false)
             put("overview", WorldsmithWorkflow.OVERVIEW)
             put("procedure", procedureJson())
+            put("terrainContract", templates.load(PromptSet.DEFAULT.terrainPlan).systemPrompt)
             put("designContract", templates.load(PromptSet.DEFAULT.biomePlan).systemPrompt)
             put("climatePlacement", climatePlacementJson())
             put("nextTool", WorldsmithWorkflow.TEMPLATE_TOOL)
@@ -293,6 +295,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             "description must be at most $MAX_DESCRIPTION_LENGTH characters"
         }
 
+        val sessionId = optionalString(arguments, "sessionId").trim()
+        val guidedSession = sessionId.isNotEmpty() && sessions.find(sessionId) != null
         val terrain = decode<TerrainPlan>(requiredObject(arguments, "terrain"))
         val biomes = decode<BiomePlan>(requiredObject(arguments, "biomes"))
         val features = decode<FeatureLibrary>(requiredObject(arguments, "features"))
@@ -311,7 +315,15 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         )
         val manifest = WorldsmithHashUtil.finalizeManifest(draftManifest, contents)
         val pack = WorldsmithPack(manifest, terrain, biomes, features, manifest.id)
-        val diagnostics = WorldsmithPackValidator.validate(pack)
+        val diagnostics = WorldsmithPackValidator.validate(pack).toMutableList()
+        if (guidedSession && terrain.shape !is TerrainShape.Procedural) {
+            diagnostics += Diagnostic(
+                path = "terrain.shape",
+                code = "PROMPT_TERRAIN_REQUIRED",
+                severity = DiagnosticSeverity.ERROR,
+                message = "A guided prompt run must provide a procedural terrain shape derived from its terrain contract",
+            )
+        }
         val structured = buildJsonObject {
             put("id", manifest.id)
             put("valid", diagnostics.none { it.severity == DiagnosticSeverity.ERROR })
@@ -324,7 +336,6 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val directory = persistPack(manifest, contents)
         // An unknown session is reported rather than thrown: the pack really was
         // saved, and failing the call here would hide that.
-        val sessionId = optionalString(arguments, "sessionId").trim()
         val recorded = sessionId.isNotEmpty() && sessions.recordPack(sessionId, manifest.id) != null
         val result = buildJsonObject {
             put("id", manifest.id)
@@ -578,7 +589,9 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 put("type", "string")
                 put("maxLength", MAX_DESCRIPTION_LENGTH)
             },
-            "terrain" to documentSchema("A TerrainPlan object matching the template."),
+            "terrain" to documentSchema(
+                "A TerrainPlan matching the template, with a procedural shape whose six controls come from the player's prompt.",
+            ),
             "biomes" to documentSchema("A BiomePlan object matching the template."),
             "features" to documentSchema("A FeatureLibrary object matching the template."),
         ),

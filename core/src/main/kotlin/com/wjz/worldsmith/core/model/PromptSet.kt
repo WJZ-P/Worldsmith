@@ -13,6 +13,7 @@ data class PromptSet(
     val structureCatalog: PromptTemplateRef,
     val structureDetail: PromptTemplateRef,
     val consistencyReview: PromptTemplateRef,
+    val terrainPlan: PromptTemplateRef,
     val biomePlan: PromptTemplateRef,
 ) {
     companion object {
@@ -21,6 +22,7 @@ data class PromptSet(
             structureCatalog = PromptTemplateRef("structure_catalog"),
             structureDetail = PromptTemplateRef("structure_detail"),
             consistencyReview = PromptTemplateRef("consistency_review"),
+            terrainPlan = PromptTemplateRef("terrain_plan"),
             biomePlan = PromptTemplateRef("biome_plan"),
         )
     }
