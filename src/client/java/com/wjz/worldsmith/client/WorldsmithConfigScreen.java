@@ -3,7 +3,10 @@ package com.wjz.worldsmith.client;
 import com.wjz.worldsmith.config.WorldsmithConfig;
 import com.wjz.worldsmith.core.ai.LlmProvider;
 import com.wjz.worldsmith.core.ai.LlmSettings;
+import com.wjz.worldsmith.core.mcp.McpHttpServer;
+import com.wjz.worldsmith.core.settings.McpSettings;
 import com.wjz.worldsmith.core.settings.WorldsmithSettings;
+import com.wjz.worldsmith.mcp.WorldsmithMcpService;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
@@ -25,19 +28,33 @@ public final class WorldsmithConfigScreen {
 	}
 
 	public static Screen create(Screen parent) {
-		Draft draft = Draft.of(WorldsmithConfig.get().getLlm());
+		Draft draft = Draft.of(WorldsmithConfig.get());
 
 		ConfigBuilder builder = ConfigBuilder.create()
 			.setParentScreen(parent)
 			.setTitle(Component.translatable("worldsmith.config.title"))
-			.setSavingRunnable(() -> WorldsmithConfig.set(
-				new WorldsmithSettings(WorldsmithSettings.SCHEMA_VERSION, draft.toSettings())
-			));
+			.setSavingRunnable(() -> save(draft));
 
 		ConfigEntryBuilder entries = builder.entryBuilder();
 		addModelCategory(builder, entries, draft);
 		addCredentialCategory(builder, entries, draft);
+		addBridgeCategory(builder, entries, draft);
 		return builder.build();
+	}
+
+	/**
+	 * Writes the settings, then brings the bridge in line with them.
+	 *
+	 * The bridge is applied from the stored settings rather than the draft so it
+	 * sees the clamped port, not whatever was typed.
+	 */
+	private static void save(Draft draft) {
+		WorldsmithConfig.set(new WorldsmithSettings(
+			WorldsmithSettings.SCHEMA_VERSION,
+			draft.toLlmSettings(),
+			draft.toMcpSettings()
+		));
+		WorldsmithMcpService.apply(WorldsmithConfig.get().getMcp());
 	}
 
 	private static void addModelCategory(ConfigBuilder builder, ConfigEntryBuilder entries, Draft draft) {
@@ -116,6 +133,57 @@ public final class WorldsmithConfigScreen {
 			.build());
 	}
 
+	/**
+	 * The local MCP bridge.
+	 *
+	 * Off by default, and the description says plainly what turning it on does,
+	 * because opening a port is not something a settings screen should do
+	 * quietly.
+	 */
+	private static void addBridgeCategory(ConfigBuilder builder, ConfigEntryBuilder entries, Draft draft) {
+		ConfigCategory category = builder.getOrCreateCategory(Component.translatable("worldsmith.config.category.mcp"));
+
+		category.addEntry(entries
+			.startTextDescription(Component.translatable("worldsmith.config.mcp.about"))
+			.build());
+
+		category.addEntry(entries
+			.startBooleanToggle(Component.translatable("worldsmith.config.mcp.enabled"), draft.mcpEnabled)
+			.setDefaultValue(new McpSettings().getEnabled())
+			.setTooltip(Component.translatable("worldsmith.config.mcp.enabled.tooltip"))
+			.setSaveConsumer(value -> draft.mcpEnabled = value)
+			.build());
+
+		category.addEntry(entries
+			.startIntField(Component.translatable("worldsmith.config.mcp.port"), draft.mcpPort)
+			.setDefaultValue(McpSettings.DEFAULT_PORT)
+			.setMin(McpSettings.MIN_PORT)
+			.setMax(McpSettings.MAX_PORT)
+			.setTooltip(Component.translatable("worldsmith.config.mcp.port.tooltip"))
+			.setSaveConsumer(value -> draft.mcpPort = value)
+			.build());
+
+		category.addEntry(entries
+			.startTextDescription(Component.translatable("worldsmith.config.mcp.endpoint", endpointLabel(draft)))
+			.build());
+
+		category.addEntry(entries
+			.startTextDescription(Component.translatable(
+				"worldsmith.config.mcp.discovery",
+				WorldsmithMcpService.discoveryFile().toString()
+			))
+			.build());
+	}
+
+	/** The live address when the bridge is up, otherwise the one it would take. */
+	private static String endpointLabel(Draft draft) {
+		java.net.URI endpoint = WorldsmithMcpService.endpoint();
+		if (endpoint != null) {
+			return endpoint.toString();
+		}
+		return "http://" + McpHttpServer.LOOPBACK_HOST + ":" + draft.mcpPort + McpHttpServer.MCP_PATH;
+	}
+
 	private static String providerTranslationKey(LlmProvider provider) {
 		return switch (provider) {
 			case ANTHROPIC -> "worldsmith.config.provider.anthropic";
@@ -135,8 +203,12 @@ public final class WorldsmithConfigScreen {
 		private String model;
 		private int maxOutputTokens;
 		private int timeoutSeconds;
+		private boolean mcpEnabled;
+		private int mcpPort;
 
-		private static Draft of(LlmSettings llm) {
+		private static Draft of(WorldsmithSettings settings) {
+			LlmSettings llm = settings.getLlm();
+			McpSettings mcp = settings.getMcp();
 			Draft draft = new Draft();
 			draft.provider = llm.getProvider();
 			draft.baseUrl = llm.getBaseUrl();
@@ -146,13 +218,19 @@ public final class WorldsmithConfigScreen {
 			draft.model = llm.getModel();
 			draft.maxOutputTokens = llm.getMaxOutputTokens();
 			draft.timeoutSeconds = llm.getTimeoutSeconds();
+			draft.mcpEnabled = mcp.getEnabled();
+			draft.mcpPort = mcp.getPort();
 			return draft;
 		}
 
-		private LlmSettings toSettings() {
+		private LlmSettings toLlmSettings() {
 			return new LlmSettings(
 				provider, baseUrl, apiKey, apiSecret, region, model, maxOutputTokens, timeoutSeconds
 			);
+		}
+
+		private McpSettings toMcpSettings() {
+			return new McpSettings(mcpEnabled, mcpPort);
 		}
 	}
 }

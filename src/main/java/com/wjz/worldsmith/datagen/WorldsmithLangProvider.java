@@ -69,5 +69,20 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 
 		builder.add("worldsmith.config.region", "AWS region");
 		builder.add("worldsmith.config.region.tooltip", "AWS Bedrock only. Ignored by every other provider.");
+
+		builder.add("worldsmith.config.category.mcp", "MCP Bridge");
+		builder.add("worldsmith.config.mcp.about",
+			"Lets an external assistant read and write Worldsmith packs while the game is running. "
+				+ "It listens on this machine only and is never reachable from the network.");
+		builder.add("worldsmith.config.mcp.enabled", "Enable bridge");
+		builder.add("worldsmith.config.mcp.enabled.tooltip",
+			"Off by default. Turning this on opens a local port for as long as the game is running.");
+		builder.add("worldsmith.config.mcp.port", "Port");
+		builder.add("worldsmith.config.mcp.port.tooltip",
+			"Change this if something else already uses the default. The bridge restarts when you save.");
+		builder.add("worldsmith.config.mcp.endpoint", "Address: %s");
+		builder.add("worldsmith.config.mcp.discovery",
+			"Running bridges announce themselves in %s, so an agent can read the address from there "
+				+ "instead of being told it. The file disappears when the bridge stops.");
 	}
 }

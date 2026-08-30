@@ -12,6 +12,7 @@ import java.nio.file.Path
 data class WorldsmithSettings(
     val schemaVersion: Int = SCHEMA_VERSION,
     val llm: LlmSettings = LlmSettings(),
+    val mcp: McpSettings = McpSettings(),
 ) {
     companion object {
         const val SCHEMA_VERSION: Int = 1
@@ -61,6 +62,9 @@ object WorldsmithSettingsStore {
                 .coerceIn(LlmSettings.MIN_OUTPUT_TOKENS, LlmSettings.MAX_OUTPUT_TOKENS),
             timeoutSeconds = settings.llm.timeoutSeconds
                 .coerceIn(LlmSettings.MIN_TIMEOUT_SECONDS, LlmSettings.MAX_TIMEOUT_SECONDS),
+        ),
+        mcp = settings.mcp.copy(
+            port = settings.mcp.port.coerceIn(McpSettings.MIN_PORT, McpSettings.MAX_PORT),
         ),
     )
 }
