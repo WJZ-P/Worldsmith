@@ -16,9 +16,9 @@ enum class BiomeArchetypeRole {
 /**
  * Where a biome sits along the land-shape axis.
  *
- * <p>Terrain height is driven by continentalness and erosion, so selecting
- * biomes with the same two values is what keeps a swamp off a mountain peak.
- * The bands are fixed and adjacent, which is what makes coverage provable.
+ * <p>Terrain height is driven by continentalness and erosion, so these presets
+ * are useful when a prompt wants a familiar water/coast/highland split. They
+ * are optional; raw climate boxes are equally first-class.
  */
 @Serializable
 enum class ReliefBand {
@@ -44,12 +44,11 @@ enum class HumidityBand {
 }
 
 /**
- * The preferred way to place a biome: name bands instead of writing raw numbers.
+ * A concise way to place a biome: name bands instead of writing raw numbers.
  *
- * An empty list on an axis claims that whole axis, so a slot naming only a
- * relief takes every temperature and humidity within it. Listing several bands
- * is allowed as long as they are adjacent; a gap would make the resulting box
- * quietly swallow the band in between.
+ * An empty list spans the whole axis. Listing several bands is allowed as long
+ * as they are adjacent; a gap would make the resulting box quietly include the
+ * band in between.
  */
 @Serializable
 data class ClimateSlot(

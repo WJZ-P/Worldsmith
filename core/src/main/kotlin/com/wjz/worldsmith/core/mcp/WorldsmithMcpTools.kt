@@ -3,7 +3,6 @@ package com.wjz.worldsmith.core.mcp
 import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import com.wjz.worldsmith.core.model.BiomePlan
-import com.wjz.worldsmith.core.model.ClimateBands
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.HumidityBand
 import com.wjz.worldsmith.core.model.PromptSet
@@ -66,7 +65,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             title = "Begin a Worldsmith world",
             description =
                 "Start here. Takes the player's description of a world and returns the whole procedure for " +
-                    "building it: the design rules a pack must satisfy, the climate grid every biome sits on, " +
+                    "building it: the design rules, optional semantic placement presets, exact climate axes, " +
                     "and a sessionId that carries the run through to ${WorldsmithWorkflow.FINISH_TOOL}.",
             inputSchema = beginWorldSchema(),
             readOnly = false,
@@ -161,7 +160,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             put("overview", WorldsmithWorkflow.OVERVIEW)
             put("procedure", procedureJson())
             put("designContract", templates.load(PromptSet.DEFAULT.biomePlan).systemPrompt)
-            put("climateGrid", climateGridJson())
+            put("climatePlacement", climatePlacementJson())
             put("nextTool", WorldsmithWorkflow.TEMPLATE_TOOL)
         }
         val text = buildString {
@@ -185,17 +184,30 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         }
     }
 
-    /** The axes a biome is placed on, so they never have to be inferred from the template. */
-    private fun climateGridJson(): JsonObject = buildJsonObject {
-        put("relief", bandNames(ReliefBand.entries))
-        put("temperature", bandNames(TemperatureBand.entries))
-        put("humidity", bandNames(HumidityBand.entries))
-        put("cellCount", ClimateBands.ALL_CELLS.size)
+    /** Placement vocabulary, explicitly presented as optional rather than a quota. */
+    private fun climatePlacementJson(): JsonObject = buildJsonObject {
         put(
-            "rule",
-            "A cell is one relief, temperature and humidity band together, and every cell must be claimed by " +
-                "exactly one biome. Minecraft resolves an unclaimed cell to whichever biome is nearest, which " +
-                "is not a decision you get to make, so a gap is rejected rather than filled.",
+            "principle",
+            "The player's prompt is the only distribution standard. There is no required biome count, " +
+                "temperature quota, humidity quota or full-grid coverage rule.",
+        )
+        putJsonObject("semanticSlotPresets") {
+            put("relief", bandNames(ReliefBand.entries))
+            put("temperature", bandNames(TemperatureBand.entries))
+            put("humidity", bandNames(HumidityBand.entries))
+        }
+        put(
+            "rawClimateAxes",
+            JsonArray(
+                listOf("temperature", "humidity", "continentalness", "erosion", "depth", "weirdness", "offset")
+                    .map(::JsonPrimitive),
+            ),
+        )
+        put(
+            "guidance",
+            "Use a semantic slot for a simple familiar placement or a raw climate box for precise distribution. " +
+                "Broad ranges make a theme dominant; narrow ranges make it rare. Gaps are valid and Minecraft " +
+                "resolves them to the nearest declared biome.",
         )
     }
 
@@ -396,10 +408,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             }
         }
         sessions.finish(sessionId)
-        val covered = coveredCells(pack)
         val report = "Worldsmith pack '${pack.manifest.displayName}' is saved and valid: " +
-            "${pack.biomes.biomes.size} biomes and ${pack.features.features.size} features claiming " +
-            "$covered of ${ClimateBands.ALL_CELLS.size} climate cells, stored at $directory. " +
+            "${pack.biomes.biomes.size} biomes and ${pack.features.features.size} features, stored at $directory. " +
             "It has been selected for Minecraft's world-creation screen. Nothing further is required from you."
         val structured = buildJsonObject {
             put("sessionId", sessionId)
@@ -411,9 +421,9 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             put("path", directory.toString())
             put("biomeCount", pack.biomes.biomes.size)
             put("featureCount", pack.features.features.size)
-            putJsonObject("climateCoverage") {
-                put("covered", covered)
-                put("total", ClimateBands.ALL_CELLS.size)
+            putJsonObject("climatePlacement") {
+                put("semanticSlots", pack.biomes.biomes.count { it.slot != null })
+                put("rawClimateBoxes", pack.biomes.biomes.count { it.climate != null })
             }
             put("diagnostics", diagnosticsJson(diagnostics))
             put("activationQueued", activationQueued)
@@ -433,10 +443,6 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         }
         return McpToolResult.success(structured, "complete=false. $reason Call $nextTool next.")
     }
-
-    /** Only slots claim named cells, so a pack written as raw boxes reports fewer. */
-    private fun coveredCells(pack: WorldsmithPack): Int =
-        pack.biomes.biomes.mapNotNull { it.slot }.flatMapTo(mutableSetOf()) { ClimateBands.cells(it) }.size
 
     /** Resolves a managed pack directory, refusing anything that leaves it. */
     private fun managedPack(id: String): Path? {

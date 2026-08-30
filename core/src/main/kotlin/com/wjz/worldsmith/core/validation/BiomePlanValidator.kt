@@ -7,7 +7,6 @@ import com.wjz.worldsmith.core.model.BiomeEnvironment
 import com.wjz.worldsmith.core.model.BiomePlan
 import com.wjz.worldsmith.core.model.ClimateBands
 import com.wjz.worldsmith.core.model.ClimateBox
-import com.wjz.worldsmith.core.model.ClimateCell
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.NumericRange
 
@@ -41,58 +40,7 @@ object BiomePlanValidator {
         plan.biomes.forEachIndexed { index, biome ->
             addAll(validateBiome("biomes[" + index + "]", biome, features, featureIds))
         }
-
-        addAll(validateCoverage(plan))
     }
-
-    /**
-     * Proves that every climate cell is claimed by exactly one biome.
-     *
-     * Minecraft resolves biomes by nearest neighbour, so a gap never leaves a
-     * hole in the world; it silently hands that space to whichever box happens
-     * to be closest. That is why an uncovered cell is an error here rather than
-     * something to discover in-game much later.
-     */
-    private fun validateCoverage(plan: BiomePlan): List<Diagnostic> = buildList {
-        val raw = plan.biomes.filter { it.slot == null && it.climate != null }
-        val owners = linkedMapOf<ClimateCell, MutableList<String>>()
-        plan.biomes.forEach { biome ->
-            val slot = biome.slot ?: return@forEach
-            ClimateBands.cells(slot).forEach { cell ->
-                owners.getOrPut(cell) { mutableListOf() }.add(biome.id)
-            }
-        }
-
-        owners.filterValues { it.size > 1 }.forEach { (cell, ids) ->
-            add(
-                error(
-                    "biomes",
-                    "DUPLICATE_CLIMATE_CELL",
-                    "Climate cell " + describe(cell) + " is claimed by " + ids.sorted().joinToString(", "),
-                ),
-            )
-        }
-
-        if (raw.isNotEmpty()) {
-            add(
-                warning(
-                    "biomes",
-                    "CLIMATE_COVERAGE_UNPROVEN",
-                    "Raw climate boxes bypass the band grid, so full coverage cannot be proven for " +
-                        raw.map { it.id }.sorted().joinToString(", "),
-                ),
-            )
-            return@buildList
-        }
-
-        (ClimateBands.ALL_CELLS - owners.keys)
-            .sortedWith(compareBy({ it.relief.ordinal }, { it.temperature.ordinal }, { it.humidity.ordinal }))
-            .forEach { cell ->
-                add(error("biomes", "UNCOVERED_CLIMATE_CELL", "No biome claims climate cell " + describe(cell)))
-            }
-    }
-
-    private fun describe(cell: ClimateCell) = cell.relief.name + "/" + cell.temperature.name + "/" + cell.humidity.name
 
     private fun validateBiome(
         path: String,
@@ -280,6 +228,4 @@ object BiomePlanValidator {
     private fun error(path: String, code: String, message: String) =
         Diagnostic(path, code, DiagnosticSeverity.ERROR, message)
 
-    private fun warning(path: String, code: String, message: String) =
-        Diagnostic(path, code, DiagnosticSeverity.WARNING, message)
 }

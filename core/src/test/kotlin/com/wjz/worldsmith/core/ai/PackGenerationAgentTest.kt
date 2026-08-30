@@ -18,9 +18,12 @@ class PackGenerationAgentTest {
         WorldsmithJson.encode(GeneratedPack(it.biomes, it.features))
     }
 
-    /** Dropping a biome leaves two climate cells unclaimed. */
-    private val incompletePack: String = WorldsmithJson.decode<GeneratedPack>(validPack).let { pack ->
-        WorldsmithJson.encode(pack.copy(biomes = pack.biomes.copy(biomes = pack.biomes.biomes.dropLast(1))))
+    /** A biome still needs one concrete placement even though global coverage is optional. */
+    private val invalidPack: String = WorldsmithJson.decode<GeneratedPack>(validPack).let { pack ->
+        val broken = pack.biomes.biomes.mapIndexed { index, biome ->
+            if (index == pack.biomes.biomes.lastIndex) biome.copy(slot = null, climate = null) else biome
+        }
+        WorldsmithJson.encode(pack.copy(biomes = pack.biomes.copy(biomes = broken)))
     }
 
     private class ScriptedClient(replies: List<String>) : LlmClient {
@@ -56,7 +59,7 @@ class PackGenerationAgentTest {
 
     @Test
     fun `a rejected answer comes back with its diagnostics and the previous document`(): Unit = runBlocking {
-        val client = ScriptedClient(listOf(incompletePack, validPack))
+        val client = ScriptedClient(listOf(invalidPack, validPack))
 
         val result = PackGenerationAgent(client).generate(settings, request)
 
@@ -64,7 +67,7 @@ class PackGenerationAgentTest {
         assertEquals(2, success.attempts)
 
         val repair = client.prompts[1]
-        assertTrue("UNCOVERED_CLIMATE_CELL" in repair, "the repair prompt should name the failure")
+        assertTrue("MISSING_CLIMATE" in repair, "the repair prompt should name the failure")
         assertTrue(request.playerPrompt in repair, "the repair prompt should keep the original request")
         assertTrue("Previous answer:" in repair, "the repair prompt should include what to fix")
     }
@@ -81,13 +84,13 @@ class PackGenerationAgentTest {
 
     @Test
     fun `giving up reports the last diagnostics rather than throwing`(): Unit = runBlocking {
-        val client = ScriptedClient(List(3) { incompletePack })
+        val client = ScriptedClient(List(3) { invalidPack })
 
         val result = PackGenerationAgent(client, maxAttempts = 3).generate(settings, request)
 
         val rejected = assertInstanceOf(PackGenerationResult.Rejected::class.java, result)
         assertEquals(3, rejected.attempts)
-        assertTrue(rejected.diagnostics.all { it.code == "UNCOVERED_CLIMATE_CELL" })
+        assertTrue(rejected.diagnostics.all { it.code == "MISSING_CLIMATE" })
         assertEquals(3, client.prompts.size)
     }
 }

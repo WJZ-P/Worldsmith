@@ -44,8 +44,9 @@ object WorldsmithWorkflow {
     const val OVERVIEW: String =
         "You are designing one Minecraft world from the player's description. Work through `procedure` in " +
             "order and do not stop until $FINISH_TOOL answers complete=true.\n\n" +
-            "Design the biomes yourself. `designContract` holds the rules the pack must satisfy and " +
-            "`climateGrid` holds the grid every biome is placed on. Worldsmith validates what you send and " +
+            "Design the biomes yourself. The player's prompt is the only standard for their number and " +
+            "distribution. `designContract` holds the schema rules and `climatePlacement` describes optional " +
+            "semantic presets plus exact raw axes. Worldsmith validates what you send and " +
             "reports exactly what is wrong, so a rejected pack is a repair job rather than a restart: change " +
             "only what the diagnostics name and send the whole document again.\n\n" +
             "complete=true means exactly this much: the pack is saved in Worldsmith's pack directory, reads " +
@@ -59,8 +60,8 @@ object WorldsmithWorkflow {
             order = 1,
             tool = TEMPLATE_TOOL,
             instruction =
-                "Call it once. It returns the built-in pack: a complete worked example of the terrain, biome " +
-                    "and feature documents, and the only reliable source of the exact field names.",
+                "Call it once. It returns the built-in pack as a field-shape example. Copy its schema, not its " +
+                    "biome count, climate partition or theme; those come only from the player's prompt.",
         ),
         WorkflowStep(
             order = 2,

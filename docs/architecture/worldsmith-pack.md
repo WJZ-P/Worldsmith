@@ -47,34 +47,40 @@ A **climate slot** names bands instead of writing numbers:
 "slot": { "relief": "FLATS", "temperature": ["COLD"], "humidity": ["ARID"] }
 ```
 
-The grid has three axes:
+The semantic vocabulary has three axes:
 
 - `relief`: `DEEP_WATER`, `SHALLOW_WATER`, `COAST`, `PEAKS`, `HIGHLAND`, `FLATS`
 - `temperature`: `COLD`, `TEMPERATE`, `HOT`
 - `humidity`: `ARID`, `HUMID`
 
-An empty list on an axis claims that whole axis, so a slot naming only a relief
-takes all six of its cells. Several bands may be listed as long as they are
-adjacent: they collapse into one span, so a gap would make the box quietly
-swallow the band in between, and the validator rejects that.
+An empty list spans the whole axis. Several bands may be listed as long as they
+are adjacent: they collapse into one range, so a gap would quietly include the
+band in between, and the validator rejects that mismatch.
 
 The band edges mirror vanilla's overworld builder, so terrain height and biome
-choice stay derived from the same continentalness and erosion values. Because
-the grid is finite (6 × 3 × 2 = 36 cells), "every cell is claimed exactly once"
-is a proof that every biome in the pack can actually generate, and the validator
-checks it.
+choice stay derived from the same continentalness and erosion values. Slots are
+optional presets, not a world template: packs do not need to use every band and
+several biomes may intentionally describe nearby regions.
 
-A **raw climate box** is the escape hatch:
+A **raw climate box** is the precise form:
 
 ```json
-"climate": { "continentalness": { "min": -1.2, "max": -0.455 } }
+"climate": {
+  "temperature": { "min": -1.0, "max": 1.0 },
+  "humidity": { "min": -1.0, "max": 0.55 },
+  "continentalness": { "min": -0.11, "max": 1.0 },
+  "erosion": { "min": 0.05, "max": 1.0 }
+}
 ```
 
-It is legal but forfeits the proof, so the validator downgrades coverage to a
-warning for the whole pack. Reach for it only when a band cannot express the
-intent. Note that `depth` is not ocean depth: it is position relative to the
-surface, near zero at ground level and approaching one deep underground.
-Constraining it is almost never what an author means.
+It is first-class and is normally the better choice when the prompt describes
+dominance or rarity: broad ranges make a biome common, narrow ranges make it
+rare. Unnamed parameter regions are valid and resolve to the nearest declared
+biome. `depth` is not ocean depth: it is position relative to the surface, near
+zero at ground level and approaching one deep underground.
+
+Worldsmith imposes no required biome count, distribution symmetry or coverage
+quota. Those decisions come from the player prompt.
 
 ## Tags
 

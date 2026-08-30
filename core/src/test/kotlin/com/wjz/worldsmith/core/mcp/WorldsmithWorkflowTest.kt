@@ -62,7 +62,7 @@ class WorldsmithWorkflowTest {
     }
 
     @Test
-    fun `beginning a world hands out the procedure, the design rules and the grid`() {
+    fun `beginning a world makes the prompt authoritative and exposes placement options`() {
         val brief = begin()
 
         assertFalse(brief.bool("complete"))
@@ -73,13 +73,16 @@ class WorldsmithWorkflowTest {
         // The rules handed to an outside agent are the same prompt the in-game
         // generator uses, so this fails if the two ever drift apart.
         val contract = brief.text("designContract")
-        assertTrue("climate slot" in contract, "the contract should be the biome plan prompt")
+        assertTrue("only standard" in contract.lowercase(), "the contract should make the prompt authoritative")
 
-        val grid = brief.getValue("climateGrid").jsonObject
-        assertEquals(36, grid.getValue("cellCount").jsonPrimitive.int)
-        assertEquals(6, grid.getValue("relief").jsonArray.size)
-        assertEquals(3, grid.getValue("temperature").jsonArray.size)
-        assertEquals(2, grid.getValue("humidity").jsonArray.size)
+        val placement = brief.getValue("climatePlacement").jsonObject
+        assertTrue("only distribution standard" in placement.getValue("principle").jsonPrimitive.content)
+        val presets = placement.getValue("semanticSlotPresets").jsonObject
+        assertEquals(6, presets.getValue("relief").jsonArray.size)
+        assertEquals(3, presets.getValue("temperature").jsonArray.size)
+        assertEquals(2, presets.getValue("humidity").jsonArray.size)
+        assertTrue("continentalness" in placement.getValue("rawClimateAxes").jsonArray.map { it.jsonPrimitive.content })
+        assertFalse("climateGrid" in brief)
     }
 
     @Test
@@ -101,9 +104,9 @@ class WorldsmithWorkflowTest {
         assertEquals(16, done.getValue("biomeCount").jsonPrimitive.int)
         assertEquals(JsonNull, done.getValue("nextTool"))
 
-        val coverage = done.getValue("climateCoverage").jsonObject
-        assertEquals(36, coverage.getValue("covered").jsonPrimitive.int)
-        assertEquals(36, coverage.getValue("total").jsonPrimitive.int)
+        val placement = done.getValue("climatePlacement").jsonObject
+        assertEquals(16, placement.getValue("semanticSlots").jsonPrimitive.int)
+        assertEquals(0, placement.getValue("rawClimateBoxes").jsonPrimitive.int)
         assertTrue(done.text("report").contains("16 biomes"))
     }
 

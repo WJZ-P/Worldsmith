@@ -22,33 +22,28 @@ import org.junit.jupiter.api.Test
 
 class BiomePlanValidatorTest {
     @Test
-    fun `a plan whose slots tile the grid reports no diagnostics`() {
+    fun `a plan using semantic slots reports no diagnostics`() {
         assertTrue(BiomePlanValidator.validate(plan(), library()).isEmpty())
     }
 
     @Test
-    fun `an unclaimed climate cell is reported`() {
+    fun `a prompt may intentionally leave semantic bands undeclared`() {
         val incomplete = plan().let { it.copy(biomes = it.biomes.filterNot { biome -> biome.id == "flats_hot" }) }
 
-        val diagnostics = BiomePlanValidator.validate(incomplete, library())
-
-        assertEquals(List(2) { "UNCOVERED_CLIMATE_CELL" }, diagnostics.map { it.code })
-        assertTrue(diagnostics.all { "FLATS/HOT" in it.message })
+        assertTrue(BiomePlanValidator.validate(incomplete, library()).isEmpty())
     }
 
     @Test
-    fun `two biomes claiming the same cell are reported`() {
+    fun `overlapping semantic slots are not treated as a global quota violation`() {
         val overlapping = plan().let {
             it.copy(biomes = it.biomes + biome("second_shore", ClimateSlot(ReliefBand.COAST), BiomeArchetypeRole.BEACH))
         }
 
-        val diagnostics = BiomePlanValidator.validate(overlapping, library())
-
-        assertEquals(List(6) { "DUPLICATE_CLIMATE_CELL" }, diagnostics.map { it.code })
+        assertTrue(BiomePlanValidator.validate(overlapping, library()).isEmpty())
     }
 
     @Test
-    fun `a raw climate box downgrades coverage to a warning`() {
+    fun `a raw climate box is a first class placement`() {
         val raw = plan().let {
             it.copy(
                 biomes = it.biomes.map { biome ->
@@ -57,10 +52,7 @@ class BiomePlanValidatorTest {
             )
         }
 
-        val diagnostics = BiomePlanValidator.validate(raw, library())
-
-        assertEquals(listOf("CLIMATE_COVERAGE_UNPROVEN"), diagnostics.map { it.code })
-        assertEquals(listOf(DiagnosticSeverity.WARNING), diagnostics.map { it.severity })
+        assertTrue(BiomePlanValidator.validate(raw, library()).isEmpty())
     }
 
     @Test

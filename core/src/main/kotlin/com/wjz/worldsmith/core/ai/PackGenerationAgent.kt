@@ -37,8 +37,8 @@ sealed interface PackGenerationResult {
  * usually only has to fix the cells it missed rather than invent sixteen biomes
  * again.
  *
- * Only errors block. Warnings, such as a raw climate box forfeiting the
- * coverage proof, are reported but accepted.
+ * Only errors block. The player prompt decides distribution; raw climate boxes
+ * and intentionally uncovered parameter regions are ordinary valid input.
  */
 class PackGenerationAgent(
     private val client: LlmClient,

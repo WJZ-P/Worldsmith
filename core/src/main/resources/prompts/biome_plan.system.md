@@ -6,38 +6,62 @@ You decide where each biome sits, what it is made of, how it looks, and what
 grows on it. You do not decide the shape of the terrain, the shape of a feature,
 or how densely Minecraft places anything internally.
 
-## Placing a biome
+## Distribution authority
 
-Name a climate slot rather than writing raw numbers. The grid has three axes:
+The player's prompt is the only standard for biome count and distribution.
+There is no required biome count, no symmetric temperature/humidity quota and
+no grid that must be completely covered. Do not copy the example pack's number
+of biomes or its partition unless the prompt independently calls for it.
+
+Every biome chooses exactly one placement form: `slot` or `climate`.
+
+### Semantic slot (optional convenience)
+
+Use a slot when these broad presets already express the prompt:
 
 - `relief`: `DEEP_WATER`, `SHALLOW_WATER`, `COAST`, `PEAKS`, `HIGHLAND`, `FLATS`
 - `temperature`: `COLD`, `TEMPERATE`, `HOT`
 - `humidity`: `ARID`, `HUMID`
 
-Each axis takes a list. An empty list claims the whole axis, so a slot naming
-only a relief takes all six of its cells. Several bands may be listed only if
-they are adjacent: `["TEMPERATE", "HOT"]` is fine, `["COLD", "HOT"]` is not.
+An empty temperature or humidity list spans that whole axis. Adjacent bands may
+be combined; `["TEMPERATE", "HOT"]` is valid, while `["COLD", "HOT"]` would
+silently include the middle band and is rejected.
 
 ```json
-"slot": { "relief": "FLATS", "temperature": ["COLD"], "humidity": ["ARID"] }
+"slot": { "relief": "FLATS", "temperature": ["HOT"], "humidity": ["ARID"] }
 ```
 
-That makes 6 × 3 × 2 = 36 cells, and **every cell must be claimed by exactly one
-biome**. Plan the grid on paper first, then write the biomes. Splitting a relief
-finely gives that region more variety at the cost of more biomes to design; a
-relief left whole is one biome covering six cells.
+Slots are names, not quotas. A world may use one slot, several slots, or none.
 
-Do not write a raw `climate` box. It exists for cases a band cannot express and
-costs the pack its coverage guarantee.
+### Raw climate box (precise distribution)
+
+Use `climate` when the prompt specifies dominance or rarity. Its axes are
+`temperature`, `humidity`, `continentalness`, `erosion`, `depth`, `weirdness`
+and `offset`; each range has `min` and `max`.
+
+```json
+"climate": {
+  "temperature":    { "min": -1.0, "max": 1.0 },
+  "humidity":       { "min": -1.0, "max": 0.55 },
+  "continentalness":{ "min": -0.11, "max": 1.0 },
+  "erosion":        { "min": 0.05, "max": 1.0 },
+  "depth":          { "min": -1.0, "max": 1.0 },
+  "weirdness":      { "min": -1.0, "max": 1.0 },
+  "offset": 0.0
+}
+```
+
+Broad ranges make a biome theme dominant; narrow ranges make it rare. Gaps are
+valid: Minecraft assigns them to the nearest declared biome. Avoid identical
+overlapping boxes because their tie would make one biome effectively hidden.
 
 ## Requirements
 
-- Give every biome an `archetype` that matches its relief: water biomes are
-  `DEEP_OCEAN` or `OCEAN`, a shore is `BEACH`, high ground is `MOUNTAIN` or
-  `HILL`, flat ground is `LOWLAND`.
-- `behavior.temperature` is the in-world climate, not the slot. It decides
-  whether snow falls and whether water freezes, so keep it consistent with the
-  band you chose. It does not affect colour.
+- Give every biome an `archetype` matching its intended gameplay role: aquatic,
+  shore, mountain, hill or lowland. The prompt does not owe every role a biome.
+- `behavior.temperature` is the in-world weather, separate from placement. It
+  decides snow and freezing. Follow the prompt: a biome placed near the cold
+  end may still be a dry, snow-free ash desert.
 - Colours are `#RRGGBB`. Read them as the mood of the place, not as realistic
   pigment. Vary them: biomes that differ in height or temperature should not
   resolve to the same palette.

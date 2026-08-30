@@ -1,29 +1,21 @@
 package com.wjz.worldsmith.core.model
 
-/** One indivisible square of the semantic climate grid. */
-data class ClimateCell(
-    val relief: ReliefBand,
-    val temperature: TemperatureBand,
-    val humidity: HumidityBand,
-)
-
 /**
- * Translates semantic climate slots into the raw parameter boxes Minecraft's
- * biome source wants.
+ * Translates optional semantic climate presets into raw parameter boxes.
  *
  * The band edges mirror vanilla's `OverworldBiomeBuilder`. They are chosen to be
  * adjacent and gapless: continentalness is cut into four touching spans, the
  * inland span into three touching erosion spans, and temperature and humidity
- * into touching spans of their own. Because of that, "every cell is claimed
- * exactly once" is a sufficient proof that every biome in the pack can actually
- * generate, with no sampling required.
+ * into touching spans of their own. These names are conveniences, not a
+ * mandatory partition of every world.
  *
  * A slot may claim several adjacent bands on an axis. They must be adjacent:
  * a box spanning COLD and HOT would silently swallow TEMPERATE as well, so the
  * validator rejects gaps rather than letting the box lie about what it covers.
  *
- * A pack may still write a raw [ClimateBox] instead of a slot. That escape hatch
- * is legal but forfeits the proof, and the validator says so.
+ * A prompt may use any subset of slots, or use a raw [ClimateBox] when it needs
+ * exact control over dominance and rarity. Unnamed parameter regions are
+ * intentionally resolved by Minecraft's nearest-neighbour biome search.
  */
 object ClimateBands {
     private val FULL = NumericRange(-1.0f, 1.0f)
@@ -49,28 +41,12 @@ object ClimateBands {
         HumidityBand.HUMID to NumericRange(-0.1f, 1.0f),
     )
 
-    /** Every cell the grid contains. */
-    val ALL_CELLS: Set<ClimateCell> = ReliefBand.entries.flatMap { relief ->
-        TemperatureBand.entries.flatMap { temperature ->
-            HumidityBand.entries.map { ClimateCell(relief, temperature, it) }
-        }
-    }.toSet()
-
     /** An empty band list on an axis claims that whole axis. */
     fun temperatureBands(slot: ClimateSlot): List<TemperatureBand> =
         slot.temperature.ifEmpty { TemperatureBand.entries }
 
     fun humidityBands(slot: ClimateSlot): List<HumidityBand> =
         slot.humidity.ifEmpty { HumidityBand.entries }
-
-    /** The cells a slot claims. */
-    fun cells(slot: ClimateSlot): Set<ClimateCell> = buildSet {
-        temperatureBands(slot).forEach { temperature ->
-            humidityBands(slot).forEach { humidity ->
-                add(ClimateCell(slot.relief, temperature, humidity))
-            }
-        }
-    }
 
     /** True when the listed bands form an unbroken run, so their span covers only them. */
     fun <T : Enum<T>> isContiguous(bands: List<T>): Boolean {
@@ -82,9 +58,8 @@ object ClimateBands {
     }
 
     /**
-     * Depth and weirdness stay open so the grid keeps covering caves and river
-     * bands rather than leaving holes for the nearest-neighbour search to fill
-     * arbitrarily.
+     * Depth and weirdness stay open for a semantic preset; a raw climate box
+     * can constrain either axis when the prompt calls for it.
      */
     fun resolve(slot: ClimateSlot): ClimateBox {
         val (continentalness, erosion) = requireNotNull(RELIEF[slot.relief]) { "Unmapped relief band ${slot.relief}" }
