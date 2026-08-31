@@ -32,6 +32,9 @@ data class WorkflowSession(
 object WorldsmithWorkflow {
     const val BEGIN_TOOL: String = "worldsmith_begin_world"
     const val TEMPLATE_TOOL: String = "worldsmith_get_pack_template"
+    const val STYLE_LIST_TOOL: String = "worldsmith_list_styles"
+    const val STYLE_GET_TOOL: String = "worldsmith_get_style"
+    const val CONTRACT_TOOL: String = "worldsmith_get_contract"
     const val WRITE_TOOL: String = "worldsmith_write_pack"
     const val FINISH_TOOL: String = "worldsmith_finish_world"
 
@@ -44,11 +47,13 @@ object WorldsmithWorkflow {
     const val OVERVIEW: String =
         "You are designing one Minecraft world from the player's description. Work through `procedure` in " +
             "order and do not stop until $FINISH_TOOL answers complete=true.\n\n" +
-            "Design both the terrain and the biomes yourself. The player's prompt is the only standard for " +
-            "land/ocean balance, scale, relief, height, caves, rivers, lakes, ocean depth, biome count and biome distribution. " +
-            "`terrainContract` defines the semantic terrain and hydrology controls; `designContract` holds the biome " +
-            "rules; and `climatePlacement` describes optional semantic presets plus exact raw axes. " +
-            "Worldsmith validates what you send and " +
+            "Design the terrain, the biomes and the features yourself. The player's prompt is the only standard " +
+            "for land/ocean balance, scale, relief, height, caves, rivers, lakes, ocean depth, biome count and " +
+            "biome distribution. `howToDesign` gives the order those decisions go in and the joins where two " +
+            "documents have to agree; `contracts` holds the field vocabulary, one document each for terrain, " +
+            "biome and feature, and $CONTRACT_TOOL hands any of them back if you need to re-read one; " +
+            "`climatePlacement` describes optional semantic presets plus the exact raw axes. Worldsmith " +
+            "validates what you send and " +
             "reports exactly what is wrong, so a rejected pack is a repair job rather than a restart: change " +
             "only what the diagnostics name and send the whole document again.\n\n" +
             "complete=true means exactly this much: the pack is saved in Worldsmith's pack directory, reads " +
@@ -67,6 +72,21 @@ object WorldsmithWorkflow {
         ),
         WorkflowStep(
             order = 2,
+            tool = STYLE_LIST_TOOL,
+            instruction =
+                "Call it once and read the one-line descriptions. A style says which values make a world feel " +
+                    "like a particular kind of place, which is the one thing you cannot work out from the " +
+                    "contracts alone. Pick the one that matches the player's prompt, or none if none does.",
+        ),
+        WorkflowStep(
+            order = 3,
+            tool = STYLE_GET_TOOL,
+            instruction =
+                "Read the style you picked. When none matched, read `general`: it is the method for deriving a " +
+                    "world from an arbitrary prompt, and using it is the normal path rather than a failure.",
+        ),
+        WorkflowStep(
+            order = 4,
             tool = WRITE_TOOL,
             instruction =
                 "Send the whole pack with this sessionId. Preserve the template's technical terrain envelope, " +
@@ -75,7 +95,7 @@ object WorldsmithWorkflow {
                     "error diagnostics means nothing was saved, so repair those exact problems and call it again.",
         ),
         WorkflowStep(
-            order = 3,
+            order = 5,
             tool = FINISH_TOOL,
             instruction =
                 "Call it with this sessionId. It re-reads the pack from disk and re-validates it. Stop when it " +

@@ -15,7 +15,9 @@ import com.wjz.worldsmith.core.model.WorldsmithPackFiles
 import com.wjz.worldsmith.core.model.WorldsmithPackManifest
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
 import com.wjz.worldsmith.core.prompt.ClasspathPromptTemplateRepository
+import com.wjz.worldsmith.core.prompt.ClasspathStyleCatalog
 import com.wjz.worldsmith.core.prompt.PromptTemplateRepository
+import com.wjz.worldsmith.core.prompt.StyleCatalog
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.validation.Diagnostic
 import com.wjz.worldsmith.core.validation.DiagnosticSeverity
@@ -56,6 +58,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private val runtimeInfo: Supplier<Map<String, String>> = Supplier { emptyMap() },
     private val packFinished: Consumer<String> = Consumer { },
     private val templates: PromptTemplateRepository = ClasspathPromptTemplateRepository(),
+    private val styles: StyleCatalog = ClasspathStyleCatalog(),
     private val sessions: WorkflowSessions = WorkflowSessions(),
 ) {
     private val packDirectory = packDirectory.toAbsolutePath().normalize()
@@ -90,6 +93,60 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             inputSchema = emptySchema(),
             readOnly = true,
             handler = { getPackTemplate() },
+        ),
+        McpTool(
+            name = WorldsmithWorkflow.STYLE_LIST_TOOL,
+            title = "List Worldsmith world styles",
+            description =
+                "List the world styles available, one sentence each. A style says which values make a world " +
+                    "read as a particular kind of place. Pick the one matching the player's prompt and read it " +
+                    "with " + WorldsmithWorkflow.STYLE_GET_TOOL + "; when none matches, read `general` instead.",
+            inputSchema = emptySchema(),
+            readOnly = true,
+            handler = { listStyles() },
+        ),
+        McpTool(
+            name = WorldsmithWorkflow.STYLE_GET_TOOL,
+            title = "Get a Worldsmith world style",
+            description =
+                "Return one style in full, by the id " + WorldsmithWorkflow.STYLE_LIST_TOOL + " reported. Ask " +
+                    "for `general` when no style matched the prompt: it is the method for deriving a world from " +
+                    "an arbitrary description.",
+            inputSchema = objectSchema(
+                properties = mapOf(
+                    "id" to buildJsonObject {
+                        put("type", "string")
+                        put(
+                            "description",
+                            "A style id from " + WorldsmithWorkflow.STYLE_LIST_TOOL + ", or '" +
+                                StyleCatalog.FALLBACK_ID + "' when none matched.",
+                        )
+                    },
+                ),
+                required = listOf("id"),
+            ),
+            readOnly = true,
+            handler = ::getStyle,
+        ),
+        McpTool(
+            name = WorldsmithWorkflow.CONTRACT_TOOL,
+            title = "Get a Worldsmith document contract",
+            description =
+                "Return one pack contract in full: 'terrain', 'biome' or 'feature'. " +
+                    WorldsmithWorkflow.BEGIN_TOOL + " already hands out all three, so reach for this only to " +
+                    "re-read one while repairing a document.",
+            inputSchema = objectSchema(
+                properties = mapOf(
+                    "id" to buildJsonObject {
+                        put("type", "string")
+                        put("enum", JsonArray(PromptSet.DEFAULT.contracts.keys.map(::JsonPrimitive)))
+                        put("description", "Which document's field vocabulary to return.")
+                    },
+                ),
+                required = listOf("id"),
+            ),
+            readOnly = true,
+            handler = ::getContract,
         ),
         McpTool(
             name = "worldsmith_list_packs",
@@ -160,8 +217,11 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             put("complete", false)
             put("overview", WorldsmithWorkflow.OVERVIEW)
             put("procedure", procedureJson())
-            put("terrainContract", templates.load(PromptSet.DEFAULT.terrainPlan).systemPrompt)
-            put("designContract", templates.load(PromptSet.DEFAULT.biomePlan).systemPrompt)
+            put("howToDesign", templates.load(PromptSet.DEFAULT.worldEntry).systemPrompt)
+            putJsonObject("contracts") {
+                PromptSet.DEFAULT.contracts.forEach { (name, ref) -> put(name, templates.load(ref).systemPrompt) }
+            }
+            put("styleCount", styles.list().size)
             put("climatePlacement", climatePlacementJson())
             put("nextTool", WorldsmithWorkflow.TEMPLATE_TOOL)
         }
@@ -214,6 +274,90 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     }
 
     private fun bandNames(values: List<Enum<*>>): JsonArray = JsonArray(values.map { JsonPrimitive(it.name) })
+
+    /**
+     * The cheap half of the style lookup: an id and a sentence each.
+     *
+     * Kept apart from the bodies so that adding a style costs the agent one line
+     * rather than a page. That is the only reason a catalog of styles can grow
+     * at all: a run consults one of them, so paying for all of them up front
+     * would crowd out the design the styles exist to inform.
+     */
+    private fun listStyles(): McpToolResult {
+        val summaries = styles.list()
+        val fallback = styles.fallback().summary
+        val structured = buildJsonObject {
+            putJsonArray("styles") {
+                summaries.forEach { style ->
+                    add(
+                        buildJsonObject {
+                            put("id", style.id)
+                            put("name", style.name)
+                            put("description", style.description)
+                        },
+                    )
+                }
+            }
+            putJsonObject("fallback") {
+                put("id", fallback.id)
+                put("name", fallback.name)
+                put("description", fallback.description)
+            }
+            put("nextTool", WorldsmithWorkflow.STYLE_GET_TOOL)
+        }
+        val text = buildString {
+            if (summaries.isEmpty()) {
+                append("No styles are installed, which is not a failure. Read '")
+                append(fallback.id)
+                append("' with ")
+                append(WorldsmithWorkflow.STYLE_GET_TOOL)
+                append(" and derive the world from the prompt itself.")
+            } else {
+                appendLine("Pick the style matching the player's prompt, or '" + fallback.id + "' when none does.")
+                summaries.forEach { appendLine(it.id + " - " + it.description) }
+                append(fallback.id + " - " + fallback.description)
+            }
+        }
+        return McpToolResult.success(structured, text)
+    }
+
+    private fun getStyle(arguments: JsonObject): McpToolResult {
+        val id = requiredString(arguments, "id").trim()
+        // An unknown id is answered rather than resolved: silently falling back
+        // would turn a typo into a world built from the wrong method, and the
+        // agent would have no way to notice.
+        val guide = styles.load(id)
+            ?: return McpToolResult.error(
+                "Unknown style '" + id + "'. Call " + WorldsmithWorkflow.STYLE_LIST_TOOL +
+                    " for the ids, or ask for '" + StyleCatalog.FALLBACK_ID +
+                    "' to derive the world from the prompt.",
+            )
+        val structured = buildJsonObject {
+            put("id", guide.summary.id)
+            put("name", guide.summary.name)
+            put("description", guide.summary.description)
+            put("guide", guide.body)
+            put("nextTool", WorldsmithWorkflow.WRITE_TOOL)
+        }
+        return McpToolResult.success(structured, guide.body)
+    }
+
+    private fun getContract(arguments: JsonObject): McpToolResult {
+        val id = requiredString(arguments, "id").trim()
+        val ref = PromptSet.DEFAULT.contracts[id]
+            ?: return McpToolResult.error(
+                "Unknown contract '" + id + "'. It is one of " +
+                    PromptSet.DEFAULT.contracts.keys.joinToString(", ") + ".",
+            )
+        val contract = templates.load(ref).systemPrompt
+        return McpToolResult.success(
+            buildJsonObject {
+                put("id", id)
+                put("contract", contract)
+            },
+            contract,
+        )
+    }
 
     private fun status(): McpToolResult {
         val structured = buildJsonObject {

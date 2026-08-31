@@ -57,8 +57,10 @@ overlapping boxes because their tie would make one biome effectively hidden.
 
 ## Requirements
 
-- Give every biome an `archetype` matching its intended gameplay role: aquatic,
-  shore, mountain, hill or lowland. The prompt does not owe every role a biome.
+- Give every biome an `archetype` naming its gameplay role. It is one of
+  `DEEP_OCEAN`, `OCEAN`, `BEACH`, `MOUNTAIN`, `HILL` or `LOWLAND`. The first two
+  are open water; the other four are ground a player can stand and build on. The
+  prompt does not owe every role a biome.
 - `behavior.temperature` is the in-world weather, separate from placement. It
   decides snow and freezing. Follow the prompt: a biome placed near the cold
   end may still be a dry, snow-free ash desert.
@@ -87,18 +89,10 @@ overlapping boxes because their tie would make one biome effectively hidden.
 - Build every biome's `surface` as one required `base` stack plus an ordered
   `rules` list. Earlier rules have higher priority; all fields inside one
   `conditions` object are ANDed.
-- Declare each feature once in the feature library and reference it by id from
-  every biome that wants it. Override `density` on the reference only when a
-  biome genuinely needs a different amount.
-- **At least one land biome must carry a `DEAD_TREE` feature whose block is a
-  log.** Minecraft survival starts by punching a tree: without wood there is no
-  crafting table, no tools, and no way to play the world at all. This holds even
-  for a dead or hostile world - a petrified trunk, a fossil spar, a wrecked mast
-  are all logs, and any of them keeps the world playable while staying in
-  character. Prefer a biome the player is likely to meet early, and a density of
-  at least `0.15` so the wood can actually be found.
-- Beyond that requirement, `features` may be empty. Prefer empty over inventing
-  life a dead world would not support.
+- Reference features by id from the library the feature contract describes, and
+  override `density` only when a biome needs a different amount than the library
+  declares. That contract also carries the requirement that at least one land
+  biome grow wood, without which the world cannot be played at all.
 - Keep every biome recognisably part of the same world as the world bible.
 
 ## Surface grammar

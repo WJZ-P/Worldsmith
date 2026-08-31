@@ -1,8 +1,11 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.model.PromptSet
 import com.wjz.worldsmith.core.model.TerrainPlan
 import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.VanillaNoisePreset
+import com.wjz.worldsmith.core.model.VegetationRecipe
+import com.wjz.worldsmith.core.prompt.StyleCatalog
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -64,7 +67,11 @@ class WorldsmithWorkflowTest {
             assertTrue(step.tool in served, "procedure names ${step.tool}, which no tool serves")
         }
         assertTrue(WorldsmithWorkflow.BEGIN_TOOL in served)
-        assertEquals(listOf(1, 2, 3), WorldsmithWorkflow.PROCEDURE.map { it.order })
+        assertEquals(
+            (1..WorldsmithWorkflow.PROCEDURE.size).toList(),
+            WorldsmithWorkflow.PROCEDURE.map { it.order },
+            "the steps are handed to an agent as an ordered list, so the orders must be a gapless run",
+        )
     }
 
     @Test
@@ -74,16 +81,26 @@ class WorldsmithWorkflowTest {
         assertFalse(brief.bool("complete"))
         assertTrue(brief.text("sessionId").isNotBlank())
         assertEquals(WorldsmithWorkflow.TEMPLATE_TOOL, brief.text("nextTool"))
-        assertEquals(3, brief.getValue("procedure").jsonArray.size)
+        assertEquals(WorldsmithWorkflow.PROCEDURE.size, brief.getValue("procedure").jsonArray.size)
 
-        // The rules handed to an outside agent are the same prompt the in-game
+        // What the entry document is for: the sequencing and the cross-document
+        // joins, which belong to no single contract and so would otherwise be
+        // stated in all three or in none.
+        val howToDesign = brief.text("howToDesign")
+        assertTrue("Terrain first" in howToDesign)
+        assertTrue("hydrology" in howToDesign)
+        assertTrue("anchor" in howToDesign)
+
+        // The rules handed to an outside agent are the same prompts the in-game
         // generator uses, so this fails if the two ever drift apart.
-        val contract = brief.text("designContract")
+        val contracts = brief.getValue("contracts").jsonObject
+        assertEquals(PromptSet.DEFAULT.contracts.keys, contracts.keys)
+        val contract = contracts.text("biome")
         assertTrue("only standard" in contract.lowercase(), "the contract should make the prompt authoritative")
         assertTrue("Surface grammar" in contract)
         assertTrue("DRY_RIVERBED" in contract)
         assertTrue("Earlier rules have higher priority" in contract)
-        val terrainContract = brief.text("terrainContract")
+        val terrainContract = contracts.text("terrain")
         assertTrue("landRatio" in terrainContract)
         assertTrue("continentScale" in terrainContract)
         assertTrue("coastRoughness" in terrainContract)
@@ -95,6 +112,13 @@ class WorldsmithWorkflowTest {
         assertTrue("oceanDepth" in terrainContract)
         assertTrue("set an unwanted landform to zero" in terrainContract)
 
+        // The vocabulary that was missing entirely: two of the three recipes
+        // appeared in no prompt, so an agent could only ever use the third.
+        val featureContract = contracts.text("feature")
+        VegetationRecipe.entries.forEach {
+            assertTrue(it.name in featureContract, "the feature contract never names ${it.name}")
+        }
+
         val placement = brief.getValue("climatePlacement").jsonObject
         assertTrue("only distribution standard" in placement.getValue("principle").jsonPrimitive.content)
         val presets = placement.getValue("semanticSlotPresets").jsonObject
@@ -103,6 +127,56 @@ class WorldsmithWorkflowTest {
         assertEquals(2, presets.getValue("humidity").jsonArray.size)
         assertTrue("continentalness" in placement.getValue("rawClimateAxes").jsonArray.map { it.jsonPrimitive.content })
         assertFalse("climateGrid" in brief)
+    }
+
+    @Test
+    fun `a run with no installed styles is pointed at the general method`() {
+        val listed = call(WorldsmithWorkflow.STYLE_LIST_TOOL)
+        val body = listed.structuredContent
+
+        assertFalse(listed.isError)
+        // Deliberately empty for now. The fallback is what makes that survivable,
+        // so an empty catalog has to read as a normal state rather than a hole.
+        assertTrue(body.getValue("styles").jsonArray.isEmpty())
+        val fallback = body.getValue("fallback").jsonObject
+        assertEquals(StyleCatalog.FALLBACK_ID, fallback.text("id"))
+        assertTrue(fallback.text("description").isNotBlank())
+        assertTrue(StyleCatalog.FALLBACK_ID in listed.text)
+    }
+
+    @Test
+    fun `the general method teaches how to reach values from a prompt`() {
+        val guide = call(
+            WorldsmithWorkflow.STYLE_GET_TOOL,
+            buildJsonObject { put("id", StyleCatalog.FALLBACK_ID) },
+        ).structuredContent.text("guide")
+
+        // A style is worth having only where it carries calibration a model has
+        // no way to infer; naming the theme back at it would be worth nothing.
+        assertTrue("landRatio" in guide)
+        assertTrue("continentScale" in guide)
+        assertTrue("coastRoughness" in guide)
+        assertTrue("verticalScale" in guide)
+    }
+
+    @Test
+    fun `an unknown style is refused rather than quietly resolved`() {
+        val result = call(WorldsmithWorkflow.STYLE_GET_TOOL, buildJsonObject { put("id", "solarpunk") })
+
+        assertTrue(result.isError)
+        assertTrue(WorldsmithWorkflow.STYLE_LIST_TOOL in result.text)
+        assertTrue(StyleCatalog.FALLBACK_ID in result.text)
+    }
+
+    @Test
+    fun `every contract can be re-read by name while repairing a document`() {
+        PromptSet.DEFAULT.contracts.keys.forEach { id ->
+            val result = call(WorldsmithWorkflow.CONTRACT_TOOL, buildJsonObject { put("id", id) })
+
+            assertFalse(result.isError, "contract $id should be served")
+            assertTrue(result.structuredContent.text("contract").isNotBlank())
+        }
+        assertTrue(call(WorldsmithWorkflow.CONTRACT_TOOL, buildJsonObject { put("id", "weather") }).isError)
     }
 
     @Test
