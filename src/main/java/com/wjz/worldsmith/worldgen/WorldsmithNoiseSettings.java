@@ -56,6 +56,9 @@ public final class WorldsmithNoiseSettings {
 	private static final double ANCHOR_BAND_THRESHOLD = 0.2;
 	/** How narrow the coastal strip is; larger keeps it closer to the shoreline. */
 	private static final double COASTAL_EDGE = 8.0;
+	/** How hard an anchor's climate influence is distorted, and how broad the lobes are. */
+	private static final double ANCHOR_CLIMATE_WARP = 0.55;
+	private static final double ANCHOR_CLIMATE_WARP_SCALE = 220.0;
 
 	private WorldsmithNoiseSettings() {
 	}
@@ -238,18 +241,14 @@ public final class WorldsmithNoiseSettings {
 			);
 		}
 		DensityFunction temperature = biasClimate(
-			vanilla.temperature(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getTemperature
-		);
+			vanilla.temperature(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getTemperature, noises);
 		DensityFunction humidity = biasClimate(
-			vanilla.vegetation(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getHumidity
-		);
+			vanilla.vegetation(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getHumidity, noises);
 		DensityFunction biomeContinents = biasClimate(
-			hydrology.continents(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getContinentalness
-		);
-		erosion = biasClimate(erosion, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getErosion);
+			hydrology.continents(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getContinentalness, noises);
+		erosion = biasClimate(erosion, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getErosion, noises);
 		DensityFunction weirdness = biasClimate(
-			reliefSelector, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getWeirdness
-		);
+			reliefSelector, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getWeirdness, noises);
 
 		int minY = terrain.getMinY();
 		int maxY = minY + terrain.getHeight();
@@ -357,7 +356,8 @@ public final class WorldsmithNoiseSettings {
 		DensityFunction source,
 		List<Anchor> anchors,
 		Map<String, DensityFunction> influence,
-		Function<AnchorClimateBias, Double> target
+		Function<AnchorClimateBias, Double> target,
+		HolderGetter<NormalNoise.NoiseParameters> noises
 	) {
 		DensityFunction biased = source;
 		for (Anchor anchor : anchors) {
@@ -369,8 +369,17 @@ public final class WorldsmithNoiseSettings {
 			if (targetValue == null) {
 				continue;
 			}
+			// The influence is warped before it is used, and that is what keeps a
+			// landmark from wearing bullseye rings. A biome border is drawn where
+			// a field crosses a threshold; interpolating toward a target makes
+			// the field a function of the raw influence, and the raw influence is
+			// a function of distance alone, so every such border comes out a
+			// perfect circle. Distorting the influence with a low-frequency noise
+			// leaves the target reached at the centre - which an ocean landmark
+			// needs in order to publish an inland climate at all - while making
+			// every contour around it as ragged as the world it sits in.
 			DensityFunction strength = DensityFunctions.mul(
-				influence.get(anchor.getId()),
+				warpedInfluence(influence.get(anchor.getId()), anchor.getRadius(), noises),
 				DensityFunctions.constant(climate.getStrength())
 			);
 			biased = DensityFunctions.lerp(
@@ -380,6 +389,45 @@ public final class WorldsmithNoiseSettings {
 			);
 		}
 		return biased;
+	}
+
+	/**
+	 * The anchor influence with its contours broken up.
+	 *
+	 * <p>The distortion is scaled by how far the influence already is from full,
+	 * so it vanishes at the centre and is strongest in between. That is where it
+	 * is wanted: the summit must still reach the target exactly, because an
+	 * ocean landmark cannot publish an inland climate otherwise, while every
+	 * contour that a biome border could follow lies at partial influence.
+	 *
+	 * <p>Its wavelength is scaled by the anchor's own radius so a large landmark
+	 * undulates broadly rather than being fringed.
+	 */
+	private static DensityFunction warpedInfluence(
+		DensityFunction influence,
+		int radius,
+		HolderGetter<NormalNoise.NoiseParameters> noises
+	) {
+		DensityFunction warp = DensityFunctions.shiftedNoise2d(
+			DensityFunctions.zero(),
+			DensityFunctions.zero(),
+			ANCHOR_CLIMATE_WARP_SCALE / Math.max(64.0, radius),
+			noises.getOrThrow(Noises.SURFACE_SECONDARY)
+		).clamp(-1.0, 1.0);
+		DensityFunction fade = DensityFunctions.add(
+			DensityFunctions.constant(1.0),
+			DensityFunctions.mul(influence, DensityFunctions.constant(-1.0))
+		);
+		return DensityFunctions.mul(
+			influence,
+			DensityFunctions.add(
+				DensityFunctions.constant(1.0),
+				DensityFunctions.mul(
+					DensityFunctions.mul(warp, fade),
+					DensityFunctions.constant(ANCHOR_CLIMATE_WARP)
+				)
+			)
+		).clamp(0.0, 1.0);
 	}
 
 	private static DensityFunction anchorField(

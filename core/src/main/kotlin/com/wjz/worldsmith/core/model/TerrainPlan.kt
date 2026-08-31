@@ -115,6 +115,12 @@ sealed interface AnchorPlacement {
  * inland continentalness and peak erosion. Null axes keep the surrounding
  * climate untouched; [strength] scales every declared target by the shared
  * anchor influence.
+ *
+ * A target says where the axis is *centred* under the anchor, not a value it is
+ * flattened to. The surrounding variation is kept, which is what stops a
+ * landmark from wearing perfectly circular rings of biome: a border is drawn
+ * where a noisy field crosses a threshold, so a field with no noise left in it
+ * draws that border as a circle.
  */
 @Serializable
 data class AnchorClimateBias(

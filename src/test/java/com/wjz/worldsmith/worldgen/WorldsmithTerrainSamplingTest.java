@@ -36,6 +36,8 @@ import org.junit.jupiter.api.Test;
  * by JSON but accidentally ignored by the target-version compiler.
  */
 final class WorldsmithTerrainSamplingTest {
+	/** Where the relief bands cut erosion between peaks and highland. */
+	private static final double PEAK_BAND_EDGE = -0.375;
 	private static final long SEED = 0x574F524C44534D49L;
 	private static HolderLookup.Provider activeWorldgen;
 
@@ -454,6 +456,54 @@ final class WorldsmithTerrainSamplingTest {
 		assertHalfway(plain.router().continents(), authored.router().continents(), centre, 0.45, "continentalness");
 		assertHalfway(plain.router().erosion(), authored.router().erosion(), centre, -0.7, "erosion");
 		assertHalfway(plain.router().ridges(), authored.router().ridges(), centre, 0.6, "weirdness");
+	}
+
+	/**
+	 * A climate target must not draw its biome border as a circle.
+	 *
+	 * <p>A border lies where a field crosses a threshold. Interpolating toward a
+	 * target makes the field a function of the raw influence, and the raw
+	 * influence is a function of distance alone, so every border around a
+	 * landmark comes out a perfect ring. A flat core is fine - it is one biome,
+	 * with no border inside it - so what this measures is the crossing itself:
+	 * the radius at which erosion leaves the peak band, taken all the way round.
+	 */
+	@Test
+	void aClimateTargetDoesNotDrawCircularBiomeBorders() {
+		RandomState biased = state(
+			anchorShape(new Anchor(
+				"peak",
+				new AnchorPlacement.Fixed(0, 0),
+				2_000,
+				150.0,
+				1.0,
+				new AnchorClimateBias(1.0, null, null, null, -0.8, null)
+			)),
+			'a'
+		);
+
+		DensityFunction erosion = biased.router().erosion();
+		double closest = Double.MAX_VALUE;
+		double furthest = -Double.MAX_VALUE;
+		for (int step = 0; step < 24; step++) {
+			double angle = step * Math.PI / 12.0;
+			for (int radius = 100; radius <= 2_400; radius += 25) {
+				int x = (int) Math.round(Math.cos(angle) * radius);
+				int z = (int) Math.round(Math.sin(angle) * radius);
+				if (erosion.compute(new DensityFunction.SinglePointContext(x, 0, z)) > PEAK_BAND_EDGE) {
+					closest = Math.min(closest, radius);
+					furthest = Math.max(furthest, radius);
+					break;
+				}
+			}
+		}
+		double nearest = closest;
+		double outermost = furthest;
+
+		assertTrue(
+			outermost - nearest > 300.0,
+			() -> "the peak band border should wander, but ran from " + nearest + " to " + outermost
+		);
 	}
 
 	@Test
