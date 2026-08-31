@@ -15,6 +15,7 @@ import com.wjz.worldsmith.core.model.ClimateBox
 import com.wjz.worldsmith.core.model.ClimateCell
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.NumericRange
+import com.wjz.worldsmith.core.model.VegetationRecipe
 import com.wjz.worldsmith.core.model.SurfaceConditions
 import com.wjz.worldsmith.core.model.SurfaceDefinition
 import com.wjz.worldsmith.core.model.SurfaceStack
@@ -55,6 +56,7 @@ object BiomePlanValidator {
         }
 
         addAll(reportCoverage(plan))
+        addAll(reportSurvivability(plan, features))
     }
 
     private fun validateBiome(
@@ -317,6 +319,45 @@ object BiomePlanValidator {
      * looks in-game like a region that was never designed rather than like a
      * gap, so it is reported and left to the author.
      */
+    /**
+     * Reports a world the player cannot start in.
+     *
+     * <p>Minecraft survival begins by punching a tree: no wood means no
+     * crafting table, no tools, and nothing to do but starve. A pack can only
+     * be checked structurally here, because core never sees the Minecraft
+     * registries and so cannot know whether a block id names a log; the target
+     * compiler checks that half. What can be checked is whether any land biome
+     * grows anything tree-shaped at all, which is where this usually fails.
+     */
+    private fun reportSurvivability(plan: BiomePlan, features: FeatureLibrary): List<Diagnostic> = buildList {
+        val trunks = features.features.filter { it.recipe == VegetationRecipe.DEAD_TREE }.mapTo(mutableSetOf()) { it.id }
+        if (trunks.isEmpty()) {
+            add(
+                warning(
+                    "features",
+                    "NO_WOOD_IN_WORLD",
+                    "No feature uses the DEAD_TREE recipe, so the world grows no wood. A player cannot craft " +
+                        "anything without it. Even a dead world can carry a petrified trunk or a wrecked mast.",
+                ),
+            )
+            return@buildList
+        }
+
+        val reachable = plan.biomes.any { biome ->
+            biome.archetype.isLand && biome.features.any { it.feature in trunks }
+        }
+        if (!reachable) {
+            add(
+                warning(
+                    "biomes",
+                    "NO_WOOD_ON_LAND",
+                    "Wood is declared but no land biome grows it, so a player who spawns ashore can never craft. " +
+                        "Reference a DEAD_TREE feature from a biome the player is likely to meet early.",
+                ),
+            )
+        }
+    }
+
     private fun reportCoverage(plan: BiomePlan): List<Diagnostic> = buildList {
         val rawBoxes = plan.biomes.filter { it.slot == null && it.climate != null }
         if (rawBoxes.isNotEmpty()) {

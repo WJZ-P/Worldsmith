@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.worldgen;
 
+import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.feature.VegetationBudget;
 import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
@@ -114,10 +115,24 @@ public final class WorldsmithVegetation {
 				Feature.SIMPLE_BLOCK,
 				new SimpleBlockConfiguration(BlockStateProvider.simple(state))
 			);
-			case DEAD_TREE -> new ConfiguredFeature<>(
-				Feature.BLOCK_COLUMN,
-				BlockColumnConfiguration.simple(UniformInt.of(2, 5), BlockStateProvider.simple(state))
-			);
+			case DEAD_TREE -> {
+				// The half of the survivability check core cannot make. It knows
+				// whether a land biome grows something tree-shaped; only here is
+				// it knowable whether that shape is actually wood, and a trunk of
+				// stone leaves the world just as uncraftable as no trunk at all.
+				if (!state.is(BlockTags.LOGS)) {
+					Worldsmith.LOGGER.warn(
+						"Feature '{}' is shaped like a tree but made of {}, which is not a log; "
+							+ "a player cannot craft from it",
+						feature.getId(),
+						state.getBlock()
+					);
+				}
+				yield new ConfiguredFeature<>(
+					Feature.BLOCK_COLUMN,
+					BlockColumnConfiguration.simple(UniformInt.of(2, 5), BlockStateProvider.simple(state))
+				);
+			}
 			case BOULDER -> new ConfiguredFeature<>(
 				Feature.BLOCK_BLOB,
 				new BlockBlobConfiguration(state, BlockPredicate.matchesTag(BlockTags.FOREST_ROCK_CAN_PLACE_ON))

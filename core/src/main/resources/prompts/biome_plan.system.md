@@ -90,8 +90,15 @@ overlapping boxes because their tie would make one biome effectively hidden.
 - Declare each feature once in the feature library and reference it by id from
   every biome that wants it. Override `density` on the reference only when a
   biome genuinely needs a different amount.
-- `features` may be empty. Prefer empty over inventing life a dead world would
-  not support.
+- **At least one land biome must carry a `DEAD_TREE` feature whose block is a
+  log.** Minecraft survival starts by punching a tree: without wood there is no
+  crafting table, no tools, and no way to play the world at all. This holds even
+  for a dead or hostile world - a petrified trunk, a fossil spar, a wrecked mast
+  are all logs, and any of them keeps the world playable while staying in
+  character. Prefer a biome the player is likely to meet early, and a density of
+  at least `0.15` so the wood can actually be found.
+- Beyond that requirement, `features` may be empty. Prefer empty over inventing
+  life a dead world would not support.
 - Keep every biome recognisably part of the same world as the world bible.
 
 ## Surface grammar

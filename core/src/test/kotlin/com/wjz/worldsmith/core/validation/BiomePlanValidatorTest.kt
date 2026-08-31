@@ -245,11 +245,48 @@ class BiomePlanValidatorTest {
         assertTrue(diagnostics.none { it.code == "EMPTY_SURFACE_CONDITIONS" }, diagnostics.toString())
     }
 
+    /**
+     * Minecraft survival begins by punching a tree. A world with no wood cannot
+     * be played at all, and nothing about it looks broken from the outside, so
+     * it has to be said out loud.
+     */
+    @Test
+    fun `a world with no wood is reported as unplayable`() {
+        val woodless = library().let { it.copy(features = it.features.filterNot { f -> f.id == "dead_trunk" }) }
+        val plan = plan().let {
+            it.copy(biomes = it.biomes.map { biome -> biome.copy(features = emptyList()) })
+        }
+
+        val codes = BiomePlanValidator.validate(plan, woodless).map { it.code }
+
+        assertTrue("NO_WOOD_IN_WORLD" in codes, codes.toString())
+    }
+
+    @Test
+    fun `wood that only grows at sea does not count`() {
+        val afloat = plan().let { source ->
+            source.copy(
+                biomes = source.biomes.map { biome ->
+                    when {
+                        biome.id == "abyss" -> biome.copy(features = listOf(BiomeFeatureRef("dead_trunk")))
+                        else -> biome.copy(features = emptyList())
+                    }
+                },
+            )
+        }
+
+        val diagnostics = BiomePlanValidator.validate(afloat, library())
+
+        assertTrue(diagnostics.any { it.code == "NO_WOOD_ON_LAND" }, diagnostics.toString())
+        assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+    }
+
     private fun library() = FeatureLibrary(
         features = listOf(
             FeatureDefinition("ash_scrub", VegetationRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), 0.45),
             FeatureDefinition("second_scrub", VegetationRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), 0.45),
             FeatureDefinition("third_scrub", VegetationRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), 0.45),
+            FeatureDefinition("dead_trunk", VegetationRecipe.DEAD_TREE, material("dead_wood", "minecraft:stripped_spruce_log"), 0.2),
         ),
     )
 
@@ -261,7 +298,11 @@ class BiomePlanValidatorTest {
             biome("peaks", ClimateSlot(ReliefBand.PEAKS), BiomeArchetypeRole.MOUNTAIN),
             biome("highland", ClimateSlot(ReliefBand.HIGHLAND), BiomeArchetypeRole.HILL),
             biome("flats_cold", ClimateSlot(ReliefBand.FLATS, listOf(TemperatureBand.COLD)), BiomeArchetypeRole.LOWLAND),
-            biome("flats_temperate", ClimateSlot(ReliefBand.FLATS, listOf(TemperatureBand.TEMPERATE)), BiomeArchetypeRole.LOWLAND),
+            // Carries the wood a player needs to craft, so the fixture is a
+            // world someone could actually start in rather than only a valid
+            // document.
+            biome("flats_temperate", ClimateSlot(ReliefBand.FLATS, listOf(TemperatureBand.TEMPERATE)), BiomeArchetypeRole.LOWLAND)
+                .copy(features = listOf(BiomeFeatureRef("dead_trunk"))),
             biome("flats_hot", ClimateSlot(ReliefBand.FLATS, listOf(TemperatureBand.HOT)), BiomeArchetypeRole.LOWLAND),
         ),
     )

@@ -11,6 +11,11 @@ enum class BiomeArchetypeRole {
     MOUNTAIN,
     HILL,
     LOWLAND,
+    ;
+
+    /** Ground a player can stand and build on, as opposed to open water. */
+    val isLand: Boolean
+        get() = this != DEEP_OCEAN && this != OCEAN
 }
 
 /**
