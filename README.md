@@ -19,19 +19,22 @@ deterministic Minecraft world-generation blueprint.
 - `com.wjz.worldsmith.datagen`: generated data entrypoint
 - `com.wjz.worldsmith.worldgen`: Minecraft 26.2 world-generation integration
 
-The core pipeline currently models:
+The current player-facing flow is:
 
 ```text
 Player prompt
-  -> World Bible expansion
-  -> Structure catalog planning
-  -> Concurrent structure detail agents
-  -> Consistency review
-  -> WorldBlueprint JSON
+  -> MCP terrain and biome contracts
+  -> portable Worldsmith Pack JSON
+  -> deterministic validation
+  -> Minecraft 26.2 target compiler
+  -> selected Create World preset
 ```
 
-See [the prompt pipeline architecture](docs/architecture/prompt-pipeline.md).
-See [the portable Worldsmith Pack format](docs/architecture/worldsmith-pack.md).
+The AI-facing source of truth lives under
+[`core/src/main/resources/prompts`](core/src/main/resources/prompts), with the
+validated built-in JSON shape under
+[`core/src/main/resources/worldsmith/packs/ashlands`](core/src/main/resources/worldsmith/packs/ashlands).
+
 See [the local MCP-to-Create-World workflow](docs/mcp-world-creation.md).
 
 ## Build

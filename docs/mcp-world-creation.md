@@ -16,7 +16,9 @@ configuration to:
 <minecraft-instance>/config/worldsmith/mcp.json
 ```
 
-With the default port, Codex can be connected with:
+The configured port is preferred. If it is occupied, Worldsmith takes the next
+free loopback port, so clients should use the URL announced in this file rather
+than assuming a fixed value. With the default port, Codex can be connected with:
 
 ```powershell
 codex mcp add worldsmith --url http://127.0.0.1:47631/mcp
@@ -40,8 +42,10 @@ The guided MCP contract requires this sequence:
 The first tool returns both a biome contract and a terrain contract. The terrain
 contract tells the client to derive land/ocean balance, continent size,
 coastline roughness, flat/highland/peak shares, vertical scale, cave density,
-river routing, lake basins and ocean depth from the player's prompt. The
-template supplies the technical envelope; it is not a fixed terrain design.
+river routing, lake basins, ocean depth, additive/carving density bands and
+landmark anchors from the player's prompt. The biome contract covers climate
+placement, environment, surface grammar and features. The template supplies the
+technical envelope; it is not a fixed terrain design.
 
 `complete=true` means the pack was read back, validated and selected for the
 Minecraft world-creation screen. The final pack remains in:
