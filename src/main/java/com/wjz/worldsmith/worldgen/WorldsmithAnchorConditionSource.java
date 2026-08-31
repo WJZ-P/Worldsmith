@@ -3,7 +3,6 @@ package com.wjz.worldsmith.worldgen;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.world.level.levelgen.Noises;
 import net.minecraft.world.level.levelgen.SurfaceRules;
 
 /**
@@ -49,8 +48,10 @@ record WorldsmithAnchorConditionSource(
 	@Override
 	public SurfaceRules.Condition apply(SurfaceRules.Context context) {
 		WorldsmithAnchorFields.NoiseSampler jitterNoise = this.scattered
-			? context.randomState.getOrCreateNoise(Noises.SPAGHETTI_3D_RARITY)::getValue
+			? context.randomState.getOrCreateNoise(WorldsmithAnchorFields.JITTER_NOISE)::getValue
 			: null;
+		WorldsmithAnchorFields.NoiseSampler silhouetteNoise =
+			context.randomState.getOrCreateNoise(WorldsmithAnchorFields.SILHOUETTE_NOISE)::getValue;
 
 		return new SurfaceRules.Condition() {
 			private long lastPosition = Long.MIN_VALUE;
@@ -61,18 +62,27 @@ record WorldsmithAnchorConditionSource(
 				long position = ((long) context.blockX << 32) ^ (context.blockZ & 0xFFFF_FFFFL);
 				if (position != this.lastPosition) {
 					this.lastPosition = position;
-					this.lastResult = matches(context.blockX, context.blockZ, jitterNoise);
+					this.lastResult = matches(context.blockX, context.blockZ, jitterNoise, silhouetteNoise);
 				}
 				return this.lastResult;
 			}
 		};
 	}
 
-	private boolean matches(int blockX, int blockZ, WorldsmithAnchorFields.NoiseSampler jitterNoise) {
+	private boolean matches(
+		int blockX,
+		int blockZ,
+		WorldsmithAnchorFields.NoiseSampler jitterNoise,
+		WorldsmithAnchorFields.NoiseSampler silhouetteNoise
+	) {
 		double distance = this.scattered
 			? WorldsmithAnchorFields.latticeDistance(blockX, blockZ, this.spacing, this.jitter, jitterNoise)
 			: WorldsmithAnchorFields.pointDistance(blockX, blockZ, this.x, this.z);
-		double influence = WorldsmithAnchorFields.profile(distance, this.radius, this.falloff);
+		double influence = WorldsmithAnchorFields.profile(
+			WorldsmithAnchorFields.warpDistance(blockX, blockZ, distance, this.radius, silhouetteNoise),
+			this.radius,
+			this.falloff
+		);
 		return influence > this.minInfluence && influence <= this.maxInfluence;
 	}
 }

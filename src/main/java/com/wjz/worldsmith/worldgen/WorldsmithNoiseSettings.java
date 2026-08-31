@@ -440,7 +440,8 @@ public final class WorldsmithNoiseSettings {
 				fixed.getX(),
 				fixed.getZ(),
 				anchor.getRadius(),
-				anchor.getFalloff()
+				anchor.getFalloff(),
+				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.SILHOUETTE_NOISE))
 			);
 		}
 		if (placement instanceof AnchorPlacement.Scattered scattered) {
@@ -449,7 +450,8 @@ public final class WorldsmithNoiseSettings {
 				scattered.getJitter(),
 				anchor.getRadius(),
 				anchor.getFalloff(),
-				new DensityFunction.NoiseHolder(noises.getOrThrow(Noises.SPAGHETTI_3D_RARITY))
+				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.JITTER_NOISE)),
+				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.SILHOUETTE_NOISE))
 			);
 		}
 		throw new IllegalStateException(

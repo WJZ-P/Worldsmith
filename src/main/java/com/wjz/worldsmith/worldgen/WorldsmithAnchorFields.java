@@ -3,9 +3,12 @@ package com.wjz.worldsmith.worldgen;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.Noises;
+import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 /**
  * Density functions that know where they are.
@@ -60,6 +63,44 @@ public final class WorldsmithAnchorFields {
 	}
 
 	/**
+	 * The noises an anchor uses, named once.
+	 *
+	 * <p>The terrain compiler builds the density function and the surface rule
+	 * builds a condition over the same geometry, and each reaches for its noise
+	 * separately. Naming them here is what stops the two from drifting onto
+	 * different fields and placing the same landmark in two different spots.
+	 */
+	public static final ResourceKey<NormalNoise.NoiseParameters> JITTER_NOISE = Noises.SPAGHETTI_3D_RARITY;
+	public static final ResourceKey<NormalNoise.NoiseParameters> SILHOUETTE_NOISE = Noises.SURFACE_SECONDARY;
+
+	/** How deeply the outline is bitten into, and how broad the bites are. */
+	private static final double SILHOUETTE_WARP = 0.5;
+	private static final double SILHOUETTE_WARP_SCALE = 180.0;
+
+	/**
+	 * Distance to an anchor, with the outline broken up.
+	 *
+	 * <p>A radial profile draws a perfect circle, which reads as machined rather
+	 * than as a place. This distorts the distance instead of the profile, so one
+	 * change reaches everything the influence feeds: the ground it raises, the
+	 * biome it biases, the rings of material it wears and the bands it bounds.
+	 *
+	 * <p>The distortion only ever makes the distance larger, so a shape is
+	 * bitten into and never bulges out. That keeps the extent inside the
+	 * declared radius, which the scattered lattice depends on: instances are
+	 * found by searching the nine cells around a point, and that is only exact
+	 * while nothing reaches past a neighbouring cell.
+	 */
+	public static double warpDistance(int x, int z, double distance, int radius, NoiseSampler warp) {
+		if (warp == null) {
+			return distance;
+		}
+		double frequency = SILHOUETTE_WARP_SCALE / Math.max(64.0, (double) radius);
+		double sample = Mth.clamp(warp.get(x * frequency, 0.0, z * frequency), -1.0, 1.0);
+		return distance * (1.0 + SILHOUETTE_WARP * (sample + 1.0) * 0.5);
+	}
+
+	/**
 	 * Distance to the nearest anchor of a jittered lattice.
 	 *
 	 * <p>Shared rather than written twice because the terrain compiler and the
@@ -105,14 +146,15 @@ public final class WorldsmithAnchorFields {
 	}
 
 	/** One anchor at an authored position, for the place a player should be able to find. */
-	public record Point(int x, int z, int radius, double falloff)
-		implements DensityFunction.SimpleFunction {
+	public record Point(int x, int z, int radius, double falloff, DensityFunction.NoiseHolder silhouetteNoise)
+		implements DensityFunction {
 		private static final MapCodec<Point> DATA_CODEC = RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
 					Codec.INT.fieldOf("x").forGetter(Point::x),
 					Codec.INT.fieldOf("z").forGetter(Point::z),
 					Codec.intRange(1, 100_000).fieldOf("radius").forGetter(Point::radius),
-					Codec.doubleRange(0.05, 8.0).fieldOf("falloff").forGetter(Point::falloff)
+					Codec.doubleRange(0.05, 8.0).fieldOf("falloff").forGetter(Point::falloff),
+					DensityFunction.NoiseHolder.CODEC.fieldOf("silhouette_noise").forGetter(Point::silhouetteNoise)
 				)
 				.apply(instance, Point::new)
 		);
@@ -120,10 +162,29 @@ public final class WorldsmithAnchorFields {
 
 		@Override
 		public double compute(DensityFunction.FunctionContext context) {
+			int x = context.blockX();
+			int z = context.blockZ();
+			double distance = pointDistance(x, z, this.x, this.z);
 			return profile(
-				pointDistance(context.blockX(), context.blockZ(), this.x, this.z),
+				warpDistance(x, z, distance, this.radius, this.silhouetteNoise::getValue),
 				this.radius,
 				this.falloff
+			);
+		}
+
+		@Override
+		public void fillArray(double[] output, DensityFunction.ContextProvider contextProvider) {
+			contextProvider.fillAllDirectly(output, this);
+		}
+
+		@Override
+		public DensityFunction mapChildren(DensityFunction.Visitor visitor) {
+			return new Point(
+				this.x,
+				this.z,
+				this.radius,
+				this.falloff,
+				visitor.visitNoise(this.silhouetteNoise)
 			);
 		}
 
@@ -162,7 +223,8 @@ public final class WorldsmithAnchorFields {
 		double jitter,
 		int radius,
 		double falloff,
-		DensityFunction.NoiseHolder offsetNoise
+		DensityFunction.NoiseHolder offsetNoise,
+		DensityFunction.NoiseHolder silhouetteNoise
 	) implements DensityFunction {
 		private static final MapCodec<Grid> DATA_CODEC = RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
@@ -170,7 +232,8 @@ public final class WorldsmithAnchorFields {
 					Codec.doubleRange(0.0, 1.0).fieldOf("jitter").forGetter(Grid::jitter),
 					Codec.intRange(1, 100_000).fieldOf("radius").forGetter(Grid::radius),
 					Codec.doubleRange(0.05, 8.0).fieldOf("falloff").forGetter(Grid::falloff),
-					DensityFunction.NoiseHolder.CODEC.fieldOf("offset_noise").forGetter(Grid::offsetNoise)
+					DensityFunction.NoiseHolder.CODEC.fieldOf("offset_noise").forGetter(Grid::offsetNoise),
+					DensityFunction.NoiseHolder.CODEC.fieldOf("silhouette_noise").forGetter(Grid::silhouetteNoise)
 				)
 				.apply(instance, Grid::new)
 		);
@@ -180,8 +243,9 @@ public final class WorldsmithAnchorFields {
 		public double compute(DensityFunction.FunctionContext context) {
 			int x = context.blockX();
 			int z = context.blockZ();
+			double distance = latticeDistance(x, z, this.spacing, this.jitter, this.offsetNoise::getValue);
 			return profile(
-				latticeDistance(x, z, this.spacing, this.jitter, this.offsetNoise::getValue),
+				warpDistance(x, z, distance, this.radius, this.silhouetteNoise::getValue),
 				this.radius,
 				this.falloff
 			);
@@ -199,7 +263,8 @@ public final class WorldsmithAnchorFields {
 				this.jitter,
 				this.radius,
 				this.falloff,
-				visitor.visitNoise(this.offsetNoise)
+				visitor.visitNoise(this.offsetNoise),
+				visitor.visitNoise(this.silhouetteNoise)
 			);
 		}
 

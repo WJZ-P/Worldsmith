@@ -506,6 +506,48 @@ final class WorldsmithTerrainSamplingTest {
 		);
 	}
 
+	/**
+	 * The outline of a landmark must not be a circle either.
+	 *
+	 * <p>A radial profile draws one, which reads as machined rather than as a
+	 * place. The distortion is applied to the distance rather than to the
+	 * profile, so this walks outward at many angles and asks where the ground
+	 * stops being raised: a circle answers with the same number every time.
+	 */
+	@Test
+	void anAnchorOutlineIsNotACircle() {
+		RandomState plain = state(anchorShape(), 'b');
+		RandomState peaked = state(
+			anchorShape(new Anchor("peak", new AnchorPlacement.Fixed(0, 0), 1_200, 150.0, 1.0, null)),
+			'c'
+		);
+
+		double closest = Double.MAX_VALUE;
+		double furthest = -Double.MAX_VALUE;
+		for (int step = 0; step < 24; step++) {
+			double angle = step * Math.PI / 12.0;
+			for (int radius = 100; radius <= 1_400; radius += 25) {
+				int x = (int) Math.round(Math.cos(angle) * radius);
+				int z = (int) Math.round(Math.sin(angle) * radius);
+				if (surfaceHeight(peaked, x, z) - surfaceHeight(plain, x, z) < 8.0) {
+					closest = Math.min(closest, radius);
+					furthest = Math.max(furthest, radius);
+					break;
+				}
+			}
+		}
+		double nearest = closest;
+		double outermost = furthest;
+
+		assertTrue(
+			outermost - nearest > 200.0,
+			() -> "the outline should wander, but ran from " + nearest + " to " + outermost
+		);
+		// Bitten into, never bulging: the extent has to stay inside the declared
+		// radius or a scattered lattice could reach past its neighbouring cell.
+		assertTrue(outermost <= 1_200.0, () -> "the outline left its radius at " + outermost);
+	}
+
 	@Test
 	void caveDensityChangesHowMuchSolidTerrainIsCarved() {
 		TerrainShape.Procedural solidShape = shape(0.82, 1.0, 0.3, 0.5, 0.35, 0.15, 1.0, 0.0);
