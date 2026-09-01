@@ -33,6 +33,25 @@ silently include the middle band and is rejected.
 
 Slots are names, not quotas. A world may use one slot, several slots, or none.
 
+#### A band held by one biome is that biome forever
+
+`relief` is altitude, and a band is world-sized: `FLATS` is every flat place in
+an infinite world. Give a land band a single biome and a player walking the
+plains meets that biome and nothing else however far they go, while the only
+border they ever cross is a contour line - because the thing that changed was
+their height, not their surroundings.
+
+Split every land band the world uses across at least two biomes, and give
+`FLATS` the most, since that is where a player spends nearly all of their time.
+Split on `temperature` and `humidity`: both vary horizontally and neither
+depends on height, so the borders they draw run across the landscape instead of
+around it. This is a structural floor rather than a biome count - a world is
+still free to use only two relief bands, or to leave squares unclaimed.
+
+The built-in pack does exactly this: six biomes across the flats, three across
+the highlands, two each on the coast and the peaks. That structure is worth
+copying even though its count, its partition and its theme are not.
+
 ### Raw climate box (precise distribution)
 
 Use `climate` when the prompt specifies dominance or rarity. Its axes are

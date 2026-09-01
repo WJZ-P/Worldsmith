@@ -32,7 +32,10 @@ enum class ReliefBand {
     COAST,
     PEAKS,
     HIGHLAND,
-    FLATS,
+    FLATS;
+
+    /** Ground a player crosses on foot, and so notices the sameness of. */
+    val isLand: Boolean get() = this != DEEP_WATER && this != SHALLOW_WATER
 }
 
 @Serializable

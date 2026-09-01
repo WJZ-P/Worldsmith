@@ -13,6 +13,7 @@ import com.wjz.worldsmith.core.model.ClimateBox
 import com.wjz.worldsmith.core.model.ClimateSlot
 import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureLibrary
+import com.wjz.worldsmith.core.model.HumidityBand
 import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.ReliefBand
 import com.wjz.worldsmith.core.model.SurfaceAltitude
@@ -32,6 +33,37 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class BiomePlanValidatorTest {
+    @Test
+    fun `a relief band held by one biome is reported as a contour line`() {
+        val monotone = plan().let { source ->
+            source.copy(
+                biomes = source.biomes.filterNot { it.id.startsWith("flats_") } +
+                    biome("flats", ClimateSlot(ReliefBand.FLATS), BiomeArchetypeRole.LOWLAND)
+                        .copy(features = listOf(BiomeFeatureRef("dead_trunk"))),
+            )
+        }
+
+        val diagnostics = BiomePlanValidator.validate(monotone, library())
+
+        // The partition is still perfect - every square claimed exactly once -
+        // which is the whole point: a plan can score full marks on coverage and
+        // still hand the player one biome per altitude.
+        assertTrue(diagnostics.none { it.code == "UNCLAIMED_CLIMATE_CELL" }, diagnostics.toString())
+        assertTrue(diagnostics.none { it.code == "OVERLAPPING_CLIMATE_CELL" }, diagnostics.toString())
+        assertTrue(diagnostics.any { it.code == "MONOTONE_RELIEF_BAND" }, diagnostics.toString())
+        assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+    }
+
+    @Test
+    fun `open water is exempt because nobody walks across it`() {
+        // The fixture deliberately holds one deep-water and one shallow-water
+        // biome. Sameness underwater is a decision; sameness on the plains is
+        // the failure this check exists for.
+        val diagnostics = BiomePlanValidator.validate(plan(), library())
+
+        assertTrue(diagnostics.none { it.code == "MONOTONE_RELIEF_BAND" }, diagnostics.toString())
+    }
+
     @Test
     fun `a plan using semantic slots reports no diagnostics`() {
         assertTrue(BiomePlanValidator.validate(plan(), library()).isEmpty())
@@ -294,9 +326,12 @@ class BiomePlanValidatorTest {
         biomes = listOf(
             biome("abyss", ClimateSlot(ReliefBand.DEEP_WATER), BiomeArchetypeRole.DEEP_OCEAN),
             biome("shallows", ClimateSlot(ReliefBand.SHALLOW_WATER), BiomeArchetypeRole.OCEAN),
-            biome("shore", ClimateSlot(ReliefBand.COAST), BiomeArchetypeRole.BEACH),
-            biome("peaks", ClimateSlot(ReliefBand.PEAKS), BiomeArchetypeRole.MOUNTAIN),
-            biome("highland", ClimateSlot(ReliefBand.HIGHLAND), BiomeArchetypeRole.HILL),
+            biome("shore_dry", coast(HumidityBand.ARID), BiomeArchetypeRole.BEACH),
+            biome("shore_wet", coast(HumidityBand.HUMID), BiomeArchetypeRole.BEACH),
+            biome("peaks_dry", peaks(HumidityBand.ARID), BiomeArchetypeRole.MOUNTAIN),
+            biome("peaks_wet", peaks(HumidityBand.HUMID), BiomeArchetypeRole.MOUNTAIN),
+            biome("highland_dry", highland(HumidityBand.ARID), BiomeArchetypeRole.HILL),
+            biome("highland_wet", highland(HumidityBand.HUMID), BiomeArchetypeRole.HILL),
             biome("flats_cold", ClimateSlot(ReliefBand.FLATS, listOf(TemperatureBand.COLD)), BiomeArchetypeRole.LOWLAND),
             // Carries the wood a player needs to craft, so the fixture is a
             // world someone could actually start in rather than only a valid
@@ -306,6 +341,12 @@ class BiomePlanValidatorTest {
             biome("flats_hot", ClimateSlot(ReliefBand.FLATS, listOf(TemperatureBand.HOT)), BiomeArchetypeRole.LOWLAND),
         ),
     )
+
+    private fun coast(humidity: HumidityBand) = ClimateSlot(ReliefBand.COAST, humidity = listOf(humidity))
+
+    private fun peaks(humidity: HumidityBand) = ClimateSlot(ReliefBand.PEAKS, humidity = listOf(humidity))
+
+    private fun highland(humidity: HumidityBand) = ClimateSlot(ReliefBand.HIGHLAND, humidity = listOf(humidity))
 
     private fun biome(id: String, slot: ClimateSlot, archetype: BiomeArchetypeRole) = BiomeDefinition(
         id = id,

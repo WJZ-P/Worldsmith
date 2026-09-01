@@ -15,6 +15,7 @@ import com.wjz.worldsmith.core.model.ClimateBox
 import com.wjz.worldsmith.core.model.ClimateCell
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.NumericRange
+import com.wjz.worldsmith.core.model.ReliefBand
 import com.wjz.worldsmith.core.model.VegetationRecipe
 import com.wjz.worldsmith.core.model.SurfaceConditions
 import com.wjz.worldsmith.core.model.SurfaceDefinition
@@ -391,6 +392,8 @@ object BiomePlanValidator {
             )
         }
 
+        addAll(reportVariety(owners))
+
         val unclaimed = ClimateBands.ALL_CELLS.filterNot(owners::containsKey)
         if (unclaimed.isNotEmpty()) {
             val shown = unclaimed.take(MAX_REPORTED_CELLS).joinToString(", ")
@@ -403,6 +406,40 @@ object BiomePlanValidator {
                         "claimed by no biome and will be filled by the nearest one instead: " + shown + rest,
                 ),
             )
+        }
+    }
+
+    /**
+     * Reports a band a player can cross without the world changing.
+     *
+     * <p>Coverage asks whether every square is claimed and stops there, so a
+     * plan can score a perfect partition and still be a topographic map: relief
+     * is altitude, and a band claimed by one biome is that biome at that height
+     * everywhere, forever. The only border such a world has is a contour line,
+     * which is exactly what it looks like from a hilltop.
+     *
+     * <p>Only bands above water are checked. One deep ocean is a reasonable
+     * decision; one plains is a world with a single field in it. Nothing is
+     * reported for a plan using raw climate boxes, because the caller has
+     * already returned by then - which band a raw box lands in is not knowable
+     * from the box alone.
+     */
+    private fun reportVariety(owners: Map<ClimateCell, List<String>>): List<Diagnostic> = buildList {
+        ReliefBand.entries.filter { it.isLand }.forEach { band ->
+            val claimants = owners.entries
+                .filter { it.key.relief == band }
+                .flatMapTo(linkedSetOf()) { it.value }
+            if (claimants.size == 1) {
+                add(
+                    warning(
+                        "biomes",
+                        "MONOTONE_RELIEF_BAND",
+                        "Every " + band + " square belongs to " + claimants.single() + ", so that biome is the " +
+                            "whole world at that height and the only border a player crosses is a contour line. " +
+                            "Split the band on temperature or humidity, which vary horizontally.",
+                    ),
+                )
+            }
         }
     }
 
