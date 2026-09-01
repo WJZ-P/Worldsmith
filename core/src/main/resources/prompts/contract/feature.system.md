@@ -74,6 +74,11 @@ Omit `density` to use the library value, which lets every biome share one
 compiled placement. Override it only when a biome genuinely needs a different
 amount - a trunk that is common in the forest and rare on the plain.
 
+The order of entries in a biome's `features` array has no placement meaning.
+The compiler always normalizes shared features to their declaration order in
+this library because Minecraft builds one global feature order across all
+biomes. Express abundance with `density`, not by reordering the array.
+
 ## Required: the world must be playable
 
 **At least one land biome must reference a `DEAD_TREE` feature whose block is a

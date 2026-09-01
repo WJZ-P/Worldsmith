@@ -85,7 +85,7 @@ public final class BiomeCompiler {
 			BiomeDefaultFeatures.addSurfaceFreezing(generation);
 		}
 
-		for (BiomeFeatureRef ref : definition.getFeatures()) {
+		for (BiomeFeatureRef ref : WorldsmithVegetation.orderedRefs(pack.features(), definition.getFeatures())) {
 			generation.addFeature(
 				GenerationStep.Decoration.VEGETAL_DECORATION,
 				WorldsmithVegetation.placedKeyFor(pack, definition, ref)

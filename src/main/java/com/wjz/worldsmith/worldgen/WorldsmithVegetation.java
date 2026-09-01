@@ -6,6 +6,7 @@ import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
 import com.wjz.worldsmith.core.model.FeatureDefinition;
 import com.wjz.worldsmith.core.model.FeatureLibrary;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +68,33 @@ public final class WorldsmithVegetation {
 		return ref.getDensity() == null
 			? placedKey(pack, ref.getFeature())
 			: placedKey(pack, ref.getFeature(), biome.getId());
+	}
+
+	/**
+	 * Gives every biome the same relative order for shared placed features.
+	 *
+	 * <p>Minecraft does not treat a biome's feature array as local decoration
+	 * priority. {@code FeatureSorter} combines every biome's array into one
+	 * global dependency graph. If one biome says A then B and another says B
+	 * then A, world creation reaches chunk generation and fails with a feature
+	 * order cycle. Feature order is not part of Worldsmith's prompt vocabulary,
+	 * so the feature-library declaration order is the single canonical order.
+	 */
+	static List<BiomeFeatureRef> orderedRefs(FeatureLibrary library, List<BiomeFeatureRef> refs) {
+		Map<String, Integer> order = new LinkedHashMap<>();
+		for (int index = 0; index < library.getFeatures().size(); index++) {
+			order.put(library.getFeatures().get(index).getId(), index);
+		}
+
+		return refs.stream()
+			.sorted(Comparator.comparingInt(ref -> {
+				Integer index = order.get(ref.getFeature());
+				if (index == null) {
+					throw new IllegalStateException("Biome references unknown feature '" + ref.getFeature() + "'");
+				}
+				return index;
+			}))
+			.toList();
 	}
 
 	public static void bootstrapConfigured(CompiledPack pack, BootstrapContext<ConfiguredFeature<?, ?>> context) {
