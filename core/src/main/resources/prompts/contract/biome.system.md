@@ -114,6 +114,41 @@ overlapping boxes because their tie would make one biome effectively hidden.
   biome grow wood, without which the world cannot be played at all.
 - Keep every biome recognisably part of the same world as the world bible.
 
+### Ambient particles
+
+`environment.ambientParticles` is the strongest atmospheric tool here and the
+easiest one to overuse. Vanilla uses it in **four biomes in the entire game**,
+all of them in the Nether, and in no overworld biome at all:
+
+| biome | particle | probability |
+| --- | --- | --- |
+| soul sand valley | `ash` | 0.006 |
+| warped forest | `warped_spore` | 0.014 |
+| crimson forest | `crimson_spore` | 0.025 |
+| basalt deltas | `white_ash` | 0.118 |
+
+**The particle matters more than the number.** Those four are small, dim and
+short-lived: they tint the air. A particle that glows or is drawn large -
+`end_rod`, `glow`, `flame`, `soul_fire_flame`, `soul`, `sculk_soul`, `enchant`,
+`firework`, `totem_of_undying`, `electric_spark`, `nautilus`, `glow_squid_ink`,
+`happy_villager`, `heart`, `witch`, `lava` - reads as something happening rather
+than as weather, and at the same probability is far more visible. `end_rod` in
+particular is a bright white spark that vanilla only ever emits from a light
+source; a plain full of them is exhausting to stand in within a minute. Reach
+for one of these only where the prompt really asks for magic hanging in the air,
+and keep it at or below `0.005`. Small dim particles carry vanilla's range.
+
+**Not every biome wants one.** Particles read as remarkable only while some
+places have them and others do not. Give every biome an ambient particle and the
+effect becomes the background: a player sees the same drifting flecks wherever
+they stand, and no place is marked by them. Choose the few biomes where the air
+itself is part of what the place is.
+
+Some particles need a block or a colour before they can be drawn - `falling_dust`,
+`dust`, `block`, `item`, `tinted_leaves`, `trail`, `vibration` among them - and
+cannot be named by id alone. Those are skipped while the world loads, so the
+effect simply never appears.
+
 ## Surface grammar
 
 A stack lists fixed-thickness layers from the exposed block downward, followed

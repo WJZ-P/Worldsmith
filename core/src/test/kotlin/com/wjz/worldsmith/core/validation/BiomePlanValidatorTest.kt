@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.core.validation
 
+import com.wjz.worldsmith.core.model.AmbientParticleSpec
 import com.wjz.worldsmith.core.model.BiomeArchetypeRole
 import com.wjz.worldsmith.core.model.BiomeBehavior
 import com.wjz.worldsmith.core.model.BiomeDefinition
@@ -341,6 +342,55 @@ class BiomePlanValidatorTest {
             biome("flats_hot", ClimateSlot(ReliefBand.FLATS, listOf(TemperatureBand.HOT)), BiomeArchetypeRole.LOWLAND),
         ),
     )
+
+    @Test
+    fun `a glowing particle is reported at a rate that is fine for ash`() {
+        // The rate a model reaches for is inside vanilla's range; what makes it
+        // unbearable is which particle is drawn at it.
+        val diagnostics = BiomePlanValidator.validate(
+            withParticle("minecraft:end_rod", 0.018f),
+            library(),
+        )
+
+        assertTrue(diagnostics.any { it.code == "OBTRUSIVE_AMBIENT_PARTICLE" }, diagnostics.toString())
+        assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+    }
+
+    @Test
+    fun `a small dim particle may use the whole vanilla range`() {
+        // basalt deltas runs white ash at 0.118, and the built-in pack goes
+        // further still; an ash storm is a decision, not an accident.
+        val diagnostics = BiomePlanValidator.validate(
+            withParticle("minecraft:white_ash", 0.118f),
+            library(),
+        )
+
+        assertTrue(diagnostics.none { it.code.endsWith("_AMBIENT_PARTICLE") }, diagnostics.toString())
+    }
+
+    @Test
+    fun `a wall of particles is reported whichever particle it is made of`() {
+        val diagnostics = BiomePlanValidator.validate(withParticle("minecraft:ash", 0.6f), library())
+
+        assertTrue(diagnostics.any { it.code == "DENSE_AMBIENT_PARTICLE" }, diagnostics.toString())
+        assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+    }
+
+    private fun withParticle(particle: String, probability: Float) = plan().let { source ->
+        source.copy(
+            biomes = source.biomes.map { biome ->
+                if (biome.id != "flats_temperate") {
+                    biome
+                } else {
+                    biome.copy(
+                        environment = biome.environment.copy(
+                            ambientParticles = listOf(AmbientParticleSpec(particle, probability)),
+                        ),
+                    )
+                }
+            },
+        )
+    }
 
     private fun coast(humidity: HumidityBand) = ClimateSlot(ReliefBand.COAST, humidity = listOf(humidity))
 

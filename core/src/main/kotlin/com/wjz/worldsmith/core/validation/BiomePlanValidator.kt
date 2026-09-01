@@ -39,6 +39,47 @@ object BiomePlanValidator {
     private const val MIN_CLOUD_HEIGHT = -64.0f
     private const val MAX_CLOUD_HEIGHT = 1024.0f
 
+    /**
+     * Particles that glow or are drawn large, so they read as something
+     * happening rather than as weather.
+     *
+     * <p>Vanilla's four ambient particles are all small, dim and short-lived,
+     * and it uses none of these. {@code end_rod} is the one a model reaches for
+     * when a prompt says magic: it is a bright white spark vanilla only ever
+     * emits from a light source, and at a probability that would be invisible
+     * for ash it fills the screen.
+     *
+     * <p>Every id here is one Minecraft can build from its name alone. A
+     * particle needing a block or a colour cannot be an ambient particle at
+     * all, so listing one would be listing something that never renders.
+     */
+    private val OBTRUSIVE_PARTICLES = setOf(
+        "minecraft:electric_spark",
+        "minecraft:enchant",
+        "minecraft:end_rod",
+        "minecraft:explosion",
+        "minecraft:explosion_emitter",
+        "minecraft:firework",
+        "minecraft:flame",
+        "minecraft:glow",
+        "minecraft:glow_squid_ink",
+        "minecraft:happy_villager",
+        "minecraft:heart",
+        "minecraft:lava",
+        "minecraft:nautilus",
+        "minecraft:sculk_soul",
+        "minecraft:soul",
+        "minecraft:soul_fire_flame",
+        "minecraft:totem_of_undying",
+        "minecraft:witch",
+    )
+
+    /** Below vanilla's quietest ambient particle, because these are louder at any rate. */
+    private const val MAX_OBTRUSIVE_PARTICLE_PROBABILITY = 0.005f
+
+    /** Twice the densest thing vanilla or the built-in pack does. */
+    private const val MAX_PARTICLE_PROBABILITY = 0.25f
+
     fun validate(plan: BiomePlan, features: FeatureLibrary): List<Diagnostic> = buildList {
         if (plan.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
             add(error("schemaVersion", "UNSUPPORTED_SCHEMA", "Unsupported biome plan schema " + plan.schemaVersion))
@@ -215,6 +256,30 @@ object BiomePlanValidator {
                 add(error("$particlePath.particle", "INVALID_PARTICLE_ID", "Particle must be a namespaced id but was " + particle.particle))
             }
             addAll(unit("$particlePath.probability", particle.probability))
+            if (particle.particle in OBTRUSIVE_PARTICLES &&
+                particle.probability > MAX_OBTRUSIVE_PARTICLE_PROBABILITY
+            ) {
+                add(
+                    warning(
+                        "$particlePath.probability",
+                        "OBTRUSIVE_AMBIENT_PARTICLE",
+                        "${particle.particle} glows and is drawn large, so at ${particle.probability} it reads " +
+                            "as an effect rather than as air and quickly becomes tiring to stand in. Keep it at " +
+                            "or below $MAX_OBTRUSIVE_PARTICLE_PROBABILITY, or choose a small dim particle like " +
+                            "ash or a spore, which carry vanilla's range.",
+                    ),
+                )
+            }
+            if (particle.probability > MAX_PARTICLE_PROBABILITY) {
+                add(
+                    warning(
+                        "$particlePath.probability",
+                        "DENSE_AMBIENT_PARTICLE",
+                        "${particle.probability} is denser than anything vanilla does; its heaviest ambient " +
+                            "particle is 0.118. This will read as falling snow rather than as atmosphere.",
+                    ),
+                )
+            }
         }
     }
 
