@@ -27,7 +27,8 @@
       "minecraft:lake_lava_surface"
     ],
     [
-      "minecraft:amethyst_geode"
+      "minecraft:amethyst_geode",
+      "worldsmith:vegetation/rubble_boulder/frost_highland"
     ],
     [
       "minecraft:monster_room",
@@ -73,7 +74,6 @@
     ],
     [
       "minecraft:glow_lichen",
-      "worldsmith:vegetation/rubble_boulder/frost_highland",
       "worldsmith:vegetation/dead_spruce_trunk"
     ],
     [

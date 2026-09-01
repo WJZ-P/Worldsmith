@@ -65,11 +65,27 @@ data class ClimateSlot(
     val humidity: List<HumidityBand> = emptyList(),
 )
 
+/**
+ * Whether one biome holds the same temperature everywhere inside itself.
+ *
+ * <p>[UNIFORM] freezes along a line, because the only thing that changes across
+ * a biome is which biome it is. [PATCHY] pulls the temperature down to freezing
+ * wherever a low-frequency noise says so, so ice forms in drifts and open
+ * stretches inside one biome rather than stopping at its border. It is the
+ * difference between a frozen ocean with broken floes and one solid sheet.
+ */
+@Serializable
+enum class TemperatureVariation {
+    UNIFORM,
+    PATCHY,
+}
+
 @Serializable
 data class BiomeBehavior(
     val temperature: Float,
     val downfall: Float,
     val hasPrecipitation: Boolean,
+    val temperatureVariation: TemperatureVariation = TemperatureVariation.UNIFORM,
 )
 
 @Serializable

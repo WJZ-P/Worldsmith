@@ -12,6 +12,9 @@ enum class VegetationRecipe {
     GROUND_PATCH,
     DEAD_TREE,
     BOULDER,
+    ORE_VEIN,
+    CAVE_PATCH,
+    SURFACE_LAYER,
 }
 
 /**

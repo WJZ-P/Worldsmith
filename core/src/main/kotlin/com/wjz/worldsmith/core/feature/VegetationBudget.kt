@@ -17,6 +17,7 @@ import kotlin.math.roundToInt
 object VegetationBudget {
     const val MAX_PATCH_COUNT: Int = 24
     const val MAX_RARITY: Int = 32
+    const val MAX_VEIN_COUNT: Int = 16
 
     /** Attempts per chunk a single biome may spend on vegetation. */
     const val MAX_ATTEMPTS_PER_CHUNK: Double = 64.0
@@ -27,9 +28,14 @@ object VegetationBudget {
     @JvmStatic
     fun rarity(density: Double): Int = max(1, ((1.0 - density) * MAX_RARITY).roundToInt())
 
+    /** Ore veins are cheap per attempt but many, so they get their own scale. */
+    @JvmStatic
+    fun veinCount(density: Double): Int = max(1, (density * MAX_VEIN_COUNT).roundToInt())
+
     @JvmStatic
     fun attemptsPerChunk(recipe: VegetationRecipe, density: Double): Double = when (recipe) {
-        VegetationRecipe.GROUND_PATCH -> patchCount(density).toDouble()
+        VegetationRecipe.GROUND_PATCH, VegetationRecipe.SURFACE_LAYER -> patchCount(density).toDouble()
+        VegetationRecipe.ORE_VEIN, VegetationRecipe.CAVE_PATCH -> veinCount(density).toDouble()
         VegetationRecipe.DEAD_TREE, VegetationRecipe.BOULDER -> 1.0 / rarity(density)
     }
 }

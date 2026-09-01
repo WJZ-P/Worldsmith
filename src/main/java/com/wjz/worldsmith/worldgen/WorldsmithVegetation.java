@@ -6,6 +6,7 @@ import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
 import com.wjz.worldsmith.core.model.FeatureDefinition;
 import com.wjz.worldsmith.core.model.FeatureLibrary;
+import com.wjz.worldsmith.core.model.VegetationRecipe;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,23 +16,32 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.valueproviders.ConstantInt;
 import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
 import net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate;
+import net.minecraft.world.level.levelgen.structure.templatesystem.TagMatchTest;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.configurations.BlockBlobConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.BlockColumnConfiguration;
+import net.minecraft.world.level.levelgen.feature.configurations.OreConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.SimpleBlockConfiguration;
 import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
 import net.minecraft.world.level.levelgen.placement.BiomeFilter;
 import net.minecraft.world.level.levelgen.placement.BlockPredicateFilter;
 import net.minecraft.world.level.levelgen.placement.CountPlacement;
+import net.minecraft.world.level.levelgen.placement.EnvironmentScanPlacement;
+import net.minecraft.world.level.levelgen.placement.HeightRangePlacement;
 import net.minecraft.world.level.levelgen.placement.InSquarePlacement;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
+import net.minecraft.world.level.levelgen.placement.RandomOffsetPlacement;
 import net.minecraft.world.level.levelgen.placement.RarityFilter;
 
 /**
@@ -48,6 +58,13 @@ import net.minecraft.world.level.levelgen.placement.RarityFilter;
  * it fails while loading rather than producing a quietly empty world.
  */
 public final class WorldsmithVegetation {
+	/** Vanilla's common ore size; a vein of roughly this many blocks. */
+	private static final int ORE_VEIN_SIZE = 33;
+	/** Ore and cave decoration stay below the ordinary surface. */
+	private static final int ORE_VEIN_CEILING = 64;
+	/** How far down a cave patch looks for a floor before giving up. */
+	private static final int CAVE_SCAN_DEPTH = 12;
+
 	private WorldsmithVegetation() {
 	}
 
@@ -165,6 +182,14 @@ public final class WorldsmithVegetation {
 				Feature.BLOCK_BLOB,
 				new BlockBlobConfiguration(state, BlockPredicate.matchesTag(BlockTags.FOREST_ROCK_CAN_PLACE_ON))
 			);
+			case ORE_VEIN -> new ConfiguredFeature<>(
+				Feature.ORE,
+				new OreConfiguration(new TagMatchTest(BlockTags.STONE_ORE_REPLACEABLES), state, ORE_VEIN_SIZE)
+			);
+			case CAVE_PATCH, SURFACE_LAYER -> new ConfiguredFeature<>(
+				Feature.SIMPLE_BLOCK,
+				new SimpleBlockConfiguration(BlockStateProvider.simple(state))
+			);
 		};
 	}
 
@@ -183,6 +208,57 @@ public final class WorldsmithVegetation {
 				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
 				BiomeFilter.biome()
 			);
+			// Mirrors vanilla's commonOrePlacement, which is a count, a spread, a
+			// height range and the biome filter, in that order.
+			case ORE_VEIN -> List.of(
+				CountPlacement.of(VegetationBudget.veinCount(density)),
+				InSquarePlacement.spread(),
+				HeightRangePlacement.uniform(VerticalAnchor.aboveBottom(8), VerticalAnchor.absolute(ORE_VEIN_CEILING)),
+				BiomeFilter.biome()
+			);
+			// Dropped into the open underground and then walked down onto the
+			// first solid surface, which is what puts it on a cave floor rather
+			// than inside the rock.
+			case CAVE_PATCH -> List.of(
+				CountPlacement.of(VegetationBudget.veinCount(density)),
+				InSquarePlacement.spread(),
+				HeightRangePlacement.uniform(VerticalAnchor.aboveBottom(8), VerticalAnchor.absolute(ORE_VEIN_CEILING)),
+				EnvironmentScanPlacement.scanningFor(
+					Direction.DOWN,
+					BlockPredicate.solid(),
+					BlockPredicate.ONLY_IN_AIR_PREDICATE,
+					CAVE_SCAN_DEPTH
+				),
+				RandomOffsetPlacement.vertical(ConstantInt.of(1)),
+				BiomeFilter.biome()
+			);
+			// Same shape as a ground patch; the difference is the step it runs
+			// in, which is after everything else has been placed.
+			case SURFACE_LAYER -> List.of(
+				CountPlacement.of(VegetationBudget.patchCount(density)),
+				InSquarePlacement.spread(),
+				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
+				BiomeFilter.biome(),
+				BlockPredicateFilter.forPredicate(BlockPredicate.ONLY_IN_AIR_PREDICATE)
+			);
+		};
+	}
+
+	/**
+	 * The decoration step a recipe belongs in.
+	 *
+	 * <p>The step is ordering, not position: it decides what is already there
+	 * when a feature runs. Ore has to be cut into rock before anything stands on
+	 * it, a boulder is a change to the land rather than something growing out of
+	 * it, and a surface layer has to settle after the things it settles on.
+	 */
+	static GenerationStep.Decoration step(VegetationRecipe recipe) {
+		return switch (recipe) {
+			case ORE_VEIN -> GenerationStep.Decoration.UNDERGROUND_ORES;
+			case CAVE_PATCH -> GenerationStep.Decoration.UNDERGROUND_DECORATION;
+			case BOULDER -> GenerationStep.Decoration.LOCAL_MODIFICATIONS;
+			case GROUND_PATCH, DEAD_TREE -> GenerationStep.Decoration.VEGETAL_DECORATION;
+			case SURFACE_LAYER -> GenerationStep.Decoration.TOP_LAYER_MODIFICATION;
 		};
 	}
 }

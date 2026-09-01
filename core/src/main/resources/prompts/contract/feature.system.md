@@ -37,10 +37,18 @@ fails while loading rather than producing a quietly empty world.
 | `GROUND_PATCH` | one block on the surface | many attempts per chunk, only into air | grass, dead bush, ash tufts, mushrooms, coral - the cover that makes a biome look like a place rather than a texture |
 | `DEAD_TREE` | a vertical column 2-5 blocks tall | a rarity filter | trunks, spars, masts, stone pillars, cactus columns. **The only recipe that can be wood** |
 | `BOULDER` | an irregular blob | a rarity filter, on ground that accepts it | rocks, slag lumps, ice chunks, bone piles, rubble |
+| `ORE_VEIN` | a vein of about 33 blocks cut into stone | underground, from near bedrock up to y 64 | a mineral that belongs to this place - ore, crystal, buried ice, a seam of something wrong |
+| `CAVE_PATCH` | one block standing on a cave floor | underground, dropped into open air and walked down onto solid ground | glowing moss, crystal shards, fungus, bones - what a player finds by going down |
+| `SURFACE_LAYER` | one block on the ground | the same as a ground patch, but placed after everything else | settled ash, drifted petals, snow, dust - cover that lies **on top of** the trunks and boulders rather than beside them |
 
 `DEAD_TREE` is a naming accident worth reading past: it compiles to a bare
 column with no leaves, whatever block it is made of. It is not restricted to
 dead worlds, and it is what you use for any living trunk too.
+
+`ORE_VEIN` replaces stone, so its block should be something that reads as being
+*in* the rock. It is the only way a biome can own part of the underground: two
+biomes with the same surface and different veins are two different places to
+mine.
 
 Most worlds want all three. A world with only trunks reads as a stage set: no
 ground cover means bare terrain-coloured floor to the horizon, and no boulders
@@ -51,15 +59,27 @@ means nothing breaks up the silhouette.
 Density is one number with two meanings, because the two placement styles are
 not comparable:
 
-- `GROUND_PATCH` becomes an attempt count per chunk, `1..24`. `0.1` is scattered
-  tufts, `0.4` is ordinary cover, `1.0` is a carpet.
+- `GROUND_PATCH` and `SURFACE_LAYER` become an attempt count per chunk, `1..24`.
+  `0.1` is scattered tufts, `0.4` is ordinary cover, `1.0` is a carpet.
 - `DEAD_TREE` and `BOULDER` become a rarity filter: roughly one attempt every
   `(1 - density) * 32` chunks. `0.05` is a landmark you find every few minutes of
   walking, `0.5` is one every sixteen chunks, above `0.9` is nearly every chunk.
+- `ORE_VEIN` and `CAVE_PATCH` become a vein or cluster count per chunk, `1..16`.
+  `0.25` is roughly as common as vanilla iron; above `0.6` a player will not be
+  able to walk a cave without seeing it.
 
 One biome may spend at most 64 attempts per chunk in total. Exceeding it is the
 `VEGETATION_BUDGET_EXCEEDED` error; the cap exists because an over-eager density
 makes world generation crawl, and a slow world looks nothing like its cause.
+
+## Where each one runs
+
+The recipe also decides which stage of chunk generation the feature belongs to,
+and that is ordering rather than position: it decides what is already there when
+the feature runs. Ore is cut before anything stands on the ground, a boulder is
+a change to the land rather than something growing out of it, plants grow after
+both, and a surface layer settles last onto whatever the others left. You do not
+choose the stage; naming the right recipe chooses it.
 
 ## Referencing from a biome
 

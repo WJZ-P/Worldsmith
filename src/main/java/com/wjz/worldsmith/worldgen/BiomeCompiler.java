@@ -4,14 +4,18 @@ import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.AmbientParticleSpec;
 import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeEnvironment;
+import com.wjz.worldsmith.core.model.TemperatureVariation;
 import com.wjz.worldsmith.core.model.BiomeFog;
 import com.wjz.worldsmith.core.model.BiomeLight;
 import com.wjz.worldsmith.core.model.BiomeSky;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
+import com.wjz.worldsmith.core.model.FeatureDefinition;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WaterFog;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.particles.ParticleOptions;
@@ -85,9 +89,11 @@ public final class BiomeCompiler {
 			BiomeDefaultFeatures.addSurfaceFreezing(generation);
 		}
 
+		Map<String, FeatureDefinition> library = new LinkedHashMap<>();
+		pack.features().getFeatures().forEach(feature -> library.put(feature.getId(), feature));
 		for (BiomeFeatureRef ref : WorldsmithVegetation.orderedRefs(pack.features(), definition.getFeatures())) {
 			generation.addFeature(
-				GenerationStep.Decoration.VEGETAL_DECORATION,
+				WorldsmithVegetation.step(library.get(ref.getFeature()).getRecipe()),
 				WorldsmithVegetation.placedKeyFor(pack, definition, ref)
 			);
 		}
@@ -103,6 +109,11 @@ public final class BiomeCompiler {
 			.hasPrecipitation(definition.getBehavior().getHasPrecipitation())
 			.temperature(definition.getBehavior().getTemperature())
 			.downfall(definition.getBehavior().getDownfall())
+			.temperatureAdjustment(
+				definition.getBehavior().getTemperatureVariation() == TemperatureVariation.PATCHY
+					? Biome.TemperatureModifier.FROZEN
+					: Biome.TemperatureModifier.NONE
+			)
 			.specialEffects(
 				new BiomeSpecialEffects.Builder()
 					.waterColor(rgb(environment.getTint().getWater()))

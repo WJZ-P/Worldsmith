@@ -35,7 +35,8 @@
       "minecraft:lake_lava_surface"
     ],
     [
-      "minecraft:amethyst_geode"
+      "minecraft:amethyst_geode",
+      "worldsmith:vegetation/slag_boulder/scorch_highland"
     ],
     [
       "minecraft:monster_room",
@@ -80,8 +81,7 @@
       "minecraft:spring_lava"
     ],
     [
-      "minecraft:glow_lichen",
-      "worldsmith:vegetation/slag_boulder/scorch_highland"
+      "minecraft:glow_lichen"
     ]
   ],
   "has_precipitation": false,

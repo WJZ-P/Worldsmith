@@ -83,6 +83,12 @@ overlapping boxes because their tie would make one biome effectively hidden.
 - `behavior.temperature` is the in-world weather, separate from placement. It
   decides snow and freezing. Follow the prompt: a biome placed near the cold
   end may still be a dry, snow-free ash desert.
+- `behavior.temperatureVariation` is `UNIFORM` or `PATCHY` and defaults to
+  `UNIFORM`, where one biome is the same temperature throughout and so freezes
+  along its own border. `PATCHY` lets a noise pull the temperature to freezing
+  in places, so ice and snow form in drifts with open ground between them inside
+  a single biome. Use it where a frontier should look weathered rather than
+  drawn - a thawing shore, a broken floe, a peak whose snowline wanders.
 - Colours are `#RRGGBB`, except `sky.cloudColor` and `sky.sunriseSunsetColor`,
   which carry alpha and are `#AARRGGBB`. Read them as the mood of the place, not
   as realistic pigment. Vary them: biomes that differ in height or temperature

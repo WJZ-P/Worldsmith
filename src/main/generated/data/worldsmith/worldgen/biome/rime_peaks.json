@@ -35,7 +35,8 @@
       "minecraft:lake_lava_surface"
     ],
     [
-      "minecraft:amethyst_geode"
+      "minecraft:amethyst_geode",
+      "worldsmith:vegetation/rubble_boulder/rime_peaks"
     ],
     [
       "minecraft:monster_room",
@@ -80,8 +81,7 @@
       "minecraft:spring_lava"
     ],
     [
-      "minecraft:glow_lichen",
-      "worldsmith:vegetation/rubble_boulder/rime_peaks"
+      "minecraft:glow_lichen"
     ],
     [
       "minecraft:freeze_top_layer"

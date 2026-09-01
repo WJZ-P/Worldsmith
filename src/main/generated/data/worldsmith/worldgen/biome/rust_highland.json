@@ -27,7 +27,8 @@
       "minecraft:lake_lava_surface"
     ],
     [
-      "minecraft:amethyst_geode"
+      "minecraft:amethyst_geode",
+      "worldsmith:vegetation/rubble_boulder"
     ],
     [
       "minecraft:monster_room",
@@ -73,8 +74,7 @@
     ],
     [
       "minecraft:glow_lichen",
-      "worldsmith:vegetation/ash_scrub/rust_highland",
-      "worldsmith:vegetation/rubble_boulder"
+      "worldsmith:vegetation/ash_scrub/rust_highland"
     ]
   ],
   "has_precipitation": true,

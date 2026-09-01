@@ -35,7 +35,8 @@
       "minecraft:lake_lava_surface"
     ],
     [
-      "minecraft:amethyst_geode"
+      "minecraft:amethyst_geode",
+      "worldsmith:vegetation/slag_boulder/sulfur_flats"
     ],
     [
       "minecraft:monster_room",
@@ -81,8 +82,7 @@
     ],
     [
       "minecraft:glow_lichen",
-      "worldsmith:vegetation/ash_scrub/sulfur_flats",
-      "worldsmith:vegetation/slag_boulder/sulfur_flats"
+      "worldsmith:vegetation/ash_scrub/sulfur_flats"
     ]
   ],
   "has_precipitation": true,
