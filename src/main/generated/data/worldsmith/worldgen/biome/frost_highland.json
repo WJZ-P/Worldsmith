@@ -73,8 +73,8 @@
     ],
     [
       "minecraft:glow_lichen",
-      "worldsmith:vegetation/dead_spruce_trunk",
-      "worldsmith:vegetation/rubble_boulder/frost_highland"
+      "worldsmith:vegetation/rubble_boulder/frost_highland",
+      "worldsmith:vegetation/dead_spruce_trunk"
     ],
     [
       "minecraft:freeze_top_layer"

@@ -73,8 +73,8 @@
     ],
     [
       "minecraft:glow_lichen",
-      "worldsmith:vegetation/dead_oak_trunk/tar_mire",
-      "worldsmith:vegetation/ash_scrub/tar_mire"
+      "worldsmith:vegetation/ash_scrub/tar_mire",
+      "worldsmith:vegetation/dead_oak_trunk/tar_mire"
     ]
   ],
   "has_precipitation": true,

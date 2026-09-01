@@ -73,8 +73,8 @@
     ],
     [
       "minecraft:glow_lichen",
-      "worldsmith:vegetation/dead_spruce_trunk/rime_bog",
-      "worldsmith:vegetation/ash_scrub/rime_bog"
+      "worldsmith:vegetation/ash_scrub/rime_bog",
+      "worldsmith:vegetation/dead_spruce_trunk/rime_bog"
     ],
     [
       "minecraft:freeze_top_layer"
