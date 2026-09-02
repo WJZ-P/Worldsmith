@@ -30,6 +30,8 @@ import com.wjz.worldsmith.core.model.SurfaceRuleDefinition
 import com.wjz.worldsmith.core.model.SurfaceStack
 import com.wjz.worldsmith.core.model.TemperatureBand
 import com.wjz.worldsmith.core.model.FeatureRecipe
+import com.wjz.worldsmith.core.model.TreeSilhouette
+import com.wjz.worldsmith.core.model.TreeSpec
 import com.wjz.worldsmith.core.model.WaterFog
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -358,12 +360,13 @@ class BiomePlanValidatorTest {
     fun `a living tree on land satisfies the structural wood check`() {
         val tree = FeatureDefinition(
             "living_tree",
-            FeatureRecipe.BLOSSOM_TREE,
+            FeatureRecipe.TREE,
             materials = mapOf(
                 MaterialRole.TRUNK to material("wood", "minecraft:cherry_log"),
                 MaterialRole.FOLIAGE to material("leaves", "minecraft:cherry_leaves"),
             ),
             density = 0.3,
+            tree = TreeSpec(TreeSilhouette.BLOSSOM),
         )
         val features = library().copy(features = library().features + tree)
         val living = plan().copy(

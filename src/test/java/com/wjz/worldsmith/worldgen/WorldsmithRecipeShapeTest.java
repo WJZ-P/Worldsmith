@@ -9,6 +9,8 @@ import com.wjz.worldsmith.core.model.FeatureDefinition;
 import com.wjz.worldsmith.core.model.FeatureRecipe;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
+import com.wjz.worldsmith.core.model.TreeSilhouette;
+import com.wjz.worldsmith.core.model.TreeSpec;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,16 +53,11 @@ class WorldsmithRecipeShapeTest {
 
 	@Test
 	void everySilhouetteIsActuallyATree() {
-		// The whole point of the family: six names that all reach Feature.TREE
-		// and differ only in the placer pair the compiler chose.
-		for (FeatureRecipe recipe : FeatureRecipe.values()) {
-			if (!recipe.isTree()) {
-				continue;
-			}
-			ConfiguredFeature<?, ?> configured = WorldsmithVegetation.configure(sample(recipe), new MaterialResolver());
-			assertEquals(Feature.TREE, configured.feature(), recipe + " is named a tree but did not build one");
+		for (TreeSilhouette silhouette : TreeSilhouette.values()) {
+			ConfiguredFeature<?, ?> configured = WorldsmithVegetation.configure(sampleTree(silhouette), new MaterialResolver());
+			assertEquals(Feature.TREE, configured.feature(), silhouette + " did not build a tree");
 		}
-		assertEquals(6, java.util.Arrays.stream(FeatureRecipe.values()).filter(FeatureRecipe::isTree).count());
+		assertEquals(6, TreeSilhouette.values().length);
 	}
 
 	/** A definition carrying exactly the roles the recipe declares it reads. */
@@ -69,7 +66,22 @@ class WorldsmithRecipeShapeTest {
 		for (MaterialRole role : recipe.getRoles()) {
 			materials.put(role, selector(role));
 		}
-		return new FeatureDefinition("sample", recipe, null, materials, 0.3);
+		TreeSpec tree = recipe.isTree() ? new TreeSpec(TreeSilhouette.BROADLEAF) : null;
+		return new FeatureDefinition("sample", recipe, null, materials, 0.3, tree);
+	}
+
+	private static FeatureDefinition sampleTree(TreeSilhouette silhouette) {
+		return new FeatureDefinition(
+			"sample_" + silhouette.name().toLowerCase(java.util.Locale.ROOT),
+			FeatureRecipe.TREE,
+			null,
+			Map.of(
+				MaterialRole.TRUNK, selector(MaterialRole.TRUNK),
+				MaterialRole.FOLIAGE, selector(MaterialRole.FOLIAGE)
+			),
+			0.3,
+			new TreeSpec(silhouette)
+		);
 	}
 
 	private static MaterialSelector selector(MaterialRole role) {

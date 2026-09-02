@@ -9,6 +9,8 @@ import com.wjz.worldsmith.core.model.FeatureLibrary;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.FeatureRecipe;
+import com.wjz.worldsmith.core.model.TreeSilhouette;
+import com.wjz.worldsmith.core.model.TreeSpec;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -204,12 +206,13 @@ public final class WorldsmithVegetation {
 				).build()
 			);
 		}
-		MaterialSelector primary = material(feature, MaterialRole.BLOCK);
+		MaterialRole primaryRole = feature.getRecipe().getRoles().iterator().next();
+		MaterialSelector primary = material(feature, primaryRole);
 		MaterialResolver.ResolvedMaterial resolved = resolver.resolveMaterial(primary, Blocks.DEAD_BUSH);
 		BlockState state = resolved.representativeState();
 		BlockStateProvider provider = resolved.provider();
 		return switch (feature.getRecipe()) {
-			case TREE, CONIFER, BLOSSOM_TREE, WEEPING_TREE, UMBRELLA_TREE, SHRUB, FALLEN_LOG ->
+			case TREE, FALLEN_LOG ->
 				throw new IllegalStateException("handled above");
 			case GROUND_PATCH -> new ConfiguredFeature<>(
 				Feature.SIMPLE_BLOCK,
@@ -270,6 +273,10 @@ public final class WorldsmithVegetation {
 	 * pairs here, not new vocabulary for the pack to get wrong.
 	 */
 	private static ConfiguredFeature<?, ?> tree(FeatureDefinition feature, MaterialResolver resolver) {
+		TreeSpec tree = feature.getTree();
+		if (tree == null) {
+			throw new IllegalStateException("Feature '" + feature.getId() + "' declares TREE without a tree specification");
+		}
 		MaterialResolver.ResolvedMaterial trunkMaterial = resolver.resolveMaterial(
 			material(feature, MaterialRole.TRUNK),
 			Blocks.OAK_LOG
@@ -292,16 +299,14 @@ public final class WorldsmithVegetation {
 		// never the geometry, exactly as it names a relief band and never an
 		// erosion range; adding a shape later is another arm here rather than
 		// another thing a document can get wrong.
-		TrunkPlacer trunkPlacer;
-		FoliagePlacer foliagePlacer;
-		FeatureSize size = new TwoLayersFeatureSize(1, 0, 1);
-		switch (feature.getRecipe()) {
-			case CONIFER -> {
-				trunkPlacer = new StraightTrunkPlacer(6, 3, 0);
-				foliagePlacer = new SpruceFoliagePlacer(UniformInt.of(2, 3), UniformInt.of(0, 2), UniformInt.of(1, 2));
-			}
-			case BLOSSOM_TREE -> {
-				trunkPlacer = new CherryTrunkPlacer(
+		TreeShape shape = switch (tree.getSilhouette()) {
+			case CONIFER -> new TreeShape(
+				new StraightTrunkPlacer(6, 3, 0),
+				new SpruceFoliagePlacer(UniformInt.of(2, 3), UniformInt.of(0, 2), UniformInt.of(1, 2)),
+				new TwoLayersFeatureSize(1, 0, 1)
+			);
+			case BLOSSOM -> {
+				TrunkPlacer trunkPlacer = new CherryTrunkPlacer(
 					7,
 					1,
 					0,
@@ -316,42 +321,50 @@ public final class WorldsmithVegetation {
 					UniformInt.of(-4, -3),
 					UniformInt.of(-1, 0)
 				);
-				foliagePlacer = new CherryFoliagePlacer(ConstantInt.of(4), ConstantInt.of(0), ConstantInt.of(5), 0.25F, 0.5F, 0.1666F, 0.3333F);
-				size = new TwoLayersFeatureSize(1, 0, 2);
+				yield new TreeShape(
+					trunkPlacer,
+					new CherryFoliagePlacer(ConstantInt.of(4), ConstantInt.of(0), ConstantInt.of(5), 0.25F, 0.5F, 0.1666F, 0.3333F),
+					new TwoLayersFeatureSize(1, 0, 2)
+				);
 			}
 			// A leaning trunk under a crown that trails: the hanging chances are
 			// what read as a willow rather than as a bent oak.
-			case WEEPING_TREE -> {
-				trunkPlacer = new BendingTrunkPlacer(5, 2, 1, 4, UniformInt.of(1, 2));
-				foliagePlacer = new CherryFoliagePlacer(ConstantInt.of(3), ConstantInt.of(0), ConstantInt.of(4), 0.2F, 0.4F, 0.75F, 0.6F);
-				size = new TwoLayersFeatureSize(1, 0, 2);
-			}
-			case UMBRELLA_TREE -> {
-				trunkPlacer = new ForkingTrunkPlacer(5, 2, 2);
-				foliagePlacer = new AcaciaFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0));
-				size = new TwoLayersFeatureSize(1, 0, 2);
-			}
-			case SHRUB -> {
-				trunkPlacer = new StraightTrunkPlacer(1, 0, 0);
-				foliagePlacer = new BushFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0), 2);
-			}
-			default -> {
-				trunkPlacer = new StraightTrunkPlacer(TREE_BASE_HEIGHT, TREE_HEIGHT_VARIATION, 0);
-				foliagePlacer = new BlobFoliagePlacer(ConstantInt.of(TREE_FOLIAGE_RADIUS), ConstantInt.of(0), 3);
-			}
-		}
+			case WEEPING -> new TreeShape(
+				new BendingTrunkPlacer(5, 2, 1, 4, UniformInt.of(1, 2)),
+				new CherryFoliagePlacer(ConstantInt.of(3), ConstantInt.of(0), ConstantInt.of(4), 0.2F, 0.4F, 0.75F, 0.6F),
+				new TwoLayersFeatureSize(1, 0, 2)
+			);
+			case UMBRELLA -> new TreeShape(
+				new ForkingTrunkPlacer(5, 2, 2),
+				new AcaciaFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0)),
+				new TwoLayersFeatureSize(1, 0, 2)
+			);
+			case SHRUB -> new TreeShape(
+				new StraightTrunkPlacer(1, 0, 0),
+				new BushFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0), 2),
+				new TwoLayersFeatureSize(1, 0, 1)
+			);
+			case BROADLEAF -> new TreeShape(
+				new StraightTrunkPlacer(TREE_BASE_HEIGHT, TREE_HEIGHT_VARIATION, 0),
+				new BlobFoliagePlacer(ConstantInt.of(TREE_FOLIAGE_RADIUS), ConstantInt.of(0), 3),
+				new TwoLayersFeatureSize(1, 0, 1)
+			);
+		};
 
 		return new ConfiguredFeature<>(
 			Feature.TREE,
 			new TreeConfiguration.TreeConfigurationBuilder(
 				trunk,
-				trunkPlacer,
+				shape.trunk(),
 				foliage,
-				foliagePlacer,
-				size,
+				shape.foliage(),
+				shape.size(),
 				BlockStateProvider.simple(Blocks.DIRT)
 			).ignoreVines().build()
 		);
+	}
+
+	private record TreeShape(TrunkPlacer trunk, FoliagePlacer foliage, FeatureSize size) {
 	}
 
 	/**
@@ -387,7 +400,7 @@ public final class WorldsmithVegetation {
 			);
 			// A tree also has to check that its sapling would survive where it
 			// lands, or it grows out of stone and gravel.
-			case TREE, CONIFER, BLOSSOM_TREE, WEEPING_TREE, UMBRELLA_TREE, SHRUB -> List.of(
+			case TREE -> List.of(
 				RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density)),
 				InSquarePlacement.spread(),
 				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
@@ -477,8 +490,7 @@ public final class WorldsmithVegetation {
 			case CAVE_PATCH -> GenerationStep.Decoration.UNDERGROUND_DECORATION;
 			case BOULDER -> GenerationStep.Decoration.LOCAL_MODIFICATIONS;
 			case HANGING_PATCH -> GenerationStep.Decoration.UNDERGROUND_DECORATION;
-			case GROUND_PATCH, DEAD_TREE, AQUATIC_PATCH, TREE, CONIFER, BLOSSOM_TREE,
-				WEEPING_TREE, UMBRELLA_TREE, SHRUB, FALLEN_LOG ->
+			case GROUND_PATCH, DEAD_TREE, AQUATIC_PATCH, TREE, FALLEN_LOG ->
 				GenerationStep.Decoration.VEGETAL_DECORATION;
 			case SURFACE_LAYER -> GenerationStep.Decoration.TOP_LAYER_MODIFICATION;
 		};

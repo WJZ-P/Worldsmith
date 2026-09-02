@@ -39,24 +39,18 @@ enum class FeatureRecipe {
     AQUATIC_PATCH,
     HANGING_PATCH,
     TREE,
-    CONIFER,
-    BLOSSOM_TREE,
-    WEEPING_TREE,
-    UMBRELLA_TREE,
-    SHRUB,
     FALLEN_LOG,
     ;
 
     /** True for anything Minecraft builds from a trunk and a crown of leaves. */
     val isTree: Boolean
-        get() = this == TREE || this == CONIFER || this == BLOSSOM_TREE ||
-            this == WEEPING_TREE || this == UMBRELLA_TREE || this == SHRUB
+        get() = this == TREE
 
     /** Exactly the roles this recipe reads. Anything else is an author's wasted effort. */
     val roles: Set<MaterialRole>
         get() = when {
             isTree -> setOf(MaterialRole.TRUNK, MaterialRole.FOLIAGE)
-            this == FALLEN_LOG -> setOf(MaterialRole.TRUNK)
+            this == DEAD_TREE || this == FALLEN_LOG -> setOf(MaterialRole.TRUNK)
             else -> setOf(MaterialRole.BLOCK)
         }
 
@@ -71,6 +65,23 @@ enum class FeatureRecipe {
         get() = this != ORE_VEIN && this != BOULDER
 }
 
+/** The broad topology of a tree, independent from the blocks it is made of. */
+@Serializable
+enum class TreeSilhouette {
+    BROADLEAF,
+    CONIFER,
+    BLOSSOM,
+    WEEPING,
+    UMBRELLA,
+    SHRUB,
+}
+
+/** Configuration owned only by [FeatureRecipe.TREE]. */
+@Serializable
+data class TreeSpec(
+    val silhouette: TreeSilhouette,
+)
+
 /**
  * One reusable feature. Several biomes may reference the same definition, which
  * is the point: the shape and material are declared once and compiled once.
@@ -79,10 +90,11 @@ enum class FeatureRecipe {
 data class FeatureDefinition(
     val id: String,
     val recipe: FeatureRecipe,
-    /** Shorthand for a recipe that reads one material; equivalent to `materials.BLOCK`. */
+    /** Shorthand for a recipe that reads one material; mapped to that recipe's sole role. */
     val block: MaterialSelector? = null,
     val materials: Map<MaterialRole, MaterialSelector> = emptyMap(),
     val density: Double,
+    val tree: TreeSpec? = null,
 ) {
     /**
      * Every material this feature declares, whichever form the author wrote.
@@ -94,7 +106,7 @@ data class FeatureDefinition(
     val allMaterials: Map<MaterialRole, MaterialSelector>
         get() = when {
             materials.isNotEmpty() -> materials
-            block != null -> mapOf(MaterialRole.BLOCK to block)
+            block != null && recipe.roles.size == 1 -> mapOf(recipe.roles.single() to block)
             else -> emptyMap()
         }
 }

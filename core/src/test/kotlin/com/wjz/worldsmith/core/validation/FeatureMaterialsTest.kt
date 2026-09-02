@@ -6,6 +6,9 @@ import com.wjz.worldsmith.core.model.MaterialRole
 import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.WeightedMaterial
+import com.wjz.worldsmith.core.model.TreeSilhouette
+import com.wjz.worldsmith.core.model.TreeSpec
+import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -26,12 +29,64 @@ class FeatureMaterialsTest {
                 "oak", FeatureRecipe.TREE,
                 materials = mapOf(MaterialRole.TRUNK to selector("wood", "minecraft:oak_log")),
                 density = 0.2,
+                tree = TreeSpec(TreeSilhouette.BROADLEAF),
             ),
         )
 
         val codes = FeatureLibraryValidator.validate(missingFoliage).map { it.code }
 
         assertTrue("MISSING_MATERIAL_ROLE" in codes, codes.toString())
+    }
+
+    @Test
+    fun `tree shape belongs to TREE and is required there`() {
+        val missing = FeatureDefinition(
+            "missing_shape", FeatureRecipe.TREE,
+            materials = mapOf(
+                MaterialRole.TRUNK to selector("wood", "minecraft:oak_log"),
+                MaterialRole.FOLIAGE to selector("leaves", "minecraft:oak_leaves"),
+            ),
+            density = 0.3,
+        )
+        val misplaced = FeatureDefinition(
+            "rock_with_crown", FeatureRecipe.BOULDER,
+            block = selector("rock", "minecraft:stone"),
+            density = 0.3,
+            tree = TreeSpec(TreeSilhouette.UMBRELLA),
+        )
+
+        assertTrue(FeatureLibraryValidator.validate(library(missing)).any { it.code == "MISSING_TREE_SPEC" })
+        assertTrue(FeatureLibraryValidator.validate(library(misplaced)).any { it.code == "UNUSED_TREE_SPEC" })
+    }
+
+    @Test
+    fun `one TREE recipe carries every silhouette through json`() {
+        TreeSilhouette.entries.forEach { silhouette ->
+            val tree = FeatureDefinition(
+                "tree_${silhouette.name.lowercase()}",
+                FeatureRecipe.TREE,
+                materials = mapOf(
+                    MaterialRole.TRUNK to selector("wood", "minecraft:oak_log"),
+                    MaterialRole.FOLIAGE to selector("leaves", "minecraft:oak_leaves"),
+                ),
+                density = 0.3,
+                tree = TreeSpec(silhouette),
+            )
+
+            assertEquals(tree, WorldsmithJson.decode<FeatureLibrary>(WorldsmithJson.encode(library(tree))).features.single())
+        }
+    }
+
+    @Test
+    fun `single material trunk recipes map block shorthand onto TRUNK`() {
+        val bare = FeatureDefinition(
+            "bare", FeatureRecipe.DEAD_TREE,
+            block = selector("wood", "minecraft:oak_log"),
+            density = 0.2,
+        )
+
+        assertEquals(setOf(MaterialRole.TRUNK), bare.allMaterials.keys)
+        assertEquals(emptyList<Diagnostic>(), FeatureLibraryValidator.validate(library(bare)))
     }
 
     @Test

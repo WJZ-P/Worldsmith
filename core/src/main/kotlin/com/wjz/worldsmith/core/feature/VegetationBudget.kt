@@ -41,8 +41,7 @@ object VegetationBudget {
         // Listed rather than defaulted: a new recipe should not silently inherit
         // a cost, because being charged wrongly is how a pack slips past the cap.
         FeatureRecipe.DEAD_TREE, FeatureRecipe.BOULDER, FeatureRecipe.FALLEN_LOG,
-        FeatureRecipe.TREE, FeatureRecipe.CONIFER, FeatureRecipe.BLOSSOM_TREE,
-        FeatureRecipe.WEEPING_TREE, FeatureRecipe.UMBRELLA_TREE, FeatureRecipe.SHRUB ->
+        FeatureRecipe.TREE ->
             1.0 / rarity(density)
     }
 }

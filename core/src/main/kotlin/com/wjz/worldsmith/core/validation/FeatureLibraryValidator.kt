@@ -36,6 +36,22 @@ object FeatureLibraryValidator {
                     ),
                 )
             }
+            when {
+                feature.recipe.isTree && feature.tree == null -> add(
+                    error(
+                        "$path.tree",
+                        "MISSING_TREE_SPEC",
+                        "The TREE recipe must name its silhouette in a tree object",
+                    ),
+                )
+                !feature.recipe.isTree && feature.tree != null -> add(
+                    error(
+                        "$path.tree",
+                        "UNUSED_TREE_SPEC",
+                        "The ${feature.recipe} recipe never reads a tree object",
+                    ),
+                )
+            }
             addAll(validateRoles(path, feature))
             feature.allMaterials.forEach { (role, selector) ->
                 val rolePath = if (feature.materials.isEmpty()) "$path.block" else "$path.materials.$role"

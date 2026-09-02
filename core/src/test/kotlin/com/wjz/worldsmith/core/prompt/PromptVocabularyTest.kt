@@ -17,6 +17,7 @@ import com.wjz.worldsmith.core.model.SurfaceWater
 import com.wjz.worldsmith.core.model.TemperatureBand
 import com.wjz.worldsmith.core.model.TemperatureVariation
 import com.wjz.worldsmith.core.model.FeatureRecipe
+import com.wjz.worldsmith.core.model.TreeSilhouette
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -54,7 +55,11 @@ class PromptVocabularyTest {
             SurfaceHydrology::class.java,
             TemperatureVariation::class.java,
         ),
-        PromptSet.DEFAULT.featurePlan to listOf(FeatureRecipe::class.java, MaterialRole::class.java),
+        PromptSet.DEFAULT.featurePlan to listOf(
+            FeatureRecipe::class.java,
+            MaterialRole::class.java,
+            TreeSilhouette::class.java,
+        ),
     )
 
     /**
