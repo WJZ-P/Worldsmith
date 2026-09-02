@@ -415,29 +415,34 @@ object BiomePlanValidator {
      * grows anything tree-shaped at all, which is where this usually fails.
      */
     private fun reportSurvivability(plan: BiomePlan, features: FeatureLibrary): List<Diagnostic> = buildList {
-        val trunks = features.features.filter { it.recipe == FeatureRecipe.DEAD_TREE }.mapTo(mutableSetOf()) { it.id }
+        val trunks = features.features
+            .filter { it.recipe == FeatureRecipe.DEAD_TREE || it.recipe.isTree }
+            .associateBy { it.id }
         if (trunks.isEmpty()) {
             add(
                 warning(
                     "features",
                     "NO_WOOD_IN_WORLD",
-                    "No feature uses the DEAD_TREE recipe, so the world grows no wood. A player cannot craft " +
-                        "anything without it. Even a dead world can carry a petrified trunk or a wrecked mast.",
+                    "No feature has a trunk, so the world grows no wood. A player cannot craft anything without it. " +
+                        "Use TREE for living growth or DEAD_TREE for a bare trunk, petrified spar or wrecked mast.",
                 ),
             )
             return@buildList
         }
 
         val reachable = plan.biomes.any { biome ->
-            biome.archetype.isLand && biome.features.any { it.feature in trunks }
+            biome.archetype.isLand && biome.features.any { ref ->
+                val feature = trunks[ref.feature]
+                feature != null && (ref.density ?: feature.density) >= MIN_SURVIVAL_WOOD_DENSITY
+            }
         }
         if (!reachable) {
             add(
                 warning(
                     "biomes",
                     "NO_WOOD_ON_LAND",
-                    "Wood is declared but no land biome grows it, so a player who spawns ashore can never craft. " +
-                        "Reference a DEAD_TREE feature from a biome the player is likely to meet early.",
+                    "Wood is declared but no land biome grows enough of it for a reliable start. Reference a TREE or " +
+                        "DEAD_TREE at density $MIN_SURVIVAL_WOOD_DENSITY or above from an early land biome.",
                 ),
             )
         }
@@ -558,6 +563,7 @@ object BiomePlanValidator {
         Diagnostic(path, code, DiagnosticSeverity.ERROR, message)
 
     private const val MAX_SURFACE_RULES = 32
+    private const val MIN_SURVIVAL_WOOD_DENSITY = 0.15
     private const val MAX_LAYER_DEPTH = 8
     private const val MAX_SURFACE_DEPTH = 8
     private const val MIN_SURFACE_Y = -2048

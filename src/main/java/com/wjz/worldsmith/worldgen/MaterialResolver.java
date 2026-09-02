@@ -32,6 +32,12 @@ public final class MaterialResolver {
 	private final List<String> problems = new ArrayList<>();
 
 	public BlockState resolve(MaterialSelector selector, Block fallback) {
+		if (!selector.getWeighted().isEmpty()) {
+			// A weighted selector has no ids of its own. Treat its first entry as
+			// the representative state for callers that genuinely need one rather
+			// than reporting a false fallback against the empty outer selector.
+			return this.resolve(selector.getWeighted().getFirst().getMaterial(), fallback);
+		}
 		for (String id : selector.getPreferredIds()) {
 			Identifier parsed = Identifier.tryParse(id);
 			if (parsed == null) {
@@ -65,15 +71,38 @@ public final class MaterialResolver {
 	 * a field of one plant.
 	 */
 	public BlockStateProvider resolveProvider(MaterialSelector selector, Block fallback) {
+		return this.resolveMaterial(selector, fallback).provider();
+	}
+
+	/**
+	 * Resolves both representations a compiler may need from one material.
+	 *
+	 * <p>A tree needs the provider to place its blocks and every resolved state
+	 * to verify that all weighted trunk alternatives are usable wood. Returning
+	 * both from one pass avoids duplicate fallback reports and prevents a valid
+	 * weighted selector from being checked as though its empty outer shell were
+	 * a material of its own.
+	 */
+	public ResolvedMaterial resolveMaterial(MaterialSelector selector, Block fallback) {
 		if (selector.getWeighted().isEmpty()) {
-			return BlockStateProvider.simple(this.resolve(selector, fallback));
+			BlockState state = this.resolve(selector, fallback);
+			return new ResolvedMaterial(BlockStateProvider.simple(state), List.of(state));
 		}
 
 		WeightedList.Builder<BlockState> entries = WeightedList.builder();
+		List<BlockState> states = new ArrayList<>();
 		for (WeightedMaterial entry : selector.getWeighted()) {
-			entries.add(this.resolve(entry.getMaterial(), fallback), entry.getWeight());
+			BlockState state = this.resolve(entry.getMaterial(), fallback);
+			entries.add(state, entry.getWeight());
+			states.add(state);
 		}
-		return new WeightedStateProvider(entries.build());
+		return new ResolvedMaterial(new WeightedStateProvider(entries.build()), List.copyOf(states));
+	}
+
+	public record ResolvedMaterial(BlockStateProvider provider, List<BlockState> states) {
+		public BlockState representativeState() {
+			return this.states.getFirst();
+		}
 	}
 
 	/** Human-readable descriptions of every selector that had to fall back. */

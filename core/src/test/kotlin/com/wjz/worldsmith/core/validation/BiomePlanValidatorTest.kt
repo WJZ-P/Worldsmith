@@ -16,6 +16,7 @@ import com.wjz.worldsmith.core.model.ClimateSlot
 import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.HumidityBand
+import com.wjz.worldsmith.core.model.MaterialRole
 import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.ReliefBand
 import com.wjz.worldsmith.core.model.SurfaceAltitude
@@ -351,6 +352,45 @@ class BiomePlanValidatorTest {
 
         assertTrue(diagnostics.any { it.code == "NO_WOOD_ON_LAND" }, diagnostics.toString())
         assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+    }
+
+    @Test
+    fun `a living tree on land satisfies the structural wood check`() {
+        val tree = FeatureDefinition(
+            "living_tree",
+            FeatureRecipe.BLOSSOM_TREE,
+            materials = mapOf(
+                MaterialRole.TRUNK to material("wood", "minecraft:cherry_log"),
+                MaterialRole.FOLIAGE to material("leaves", "minecraft:cherry_leaves"),
+            ),
+            density = 0.3,
+        )
+        val features = library().copy(features = library().features + tree)
+        val living = plan().copy(
+            biomes = plan().biomes.mapIndexed { index, biome ->
+                if (index == 2) biome.copy(features = listOf(BiomeFeatureRef("living_tree"))) else biome
+            },
+        )
+
+        val codes = BiomePlanValidator.validate(living, features).map { it.code }
+
+        assertTrue("NO_WOOD_IN_WORLD" !in codes, codes.toString())
+        assertTrue("NO_WOOD_ON_LAND" !in codes, codes.toString())
+    }
+
+    @Test
+    fun `a nominal tree too rare for a reliable start is reported`() {
+        val sparse = plan().copy(
+            biomes = plan().biomes.map { biome ->
+                if (biome.id == "flats_temperate") {
+                    biome.copy(features = listOf(BiomeFeatureRef("dead_trunk", 0.05)))
+                } else {
+                    biome.copy(features = emptyList())
+                }
+            },
+        )
+
+        assertTrue(BiomePlanValidator.validate(sparse, library()).any { it.code == "NO_WOOD_ON_LAND" })
     }
 
     private fun library() = FeatureLibrary(

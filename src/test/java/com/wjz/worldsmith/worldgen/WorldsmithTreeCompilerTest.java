@@ -104,4 +104,27 @@ class WorldsmithTreeCompilerTest {
 			resolver.problems().toString()
 		);
 	}
+
+	@Test
+	void weightedTrunksResolveEveryAlternativeWithoutAFalseOuterFallback() {
+		MaterialResolver resolver = new MaterialResolver();
+		MaterialSelector trunks = new MaterialSelector(
+			"mixed_bark",
+			List.of(),
+			List.of(),
+			List.of(
+				new WeightedMaterial(new MaterialSelector("oak", List.of("minecraft:oak_log"), List.of(), List.of()), 3),
+				new WeightedMaterial(new MaterialSelector("birch", List.of("minecraft:birch_log"), List.of(), List.of()), 1)
+			)
+		);
+
+		MaterialResolver.ResolvedMaterial resolved = resolver.resolveMaterial(trunks, Blocks.OAK_LOG);
+
+		assertEquals(2, resolved.states().size());
+		assertEquals(
+			java.util.Set.of(Blocks.OAK_LOG, Blocks.BIRCH_LOG),
+			resolved.states().stream().map(BlockState::getBlock).collect(java.util.stream.Collectors.toSet())
+		);
+		assertEquals(List.of(), resolver.problems(), "the weighted selector's outer shell is not a missing material");
+	}
 }

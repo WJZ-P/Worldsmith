@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.core.HolderGetter;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
@@ -204,8 +205,9 @@ public final class WorldsmithVegetation {
 			);
 		}
 		MaterialSelector primary = material(feature, MaterialRole.BLOCK);
-		BlockState state = resolver.resolve(primary, Blocks.DEAD_BUSH);
-		BlockStateProvider provider = resolver.resolveProvider(primary, Blocks.DEAD_BUSH);
+		MaterialResolver.ResolvedMaterial resolved = resolver.resolveMaterial(primary, Blocks.DEAD_BUSH);
+		BlockState state = resolved.representativeState();
+		BlockStateProvider provider = resolved.provider();
 		return switch (feature.getRecipe()) {
 			case TREE, CONIFER, BLOSSOM_TREE, WEEPING_TREE, UMBRELLA_TREE, SHRUB, FALLEN_LOG ->
 				throw new IllegalStateException("handled above");
@@ -218,7 +220,7 @@ public final class WorldsmithVegetation {
 				// whether a land biome grows something tree-shaped; only here is
 				// it knowable whether that shape is actually wood, and a trunk of
 				// stone leaves the world just as uncraftable as no trunk at all.
-				if (!state.is(BlockTags.LOGS)) {
+				if (!invalidLogStates(List.of(state)).isEmpty()) {
 					Worldsmith.LOGGER.warn(
 						"Feature '{}' is shaped like a tree but made of {}, which is not a log; "
 							+ "a player cannot craft from it",
@@ -268,14 +270,22 @@ public final class WorldsmithVegetation {
 	 * pairs here, not new vocabulary for the pack to get wrong.
 	 */
 	private static ConfiguredFeature<?, ?> tree(FeatureDefinition feature, MaterialResolver resolver) {
-		BlockStateProvider trunk = resolver.resolveProvider(material(feature, MaterialRole.TRUNK), Blocks.OAK_LOG);
-		BlockStateProvider foliage = resolver.resolveProvider(material(feature, MaterialRole.FOLIAGE), Blocks.OAK_LEAVES);
-		BlockState trunkState = resolver.resolve(material(feature, MaterialRole.TRUNK), Blocks.OAK_LOG);
-		if (!trunkState.is(BlockTags.LOGS)) {
+		MaterialResolver.ResolvedMaterial trunkMaterial = resolver.resolveMaterial(
+			material(feature, MaterialRole.TRUNK),
+			Blocks.OAK_LOG
+		);
+		MaterialResolver.ResolvedMaterial foliageMaterial = resolver.resolveMaterial(
+			material(feature, MaterialRole.FOLIAGE),
+			Blocks.OAK_LEAVES
+		);
+		BlockStateProvider trunk = trunkMaterial.provider();
+		BlockStateProvider foliage = foliageMaterial.provider();
+		List<BlockState> invalidTrunks = invalidLogStates(trunkMaterial.states());
+		if (!invalidTrunks.isEmpty()) {
 			Worldsmith.LOGGER.warn(
-				"Feature '{}' is a tree whose trunk is {}, which is not a log; a player cannot craft from it",
+				"Feature '{}' has tree trunk alternatives that are not logs: {}; a player cannot craft from them",
 				feature.getId(),
-				trunkState.getBlock()
+				invalidTrunks.stream().map(state -> state.getBlock().toString()).toList()
 			);
 		}
 		// One placer pair per silhouette. The pack names the look it wants and
@@ -344,6 +354,22 @@ public final class WorldsmithVegetation {
 		);
 	}
 
+	/**
+	 * Checks wood only when the live registry has actually bound the log tag.
+	 *
+	 * <p>Datagen and the plain-JVM compiler tests bootstrap blocks before data
+	 * pack tags are loaded. In that phase even {@code minecraft:oak_log} reports
+	 * false for {@link BlockTags#LOGS}; treating that as a real answer produced a
+	 * warning about every valid trunk. World creation has the tag and receives
+	 * the full check, while an unbound environment stays deliberately silent.
+	 */
+	private static List<BlockState> invalidLogStates(List<BlockState> states) {
+		if (!BuiltInRegistries.BLOCK.getTagOrEmpty(BlockTags.LOGS).iterator().hasNext()) {
+			return List.of();
+		}
+		return states.stream().filter(state -> !state.is(BlockTags.LOGS)).toList();
+	}
+
 	private static List<PlacementModifier> place(FeatureDefinition feature, double density) {
 		return switch (feature.getRecipe()) {
 			case GROUND_PATCH -> List.of(
@@ -361,12 +387,21 @@ public final class WorldsmithVegetation {
 			);
 			// A tree also has to check that its sapling would survive where it
 			// lands, or it grows out of stone and gravel.
-			case TREE, CONIFER, BLOSSOM_TREE, WEEPING_TREE, UMBRELLA_TREE, SHRUB, FALLEN_LOG -> List.of(
+			case TREE, CONIFER, BLOSSOM_TREE, WEEPING_TREE, UMBRELLA_TREE, SHRUB -> List.of(
 				RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density)),
 				InSquarePlacement.spread(),
 				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
 				BiomeFilter.biome(),
 				BlockPredicateFilter.forPredicate(BlockPredicate.wouldSurvive(Blocks.OAK_SAPLING.defaultBlockState(), BlockPos.ZERO))
+			);
+			// FallenTreeFeature already searches for a sturdy floor and tolerates
+			// short gaps along the log. Applying a living oak sapling's soil rule
+			// here would erase fallen wood from stone, sand and wintry ground.
+			case FALLEN_LOG -> List.of(
+				RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density)),
+				InSquarePlacement.spread(),
+				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
+				BiomeFilter.biome()
 			);
 			// Mirrors vanilla's commonOrePlacement, which is a count, a spread, a
 			// height range and the biome filter, in that order.
