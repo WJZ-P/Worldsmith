@@ -198,7 +198,7 @@ object BiomePlanValidator {
                 add(error(refPath + ".density", "DENSITY_OUT_OF_RANGE", "Feature density override must be between 0 and 1"))
                 return@forEachIndexed
             }
-            attempts += VegetationBudget.attemptsPerChunk(definition.recipe, density)
+            attempts += VegetationBudget.attemptsPerChunk(definition, density)
         }
         if (attempts > VegetationBudget.MAX_ATTEMPTS_PER_CHUNK) {
             add(

@@ -4,8 +4,9 @@ import com.wjz.worldsmith.core.WorldsmithCore
 import kotlinx.serialization.Serializable
 
 /**
- * Vegetation shapes the target compiler knows how to build. The pack picks a
- * recipe and a material; it never describes placement geometry itself.
+ * Semantic feature shapes the target compiler knows how to build. A pack may
+ * tune bounded, meaningful controls such as tree height and forest pattern; it
+ * never names Minecraft placer classes or their version-specific codecs.
  */
 /**
  * Which material a recipe is asking for, when it asks for more than one.
@@ -74,12 +75,85 @@ enum class TreeSilhouette {
     WEEPING,
     UMBRELLA,
     SHRUB,
+    ;
+
+    /** Smallest height for which the vanilla placer behind this silhouette is well formed. */
+    val minimumHeight: Int
+        get() = when (this) {
+            BROADLEAF, SHRUB -> 1
+            CONIFER, WEEPING, UMBRELLA -> 3
+            BLOSSOM -> 5
+        }
+
+    val defaultMinHeight: Int
+        get() = when (this) {
+            BROADLEAF -> 4
+            CONIFER -> 6
+            BLOSSOM -> 7
+            WEEPING, UMBRELLA -> 5
+            SHRUB -> 1
+        }
+
+    val defaultMaxHeight: Int
+        get() = when (this) {
+            BROADLEAF -> 6
+            CONIFER -> 9
+            BLOSSOM -> 8
+            WEEPING -> 8
+            UMBRELLA -> 9
+            SHRUB -> 1
+        }
+
+    val defaultCrownRadius: Int
+        get() = when (this) {
+            BLOSSOM -> 4
+            WEEPING -> 3
+            BROADLEAF, CONIFER, UMBRELLA, SHRUB -> 2
+        }
 }
+
+/** How trees occupy chunks rather than what one tree looks like. */
+@Serializable
+enum class TreeDistribution {
+    SCATTERED,
+    GROVE,
+    FOREST,
+    DENSE_FOREST,
+}
+
+/** What kind of ground accepts the tree's origin. */
+@Serializable
+enum class TreeSubstrate {
+    NATURAL_SOIL,
+    SAND,
+    SHALLOW_WATER,
+    ANY_SOLID,
+}
+
+/** Optional details placed after the trunk and crown have succeeded. */
+@Serializable
+enum class TreeDecoration {
+    VINES,
+    LEAF_LITTER,
+}
+
+/** Inclusive nominal height range sampled before the crown is placed. */
+@Serializable
+data class TreeHeight(
+    val min: Int,
+    val max: Int,
+)
 
 /** Configuration owned only by [FeatureRecipe.TREE]. */
 @Serializable
 data class TreeSpec(
     val silhouette: TreeSilhouette,
+    val distribution: TreeDistribution,
+    val substrate: TreeSubstrate,
+    val height: TreeHeight? = null,
+    val crownRadius: Int? = null,
+    val hangingLeaves: Double? = null,
+    val decorations: List<TreeDecoration> = emptyList(),
 )
 
 /**

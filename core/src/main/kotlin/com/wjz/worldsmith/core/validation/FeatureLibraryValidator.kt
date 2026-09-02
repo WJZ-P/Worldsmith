@@ -4,11 +4,18 @@ import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.MaterialSelector
+import com.wjz.worldsmith.core.model.TreeSilhouette
+import com.wjz.worldsmith.core.model.TreeSpec
 
 object FeatureLibraryValidator {
     internal val ID = Regex("^[a-z0-9_.-]+$")
     private const val MAX_WEIGHTED_ENTRIES = 8
     private const val MAX_MATERIAL_WEIGHT = 64
+    private const val MAX_TREE_BASE_HEIGHT = 32
+    private const val MAX_TREE_HEIGHT_VARIATION = 24
+    private const val MAX_TREE_HEIGHT = MAX_TREE_BASE_HEIGHT + MAX_TREE_HEIGHT_VARIATION
+    private const val MIN_CROWN_RADIUS = 1
+    private const val MAX_CROWN_RADIUS = 8
 
     fun validate(library: FeatureLibrary): List<Diagnostic> = buildList {
         if (library.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
@@ -52,6 +59,7 @@ object FeatureLibraryValidator {
                     ),
                 )
             }
+            feature.tree?.let { addAll(validateTree("$path.tree", it)) }
             addAll(validateRoles(path, feature))
             feature.allMaterials.forEach { (role, selector) ->
                 val rolePath = if (feature.materials.isEmpty()) "$path.block" else "$path.materials.$role"
@@ -67,6 +75,78 @@ object FeatureLibraryValidator {
                     )
                 }
             }
+        }
+    }
+
+    private fun validateTree(path: String, tree: TreeSpec): List<Diagnostic> = buildList {
+        tree.height?.let { height ->
+            if (height.min > height.max) {
+                add(error("$path.height", "REVERSED_TREE_HEIGHT", "Tree height minimum must not exceed its maximum"))
+            }
+            if (height.min < tree.silhouette.minimumHeight || height.min > MAX_TREE_BASE_HEIGHT) {
+                add(
+                    error(
+                        "$path.height.min",
+                        "TREE_HEIGHT_OUT_OF_RANGE",
+                        "${tree.silhouette} height must start between ${tree.silhouette.minimumHeight} and $MAX_TREE_BASE_HEIGHT",
+                    ),
+                )
+            }
+            if (height.max > MAX_TREE_HEIGHT || height.max - height.min > MAX_TREE_HEIGHT_VARIATION) {
+                add(
+                    error(
+                        "$path.height.max",
+                        "TREE_HEIGHT_OUT_OF_RANGE",
+                        "Tree height may reach $MAX_TREE_HEIGHT with at most $MAX_TREE_HEIGHT_VARIATION blocks of variation",
+                    ),
+                )
+            }
+        }
+        tree.crownRadius?.let { radius ->
+            if (radius !in MIN_CROWN_RADIUS..MAX_CROWN_RADIUS) {
+                add(
+                    error(
+                        "$path.crownRadius",
+                        "CROWN_RADIUS_OUT_OF_RANGE",
+                        "Crown radius must be between $MIN_CROWN_RADIUS and $MAX_CROWN_RADIUS",
+                    ),
+                )
+            }
+        }
+        val effectiveMinHeight = tree.height?.min ?: tree.silhouette.defaultMinHeight
+        val effectiveRadius = tree.crownRadius ?: tree.silhouette.defaultCrownRadius
+        val minimumForCrown = when (tree.silhouette) {
+            TreeSilhouette.BROADLEAF -> effectiveRadius + 2
+            TreeSilhouette.BLOSSOM -> effectiveRadius + 3
+            TreeSilhouette.WEEPING -> effectiveRadius + 2
+            TreeSilhouette.CONIFER, TreeSilhouette.UMBRELLA -> 3
+            TreeSilhouette.SHRUB -> 1
+        }
+        if (effectiveMinHeight < minimumForCrown) {
+            add(
+                error(
+                    path,
+                    "TREE_CROWN_EXCEEDS_HEIGHT",
+                    "${tree.silhouette} with crown radius $effectiveRadius needs a minimum height of at least $minimumForCrown",
+                ),
+            )
+        }
+        tree.hangingLeaves?.let { chance ->
+            if (chance !in 0.0..1.0) {
+                add(error("$path.hangingLeaves", "HANGING_LEAVES_OUT_OF_RANGE", "Hanging leaves must be between 0 and 1"))
+            }
+            if (tree.silhouette != TreeSilhouette.BLOSSOM && tree.silhouette != TreeSilhouette.WEEPING) {
+                add(
+                    error(
+                        "$path.hangingLeaves",
+                        "HANGING_LEAVES_NOT_SUPPORTED",
+                        "Only BLOSSOM and WEEPING crowns consume hangingLeaves",
+                    ),
+                )
+            }
+        }
+        tree.decorations.groupingBy { it }.eachCount().filterValues { it > 1 }.keys.forEach { decoration ->
+            add(error("$path.decorations", "DUPLICATE_TREE_DECORATION", "$decoration is listed more than once"))
         }
     }
 

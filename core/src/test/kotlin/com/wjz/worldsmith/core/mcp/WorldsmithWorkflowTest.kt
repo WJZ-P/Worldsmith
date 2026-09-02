@@ -112,8 +112,8 @@ class WorldsmithWorkflowTest {
         assertTrue("oceanDepth" in terrainContract)
         assertTrue("set an unwanted landform to zero" in terrainContract)
 
-        // The vocabulary that was missing entirely: two of the three recipes
-        // appeared in no prompt, so an agent could only ever use the third.
+        // Every closed recipe name must reach an outside agent through the
+        // exact contract returned by begin_world.
         val featureContract = contracts.text("feature")
         FeatureRecipe.entries.forEach {
             assertTrue(it.name in featureContract, "the feature contract never names ${it.name}")

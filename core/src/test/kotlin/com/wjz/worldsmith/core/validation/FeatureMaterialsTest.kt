@@ -8,6 +8,10 @@ import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.WeightedMaterial
 import com.wjz.worldsmith.core.model.TreeSilhouette
 import com.wjz.worldsmith.core.model.TreeSpec
+import com.wjz.worldsmith.core.model.TreeDistribution
+import com.wjz.worldsmith.core.model.TreeSubstrate
+import com.wjz.worldsmith.core.model.TreeDecoration
+import com.wjz.worldsmith.core.model.TreeHeight
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -29,7 +33,7 @@ class FeatureMaterialsTest {
                 "oak", FeatureRecipe.TREE,
                 materials = mapOf(MaterialRole.TRUNK to selector("wood", "minecraft:oak_log")),
                 density = 0.2,
-                tree = TreeSpec(TreeSilhouette.BROADLEAF),
+                tree = tree(TreeSilhouette.BROADLEAF),
             ),
         )
 
@@ -52,7 +56,7 @@ class FeatureMaterialsTest {
             "rock_with_crown", FeatureRecipe.BOULDER,
             block = selector("rock", "minecraft:stone"),
             density = 0.3,
-            tree = TreeSpec(TreeSilhouette.UMBRELLA),
+            tree = tree(TreeSilhouette.UMBRELLA),
         )
 
         assertTrue(FeatureLibraryValidator.validate(library(missing)).any { it.code == "MISSING_TREE_SPEC" })
@@ -70,7 +74,7 @@ class FeatureMaterialsTest {
                     MaterialRole.FOLIAGE to selector("leaves", "minecraft:oak_leaves"),
                 ),
                 density = 0.3,
-                tree = TreeSpec(silhouette),
+                tree = tree(silhouette),
             )
 
             assertEquals(tree, WorldsmithJson.decode<FeatureLibrary>(WorldsmithJson.encode(library(tree))).features.single())
@@ -87,6 +91,48 @@ class FeatureMaterialsTest {
 
         assertEquals(setOf(MaterialRole.TRUNK), bare.allMaterials.keys)
         assertEquals(emptyList<Diagnostic>(), FeatureLibraryValidator.validate(library(bare)))
+    }
+
+    @Test
+    fun `tree geometry rejects ranges and fields its silhouette does not consume`() {
+        val malformed = FeatureDefinition(
+            "malformed_tree",
+            FeatureRecipe.TREE,
+            materials = mapOf(
+                MaterialRole.TRUNK to selector("wood", "minecraft:oak_log"),
+                MaterialRole.FOLIAGE to selector("leaves", "minecraft:oak_leaves"),
+            ),
+            density = 0.5,
+            tree = TreeSpec(
+                silhouette = TreeSilhouette.BROADLEAF,
+                distribution = TreeDistribution.FOREST,
+                substrate = TreeSubstrate.ANY_SOLID,
+                height = TreeHeight(20, 10),
+                crownRadius = 12,
+                hangingLeaves = 0.5,
+                decorations = listOf(TreeDecoration.VINES, TreeDecoration.VINES),
+            ),
+        )
+
+        val codes = FeatureLibraryValidator.validate(library(malformed)).map { it.code }
+
+        assertTrue("REVERSED_TREE_HEIGHT" in codes, codes.toString())
+        assertTrue("CROWN_RADIUS_OUT_OF_RANGE" in codes, codes.toString())
+        assertTrue("HANGING_LEAVES_NOT_SUPPORTED" in codes, codes.toString())
+        assertTrue("DUPLICATE_TREE_DECORATION" in codes, codes.toString())
+
+        val sunkenCrown = malformed.copy(
+            id = "sunken_crown",
+            tree = malformed.tree!!.copy(
+                height = TreeHeight(4, 6),
+                crownRadius = 8,
+                hangingLeaves = null,
+                decorations = emptyList(),
+            ),
+        )
+        assertTrue(
+            FeatureLibraryValidator.validate(library(sunkenCrown)).any { it.code == "TREE_CROWN_EXCEEDS_HEIGHT" },
+        )
     }
 
     @Test
@@ -198,6 +244,9 @@ class FeatureMaterialsTest {
     }
 
     private fun library(vararg features: FeatureDefinition) = FeatureLibrary(features = features.toList())
+
+    private fun tree(silhouette: TreeSilhouette) =
+        TreeSpec(silhouette, TreeDistribution.GROVE, TreeSubstrate.NATURAL_SOIL)
 
     private fun selector(role: String, id: String) = MaterialSelector(role, listOf(id))
 }

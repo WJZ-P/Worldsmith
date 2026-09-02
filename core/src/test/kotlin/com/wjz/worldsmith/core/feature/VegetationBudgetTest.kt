@@ -1,6 +1,11 @@
 package com.wjz.worldsmith.core.feature
 
+import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureRecipe
+import com.wjz.worldsmith.core.model.TreeDistribution
+import com.wjz.worldsmith.core.model.TreeSilhouette
+import com.wjz.worldsmith.core.model.TreeSpec
+import com.wjz.worldsmith.core.model.TreeSubstrate
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -15,7 +20,7 @@ class VegetationBudgetTest {
     @Test
     fun `every recipe has a cost`() {
         FeatureRecipe.entries.forEach { recipe ->
-            val cost = VegetationBudget.attemptsPerChunk(recipe, 0.5)
+            val cost = VegetationBudget.attemptsPerChunk(feature(recipe), 0.5)
             assertTrue(cost > 0.0, "$recipe costs nothing, so a biome could take unlimited copies of it")
         }
     }
@@ -27,9 +32,42 @@ class VegetationBudgetTest {
         // for a thirty-second of one.
         assertEquals(
             VegetationBudget.veinCount(0.5).toDouble(),
-            VegetationBudget.attemptsPerChunk(FeatureRecipe.ORE_VEIN, 0.5),
+            VegetationBudget.attemptsPerChunk(feature(FeatureRecipe.ORE_VEIN), 0.5),
         )
         assertTrue(VegetationBudget.veinCount(1.0) > VegetationBudget.veinCount(0.1))
-        assertEquals(1, VegetationBudget.veinCount(0.0), "a density of zero still has to place something or nothing")
     }
+
+    @Test
+    fun `zero density means no placement for every count family`() {
+        assertEquals(0, VegetationBudget.patchCount(0.0))
+        assertEquals(0, VegetationBudget.veinCount(0.0))
+        TreeDistribution.entries.forEach { distribution ->
+            assertEquals(0, VegetationBudget.treeMaximumCount(distribution, 0.0), distribution.name)
+        }
+    }
+
+    @Test
+    fun `forest modes grow from one scattered attempt into noisy dense stands`() {
+        assertEquals(1, VegetationBudget.treeMaximumCount(TreeDistribution.SCATTERED, 0.7))
+        assertTrue(
+            VegetationBudget.treeMaximumCount(TreeDistribution.GROVE, 0.7) >
+                VegetationBudget.treeMaximumCount(TreeDistribution.SCATTERED, 0.7),
+        )
+        assertTrue(VegetationBudget.treeBelowNoiseCount(TreeDistribution.FOREST, 0.7) > 0)
+        assertTrue(
+            VegetationBudget.treeMaximumCount(TreeDistribution.DENSE_FOREST, 0.7) >
+                VegetationBudget.treeMaximumCount(TreeDistribution.FOREST, 0.7),
+        )
+    }
+
+    private fun feature(recipe: FeatureRecipe) = FeatureDefinition(
+        id = "sample",
+        recipe = recipe,
+        density = 0.5,
+        tree = if (recipe.isTree) {
+            TreeSpec(TreeSilhouette.BROADLEAF, TreeDistribution.SCATTERED, TreeSubstrate.NATURAL_SOIL)
+        } else {
+            null
+        },
+    )
 }

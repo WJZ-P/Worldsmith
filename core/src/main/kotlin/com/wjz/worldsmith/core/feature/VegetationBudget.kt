@@ -1,6 +1,8 @@
 package com.wjz.worldsmith.core.feature
 
+import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureRecipe
+import com.wjz.worldsmith.core.model.TreeDistribution
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -19,29 +21,65 @@ object VegetationBudget {
     const val MAX_RARITY: Int = 32
     const val MAX_VEIN_COUNT: Int = 16
 
-    /** Attempts per chunk a single biome may spend on vegetation. */
+    /** Feature attempts a single biome may spend in one chunk. */
     const val MAX_ATTEMPTS_PER_CHUNK: Double = 64.0
 
     @JvmStatic
-    fun patchCount(density: Double): Int = max(1, (density * MAX_PATCH_COUNT).roundToInt())
+    fun patchCount(density: Double): Int = if (density <= 0.0) 0 else max(1, (density * MAX_PATCH_COUNT).roundToInt())
 
     @JvmStatic
     fun rarity(density: Double): Int = max(1, ((1.0 - density) * MAX_RARITY).roundToInt())
 
     /** Ore veins are cheap per attempt but many, so they get their own scale. */
     @JvmStatic
-    fun veinCount(density: Double): Int = max(1, (density * MAX_VEIN_COUNT).roundToInt())
+    fun veinCount(density: Double): Int = if (density <= 0.0) 0 else max(1, (density * MAX_VEIN_COUNT).roundToInt())
 
     @JvmStatic
-    fun attemptsPerChunk(recipe: FeatureRecipe, density: Double): Double = when (recipe) {
+    fun attemptsPerChunk(feature: FeatureDefinition, density: Double): Double = when (feature.recipe) {
         FeatureRecipe.GROUND_PATCH, FeatureRecipe.SURFACE_LAYER, FeatureRecipe.AQUATIC_PATCH ->
             patchCount(density).toDouble()
         FeatureRecipe.ORE_VEIN, FeatureRecipe.CAVE_PATCH, FeatureRecipe.HANGING_PATCH ->
             veinCount(density).toDouble()
         // Listed rather than defaulted: a new recipe should not silently inherit
         // a cost, because being charged wrongly is how a pack slips past the cap.
-        FeatureRecipe.DEAD_TREE, FeatureRecipe.BOULDER, FeatureRecipe.FALLEN_LOG,
-        FeatureRecipe.TREE ->
-            1.0 / rarity(density)
+        FeatureRecipe.DEAD_TREE, FeatureRecipe.BOULDER, FeatureRecipe.FALLEN_LOG ->
+            if (density <= 0.0) 0.0 else 1.0 / rarity(density)
+        FeatureRecipe.TREE -> treeMaximumCount(
+            feature.tree?.distribution ?: TreeDistribution.SCATTERED,
+            density,
+        ).toDouble()
     }
+
+    /** Noise boundary shared by the compiler and the budget documentation. */
+    @JvmStatic
+    fun treeNoiseThreshold(distribution: TreeDistribution): Double = when (distribution) {
+        TreeDistribution.SCATTERED -> 0.0
+        TreeDistribution.GROVE -> 0.15
+        TreeDistribution.FOREST -> -0.20
+        TreeDistribution.DENSE_FOREST -> -0.35
+    }
+
+    /** Count in the quieter side of the forest noise. */
+    @JvmStatic
+    fun treeBelowNoiseCount(distribution: TreeDistribution, density: Double): Int = when (distribution) {
+        TreeDistribution.SCATTERED, TreeDistribution.GROVE -> 0
+        TreeDistribution.FOREST -> scaledCount(density, 4)
+        TreeDistribution.DENSE_FOREST -> scaledCount(density, 8)
+    }
+
+    /** Count in the wooded side of the forest noise. */
+    @JvmStatic
+    fun treeAboveNoiseCount(distribution: TreeDistribution, density: Double): Int = when (distribution) {
+        TreeDistribution.SCATTERED -> if (density <= 0.0) 0 else 1
+        TreeDistribution.GROVE -> scaledCount(density, 6)
+        TreeDistribution.FOREST -> scaledCount(density, 10)
+        TreeDistribution.DENSE_FOREST -> scaledCount(density, 16)
+    }
+
+    @JvmStatic
+    fun treeMaximumCount(distribution: TreeDistribution, density: Double): Int =
+        max(treeBelowNoiseCount(distribution, density), treeAboveNoiseCount(distribution, density))
+
+    private fun scaledCount(density: Double, maximum: Int): Int =
+        if (density <= 0.0) 0 else max(1, (density * maximum).roundToInt())
 }

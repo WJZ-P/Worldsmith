@@ -18,6 +18,9 @@ import com.wjz.worldsmith.core.model.TemperatureBand
 import com.wjz.worldsmith.core.model.TemperatureVariation
 import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.TreeSilhouette
+import com.wjz.worldsmith.core.model.TreeDecoration
+import com.wjz.worldsmith.core.model.TreeDistribution
+import com.wjz.worldsmith.core.model.TreeSubstrate
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -27,7 +30,7 @@ import org.junit.jupiter.api.Test
  * A contract is the only place an outside agent learns which names a field
  * accepts, and nothing else in the build compares the two. The failure this
  * catches is silent in both directions and was live when the test was written:
- * two of the three vegetation recipes and every biome archetype existed in the
+ * several feature recipes and every biome archetype once existed in the
  * model and appeared in no prompt at all, so an agent could not use them and no
  * diagnostic ever mentioned them. The other direction is a rename, where the
  * contract keeps offering a value the model dropped and every document built
@@ -59,6 +62,9 @@ class PromptVocabularyTest {
             FeatureRecipe::class.java,
             MaterialRole::class.java,
             TreeSilhouette::class.java,
+            TreeDistribution::class.java,
+            TreeSubstrate::class.java,
+            TreeDecoration::class.java,
         ),
     )
 

@@ -11,6 +11,10 @@ import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.FeatureRecipe;
 import com.wjz.worldsmith.core.model.TreeSilhouette;
 import com.wjz.worldsmith.core.model.TreeSpec;
+import com.wjz.worldsmith.core.model.TreeDecoration;
+import com.wjz.worldsmith.core.model.TreeDistribution;
+import com.wjz.worldsmith.core.model.TreeHeight;
+import com.wjz.worldsmith.core.model.TreeSubstrate;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,6 +23,7 @@ import net.minecraft.core.HolderGetter;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.data.worldgen.features.VegetationFeatures;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.Direction;
@@ -58,12 +63,19 @@ import net.minecraft.world.level.levelgen.feature.trunkplacers.TrunkPlacer;
 import net.minecraft.world.level.levelgen.feature.featuresize.TwoLayersFeatureSize;
 import net.minecraft.world.level.levelgen.feature.foliageplacers.AcaciaFoliagePlacer;
 import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+import net.minecraft.world.level.levelgen.feature.stateproviders.RuleBasedStateProvider;
+import net.minecraft.world.level.levelgen.feature.stateproviders.WeightedStateProvider;
+import net.minecraft.world.level.levelgen.feature.treedecorators.LeaveVineDecorator;
+import net.minecraft.world.level.levelgen.feature.treedecorators.PlaceOnGroundDecorator;
+import net.minecraft.world.level.levelgen.feature.treedecorators.TreeDecorator;
+import net.minecraft.world.level.levelgen.feature.treedecorators.TrunkVineDecorator;
 import net.minecraft.world.level.levelgen.placement.BiomeFilter;
 import net.minecraft.world.level.levelgen.placement.BlockPredicateFilter;
 import net.minecraft.world.level.levelgen.placement.CountPlacement;
 import net.minecraft.world.level.levelgen.placement.EnvironmentScanPlacement;
 import net.minecraft.world.level.levelgen.placement.HeightRangePlacement;
 import net.minecraft.world.level.levelgen.placement.InSquarePlacement;
+import net.minecraft.world.level.levelgen.placement.NoiseThresholdCountPlacement;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.placement.PlacementModifier;
 import net.minecraft.world.level.levelgen.placement.RandomOffsetPlacement;
@@ -77,10 +89,10 @@ import net.minecraft.world.level.levelgen.placement.RarityFilter;
  * one is keyed by feature and biome rather than by list position, so reordering
  * a biome's feature list cannot silently repoint it at something else.
  *
- * <p>The pack picks a recipe name and a density; the shape of the feature and
- * every placement modifier is decided here. Keeping the vocabulary closed is
- * what makes the output checkable: an unknown recipe cannot be deserialised, so
- * it fails while loading rather than producing a quietly empty world.
+ * <p>The pack picks a recipe and bounded semantic controls; this compiler maps
+ * them to the target version's feature, placer and modifier types. Keeping that
+ * vocabulary closed makes the output checkable without freezing every tree to
+ * one hard-coded geometry.
  */
 public final class WorldsmithVegetation {
 	/** Vanilla's common ore size; a vein of roughly this many blocks. */
@@ -89,10 +101,6 @@ public final class WorldsmithVegetation {
 	private static final int ORE_VEIN_CEILING = 64;
 	/** How far down a cave patch looks for a floor before giving up. */
 	private static final int CAVE_SCAN_DEPTH = 12;
-	/** Vanilla's oak: four blocks plus up to two more, with a two-block crown. */
-	private static final int TREE_BASE_HEIGHT = 4;
-	private static final int TREE_HEIGHT_VARIATION = 2;
-	private static final int TREE_FOLIAGE_RADIUS = 2;
 	/** How far a hanging growth reaches down from what it is attached to. */
 	private static final int HANGING_LENGTH = 6;
 
@@ -267,10 +275,8 @@ public final class WorldsmithVegetation {
 	 *
 	 * <p>Two roles rather than one, because Minecraft builds a tree from a trunk
 	 * provider and a foliage provider placed by two separate strategies. The
-	 * shapes are the compiler's to choose, as everywhere else: this is vanilla's
-	 * straight-trunk blob-foliage oak, and the pack decides only what it is made
-	 * of. Naming further shapes - conifer, weeping, blossom - is adding placer
-	 * pairs here, not new vocabulary for the pack to get wrong.
+	 * silhouette selects a proven placer family while the optional bounded fields
+	 * tune its height, crown and trailing leaves.
 	 */
 	private static ConfiguredFeature<?, ?> tree(FeatureDefinition feature, MaterialResolver resolver) {
 		TreeSpec tree = feature.getTree();
@@ -295,20 +301,43 @@ public final class WorldsmithVegetation {
 				invalidTrunks.stream().map(state -> state.getBlock().toString()).toList()
 			);
 		}
-		// One placer pair per silhouette. The pack names the look it wants and
-		// never the geometry, exactly as it names a relief band and never an
-		// erosion range; adding a shape later is another arm here rather than
-		// another thing a document can get wrong.
-		TreeShape shape = switch (tree.getSilhouette()) {
+		TreeShape shape = treeShape(tree);
+		TreeConfiguration.TreeConfigurationBuilder builder = new TreeConfiguration.TreeConfigurationBuilder(
+			trunk,
+			shape.trunk(),
+			foliage,
+			shape.foliage(),
+			shape.size(),
+			belowTrunkProvider(tree.getSubstrate())
+		).ignoreVines();
+		List<TreeDecorator> decorations = treeDecorators(tree);
+		if (!decorations.isEmpty()) {
+			builder.decorators(decorations);
+		}
+		return new ConfiguredFeature<>(Feature.TREE, builder.build());
+	}
+
+	/** Maps a semantic, bounded tree specification onto Minecraft's placer vocabulary. */
+	private static TreeShape treeShape(TreeSpec tree) {
+		TreeHeight height = tree.getHeight() == null
+			? new TreeHeight(tree.getSilhouette().getDefaultMinHeight(), tree.getSilhouette().getDefaultMaxHeight())
+			: tree.getHeight();
+		int baseHeight = height.getMin();
+		int heightVariation = height.getMax() - height.getMin();
+		int radius = tree.getCrownRadius() == null
+			? tree.getSilhouette().getDefaultCrownRadius()
+			: tree.getCrownRadius();
+
+		return switch (tree.getSilhouette()) {
 			case CONIFER -> new TreeShape(
-				new StraightTrunkPlacer(6, 3, 0),
-				new SpruceFoliagePlacer(UniformInt.of(2, 3), UniformInt.of(0, 2), UniformInt.of(1, 2)),
+				new StraightTrunkPlacer(baseHeight, heightVariation, 0),
+				new SpruceFoliagePlacer(ConstantInt.of(radius), UniformInt.of(0, 2), UniformInt.of(1, 2)),
 				new TwoLayersFeatureSize(1, 0, 1)
 			);
 			case BLOSSOM -> {
 				TrunkPlacer trunkPlacer = new CherryTrunkPlacer(
-					7,
-					1,
+					baseHeight,
+					heightVariation,
 					0,
 					new WeightedListInt(
 						WeightedList.<IntProvider>builder()
@@ -323,45 +352,73 @@ public final class WorldsmithVegetation {
 				);
 				yield new TreeShape(
 					trunkPlacer,
-					new CherryFoliagePlacer(ConstantInt.of(4), ConstantInt.of(0), ConstantInt.of(5), 0.25F, 0.5F, 0.1666F, 0.3333F),
+					cherryFoliage(tree, radius, false),
 					new TwoLayersFeatureSize(1, 0, 2)
 				);
 			}
 			// A leaning trunk under a crown that trails: the hanging chances are
 			// what read as a willow rather than as a bent oak.
 			case WEEPING -> new TreeShape(
-				new BendingTrunkPlacer(5, 2, 1, 4, UniformInt.of(1, 2)),
-				new CherryFoliagePlacer(ConstantInt.of(3), ConstantInt.of(0), ConstantInt.of(4), 0.2F, 0.4F, 0.75F, 0.6F),
+				new BendingTrunkPlacer(baseHeight, heightVariation, 0, Math.max(1, baseHeight - 1), UniformInt.of(1, 2)),
+				cherryFoliage(tree, radius, true),
 				new TwoLayersFeatureSize(1, 0, 2)
 			);
 			case UMBRELLA -> new TreeShape(
-				new ForkingTrunkPlacer(5, 2, 2),
-				new AcaciaFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0)),
+				new ForkingTrunkPlacer(baseHeight, heightVariation, 0),
+				new AcaciaFoliagePlacer(ConstantInt.of(radius), ConstantInt.of(0)),
 				new TwoLayersFeatureSize(1, 0, 2)
 			);
 			case SHRUB -> new TreeShape(
-				new StraightTrunkPlacer(1, 0, 0),
-				new BushFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0), 2),
+				new StraightTrunkPlacer(baseHeight, heightVariation, 0),
+				new BushFoliagePlacer(ConstantInt.of(radius), ConstantInt.of(0), Math.max(1, radius)),
 				new TwoLayersFeatureSize(1, 0, 1)
 			);
 			case BROADLEAF -> new TreeShape(
-				new StraightTrunkPlacer(TREE_BASE_HEIGHT, TREE_HEIGHT_VARIATION, 0),
-				new BlobFoliagePlacer(ConstantInt.of(TREE_FOLIAGE_RADIUS), ConstantInt.of(0), 3),
+				new StraightTrunkPlacer(baseHeight, heightVariation, 0),
+				new BlobFoliagePlacer(ConstantInt.of(radius), ConstantInt.of(0), Math.max(2, radius + 1)),
 				new TwoLayersFeatureSize(1, 0, 1)
 			);
 		};
+	}
 
-		return new ConfiguredFeature<>(
-			Feature.TREE,
-			new TreeConfiguration.TreeConfigurationBuilder(
-				trunk,
-				shape.trunk(),
-				foliage,
-				shape.foliage(),
-				shape.size(),
-				BlockStateProvider.simple(Blocks.DIRT)
-			).ignoreVines().build()
+	private static CherryFoliagePlacer cherryFoliage(TreeSpec tree, int radius, boolean weeping) {
+		double defaultHanging = weeping ? 0.75 : 0.16666667;
+		double hanging = tree.getHangingLeaves() == null ? defaultHanging : tree.getHangingLeaves();
+		double extension = weeping ? hanging * 0.8 : Math.min(1.0, hanging * 2.0);
+		return new CherryFoliagePlacer(
+			ConstantInt.of(radius),
+			ConstantInt.of(0),
+			ConstantInt.of(Math.max(4, radius + 1)),
+			weeping ? 0.2F : 0.25F,
+			weeping ? 0.4F : 0.5F,
+			(float)hanging,
+			(float)extension
 		);
+	}
+
+	private static BlockStateProvider belowTrunkProvider(TreeSubstrate substrate) {
+		return substrate == TreeSubstrate.NATURAL_SOIL
+			? RuleBasedStateProvider.ifTrueThenProvide(TreeConfiguration.CAN_PLACE_BELOW_TREE_TRUNKS, Blocks.DIRT)
+			: RuleBasedStateProvider.ifTrueThenProvide(BlockPredicate.not(BlockPredicate.alwaysTrue()), Blocks.DIRT);
+	}
+
+	private static List<TreeDecorator> treeDecorators(TreeSpec tree) {
+		List<TreeDecorator> decorators = new java.util.ArrayList<>();
+		for (TreeDecoration decoration : tree.getDecorations()) {
+			switch (decoration) {
+				case VINES -> {
+					decorators.add(TrunkVineDecorator.INSTANCE);
+					decorators.add(new LeaveVineDecorator(0.25F));
+				}
+				case LEAF_LITTER -> decorators.add(new PlaceOnGroundDecorator(
+					96,
+					2,
+					2,
+					new WeightedStateProvider(VegetationFeatures.leafLitterPatchBuilder(1, 4).build())
+				));
+			}
+		}
+		return List.copyOf(decorators);
 	}
 
 	private record TreeShape(TrunkPlacer trunk, FoliagePlacer foliage, FeatureSize size) {
@@ -383,7 +440,7 @@ public final class WorldsmithVegetation {
 		return states.stream().filter(state -> !state.is(BlockTags.LOGS)).toList();
 	}
 
-	private static List<PlacementModifier> place(FeatureDefinition feature, double density) {
+	static List<PlacementModifier> place(FeatureDefinition feature, double density) {
 		return switch (feature.getRecipe()) {
 			case GROUND_PATCH -> List.of(
 				CountPlacement.of(VegetationBudget.patchCount(density)),
@@ -393,25 +450,17 @@ public final class WorldsmithVegetation {
 				BlockPredicateFilter.forPredicate(BlockPredicate.ONLY_IN_AIR_PREDICATE)
 			);
 			case DEAD_TREE, BOULDER -> List.of(
-				RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density)),
+				rareAttempt(density),
 				InSquarePlacement.spread(),
 				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
 				BiomeFilter.biome()
 			);
-			// A tree also has to check that its sapling would survive where it
-			// lands, or it grows out of stone and gravel.
-			case TREE -> List.of(
-				RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density)),
-				InSquarePlacement.spread(),
-				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
-				BiomeFilter.biome(),
-				BlockPredicateFilter.forPredicate(BlockPredicate.wouldSurvive(Blocks.OAK_SAPLING.defaultBlockState(), BlockPos.ZERO))
-			);
+			case TREE -> treePlacement(feature, density);
 			// FallenTreeFeature already searches for a sturdy floor and tolerates
 			// short gaps along the log. Applying a living oak sapling's soil rule
 			// here would erase fallen wood from stone, sand and wintry ground.
 			case FALLEN_LOG -> List.of(
-				RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density)),
+				rareAttempt(density),
 				InSquarePlacement.spread(),
 				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
 				BiomeFilter.biome()
@@ -473,6 +522,72 @@ public final class WorldsmithVegetation {
 				BiomeFilter.biome(),
 				BlockPredicateFilter.forPredicate(BlockPredicate.ONLY_IN_AIR_PREDICATE)
 			);
+		};
+	}
+
+	/** A density of zero is absence, not one last feature every 32 chunks. */
+	private static PlacementModifier rareAttempt(double density) {
+		return density <= 0.0
+			? CountPlacement.of(0)
+			: RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density));
+	}
+
+	private static List<PlacementModifier> treePlacement(FeatureDefinition feature, double density) {
+		TreeSpec tree = feature.getTree();
+		if (tree == null) {
+			throw new IllegalStateException("Feature '" + feature.getId() + "' declares TREE without a tree specification");
+		}
+		return List.of(
+			treeCount(tree.getDistribution(), density),
+			InSquarePlacement.spread(),
+			tree.getSubstrate() == TreeSubstrate.SHALLOW_WATER
+				? PlacementUtils.HEIGHTMAP_OCEAN_FLOOR
+				: PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
+			BiomeFilter.biome(),
+			BlockPredicateFilter.forPredicate(treeSubstrate(tree.getSubstrate()))
+		);
+	}
+
+	private static PlacementModifier treeCount(TreeDistribution distribution, double density) {
+		if (distribution == TreeDistribution.SCATTERED) {
+			return CountPlacement.of(fractionalZeroOrOne(density));
+		}
+		return NoiseThresholdCountPlacement.of(
+			VegetationBudget.treeNoiseThreshold(distribution),
+			VegetationBudget.treeBelowNoiseCount(distribution, density),
+			VegetationBudget.treeAboveNoiseCount(distribution, density)
+		);
+	}
+
+	/** Samples one attempt with the requested probability, including exact zero and one. */
+	private static IntProvider fractionalZeroOrOne(double probability) {
+		if (probability <= 0.0) {
+			return ConstantInt.of(0);
+		}
+		if (probability >= 1.0) {
+			return ConstantInt.of(1);
+		}
+		int oneWeight = Math.max(1, Math.min(999, (int)Math.round(probability * 1_000.0)));
+		int zeroWeight = 1_000 - oneWeight;
+		return new WeightedListInt(
+			WeightedList.<IntProvider>builder()
+				.add(ConstantInt.of(0), zeroWeight)
+				.add(ConstantInt.of(1), oneWeight)
+				.build()
+		);
+	}
+
+	private static BlockPredicate treeSubstrate(TreeSubstrate substrate) {
+		BlockPos below = new BlockPos(0, -1, 0);
+		return switch (substrate) {
+			case NATURAL_SOIL -> BlockPredicate.wouldSurvive(Blocks.OAK_SAPLING.defaultBlockState(), BlockPos.ZERO);
+			case SAND -> BlockPredicate.matchesTag(below, BlockTags.SAND);
+			case SHALLOW_WATER -> BlockPredicate.allOf(
+				BlockPredicate.matchesFluids(Fluids.WATER),
+				BlockPredicate.hasSturdyFace(below, Direction.UP),
+				BlockPredicate.matchesTag(new BlockPos(0, 4, 0), BlockTags.AIR)
+			);
+			case ANY_SOLID -> BlockPredicate.hasSturdyFace(below, Direction.UP);
 		};
 	}
 

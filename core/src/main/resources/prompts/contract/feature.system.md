@@ -32,8 +32,9 @@ number of biomes, so the shape and material are written once and compiled once.
 
 ## The recipes
 
-Ten of them, and the vocabulary is closed on purpose. The pack chooses a recipe and a material;
-the shape and every placement rule belong to the compiler. An unknown recipe
+Ten of them, and the vocabulary is closed on purpose. The pack chooses a recipe,
+materials and documented semantic controls; Minecraft placer classes and their
+version-specific fields belong to the compiler. An unknown recipe
 fails while loading rather than producing a quietly empty world.
 
 | recipe | shape | placement | use it for |
@@ -65,6 +66,40 @@ by how the tree should look, never by what it is made of - a cherry-wood
 | `UMBRELLA` | forked trunk, flat crown held high and clear of the ground - acacia, savannah |
 | `SHRUB` | one block of trunk under a small bush - undergrowth, dead scrub, tundra growth |
 
+The same silhouette can be tuned without exposing Minecraft placer internals:
+
+```json
+"tree": {
+  "silhouette": "BLOSSOM",
+  "distribution": "GROVE",
+  "substrate": "NATURAL_SOIL",
+  "height": { "min": 7, "max": 11 },
+  "crownRadius": 4,
+  "hangingLeaves": 0.25,
+  "decorations": ["LEAF_LITTER"]
+}
+```
+
+- `height` is optional. `min` is the shortest generated tree and `max` its random upper
+  bound. The silhouette's defaults are used when it is absent. The supported
+  range is deliberately ordinary-tree scale; landmark-sized trees belong to a
+  later landmark grammar rather than pretending to be dense forest scatter.
+- `crownRadius` is optional, from `1..8`. A broad crown also needs enough
+  height beneath it; validation names the required minimum rather than letting
+  the crown sink into the ground.
+- `hangingLeaves` is optional, from `0..1`, and belongs only to `BLOSSOM` and
+  `WEEPING`.
+- `distribution` is required: `SCATTERED`, `GROVE`, `FOREST`, or
+  `DENSE_FOREST`. Grove and forest modes use one broad noise field, so trees
+  gather into stands with clearings instead of forming a uniform grid.
+- `substrate` is required: `NATURAL_SOIL` follows ordinary sapling rules,
+  `SAND` makes a dry or alien sand tree, and `ANY_SOLID` accepts any sturdy
+  exposed surface. `SHALLOW_WATER` starts on a sturdy lake or sea floor only
+  when air is within four blocks, for willow and mangrove-like growth. These
+  non-soil modes preserve the block under the trunk rather than replacing a
+  themed surface with dirt.
+- `decorations` may contain `VINES` and `LEAF_LITTER`. Do not repeat one.
+
 `DEAD_TREE` is a naming accident worth reading past: it compiles to a bare
 column with no leaves, whatever block it is made of. Use it where a bare column
 is the intended silhouette; living trees belong to `TREE`.
@@ -93,8 +128,13 @@ from more than one names them instead:
     "TRUNK":   { "semanticRole": "sakura_wood",  "preferredIds": ["minecraft:cherry_log"] },
     "FOLIAGE": { "semanticRole": "sakura_bloom", "preferredIds": ["minecraft:cherry_leaves"] }
   },
-  "density": 0.2,
-  "tree": { "silhouette": "BLOSSOM" }
+  "density": 0.7,
+  "tree": {
+    "silhouette": "BLOSSOM",
+    "distribution": "GROVE",
+    "substrate": "NATURAL_SOIL",
+    "decorations": ["LEAF_LITTER"]
+  }
 }
 ```
 
@@ -134,19 +174,20 @@ fallen wood means nothing interrupts it.
 
 ## Density
 
-Density is one number with two meanings, because the two placement styles are
-not comparable:
+`density: 0` disables any feature exactly. Positive density is mapped according
+to the cost and scale of the recipe:
 
 - `GROUND_PATCH`, `SURFACE_LAYER` and `AQUATIC_PATCH` become an attempt count per
-  chunk, `1..24`. `0.1` is scattered tufts, `0.4` is ordinary cover, `1.0` is a
+  chunk, `0..24`. `0.1` is scattered tufts, `0.4` is ordinary cover, `1.0` is a
   carpet.
-- Every tree, plus `DEAD_TREE`, `BOULDER` and `FALLEN_LOG`, becomes a rarity
-  filter: roughly one attempt every `(1 - density) * 32` chunks. `0.05` is a
-  landmark you find every few minutes of walking, `0.5` is one every sixteen
-  chunks, above `0.9` is nearly every chunk. A forest wants about `0.7`; scattered
-  woodland about `0.3`.
+- `DEAD_TREE`, `BOULDER` and `FALLEN_LOG` remain rare props: positive density
+  ranges from roughly one attempt every 32 chunks to one each chunk.
+- `TREE` reads `tree.distribution`. `SCATTERED` treats density as the chance of
+  one tree in a chunk. `GROVE` places up to 6 trees only on the wooded side of a
+  noise field. `FOREST` places up to 4 in clearings and 10 in wooded chunks;
+  `DENSE_FOREST` raises those ceilings to 8 and 16. Density scales the counts.
 - `ORE_VEIN`, `CAVE_PATCH` and `HANGING_PATCH` become a vein or cluster count per
-  chunk, `1..16`. `0.25` is roughly as common as vanilla iron; above `0.6` a
+  chunk, `0..16`. `0.25` is roughly as common as vanilla iron; above `0.6` a
   player will not be able to walk a cave without seeing it.
 
 One biome may spend at most 64 attempts per chunk in total. Exceeding it is the
