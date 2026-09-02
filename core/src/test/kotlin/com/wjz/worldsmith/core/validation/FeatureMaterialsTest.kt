@@ -4,7 +4,7 @@ import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.MaterialRole
 import com.wjz.worldsmith.core.model.MaterialSelector
-import com.wjz.worldsmith.core.model.VegetationRecipe
+import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.WeightedMaterial
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -23,7 +23,7 @@ class FeatureMaterialsTest {
     fun `a tree needs both of the materials it is built from`() {
         val missingFoliage = library(
             FeatureDefinition(
-                "oak", VegetationRecipe.TREE,
+                "oak", FeatureRecipe.TREE,
                 materials = mapOf(MaterialRole.TRUNK to selector("wood", "minecraft:oak_log")),
                 density = 0.2,
             ),
@@ -38,7 +38,7 @@ class FeatureMaterialsTest {
     fun `a material the recipe never reads is rejected rather than ignored`() {
         val extra = library(
             FeatureDefinition(
-                "tuft", VegetationRecipe.GROUND_PATCH,
+                "tuft", FeatureRecipe.GROUND_PATCH,
                 materials = mapOf(
                     MaterialRole.BLOCK to selector("grass", "minecraft:short_grass"),
                     MaterialRole.FOLIAGE to selector("leaves", "minecraft:oak_leaves"),
@@ -55,10 +55,10 @@ class FeatureMaterialsTest {
     @Test
     fun `the shorthand and the map are the same thing and cannot both be written`() {
         val shorthand = FeatureDefinition(
-            "tuft", VegetationRecipe.GROUND_PATCH, selector("grass", "minecraft:short_grass"), density = 0.3,
+            "tuft", FeatureRecipe.GROUND_PATCH, selector("grass", "minecraft:short_grass"), density = 0.3,
         )
         val explicit = FeatureDefinition(
-            "tuft", VegetationRecipe.GROUND_PATCH,
+            "tuft", FeatureRecipe.GROUND_PATCH,
             materials = mapOf(MaterialRole.BLOCK to selector("grass", "minecraft:short_grass")),
             density = 0.3,
         )
@@ -68,7 +68,7 @@ class FeatureMaterialsTest {
         assertEquals(emptyList<Diagnostic>(), FeatureLibraryValidator.validate(library(explicit)))
 
         val both = FeatureDefinition(
-            "tuft", VegetationRecipe.GROUND_PATCH, selector("grass", "minecraft:short_grass"),
+            "tuft", FeatureRecipe.GROUND_PATCH, selector("grass", "minecraft:short_grass"),
             materials = mapOf(MaterialRole.BLOCK to selector("other", "minecraft:fern")),
             density = 0.3,
         )
@@ -79,7 +79,7 @@ class FeatureMaterialsTest {
     fun `a meadow may be several plants rather than one repeated`() {
         val mixed = library(
             FeatureDefinition(
-                "meadow", VegetationRecipe.GROUND_PATCH,
+                "meadow", FeatureRecipe.GROUND_PATCH,
                 MaterialSelector(
                     semanticRole = "meadow_flora",
                     weighted = listOf(
@@ -100,7 +100,7 @@ class FeatureMaterialsTest {
         // list would quietly become its first entry.
         val vein = library(
             FeatureDefinition(
-                "seam", VegetationRecipe.ORE_VEIN,
+                "seam", FeatureRecipe.ORE_VEIN,
                 MaterialSelector(
                     semanticRole = "seam",
                     weighted = listOf(
@@ -119,7 +119,7 @@ class FeatureMaterialsTest {
     fun `a weighted selector carries no material of its own and does not nest`() {
         val confused = library(
             FeatureDefinition(
-                "muddle", VegetationRecipe.GROUND_PATCH,
+                "muddle", FeatureRecipe.GROUND_PATCH,
                 MaterialSelector(
                     semanticRole = "muddle",
                     preferredIds = listOf("minecraft:short_grass"),

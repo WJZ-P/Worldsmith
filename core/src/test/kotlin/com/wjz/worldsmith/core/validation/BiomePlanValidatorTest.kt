@@ -28,7 +28,7 @@ import com.wjz.worldsmith.core.model.SurfaceNoiseBand
 import com.wjz.worldsmith.core.model.SurfaceRuleDefinition
 import com.wjz.worldsmith.core.model.SurfaceStack
 import com.wjz.worldsmith.core.model.TemperatureBand
-import com.wjz.worldsmith.core.model.VegetationRecipe
+import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.WaterFog
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -355,10 +355,10 @@ class BiomePlanValidatorTest {
 
     private fun library() = FeatureLibrary(
         features = listOf(
-            FeatureDefinition("ash_scrub", VegetationRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), density = 0.45),
-            FeatureDefinition("second_scrub", VegetationRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), density = 0.45),
-            FeatureDefinition("third_scrub", VegetationRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), density = 0.45),
-            FeatureDefinition("dead_trunk", VegetationRecipe.DEAD_TREE, material("dead_wood", "minecraft:stripped_spruce_log"), density = 0.2),
+            FeatureDefinition("ash_scrub", FeatureRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), density = 0.45),
+            FeatureDefinition("second_scrub", FeatureRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), density = 0.45),
+            FeatureDefinition("third_scrub", FeatureRecipe.GROUND_PATCH, material("dry_scrub", "minecraft:dead_bush"), density = 0.45),
+            FeatureDefinition("dead_trunk", FeatureRecipe.DEAD_TREE, material("dead_wood", "minecraft:stripped_spruce_log"), density = 0.2),
         ),
     )
 

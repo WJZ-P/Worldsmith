@@ -1,6 +1,6 @@
 package com.wjz.worldsmith.core.feature
 
-import com.wjz.worldsmith.core.model.VegetationRecipe
+import com.wjz.worldsmith.core.model.FeatureRecipe
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -33,9 +33,16 @@ object VegetationBudget {
     fun veinCount(density: Double): Int = max(1, (density * MAX_VEIN_COUNT).roundToInt())
 
     @JvmStatic
-    fun attemptsPerChunk(recipe: VegetationRecipe, density: Double): Double = when (recipe) {
-        VegetationRecipe.GROUND_PATCH, VegetationRecipe.SURFACE_LAYER -> patchCount(density).toDouble()
-        VegetationRecipe.ORE_VEIN, VegetationRecipe.CAVE_PATCH -> veinCount(density).toDouble()
-        VegetationRecipe.DEAD_TREE, VegetationRecipe.BOULDER, VegetationRecipe.TREE -> 1.0 / rarity(density)
+    fun attemptsPerChunk(recipe: FeatureRecipe, density: Double): Double = when (recipe) {
+        FeatureRecipe.GROUND_PATCH, FeatureRecipe.SURFACE_LAYER, FeatureRecipe.AQUATIC_PATCH ->
+            patchCount(density).toDouble()
+        FeatureRecipe.ORE_VEIN, FeatureRecipe.CAVE_PATCH, FeatureRecipe.HANGING_PATCH ->
+            veinCount(density).toDouble()
+        // Listed rather than defaulted: a new recipe should not silently inherit
+        // a cost, because being charged wrongly is how a pack slips past the cap.
+        FeatureRecipe.DEAD_TREE, FeatureRecipe.BOULDER, FeatureRecipe.FALLEN_LOG,
+        FeatureRecipe.TREE, FeatureRecipe.CONIFER, FeatureRecipe.BLOSSOM_TREE,
+        FeatureRecipe.WEEPING_TREE, FeatureRecipe.UMBRELLA_TREE, FeatureRecipe.SHRUB ->
+            1.0 / rarity(density)
     }
 }

@@ -1,6 +1,6 @@
 package com.wjz.worldsmith.core.feature
 
-import com.wjz.worldsmith.core.model.VegetationRecipe
+import com.wjz.worldsmith.core.model.FeatureRecipe
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
 class VegetationBudgetTest {
     @Test
     fun `every recipe has a cost`() {
-        VegetationRecipe.entries.forEach { recipe ->
+        FeatureRecipe.entries.forEach { recipe ->
             val cost = VegetationBudget.attemptsPerChunk(recipe, 0.5)
             assertTrue(cost > 0.0, "$recipe costs nothing, so a biome could take unlimited copies of it")
         }
@@ -27,7 +27,7 @@ class VegetationBudgetTest {
         // for a thirty-second of one.
         assertEquals(
             VegetationBudget.veinCount(0.5).toDouble(),
-            VegetationBudget.attemptsPerChunk(VegetationRecipe.ORE_VEIN, 0.5),
+            VegetationBudget.attemptsPerChunk(FeatureRecipe.ORE_VEIN, 0.5),
         )
         assertTrue(VegetationBudget.veinCount(1.0) > VegetationBudget.veinCount(0.1))
         assertEquals(1, VegetationBudget.veinCount(0.0), "a density of zero still has to place something or nothing")

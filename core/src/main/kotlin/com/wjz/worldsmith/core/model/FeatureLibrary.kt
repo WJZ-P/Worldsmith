@@ -29,20 +29,34 @@ enum class MaterialRole {
     FOLIAGE,
 }
 
-enum class VegetationRecipe {
+enum class FeatureRecipe {
     GROUND_PATCH,
     DEAD_TREE,
     BOULDER,
     ORE_VEIN,
     CAVE_PATCH,
     SURFACE_LAYER,
+    AQUATIC_PATCH,
+    HANGING_PATCH,
     TREE,
+    CONIFER,
+    BLOSSOM_TREE,
+    WEEPING_TREE,
+    UMBRELLA_TREE,
+    SHRUB,
+    FALLEN_LOG,
     ;
+
+    /** True for anything Minecraft builds from a trunk and a crown of leaves. */
+    val isTree: Boolean
+        get() = this == TREE || this == CONIFER || this == BLOSSOM_TREE ||
+            this == WEEPING_TREE || this == UMBRELLA_TREE || this == SHRUB
 
     /** Exactly the roles this recipe reads. Anything else is an author's wasted effort. */
     val roles: Set<MaterialRole>
-        get() = when (this) {
-            TREE -> setOf(MaterialRole.TRUNK, MaterialRole.FOLIAGE)
+        get() = when {
+            isTree -> setOf(MaterialRole.TRUNK, MaterialRole.FOLIAGE)
+            this == FALLEN_LOG -> setOf(MaterialRole.TRUNK)
             else -> setOf(MaterialRole.BLOCK)
         }
 
@@ -64,7 +78,7 @@ enum class VegetationRecipe {
 @Serializable
 data class FeatureDefinition(
     val id: String,
-    val recipe: VegetationRecipe,
+    val recipe: FeatureRecipe,
     /** Shorthand for a recipe that reads one material; equivalent to `materials.BLOCK`. */
     val block: MaterialSelector? = null,
     val materials: Map<MaterialRole, MaterialSelector> = emptyMap(),

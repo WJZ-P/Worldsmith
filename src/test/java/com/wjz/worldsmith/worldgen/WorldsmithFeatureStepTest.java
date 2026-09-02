@@ -3,7 +3,7 @@ package com.wjz.worldsmith.worldgen;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.wjz.worldsmith.core.model.VegetationRecipe;
+import com.wjz.worldsmith.core.model.FeatureRecipe;
 import java.util.EnumSet;
 import java.util.Set;
 import net.minecraft.world.level.levelgen.GenerationStep;
@@ -23,7 +23,7 @@ class WorldsmithFeatureStepTest {
 
 	@Test
 	void everyRecipeNamesAStep() {
-		for (VegetationRecipe recipe : VegetationRecipe.values()) {
+		for (FeatureRecipe recipe : FeatureRecipe.values()) {
 			assertNotNull(WorldsmithVegetation.step(recipe), recipe + " has no decoration step");
 		}
 	}
@@ -31,8 +31,8 @@ class WorldsmithFeatureStepTest {
 	@Test
 	void undergroundRecipesRunBeforeAnythingStandsOnTheGround() {
 		Set<GenerationStep.Decoration> underground = EnumSet.of(
-			WorldsmithVegetation.step(VegetationRecipe.ORE_VEIN),
-			WorldsmithVegetation.step(VegetationRecipe.CAVE_PATCH)
+			WorldsmithVegetation.step(FeatureRecipe.ORE_VEIN),
+			WorldsmithVegetation.step(FeatureRecipe.CAVE_PATCH)
 		);
 
 		for (GenerationStep.Decoration step : underground) {
@@ -48,12 +48,12 @@ class WorldsmithFeatureStepTest {
 	void aSurfaceLayerSettlesLast() {
 		assertEquals(
 			GenerationStep.Decoration.TOP_LAYER_MODIFICATION,
-			WorldsmithVegetation.step(VegetationRecipe.SURFACE_LAYER)
+			WorldsmithVegetation.step(FeatureRecipe.SURFACE_LAYER)
 		);
 		assertEquals(
 			true,
 			GenerationStep.Decoration.TOP_LAYER_MODIFICATION.ordinal()
-				> WorldsmithVegetation.step(VegetationRecipe.DEAD_TREE).ordinal(),
+				> WorldsmithVegetation.step(FeatureRecipe.DEAD_TREE).ordinal(),
 			"a layer that settles before the trunks would be buried by them"
 		);
 	}
@@ -62,7 +62,7 @@ class WorldsmithFeatureStepTest {
 	void aBoulderIsAChangeToTheLandRatherThanSomethingGrowingOnIt() {
 		assertEquals(
 			GenerationStep.Decoration.LOCAL_MODIFICATIONS,
-			WorldsmithVegetation.step(VegetationRecipe.BOULDER)
+			WorldsmithVegetation.step(FeatureRecipe.BOULDER)
 		);
 	}
 }

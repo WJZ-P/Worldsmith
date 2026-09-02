@@ -4,7 +4,7 @@ import com.wjz.worldsmith.core.model.PromptSet
 import com.wjz.worldsmith.core.model.TerrainPlan
 import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.VanillaNoisePreset
-import com.wjz.worldsmith.core.model.VegetationRecipe
+import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.prompt.StyleCatalog
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import kotlinx.serialization.json.JsonNull
@@ -115,7 +115,7 @@ class WorldsmithWorkflowTest {
         // The vocabulary that was missing entirely: two of the three recipes
         // appeared in no prompt, so an agent could only ever use the third.
         val featureContract = contracts.text("feature")
-        VegetationRecipe.entries.forEach {
+        FeatureRecipe.entries.forEach {
             assertTrue(it.name in featureContract, "the feature contract never names ${it.name}")
         }
 

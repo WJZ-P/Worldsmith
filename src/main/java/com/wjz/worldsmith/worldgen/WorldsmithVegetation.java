@@ -8,7 +8,7 @@ import com.wjz.worldsmith.core.model.FeatureDefinition;
 import com.wjz.worldsmith.core.model.FeatureLibrary;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
-import com.wjz.worldsmith.core.model.VegetationRecipe;
+import com.wjz.worldsmith.core.model.FeatureRecipe;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,9 +22,13 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.valueproviders.ConstantInt;
+import net.minecraft.util.random.WeightedList;
+import net.minecraft.util.valueproviders.IntProvider;
 import net.minecraft.util.valueproviders.UniformInt;
+import net.minecraft.util.valueproviders.WeightedListInt;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
 import net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate;
@@ -33,12 +37,23 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.configurations.BlockBlobConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.BlockColumnConfiguration;
+import net.minecraft.world.level.levelgen.feature.configurations.FallenTreeConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.OreConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.SimpleBlockConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.TreeConfiguration;
+import net.minecraft.world.level.levelgen.feature.featuresize.FeatureSize;
 import net.minecraft.world.level.levelgen.feature.foliageplacers.BlobFoliagePlacer;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.BushFoliagePlacer;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.CherryFoliagePlacer;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.SpruceFoliagePlacer;
 import net.minecraft.world.level.levelgen.feature.trunkplacers.StraightTrunkPlacer;
+import net.minecraft.world.level.levelgen.feature.trunkplacers.BendingTrunkPlacer;
+import net.minecraft.world.level.levelgen.feature.trunkplacers.CherryTrunkPlacer;
+import net.minecraft.world.level.levelgen.feature.trunkplacers.ForkingTrunkPlacer;
+import net.minecraft.world.level.levelgen.feature.trunkplacers.TrunkPlacer;
 import net.minecraft.world.level.levelgen.feature.featuresize.TwoLayersFeatureSize;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.AcaciaFoliagePlacer;
 import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
 import net.minecraft.world.level.levelgen.placement.BiomeFilter;
 import net.minecraft.world.level.levelgen.placement.BlockPredicateFilter;
@@ -75,6 +90,8 @@ public final class WorldsmithVegetation {
 	private static final int TREE_BASE_HEIGHT = 4;
 	private static final int TREE_HEIGHT_VARIATION = 2;
 	private static final int TREE_FOLIAGE_RADIUS = 2;
+	/** How far a hanging growth reaches down from what it is attached to. */
+	private static final int HANGING_LENGTH = 6;
 
 	private WorldsmithVegetation() {
 	}
@@ -173,15 +190,25 @@ public final class WorldsmithVegetation {
 		return selector;
 	}
 
-	private static ConfiguredFeature<?, ?> configure(FeatureDefinition feature, MaterialResolver resolver) {
-		if (feature.getRecipe() == VegetationRecipe.TREE) {
+	static ConfiguredFeature<?, ?> configure(FeatureDefinition feature, MaterialResolver resolver) {
+		if (feature.getRecipe().isTree()) {
 			return tree(feature, resolver);
+		}
+		if (feature.getRecipe() == FeatureRecipe.FALLEN_LOG) {
+			return new ConfiguredFeature<>(
+				Feature.FALLEN_TREE,
+				new FallenTreeConfiguration.FallenTreeConfigurationBuilder(
+					resolver.resolveProvider(material(feature, MaterialRole.TRUNK), Blocks.OAK_LOG),
+					UniformInt.of(3, 6)
+				).build()
+			);
 		}
 		MaterialSelector primary = material(feature, MaterialRole.BLOCK);
 		BlockState state = resolver.resolve(primary, Blocks.DEAD_BUSH);
 		BlockStateProvider provider = resolver.resolveProvider(primary, Blocks.DEAD_BUSH);
 		return switch (feature.getRecipe()) {
-			case TREE -> throw new IllegalStateException("handled above");
+			case TREE, CONIFER, BLOSSOM_TREE, WEEPING_TREE, UMBRELLA_TREE, SHRUB, FALLEN_LOG ->
+				throw new IllegalStateException("handled above");
 			case GROUND_PATCH -> new ConfiguredFeature<>(
 				Feature.SIMPLE_BLOCK,
 				new SimpleBlockConfiguration(provider)
@@ -212,9 +239,20 @@ public final class WorldsmithVegetation {
 				Feature.ORE,
 				new OreConfiguration(new TagMatchTest(BlockTags.STONE_ORE_REPLACEABLES), state, ORE_VEIN_SIZE)
 			);
-			case CAVE_PATCH, SURFACE_LAYER -> new ConfiguredFeature<>(
+			case CAVE_PATCH, SURFACE_LAYER, AQUATIC_PATCH -> new ConfiguredFeature<>(
 				Feature.SIMPLE_BLOCK,
 				new SimpleBlockConfiguration(provider)
+			);
+			// Grown downward from whatever it is attached to, which is what makes
+			// it hang rather than stand.
+			case HANGING_PATCH -> new ConfiguredFeature<>(
+				Feature.BLOCK_COLUMN,
+				new BlockColumnConfiguration(
+					List.of(BlockColumnConfiguration.layer(UniformInt.of(1, HANGING_LENGTH), provider)),
+					Direction.DOWN,
+					BlockPredicate.ONLY_IN_AIR_PREDICATE,
+					true
+				)
 			);
 		};
 	}
@@ -240,14 +278,67 @@ public final class WorldsmithVegetation {
 				trunkState.getBlock()
 			);
 		}
+		// One placer pair per silhouette. The pack names the look it wants and
+		// never the geometry, exactly as it names a relief band and never an
+		// erosion range; adding a shape later is another arm here rather than
+		// another thing a document can get wrong.
+		TrunkPlacer trunkPlacer;
+		FoliagePlacer foliagePlacer;
+		FeatureSize size = new TwoLayersFeatureSize(1, 0, 1);
+		switch (feature.getRecipe()) {
+			case CONIFER -> {
+				trunkPlacer = new StraightTrunkPlacer(6, 3, 0);
+				foliagePlacer = new SpruceFoliagePlacer(UniformInt.of(2, 3), UniformInt.of(0, 2), UniformInt.of(1, 2));
+			}
+			case BLOSSOM_TREE -> {
+				trunkPlacer = new CherryTrunkPlacer(
+					7,
+					1,
+					0,
+					new WeightedListInt(
+						WeightedList.<IntProvider>builder()
+							.add(ConstantInt.of(1), 1)
+							.add(ConstantInt.of(2), 1)
+							.add(ConstantInt.of(3), 1)
+							.build()
+					),
+					UniformInt.of(2, 4),
+					UniformInt.of(-4, -3),
+					UniformInt.of(-1, 0)
+				);
+				foliagePlacer = new CherryFoliagePlacer(ConstantInt.of(4), ConstantInt.of(0), ConstantInt.of(5), 0.25F, 0.5F, 0.1666F, 0.3333F);
+				size = new TwoLayersFeatureSize(1, 0, 2);
+			}
+			// A leaning trunk under a crown that trails: the hanging chances are
+			// what read as a willow rather than as a bent oak.
+			case WEEPING_TREE -> {
+				trunkPlacer = new BendingTrunkPlacer(5, 2, 1, 4, UniformInt.of(1, 2));
+				foliagePlacer = new CherryFoliagePlacer(ConstantInt.of(3), ConstantInt.of(0), ConstantInt.of(4), 0.2F, 0.4F, 0.75F, 0.6F);
+				size = new TwoLayersFeatureSize(1, 0, 2);
+			}
+			case UMBRELLA_TREE -> {
+				trunkPlacer = new ForkingTrunkPlacer(5, 2, 2);
+				foliagePlacer = new AcaciaFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0));
+				size = new TwoLayersFeatureSize(1, 0, 2);
+			}
+			case SHRUB -> {
+				trunkPlacer = new StraightTrunkPlacer(1, 0, 0);
+				foliagePlacer = new BushFoliagePlacer(ConstantInt.of(2), ConstantInt.of(0), 2);
+			}
+			default -> {
+				trunkPlacer = new StraightTrunkPlacer(TREE_BASE_HEIGHT, TREE_HEIGHT_VARIATION, 0);
+				foliagePlacer = new BlobFoliagePlacer(ConstantInt.of(TREE_FOLIAGE_RADIUS), ConstantInt.of(0), 3);
+			}
+		}
+
 		return new ConfiguredFeature<>(
 			Feature.TREE,
 			new TreeConfiguration.TreeConfigurationBuilder(
 				trunk,
-				new StraightTrunkPlacer(TREE_BASE_HEIGHT, TREE_HEIGHT_VARIATION, 0),
+				trunkPlacer,
 				foliage,
-				new BlobFoliagePlacer(ConstantInt.of(TREE_FOLIAGE_RADIUS), ConstantInt.of(0), 3),
-				new TwoLayersFeatureSize(1, 0, 1),
+				foliagePlacer,
+				size,
 				BlockStateProvider.simple(Blocks.DIRT)
 			).ignoreVines().build()
 		);
@@ -270,7 +361,7 @@ public final class WorldsmithVegetation {
 			);
 			// A tree also has to check that its sapling would survive where it
 			// lands, or it grows out of stone and gravel.
-			case TREE -> List.of(
+			case TREE, CONIFER, BLOSSOM_TREE, WEEPING_TREE, UMBRELLA_TREE, SHRUB, FALLEN_LOG -> List.of(
 				RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density)),
 				InSquarePlacement.spread(),
 				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
@@ -303,6 +394,30 @@ public final class WorldsmithVegetation {
 			);
 			// Same shape as a ground patch; the difference is the step it runs
 			// in, which is after everything else has been placed.
+			// Placed on the sea floor and then refused unless it is actually under
+			// water, so a coastal biome does not sprout kelp on its beach.
+			case AQUATIC_PATCH -> List.of(
+				CountPlacement.of(VegetationBudget.patchCount(density)),
+				InSquarePlacement.spread(),
+				PlacementUtils.HEIGHTMAP_OCEAN_FLOOR,
+				BiomeFilter.biome(),
+				BlockPredicateFilter.forPredicate(BlockPredicate.matchesFluids(Fluids.WATER))
+			);
+			// Scans upward for something to hang from, so it lands on cave
+			// ceilings and the underside of overhangs rather than in open air.
+			case HANGING_PATCH -> List.of(
+				CountPlacement.of(VegetationBudget.veinCount(density)),
+				InSquarePlacement.spread(),
+				PlacementUtils.FULL_RANGE,
+				EnvironmentScanPlacement.scanningFor(
+					Direction.UP,
+					BlockPredicate.solid(),
+					BlockPredicate.ONLY_IN_AIR_PREDICATE,
+					CAVE_SCAN_DEPTH
+				),
+				RandomOffsetPlacement.vertical(ConstantInt.of(-1)),
+				BiomeFilter.biome()
+			);
 			case SURFACE_LAYER -> List.of(
 				CountPlacement.of(VegetationBudget.patchCount(density)),
 				InSquarePlacement.spread(),
@@ -321,12 +436,15 @@ public final class WorldsmithVegetation {
 	 * it, a boulder is a change to the land rather than something growing out of
 	 * it, and a surface layer has to settle after the things it settles on.
 	 */
-	static GenerationStep.Decoration step(VegetationRecipe recipe) {
+	static GenerationStep.Decoration step(FeatureRecipe recipe) {
 		return switch (recipe) {
 			case ORE_VEIN -> GenerationStep.Decoration.UNDERGROUND_ORES;
 			case CAVE_PATCH -> GenerationStep.Decoration.UNDERGROUND_DECORATION;
 			case BOULDER -> GenerationStep.Decoration.LOCAL_MODIFICATIONS;
-			case GROUND_PATCH, DEAD_TREE, TREE -> GenerationStep.Decoration.VEGETAL_DECORATION;
+			case HANGING_PATCH -> GenerationStep.Decoration.UNDERGROUND_DECORATION;
+			case GROUND_PATCH, DEAD_TREE, AQUATIC_PATCH, TREE, CONIFER, BLOSSOM_TREE,
+				WEEPING_TREE, UMBRELLA_TREE, SHRUB, FALLEN_LOG ->
+				GenerationStep.Decoration.VEGETAL_DECORATION;
 			case SURFACE_LAYER -> GenerationStep.Decoration.TOP_LAYER_MODIFICATION;
 		};
 	}

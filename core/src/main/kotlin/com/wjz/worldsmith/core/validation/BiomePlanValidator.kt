@@ -16,7 +16,7 @@ import com.wjz.worldsmith.core.model.ClimateCell
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.NumericRange
 import com.wjz.worldsmith.core.model.ReliefBand
-import com.wjz.worldsmith.core.model.VegetationRecipe
+import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.SurfaceConditions
 import com.wjz.worldsmith.core.model.SurfaceDefinition
 import com.wjz.worldsmith.core.model.SurfaceStack
@@ -415,7 +415,7 @@ object BiomePlanValidator {
      * grows anything tree-shaped at all, which is where this usually fails.
      */
     private fun reportSurvivability(plan: BiomePlan, features: FeatureLibrary): List<Diagnostic> = buildList {
-        val trunks = features.features.filter { it.recipe == VegetationRecipe.DEAD_TREE }.mapTo(mutableSetOf()) { it.id }
+        val trunks = features.features.filter { it.recipe == FeatureRecipe.DEAD_TREE }.mapTo(mutableSetOf()) { it.id }
         if (trunks.isEmpty()) {
             add(
                 warning(
