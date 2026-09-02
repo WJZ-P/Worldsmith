@@ -17,6 +17,27 @@ data class MaterialSelector(
     val semanticRole: String,
     val preferredIds: List<String> = emptyList(),
     val requiredTags: List<String> = emptyList(),
+    /**
+     * Alternatives to pick between, block by block, instead of one material.
+     *
+     * <p>Empty is the ordinary case and means [preferredIds] alone. A non-empty
+     * list replaces them: the compiler builds a weighted provider, so a patch of
+     * "meadow flora" can be mostly grass with a scattering of flowers rather
+     * than a field of one plant. Not every recipe can take one - an ore vein and
+     * a boulder are handed a single block state by Minecraft's own config.
+     */
+    val weighted: List<WeightedMaterial> = emptyList(),
+) {
+    /** Every material this selector can produce, whichever form was written. */
+    val alternatives: List<MaterialSelector>
+        get() = if (weighted.isEmpty()) listOf(this) else weighted.map { it.material }
+}
+
+/** One choice inside a [MaterialSelector], with its share of the draw. */
+@Serializable
+data class WeightedMaterial(
+    val material: MaterialSelector,
+    val weight: Int = 1,
 )
 
 @Serializable

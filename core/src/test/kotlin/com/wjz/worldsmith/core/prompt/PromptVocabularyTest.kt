@@ -4,6 +4,7 @@ import com.wjz.worldsmith.core.model.BandEffect
 import com.wjz.worldsmith.core.model.BandRegion
 import com.wjz.worldsmith.core.model.BiomeArchetypeRole
 import com.wjz.worldsmith.core.model.HumidityBand
+import com.wjz.worldsmith.core.model.MaterialRole
 import com.wjz.worldsmith.core.model.PromptSet
 import com.wjz.worldsmith.core.model.PromptTemplateRef
 import com.wjz.worldsmith.core.model.ReliefBand
@@ -53,7 +54,7 @@ class PromptVocabularyTest {
             SurfaceHydrology::class.java,
             TemperatureVariation::class.java,
         ),
-        PromptSet.DEFAULT.featurePlan to listOf(VegetationRecipe::class.java),
+        PromptSet.DEFAULT.featurePlan to listOf(VegetationRecipe::class.java, MaterialRole::class.java),
     )
 
     /**

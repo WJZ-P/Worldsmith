@@ -2,13 +2,17 @@ package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.MaterialSelector;
+import com.wjz.worldsmith.core.model.WeightedMaterial;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.util.random.WeightedList;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
+import net.minecraft.world.level.levelgen.feature.stateproviders.WeightedStateProvider;
 
 /**
  * Resolves the core module's semantic material selectors against the live block
@@ -48,6 +52,28 @@ public final class MaterialResolver {
 		}
 
 		return fallback.defaultBlockState();
+	}
+
+	/**
+	 * The same selector as a provider, so a role can hold several blocks.
+	 *
+	 * <p>Minecraft has no palette object: a feature configuration names its own
+	 * material fields and each takes a {@link BlockStateProvider}, which is where
+	 * "one role, several blocks" actually lives. A plain selector becomes a
+	 * simple provider and a weighted one becomes a weighted provider, so a patch
+	 * of meadow flora can be mostly grass with a scattering of flowers instead of
+	 * a field of one plant.
+	 */
+	public BlockStateProvider resolveProvider(MaterialSelector selector, Block fallback) {
+		if (selector.getWeighted().isEmpty()) {
+			return BlockStateProvider.simple(this.resolve(selector, fallback));
+		}
+
+		WeightedList.Builder<BlockState> entries = WeightedList.builder();
+		for (WeightedMaterial entry : selector.getWeighted()) {
+			entries.add(this.resolve(entry.getMaterial(), fallback), entry.getWeight());
+		}
+		return new WeightedStateProvider(entries.build());
 	}
 
 	/** Human-readable descriptions of every selector that had to fall back. */

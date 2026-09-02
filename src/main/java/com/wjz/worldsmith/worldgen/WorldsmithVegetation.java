@@ -6,6 +6,8 @@ import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
 import com.wjz.worldsmith.core.model.FeatureDefinition;
 import com.wjz.worldsmith.core.model.FeatureLibrary;
+import com.wjz.worldsmith.core.model.MaterialRole;
+import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.VegetationRecipe;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -17,6 +19,7 @@ import net.minecraft.data.worldgen.BootstrapContext;
 import net.minecraft.data.worldgen.placement.PlacementUtils;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.Direction;
+import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.valueproviders.ConstantInt;
 import net.minecraft.util.valueproviders.UniformInt;
@@ -32,6 +35,10 @@ import net.minecraft.world.level.levelgen.feature.configurations.BlockBlobConfig
 import net.minecraft.world.level.levelgen.feature.configurations.BlockColumnConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.OreConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.SimpleBlockConfiguration;
+import net.minecraft.world.level.levelgen.feature.configurations.TreeConfiguration;
+import net.minecraft.world.level.levelgen.feature.foliageplacers.BlobFoliagePlacer;
+import net.minecraft.world.level.levelgen.feature.trunkplacers.StraightTrunkPlacer;
+import net.minecraft.world.level.levelgen.feature.featuresize.TwoLayersFeatureSize;
 import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
 import net.minecraft.world.level.levelgen.placement.BiomeFilter;
 import net.minecraft.world.level.levelgen.placement.BlockPredicateFilter;
@@ -64,6 +71,10 @@ public final class WorldsmithVegetation {
 	private static final int ORE_VEIN_CEILING = 64;
 	/** How far down a cave patch looks for a floor before giving up. */
 	private static final int CAVE_SCAN_DEPTH = 12;
+	/** Vanilla's oak: four blocks plus up to two more, with a two-block crown. */
+	private static final int TREE_BASE_HEIGHT = 4;
+	private static final int TREE_HEIGHT_VARIATION = 2;
+	private static final int TREE_FOLIAGE_RADIUS = 2;
 
 	private WorldsmithVegetation() {
 	}
@@ -153,12 +164,27 @@ public final class WorldsmithVegetation {
 		return byId;
 	}
 
+	/** The selector a recipe declared for one of its roles; the validator has already required it. */
+	private static MaterialSelector material(FeatureDefinition feature, MaterialRole role) {
+		MaterialSelector selector = feature.getAllMaterials().get(role);
+		if (selector == null) {
+			throw new IllegalStateException("Feature '" + feature.getId() + "' declares no " + role + " material");
+		}
+		return selector;
+	}
+
 	private static ConfiguredFeature<?, ?> configure(FeatureDefinition feature, MaterialResolver resolver) {
-		BlockState state = resolver.resolve(feature.getBlock(), Blocks.DEAD_BUSH);
+		if (feature.getRecipe() == VegetationRecipe.TREE) {
+			return tree(feature, resolver);
+		}
+		MaterialSelector primary = material(feature, MaterialRole.BLOCK);
+		BlockState state = resolver.resolve(primary, Blocks.DEAD_BUSH);
+		BlockStateProvider provider = resolver.resolveProvider(primary, Blocks.DEAD_BUSH);
 		return switch (feature.getRecipe()) {
+			case TREE -> throw new IllegalStateException("handled above");
 			case GROUND_PATCH -> new ConfiguredFeature<>(
 				Feature.SIMPLE_BLOCK,
-				new SimpleBlockConfiguration(BlockStateProvider.simple(state))
+				new SimpleBlockConfiguration(provider)
 			);
 			case DEAD_TREE -> {
 				// The half of the survivability check core cannot make. It knows
@@ -175,7 +201,7 @@ public final class WorldsmithVegetation {
 				}
 				yield new ConfiguredFeature<>(
 					Feature.BLOCK_COLUMN,
-					BlockColumnConfiguration.simple(UniformInt.of(2, 5), BlockStateProvider.simple(state))
+					BlockColumnConfiguration.simple(UniformInt.of(2, 5), provider)
 				);
 			}
 			case BOULDER -> new ConfiguredFeature<>(
@@ -188,9 +214,43 @@ public final class WorldsmithVegetation {
 			);
 			case CAVE_PATCH, SURFACE_LAYER -> new ConfiguredFeature<>(
 				Feature.SIMPLE_BLOCK,
-				new SimpleBlockConfiguration(BlockStateProvider.simple(state))
+				new SimpleBlockConfiguration(provider)
 			);
 		};
+	}
+
+	/**
+	 * A tree with leaves on it, which is the one shape a column cannot fake.
+	 *
+	 * <p>Two roles rather than one, because Minecraft builds a tree from a trunk
+	 * provider and a foliage provider placed by two separate strategies. The
+	 * shapes are the compiler's to choose, as everywhere else: this is vanilla's
+	 * straight-trunk blob-foliage oak, and the pack decides only what it is made
+	 * of. Naming further shapes - conifer, weeping, blossom - is adding placer
+	 * pairs here, not new vocabulary for the pack to get wrong.
+	 */
+	private static ConfiguredFeature<?, ?> tree(FeatureDefinition feature, MaterialResolver resolver) {
+		BlockStateProvider trunk = resolver.resolveProvider(material(feature, MaterialRole.TRUNK), Blocks.OAK_LOG);
+		BlockStateProvider foliage = resolver.resolveProvider(material(feature, MaterialRole.FOLIAGE), Blocks.OAK_LEAVES);
+		BlockState trunkState = resolver.resolve(material(feature, MaterialRole.TRUNK), Blocks.OAK_LOG);
+		if (!trunkState.is(BlockTags.LOGS)) {
+			Worldsmith.LOGGER.warn(
+				"Feature '{}' is a tree whose trunk is {}, which is not a log; a player cannot craft from it",
+				feature.getId(),
+				trunkState.getBlock()
+			);
+		}
+		return new ConfiguredFeature<>(
+			Feature.TREE,
+			new TreeConfiguration.TreeConfigurationBuilder(
+				trunk,
+				new StraightTrunkPlacer(TREE_BASE_HEIGHT, TREE_HEIGHT_VARIATION, 0),
+				foliage,
+				new BlobFoliagePlacer(ConstantInt.of(TREE_FOLIAGE_RADIUS), ConstantInt.of(0), 3),
+				new TwoLayersFeatureSize(1, 0, 1),
+				BlockStateProvider.simple(Blocks.DIRT)
+			).ignoreVines().build()
+		);
 	}
 
 	private static List<PlacementModifier> place(FeatureDefinition feature, double density) {
@@ -207,6 +267,15 @@ public final class WorldsmithVegetation {
 				InSquarePlacement.spread(),
 				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
 				BiomeFilter.biome()
+			);
+			// A tree also has to check that its sapling would survive where it
+			// lands, or it grows out of stone and gravel.
+			case TREE -> List.of(
+				RarityFilter.onAverageOnceEvery(VegetationBudget.rarity(density)),
+				InSquarePlacement.spread(),
+				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
+				BiomeFilter.biome(),
+				BlockPredicateFilter.forPredicate(BlockPredicate.wouldSurvive(Blocks.OAK_SAPLING.defaultBlockState(), BlockPos.ZERO))
 			);
 			// Mirrors vanilla's commonOrePlacement, which is a count, a spread, a
 			// height range and the biome filter, in that order.
@@ -257,7 +326,7 @@ public final class WorldsmithVegetation {
 			case ORE_VEIN -> GenerationStep.Decoration.UNDERGROUND_ORES;
 			case CAVE_PATCH -> GenerationStep.Decoration.UNDERGROUND_DECORATION;
 			case BOULDER -> GenerationStep.Decoration.LOCAL_MODIFICATIONS;
-			case GROUND_PATCH, DEAD_TREE -> GenerationStep.Decoration.VEGETAL_DECORATION;
+			case GROUND_PATCH, DEAD_TREE, TREE -> GenerationStep.Decoration.VEGETAL_DECORATION;
 			case SURFACE_LAYER -> GenerationStep.Decoration.TOP_LAYER_MODIFICATION;
 		};
 	}

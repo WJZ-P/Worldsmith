@@ -36,6 +36,6 @@ object VegetationBudget {
     fun attemptsPerChunk(recipe: VegetationRecipe, density: Double): Double = when (recipe) {
         VegetationRecipe.GROUND_PATCH, VegetationRecipe.SURFACE_LAYER -> patchCount(density).toDouble()
         VegetationRecipe.ORE_VEIN, VegetationRecipe.CAVE_PATCH -> veinCount(density).toDouble()
-        VegetationRecipe.DEAD_TREE, VegetationRecipe.BOULDER -> 1.0 / rarity(density)
+        VegetationRecipe.DEAD_TREE, VegetationRecipe.BOULDER, VegetationRecipe.TREE -> 1.0 / rarity(density)
     }
 }

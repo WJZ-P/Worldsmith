@@ -22,8 +22,11 @@ number of biomes, so the shape and material are written once and compiled once.
 
 - `id` is lowercase `a-z 0-9 _ . -` and unique in the library.
 - `recipe` is one of the three names below and nothing else.
-- `block` is a material selector: `semanticRole` is required, plus at least one
-  of `preferredIds` or `requiredTags`. Semantic role first; ids are hints.
+- `block` is the material, for a recipe that needs only one. A selector has a
+  required `semanticRole` plus at least one of `preferredIds` or `requiredTags`.
+  Semantic role first; ids are hints.
+- `materials` replaces `block` for a recipe built from more than one material,
+  keyed by role. Never write both.
 - `density` is `0..1`. Its meaning depends on the recipe; see below.
 
 ## The recipes
@@ -40,6 +43,7 @@ fails while loading rather than producing a quietly empty world.
 | `ORE_VEIN` | a vein of about 33 blocks cut into stone | underground, from near bedrock up to y 64 | a mineral that belongs to this place - ore, crystal, buried ice, a seam of something wrong |
 | `CAVE_PATCH` | one block standing on a cave floor | underground, dropped into open air and walked down onto solid ground | glowing moss, crystal shards, fungus, bones - what a player finds by going down |
 | `SURFACE_LAYER` | one block on the ground | the same as a ground patch, but placed after everything else | settled ash, drifted petals, snow, dust - cover that lies **on top of** the trunks and boulders rather than beside them |
+| `TREE` | a trunk with a crown of leaves on it | a rarity filter, only where a sapling would survive | an actual tree - the one shape a bare column cannot fake |
 
 `DEAD_TREE` is a naming accident worth reading past: it compiles to a bare
 column with no leaves, whatever block it is made of. It is not restricted to
@@ -49,6 +53,57 @@ dead worlds, and it is what you use for any living trunk too.
 *in* the rock. It is the only way a biome can own part of the underground: two
 biomes with the same surface and different veins are two different places to
 mine.
+
+## Materials by role
+
+Most recipes read one material and take the `block` shorthand. A recipe built
+from more than one names them instead:
+
+| recipe | roles |
+| --- | --- |
+| `TREE` | `TRUNK`, `FOLIAGE` |
+| everything else | `BLOCK` |
+
+```json
+{
+  "id": "sakura",
+  "recipe": "TREE",
+  "materials": {
+    "TRUNK":   { "semanticRole": "sakura_wood",  "preferredIds": ["minecraft:cherry_log"] },
+    "FOLIAGE": { "semanticRole": "sakura_bloom", "preferredIds": ["minecraft:cherry_leaves"] }
+  },
+  "density": 0.2
+}
+```
+
+A role the recipe does not read is rejected rather than ignored, because effort
+spent on a material that never reaches the world is worse than an error.
+
+## One role, several blocks
+
+A selector may pick between alternatives per block instead of naming one:
+
+```json
+"block": {
+  "semanticRole": "meadow_flora",
+  "weighted": [
+    { "material": { "semanticRole": "grass",     "preferredIds": ["minecraft:short_grass"] }, "weight": 8 },
+    { "material": { "semanticRole": "dandelion", "preferredIds": ["minecraft:dandelion"] },   "weight": 2 },
+    { "material": { "semanticRole": "poppy",     "preferredIds": ["minecraft:poppy"] },       "weight": 1 }
+  ]
+}
+```
+
+A weighted selector carries no `preferredIds` of its own, holds at most eight
+entries, and nests only one level deep. Weights are relative, from 1 to 64.
+
+This is what separates ground that reads as a meadow from ground that reads as
+one plant repeated. Use it for cover and undergrowth especially; a single
+species carpeting a whole biome is the most common way a world looks generated.
+
+`ORE_VEIN` and `BOULDER` cannot take one: Minecraft hands those a single block
+state rather than a provider, so the list would collapse to its first entry, and
+that is reported as an error rather than done quietly.
 
 Most worlds want all three. A world with only trunks reads as a stage set: no
 ground cover means bare terrain-coloured floor to the horizon, and no boulders
@@ -104,7 +159,8 @@ biomes. Express abundance with `density`, not by reordering the array.
 **At least one land biome must reference a `DEAD_TREE` feature whose block is a
 log**, at a density of at least `0.15`. Minecraft survival starts by punching a
 tree: with no wood there is no crafting table, no tools, and no way to play the
-world at all.
+world at all. A `TREE` whose `TRUNK` is a log satisfies the same need and is the
+better answer wherever the world has living growth in it.
 
 This holds for dead and hostile worlds too. A petrified trunk, a fossil spar, a
 wrecked mast and a charred pillar are all logs, and any of them keeps the world
