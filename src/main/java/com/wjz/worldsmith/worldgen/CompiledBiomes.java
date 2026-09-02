@@ -4,8 +4,10 @@ import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomePlan;
 import com.wjz.worldsmith.core.model.ClimateBands;
 import com.wjz.worldsmith.core.model.ClimateBox;
+import com.wjz.worldsmith.core.model.ClimatePlacement;
 import com.wjz.worldsmith.core.model.ClimateSlot;
 import com.wjz.worldsmith.core.model.NumericRange;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 import net.minecraft.resources.ResourceKey;
@@ -31,24 +33,33 @@ public final class CompiledBiomes {
 			definition,
 			keyFactory.apply(definition.getId()),
 			BiomeArchetype.from(definition.getArchetype()),
-			climate(resolveBox(definition))
+			resolveBoxes(definition).stream().map(CompiledBiomes::climate).toList()
 		);
 	}
 
 	/**
 	 * A slot is expanded through the shared band table; a raw box is taken as
-	 * written. The validator has already rejected declaring neither or both.
+	 * written. The validator has already rejected declaring neither or both,
+	 * and {@code allPlacements} is what folds the one-placement shorthand into
+	 * the same shape as the list so only one path is ever exercised.
 	 */
-	private static ClimateBox resolveBox(BiomeDefinition definition) {
-		ClimateSlot slot = definition.getSlot();
-		if (slot != null) {
-			return ClimateBands.INSTANCE.resolve(slot);
+	private static List<ClimateBox> resolveBoxes(BiomeDefinition definition) {
+		List<ClimateBox> boxes = new ArrayList<>();
+		for (ClimatePlacement placement : definition.getAllPlacements()) {
+			ClimateSlot slot = placement.getSlot();
+			if (slot != null) {
+				boxes.add(ClimateBands.INSTANCE.resolve(slot));
+				continue;
+			}
+			ClimateBox raw = placement.getClimate();
+			if (raw != null) {
+				boxes.add(raw);
+			}
 		}
-		ClimateBox raw = definition.getClimate();
-		if (raw == null) {
+		if (boxes.isEmpty()) {
 			throw new IllegalStateException("Biome '" + definition.getId() + "' declares no climate");
 		}
-		return raw;
+		return List.copyOf(boxes);
 	}
 
 	public static Climate.ParameterPoint climate(ClimateBox box) {

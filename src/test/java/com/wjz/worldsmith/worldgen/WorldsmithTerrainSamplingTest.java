@@ -43,11 +43,23 @@ final class WorldsmithTerrainSamplingTest {
 
 	@BeforeAll
 	static void bootstrapMinecraft() {
-		WorldsmithTestBootstrap.bootStrap();
-		activeWorldgen = WorldsmithPackExporter.compilePatch(
-			WorldsmithPacks.builtinCompiled(),
-			VanillaRegistries.createLookup()
-		).full();
+		activeWorldgen();
+	}
+
+	/**
+	 * Built on demand rather than in {@code @BeforeAll}, because another test
+	 * class reuses {@link #state} and would otherwise get a null provider
+	 * depending on which class JUnit happened to run first.
+	 */
+	static synchronized HolderLookup.Provider activeWorldgen() {
+		if (activeWorldgen == null) {
+			WorldsmithTestBootstrap.bootStrap();
+			activeWorldgen = WorldsmithPackExporter.compilePatch(
+				WorldsmithPacks.builtinCompiled(),
+				VanillaRegistries.createLookup()
+			).full();
+		}
+		return activeWorldgen;
 	}
 
 	@Test
@@ -560,7 +572,7 @@ final class WorldsmithTerrainSamplingTest {
 		assertTrue(carved > 150, () -> "full cave density should carve sampled solid points, got " + carved);
 	}
 
-	private static TerrainShape.Procedural shape(
+	static TerrainShape.Procedural shape(
 		double landRatio,
 		double continentScale,
 		double coastRoughness,
@@ -731,7 +743,7 @@ final class WorldsmithTerrainSamplingTest {
 		return detached;
 	}
 
-	private static RandomState state(TerrainShape.Procedural shape, char idCharacter) {
+	static RandomState state(TerrainShape.Procedural shape, char idCharacter) {
 		WorldsmithPack source = WorldsmithPacks.builtin();
 		TerrainPlan template = source.getTerrain();
 		TerrainPlan terrain = new TerrainPlan(
@@ -758,7 +770,7 @@ final class WorldsmithTerrainSamplingTest {
 		CompiledPack compiledPack = CompiledPack.scoped(new WorldsmithPack(
 			manifest, terrain, source.getBiomes(), source.getFeatures(), id
 		));
-		HolderLookup.Provider registries = WorldsmithPackExporter.compilePatch(compiledPack, activeWorldgen).full();
+		HolderLookup.Provider registries = WorldsmithPackExporter.compilePatch(compiledPack, activeWorldgen()).full();
 		return RandomState.create(registries, compiledPack.noiseSettingsKey(), SEED);
 	}
 

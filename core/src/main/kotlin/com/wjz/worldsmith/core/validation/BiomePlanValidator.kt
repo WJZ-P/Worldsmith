@@ -115,16 +115,35 @@ object BiomePlanValidator {
         }
 
         when {
+            biome.placements.isNotEmpty() && (biome.slot != null || biome.climate != null) ->
+                add(
+                    error(
+                        path + ".placements",
+                        "AMBIGUOUS_CLIMATE",
+                        "A biome uses the placements list or the slot/climate shorthand, not both",
+                    ),
+                )
             biome.slot != null && biome.climate != null ->
                 add(error(path + ".climate", "AMBIGUOUS_CLIMATE", "A biome declares either a slot or a raw climate, not both"))
-            biome.slot == null && biome.climate == null ->
+            biome.allPlacements.isEmpty() ->
                 add(error(path + ".slot", "MISSING_CLIMATE", "A biome must declare a climate slot or a raw climate box"))
         }
-        biome.climate?.let { addAll(validateClimate(path + ".climate", it)) }
+        biome.placements.forEachIndexed { index, placement ->
+            val placementPath = path + ".placements[" + index + "]"
+            when {
+                placement.slot != null && placement.climate != null ->
+                    add(error(placementPath, "AMBIGUOUS_CLIMATE", "A placement declares either a slot or a raw climate, not both"))
+                placement.slot == null && placement.climate == null ->
+                    add(error(placementPath, "MISSING_CLIMATE", "A placement must declare a climate slot or a raw climate box"))
+            }
+        }
+        biome.allPlacements.forEachIndexed { index, placement ->
+            placement.climate?.let { addAll(validateClimate(path + ".placements[" + index + "].climate", it)) }
+        }
 
         // Bands are turned into one span, so a gap would make the box cover a
         // band the biome never asked for.
-        biome.slot?.let { slot ->
+        biome.allPlacements.mapNotNull { it.slot }.forEach { slot ->
             if (!ClimateBands.isContiguous(slot.temperature)) {
                 add(
                     error(
@@ -425,7 +444,7 @@ object BiomePlanValidator {
     }
 
     private fun reportCoverage(plan: BiomePlan): List<Diagnostic> = buildList {
-        val rawBoxes = plan.biomes.filter { it.slot == null && it.climate != null }
+        val rawBoxes = plan.biomes.filter { biome -> biome.allPlacements.any { it.climate != null } }
         if (rawBoxes.isNotEmpty()) {
             add(
                 warning(
@@ -440,9 +459,10 @@ object BiomePlanValidator {
 
         val owners = linkedMapOf<ClimateCell, MutableList<String>>()
         plan.biomes.forEach { biome ->
-            val slot = biome.slot ?: return@forEach
-            ClimateBands.cells(slot).forEach { cell ->
-                owners.getOrPut(cell) { mutableListOf() }.add(biome.id)
+            biome.allPlacements.mapNotNull { it.slot }.forEach { slot ->
+                ClimateBands.cells(slot).forEach { cell ->
+                    owners.getOrPut(cell) { mutableListOf() }.addAll(listOf(biome.id).filterNot { it in owners[cell].orEmpty() })
+                }
             }
         }
 

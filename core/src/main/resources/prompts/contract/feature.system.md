@@ -26,9 +26,9 @@ number of biomes, so the shape and material are written once and compiled once.
   of `preferredIds` or `requiredTags`. Semantic role first; ids are hints.
 - `density` is `0..1`. Its meaning depends on the recipe; see below.
 
-## The three recipes
+## The recipes
 
-The vocabulary is closed on purpose. The pack chooses a recipe and a material;
+Six of them, and the vocabulary is closed on purpose. The pack chooses a recipe and a material;
 the shape and every placement rule belong to the compiler. An unknown recipe
 fails while loading rather than producing a quietly empty world.
 

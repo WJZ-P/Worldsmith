@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.core.mcp
 
 import com.wjz.worldsmith.core.WorldsmithCore
+import com.wjz.worldsmith.core.analysis.BiomeDistributionAnalyzer
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import com.wjz.worldsmith.core.model.BiomePlan
 import com.wjz.worldsmith.core.model.FeatureLibrary
@@ -149,6 +150,19 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             handler = ::getContract,
         ),
         McpTool(
+            name = WorldsmithWorkflow.ANALYZE_TOOL,
+            title = "Analyze Worldsmith biome distribution",
+            description =
+                "Predict how much of the world each biome will actually cover, before writing the pack. A climate " +
+                    "box says where a biome may be, never how much that is, and the axes are bell-shaped noise: " +
+                    "the HOT band looks like COLD's mirror and is a quarter its size. Reports per-biome share, " +
+                    "land/water split, biomes that are never chosen, and which pairs share a border. " +
+                    "Send the same terrain and biomes you intend to write, or the id of a saved pack.",
+            inputSchema = analyzeSchema(),
+            readOnly = true,
+            handler = ::analyzeDistribution,
+        ),
+        McpTool(
             name = "worldsmith_list_packs",
             title = "List Worldsmith packs",
             description = "List portable packs already stored in Worldsmith's managed local pack directory.",
@@ -274,6 +288,99 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     }
 
     private fun bandNames(values: List<Enum<*>>): JsonArray = JsonArray(values.map { JsonPrimitive(it.name) })
+
+    /**
+     * Answers the one question the document cannot: how much of it is what.
+     *
+     * <p>Accepts the documents directly rather than only a saved pack, because
+     * the useful moment is before the write, while the design is still cheap to
+     * change. A pack id is accepted too, for looking at what was already built.
+     */
+    private fun analyzeDistribution(arguments: JsonObject): McpToolResult {
+        val id = arguments["id"]?.jsonPrimitive?.contentOrNull
+        val terrain: TerrainPlan
+        val biomes: BiomePlan
+        if (id != null) {
+            val pack = runCatching { WorldsmithPackLoader.loadDirectory(packDirectory.resolve(id)) }
+                .getOrElse { return McpToolResult.error("No managed pack with id " + id) }
+            terrain = pack.terrain
+            biomes = pack.biomes
+        } else {
+            terrain = decode(requiredObject(arguments, "terrain"))
+            biomes = decode(requiredObject(arguments, "biomes"))
+        }
+
+        val report = BiomeDistributionAnalyzer.analyze(biomes, terrain)
+        val structured = buildJsonObject {
+            put("samples", report.samples)
+            put("landShare", report.landShare)
+            put("waterShare", report.waterShare)
+            putJsonArray("biomes") {
+                report.biomes.forEach { share ->
+                    add(
+                        buildJsonObject {
+                            put("id", share.id)
+                            put("archetype", share.archetype.name)
+                            put("share", share.share)
+                        },
+                    )
+                }
+            }
+            putJsonObject("archetypes") {
+                report.archetypes.forEach { (role, share) -> put(role.name, share) }
+            }
+            put("neverChosen", JsonArray(report.absent.map(::JsonPrimitive)))
+            put("rare", JsonArray(report.rare.map(::JsonPrimitive)))
+            put("dominant", JsonArray(report.dominant.map(::JsonPrimitive)))
+            putJsonArray("borders") {
+                report.borders.forEach { border ->
+                    add(
+                        buildJsonObject {
+                            put("first", border.first)
+                            put("second", border.second)
+                            put("share", border.share)
+                        },
+                    )
+                }
+            }
+            put("notes", JsonArray(report.notes.map(::JsonPrimitive)))
+        }
+
+        val text = buildString {
+            appendLine("land " + percent(report.landShare) + " / water " + percent(report.waterShare))
+            report.biomes.forEach { appendLine(percent(it.share).padStart(6) + "  " + it.id) }
+            if (report.absent.isNotEmpty()) {
+                appendLine("never chosen: " + report.absent.joinToString(", "))
+            }
+            if (report.rare.isNotEmpty()) {
+                appendLine("under " + percent(BiomeDistributionAnalyzer.RARE_SHARE) + ": " + report.rare.joinToString(", "))
+            }
+            report.notes.forEach { appendLine(it) }
+        }
+        return McpToolResult.success(structured, text.trim())
+    }
+
+    private fun percent(share: Double): String = ((share * 1000).toInt() / 10.0).toString() + "%"
+
+
+    private fun analyzeSchema(): JsonObject = objectSchema(
+        properties = mapOf(
+            "id" to buildJsonObject {
+                put("type", "string")
+                put("pattern", "^[0-9a-f]{64}$")
+                put("description", "A saved pack to analyze instead of sending documents.")
+            },
+            "terrain" to buildJsonObject {
+                put("type", "object")
+                put("description", "The terrain document; its land ratio decides where the coastline falls.")
+            },
+            "biomes" to buildJsonObject {
+                put("type", "object")
+                put("description", "The biome document to measure.")
+            },
+        ),
+        required = emptyList(),
+    )
 
     /**
      * The cheap half of the style lookup: an id and a sentence each.

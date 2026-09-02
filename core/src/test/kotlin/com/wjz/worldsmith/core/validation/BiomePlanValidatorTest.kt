@@ -11,6 +11,7 @@ import com.wjz.worldsmith.core.model.BiomeTint
 import com.wjz.worldsmith.core.model.BiomeFeatureRef
 import com.wjz.worldsmith.core.model.BiomePlan
 import com.wjz.worldsmith.core.model.ClimateBox
+import com.wjz.worldsmith.core.model.ClimatePlacement
 import com.wjz.worldsmith.core.model.ClimateSlot
 import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureLibrary
@@ -34,6 +35,44 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class BiomePlanValidatorTest {
+    @Test
+    fun `a biome uses the placements list or the shorthand but not both`() {
+        val mixed = plan().let { source ->
+            source.copy(
+                biomes = source.biomes.map { biome ->
+                    if (biome.id != "flats_cold") {
+                        biome
+                    } else {
+                        biome.copy(
+                            placements = listOf(ClimatePlacement(slot = ClimateSlot(ReliefBand.FLATS))),
+                        )
+                    }
+                },
+            )
+        }
+
+        // Two ways of saying where a biome goes, disagreeing. Silently picking
+        // one is how a pack generates a world its own document denies.
+        assertTrue(BiomePlanValidator.validate(mixed, library()).any { it.code == "AMBIGUOUS_CLIMATE" })
+    }
+
+    @Test
+    fun `a placement that names neither a slot nor a box is rejected`() {
+        val empty = plan().let { source ->
+            source.copy(
+                biomes = source.biomes.map { biome ->
+                    if (biome.id != "flats_cold") {
+                        biome
+                    } else {
+                        biome.copy(slot = null, placements = listOf(ClimatePlacement()))
+                    }
+                },
+            )
+        }
+
+        assertTrue(BiomePlanValidator.validate(empty, library()).any { it.code == "MISSING_CLIMATE" })
+    }
+
     @Test
     fun `a relief band held by one biome is reported as a contour line`() {
         val monotone = plan().let { source ->

@@ -69,10 +69,13 @@ data class ClimateSlot(
  * Whether one biome holds the same temperature everywhere inside itself.
  *
  * <p>[UNIFORM] freezes along a line, because the only thing that changes across
- * a biome is which biome it is. [PATCHY] pulls the temperature down to freezing
- * wherever a low-frequency noise says so, so ice forms in drifts and open
- * stretches inside one biome rather than stopping at its border. It is the
- * difference between a frozen ocean with broken floes and one solid sheet.
+ * a biome is which biome it is.
+ *
+ * <p>[PATCHY] forces the temperature to 0.2 wherever a low-frequency noise says
+ * so. Minecraft counts anything at or above 0.15 as too warm to snow, so those
+ * patches are the ones that <em>do not</em> freeze: the effect only shows in a
+ * biome that is otherwise below freezing, where it opens holes in the ice. In a
+ * warm biome nothing visible happens, because 0.2 is above freezing too.
  */
 @Serializable
 enum class TemperatureVariation {
@@ -312,19 +315,50 @@ data class BiomeFeatureRef(
     val density: Double? = null,
 )
 
+/**
+ * One region of climate space a biome claims, written either way.
+ *
+ * <p>Exactly one of the two is set. Several of these let one biome appear in
+ * places that are not neighbours - a shore biome on a cold coast and again on a
+ * hot one - without duplicating the whole definition, which is how two copies
+ * of "the same" biome drift apart in palette and features.
+ */
+@Serializable
+data class ClimatePlacement(
+    val slot: ClimateSlot? = null,
+    val climate: ClimateBox? = null,
+)
+
 @Serializable
 data class BiomeDefinition(
     val id: String,
     val displayName: String,
     val archetype: BiomeArchetypeRole,
+    /** Shorthand for a biome that claims one region; equivalent to a single entry in [placements]. */
     val slot: ClimateSlot? = null,
     val climate: ClimateBox? = null,
+    val placements: List<ClimatePlacement> = emptyList(),
     val behavior: BiomeBehavior,
     val surface: SurfaceDefinition,
     val environment: BiomeEnvironment,
     val tags: BiomeTagOverrides = BiomeTagOverrides(),
     val features: List<BiomeFeatureRef> = emptyList(),
-)
+) {
+    /**
+     * Every region this biome claims, whichever form the author wrote.
+     *
+     * <p>Read this rather than [slot] or [climate] anywhere the question is
+     * "where does this biome go": the shorthand and the list would otherwise be
+     * two code paths, and the one nobody exercised would be the broken one.
+     */
+    val allPlacements: List<ClimatePlacement>
+        get() = when {
+            placements.isNotEmpty() -> placements
+            slot != null -> listOf(ClimatePlacement(slot = slot))
+            climate != null -> listOf(ClimatePlacement(climate = climate))
+            else -> emptyList()
+        }
+}
 
 @Serializable
 data class BiomePlan(

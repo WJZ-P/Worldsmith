@@ -73,6 +73,7 @@ final class WorldsmithFeatureOrderTest {
 			biome.getArchetype(),
 			biome.getSlot(),
 			biome.getClimate(),
+			biome.getPlacements(),
 			biome.getBehavior(),
 			biome.getSurface(),
 			biome.getEnvironment(),

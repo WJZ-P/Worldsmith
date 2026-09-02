@@ -15,6 +15,19 @@ of biomes or its partition unless the prompt independently calls for it.
 
 Every biome chooses exactly one placement form: `slot` or `climate`.
 
+A biome that belongs in two places that are not neighbours may list them
+instead, and then it declares neither `slot` nor `climate` at the top level:
+
+```json
+"placements": [
+  { "slot": { "relief": "COAST", "temperature": ["COLD"] } },
+  { "slot": { "relief": "COAST", "temperature": ["HOT"] } }
+]
+```
+
+Reach for this rather than copying a biome under two ids. Two copies are two
+palettes, two feature lists and two things to keep in step, and they drift.
+
 ### Semantic slot (optional convenience)
 
 Use a slot when these broad presets already express the prompt:
@@ -85,10 +98,12 @@ overlapping boxes because their tie would make one biome effectively hidden.
   end may still be a dry, snow-free ash desert.
 - `behavior.temperatureVariation` is `UNIFORM` or `PATCHY` and defaults to
   `UNIFORM`, where one biome is the same temperature throughout and so freezes
-  along its own border. `PATCHY` lets a noise pull the temperature to freezing
-  in places, so ice and snow form in drifts with open ground between them inside
-  a single biome. Use it where a frontier should look weathered rather than
-  drawn - a thawing shore, a broken floe, a peak whose snowline wanders.
+  along its own border. `PATCHY` raises the temperature to 0.2 wherever a noise
+  says so, and 0.2 is just above the point where Minecraft stops making ice, so
+  those patches are the ones that *thaw*. It only does anything in a biome whose
+  `behavior.temperature` is already below freezing, where it opens meltwater
+  holes and bare ground in what would otherwise be one unbroken sheet. On a warm
+  biome it changes nothing.
 - Colours are `#RRGGBB`, except `sky.cloudColor` and `sky.sunriseSunsetColor`,
   which carry alpha and are `#AARRGGBB`. Read them as the mood of the place, not
   as realistic pigment. Vary them: biomes that differ in height or temperature
@@ -104,9 +119,10 @@ overlapping boxes because their tie would make one biome effectively hidden.
   never fall below) deliberately, not on every biome.
 - Do not restate a vanilla default. A pack that writes the value Minecraft
   already uses has made the world no different and the document harder to read.
-- Write `displayName` and `description` in the language the player wrote their
-  prompt in. These strings are shown to that one player and to nobody else, so a
-  Chinese prompt gets Chinese names; do not translate them to English.
+- Write `displayName` in the language the player wrote their prompt in. It is
+  shown to that one player and to nobody else, so a Chinese prompt gets Chinese
+  names; do not translate them to English. A biome carries no prose description;
+  the pack as a whole has one, and unknown fields are rejected outright.
 - `id` is the opposite: always lowercase ASCII with underscores, whatever
   language the names are in. Ids are keys - they end up in registry paths, file
   names and diagnostics, and they have to stay typeable and greppable.

@@ -35,6 +35,7 @@ object WorldsmithWorkflow {
     const val STYLE_LIST_TOOL: String = "worldsmith_list_styles"
     const val STYLE_GET_TOOL: String = "worldsmith_get_style"
     const val CONTRACT_TOOL: String = "worldsmith_get_contract"
+    const val ANALYZE_TOOL: String = "worldsmith_analyze_biome_distribution"
     const val WRITE_TOOL: String = "worldsmith_write_pack"
     const val FINISH_TOOL: String = "worldsmith_finish_world"
 
@@ -87,6 +88,15 @@ object WorldsmithWorkflow {
         ),
         WorkflowStep(
             order = 4,
+            tool = ANALYZE_TOOL,
+            instruction =
+                "Send the terrain and biome documents you are about to write. A climate box says where a biome " +
+                    "may be, never how much of the world that is, and the axes are bell-shaped noise, so a box " +
+                    "that looks half the size of another is often a quarter of it. Fix anything the report calls " +
+                    "never chosen or dominant, then run it again before writing.",
+        ),
+        WorkflowStep(
+            order = 5,
             tool = WRITE_TOOL,
             instruction =
                 "Send the whole pack with this sessionId. Preserve the template's technical terrain envelope, " +
@@ -95,7 +105,7 @@ object WorldsmithWorkflow {
                     "error diagnostics means nothing was saved, so repair those exact problems and call it again.",
         ),
         WorkflowStep(
-            order = 5,
+            order = 6,
             tool = FINISH_TOOL,
             instruction =
                 "Call it with this sessionId. It re-reads the pack from disk and re-validates it. Stop when it " +
