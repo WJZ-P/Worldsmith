@@ -27,11 +27,15 @@ final class WorldsmithTestBootstrap {
 		Bootstrap.bootStrap();
 		MappedRegistry<?> materialConditions = (MappedRegistry<?>)BuiltInRegistries.MATERIAL_CONDITION;
 		MappedRegistry<?> densityFunctions = (MappedRegistry<?>)BuiltInRegistries.DENSITY_FUNCTION_TYPE;
+		MappedRegistry<?> trunkPlacers = (MappedRegistry<?>)BuiltInRegistries.TRUNK_PLACER_TYPE;
+		MappedRegistry<?> foliagePlacers = (MappedRegistry<?>)BuiltInRegistries.FOLIAGE_PLACER_TYPE;
 		try {
 			Field frozen = MappedRegistry.class.getDeclaredField("frozen");
 			frozen.setAccessible(true);
 			frozen.setBoolean(materialConditions, false);
 			frozen.setBoolean(densityFunctions, false);
+			frozen.setBoolean(trunkPlacers, false);
+			frozen.setBoolean(foliagePlacers, false);
 			WorldsmithWorldgen.initialize();
 			Method bindValue = Holder.Reference.class.getDeclaredMethod("bindValue", Object.class);
 			bindValue.setAccessible(true);
@@ -43,11 +47,17 @@ final class WorldsmithTestBootstrap {
 				WorldsmithAnchorFields.Point.CODEC.codec(), bindValue);
 			bind(densityFunctions, Registries.DENSITY_FUNCTION_TYPE, "anchor_grid",
 				WorldsmithAnchorFields.Grid.CODEC.codec(), bindValue);
+			bind(trunkPlacers, Registries.TRUNK_PLACER_TYPE, "shaped_trunk",
+				WorldsmithTreePlacerTypes.trunk(), bindValue);
+			bind(foliagePlacers, Registries.FOLIAGE_PLACER_TYPE, "shaped_foliage",
+				WorldsmithTreePlacerTypes.foliage(), bindValue);
 			// Fabric performs the ordinary final freeze after mod registration.
 			// The plain test registry was already frozen once, so restore the flag
 			// directly instead of rebuilding its already-bound tag set.
 			frozen.setBoolean(materialConditions, true);
 			frozen.setBoolean(densityFunctions, true);
+			frozen.setBoolean(trunkPlacers, true);
+			frozen.setBoolean(foliagePlacers, true);
 		} catch (ReflectiveOperationException failure) {
 			throw new IllegalStateException("Could not open the test registries", failure);
 		}

@@ -112,6 +112,27 @@ enum class TreeSilhouette {
         }
 }
 
+/** Path followed by the centre of a Worldsmith-authored trunk. */
+@Serializable
+enum class TreeTrunkShape {
+    STRAIGHT,
+    BENT,
+    TWISTED,
+    FORKED,
+    BRANCHING,
+}
+
+/** Volume rule used by the Worldsmith foliage placer around every branch tip. */
+@Serializable
+enum class TreeCrownShape {
+    ROUND,
+    CONICAL,
+    LAYERED,
+    UMBRELLA,
+    WEEPING,
+    CLUSTERED,
+}
+
 /** How trees occupy chunks rather than what one tree looks like. */
 @Serializable
 enum class TreeDistribution {
