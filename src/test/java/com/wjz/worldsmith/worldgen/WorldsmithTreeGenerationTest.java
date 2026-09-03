@@ -8,9 +8,13 @@ import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.TreeDistribution;
 import com.wjz.worldsmith.core.model.TreeHeight;
-import com.wjz.worldsmith.core.model.TreeSilhouette;
 import com.wjz.worldsmith.core.model.TreeSpec;
 import com.wjz.worldsmith.core.model.TreeSubstrate;
+import com.wjz.worldsmith.core.model.TreeBranchSpec;
+import com.wjz.worldsmith.core.model.TreeCrownShape;
+import com.wjz.worldsmith.core.model.TreeCrownSpec;
+import com.wjz.worldsmith.core.model.TreeTrunkShape;
+import com.wjz.worldsmith.core.model.TreeTrunkSpec;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -40,29 +44,40 @@ final class WorldsmithTreeGenerationTest {
 	}
 
 	@Test
-	void everySilhouettePlacesBothTrunkAndCrown() {
-		for (TreeSilhouette silhouette : TreeSilhouette.values()) {
-			FlatWorld world = new FlatWorld();
-			ConfiguredFeature<?, ?> configured = WorldsmithVegetation.configure(tree(silhouette), new MaterialResolver());
-			boolean placed = place(configured, world.level(), RandomSource.create(0x54524545L + silhouette.ordinal()));
+	void everyTrunkAndCrownCombinationPlacesBothMaterials() {
+		for (TreeTrunkShape trunk : TreeTrunkShape.values()) {
+			for (TreeCrownShape crown : TreeCrownShape.values()) {
+				FlatWorld world = new FlatWorld();
+				ConfiguredFeature<?, ?> configured = WorldsmithVegetation.configure(tree(treeSpec(trunk, crown)), new MaterialResolver());
+				boolean placed = place(
+					configured,
+					world.level(),
+					RandomSource.create(0x54524545L + trunk.ordinal() * 31L + crown.ordinal())
+				);
 
-			long trunks = world.placed().values().stream().filter(state -> state.is(Blocks.OAK_LOG)).count();
-			long leaves = world.placed().values().stream().filter(state -> state.is(Blocks.OAK_LEAVES)).count();
-			assertTrue(placed, silhouette + " reported that placement failed");
-			assertTrue(trunks > 0, silhouette + " placed no trunk blocks");
-			assertTrue(leaves > 0, silhouette + " placed no foliage blocks");
+				long trunks = world.placed().values().stream().filter(state -> state.is(Blocks.OAK_LOG)).count();
+				long leaves = world.placed().values().stream().filter(state -> state.is(Blocks.OAK_LEAVES)).count();
+				String name = trunk + "/" + crown;
+				assertTrue(placed, name + " reported that placement failed");
+				assertTrue(trunks > 0, name + " placed no trunk blocks");
+				assertTrue(leaves > 0, name + " placed no foliage blocks");
+			}
 		}
 	}
 
 	@Test
 	void customHeightAndCrownChangeTheBlocksActuallyPlaced() {
 		TreeSpec spec = new TreeSpec(
-			TreeSilhouette.BROADLEAF,
+			new TreeTrunkSpec(
+				TreeTrunkShape.BRANCHING,
+				new TreeHeight(12, 12),
+				1,
+				0.0,
+				new TreeBranchSpec(4, 5, 0.6, 0.6)
+			),
+			new TreeCrownSpec(TreeCrownShape.ROUND, 5, 6, 0.9, 0.25, 0.0),
 			TreeDistribution.GROVE,
 			TreeSubstrate.NATURAL_SOIL,
-			new TreeHeight(12, 12),
-			5,
-			null,
 			List.of()
 		);
 		FlatWorld world = new FlatWorld();
@@ -95,21 +110,10 @@ final class WorldsmithTreeGenerationTest {
 		return feature.place(config, level, null, random, new BlockPos(0, 1, 0));
 	}
 
-	private static FeatureDefinition tree(TreeSilhouette silhouette) {
-		return tree(new TreeSpec(
-			silhouette,
-			TreeDistribution.GROVE,
-			TreeSubstrate.NATURAL_SOIL,
-			null,
-			null,
-			null,
-			List.of()
-		));
-	}
-
 	private static FeatureDefinition tree(TreeSpec spec) {
 		return new FeatureDefinition(
-			"tree_" + spec.getSilhouette().name().toLowerCase(java.util.Locale.ROOT),
+			"tree_" + spec.getTrunk().getShape().name().toLowerCase(java.util.Locale.ROOT) + "_" +
+				spec.getCrown().getShape().name().toLowerCase(java.util.Locale.ROOT),
 			FeatureRecipe.TREE,
 			null,
 			Map.of(
@@ -118,6 +122,22 @@ final class WorldsmithTreeGenerationTest {
 			),
 			0.5,
 			spec
+		);
+	}
+
+	private static TreeSpec treeSpec(TreeTrunkShape trunk, TreeCrownShape crown) {
+		TreeBranchSpec branches = switch (trunk) {
+			case FORKED -> new TreeBranchSpec(2, 4, 0.7, 0.6);
+			case BRANCHING -> new TreeBranchSpec(4, 4, 0.6, 0.5);
+			default -> null;
+		};
+		double bend = trunk == TreeTrunkShape.BENT || trunk == TreeTrunkShape.TWISTED ? 0.35 : 0.0;
+		return new TreeSpec(
+			new TreeTrunkSpec(trunk, new TreeHeight(10, 12), 1, bend, branches),
+			new TreeCrownSpec(crown, 3, 4, 0.9, 0.2, 0.0),
+			TreeDistribution.GROVE,
+			TreeSubstrate.NATURAL_SOIL,
+			List.of()
 		);
 	}
 

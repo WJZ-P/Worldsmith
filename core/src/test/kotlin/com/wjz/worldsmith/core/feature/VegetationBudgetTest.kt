@@ -2,10 +2,14 @@ package com.wjz.worldsmith.core.feature
 
 import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureRecipe
+import com.wjz.worldsmith.core.model.TreeCrownShape
+import com.wjz.worldsmith.core.model.TreeCrownSpec
 import com.wjz.worldsmith.core.model.TreeDistribution
-import com.wjz.worldsmith.core.model.TreeSilhouette
+import com.wjz.worldsmith.core.model.TreeHeight
 import com.wjz.worldsmith.core.model.TreeSpec
 import com.wjz.worldsmith.core.model.TreeSubstrate
+import com.wjz.worldsmith.core.model.TreeTrunkShape
+import com.wjz.worldsmith.core.model.TreeTrunkSpec
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -65,7 +69,12 @@ class VegetationBudgetTest {
         recipe = recipe,
         density = 0.5,
         tree = if (recipe.isTree) {
-            TreeSpec(TreeSilhouette.BROADLEAF, TreeDistribution.SCATTERED, TreeSubstrate.NATURAL_SOIL)
+            TreeSpec(
+                TreeTrunkSpec(TreeTrunkShape.STRAIGHT, TreeHeight(6, 8)),
+                TreeCrownSpec(TreeCrownShape.ROUND, radius = 3, height = 4),
+                TreeDistribution.SCATTERED,
+                TreeSubstrate.NATURAL_SOIL,
+            )
         } else {
             null
         },

@@ -10,12 +10,16 @@ import com.wjz.worldsmith.core.model.FeatureDefinition;
 import com.wjz.worldsmith.core.model.FeatureRecipe;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
-import com.wjz.worldsmith.core.model.TreeSilhouette;
 import com.wjz.worldsmith.core.model.TreeSpec;
+import com.wjz.worldsmith.core.model.TreeBranchSpec;
+import com.wjz.worldsmith.core.model.TreeCrownShape;
+import com.wjz.worldsmith.core.model.TreeCrownSpec;
 import com.wjz.worldsmith.core.model.TreeDistribution;
 import com.wjz.worldsmith.core.model.TreeSubstrate;
 import com.wjz.worldsmith.core.model.TreeDecoration;
 import com.wjz.worldsmith.core.model.TreeHeight;
+import com.wjz.worldsmith.core.model.TreeTrunkShape;
+import com.wjz.worldsmith.core.model.TreeTrunkSpec;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -58,26 +62,32 @@ class WorldsmithRecipeShapeTest {
 	}
 
 	@Test
-	void everySilhouetteIsActuallyATree() {
+	void everyTrunkAndCrownCombinationIsActuallyATree() {
 		var encodedShapes = new LinkedHashSet<String>();
-		for (TreeSilhouette silhouette : TreeSilhouette.values()) {
-			ConfiguredFeature<?, ?> configured = WorldsmithVegetation.configure(sampleTree(silhouette), new MaterialResolver());
-			assertEquals(Feature.TREE, configured.feature(), silhouette + " did not build a tree");
-			encodedShapes.add(encoded(configured));
+		for (TreeTrunkShape trunk : TreeTrunkShape.values()) {
+			for (TreeCrownShape crown : TreeCrownShape.values()) {
+				ConfiguredFeature<?, ?> configured = WorldsmithVegetation.configure(sampleTree(trunk, crown), new MaterialResolver());
+				assertEquals(Feature.TREE, configured.feature(), trunk + "/" + crown + " did not build a tree");
+				encodedShapes.add(encoded(configured));
+			}
 		}
-		assertEquals(6, TreeSilhouette.values().length);
-		assertEquals(6, encodedShapes.size(), "two silhouette names compiled to the same tree configuration");
+		int combinations = TreeTrunkShape.values().length * TreeCrownShape.values().length;
+		assertEquals(combinations, encodedShapes.size(), "two authored shape combinations compiled identically");
 	}
 
 	@Test
 	void treeGeometryAndDecorationsReachTheMinecraftConfiguration() {
 		TreeSpec tree = new TreeSpec(
-			TreeSilhouette.BLOSSOM,
+			new TreeTrunkSpec(
+				TreeTrunkShape.BRANCHING,
+				new TreeHeight(10, 14),
+				2,
+				0.0,
+				new TreeBranchSpec(4, 5, 0.55, 0.7)
+			),
+			new TreeCrownSpec(TreeCrownShape.CLUSTERED, 6, 7, 0.9, 0.45, 0.8),
 			TreeDistribution.FOREST,
 			TreeSubstrate.ANY_SOLID,
-			new TreeHeight(10, 14),
-			6,
-			0.8,
 			List.of(TreeDecoration.VINES, TreeDecoration.LEAF_LITTER)
 		);
 		FeatureDefinition feature = new FeatureDefinition(
@@ -97,7 +107,10 @@ class WorldsmithRecipeShapeTest {
 		assertTrue(json.contains("\"base_height\":10"), json);
 		assertTrue(json.contains("\"height_rand_a\":4"), json);
 		assertTrue(json.contains("\"radius\":6"), json);
-		assertTrue(json.contains("\"hanging_leaves_chance\":0.8"), json);
+		assertTrue(json.contains("\"branch_count\":4"), json);
+		assertTrue(json.contains("\"hanging_leaves\":0.8"), json);
+		assertTrue(json.contains("worldsmith:shaped_trunk"), json);
+		assertTrue(json.contains("worldsmith:shaped_foliage"), json);
 		assertTrue(json.contains("trunk_vine"), json);
 		assertTrue(json.contains("place_on_ground"), json);
 	}
@@ -108,13 +121,13 @@ class WorldsmithRecipeShapeTest {
 		for (MaterialRole role : recipe.getRoles()) {
 			materials.put(role, selector(role));
 		}
-		TreeSpec tree = recipe.isTree() ? treeSpec(TreeSilhouette.BROADLEAF) : null;
+		TreeSpec tree = recipe.isTree() ? treeSpec(TreeTrunkShape.STRAIGHT, TreeCrownShape.ROUND) : null;
 		return new FeatureDefinition("sample", recipe, null, materials, 0.3, tree);
 	}
 
-	private static FeatureDefinition sampleTree(TreeSilhouette silhouette) {
+	private static FeatureDefinition sampleTree(TreeTrunkShape trunk, TreeCrownShape crown) {
 		return new FeatureDefinition(
-			"sample_" + silhouette.name().toLowerCase(java.util.Locale.ROOT),
+			"sample_" + trunk.name().toLowerCase(java.util.Locale.ROOT) + "_" + crown.name().toLowerCase(java.util.Locale.ROOT),
 			FeatureRecipe.TREE,
 			null,
 			Map.of(
@@ -122,18 +135,22 @@ class WorldsmithRecipeShapeTest {
 				MaterialRole.FOLIAGE, selector(MaterialRole.FOLIAGE)
 			),
 			0.3,
-			treeSpec(silhouette)
+			treeSpec(trunk, crown)
 		);
 	}
 
-	private static TreeSpec treeSpec(TreeSilhouette silhouette) {
+	private static TreeSpec treeSpec(TreeTrunkShape trunk, TreeCrownShape crown) {
+		TreeBranchSpec branches = switch (trunk) {
+			case FORKED -> new TreeBranchSpec(2, 4, 0.7, 0.6);
+			case BRANCHING -> new TreeBranchSpec(4, 4, 0.6, 0.5);
+			default -> null;
+		};
+		double bend = trunk == TreeTrunkShape.BENT || trunk == TreeTrunkShape.TWISTED ? 0.35 : 0.0;
 		return new TreeSpec(
-			silhouette,
+			new TreeTrunkSpec(trunk, new TreeHeight(10, 12), 1, bend, branches),
+			new TreeCrownSpec(crown, 3, 4, 0.85, 0.25, 0.15),
 			TreeDistribution.GROVE,
 			TreeSubstrate.NATURAL_SOIL,
-			null,
-			null,
-			null,
 			List.of()
 		);
 	}

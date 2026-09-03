@@ -9,12 +9,14 @@ import com.wjz.worldsmith.core.model.FeatureLibrary;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.FeatureRecipe;
-import com.wjz.worldsmith.core.model.TreeSilhouette;
 import com.wjz.worldsmith.core.model.TreeSpec;
+import com.wjz.worldsmith.core.model.TreeBranchSpec;
+import com.wjz.worldsmith.core.model.TreeCrownSpec;
 import com.wjz.worldsmith.core.model.TreeDecoration;
 import com.wjz.worldsmith.core.model.TreeDistribution;
 import com.wjz.worldsmith.core.model.TreeHeight;
 import com.wjz.worldsmith.core.model.TreeSubstrate;
+import com.wjz.worldsmith.core.model.TreeTrunkSpec;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,19 +51,7 @@ import net.minecraft.world.level.levelgen.feature.configurations.FallenTreeConfi
 import net.minecraft.world.level.levelgen.feature.configurations.OreConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.SimpleBlockConfiguration;
 import net.minecraft.world.level.levelgen.feature.configurations.TreeConfiguration;
-import net.minecraft.world.level.levelgen.feature.featuresize.FeatureSize;
-import net.minecraft.world.level.levelgen.feature.foliageplacers.BlobFoliagePlacer;
-import net.minecraft.world.level.levelgen.feature.foliageplacers.BushFoliagePlacer;
-import net.minecraft.world.level.levelgen.feature.foliageplacers.CherryFoliagePlacer;
-import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
-import net.minecraft.world.level.levelgen.feature.foliageplacers.SpruceFoliagePlacer;
-import net.minecraft.world.level.levelgen.feature.trunkplacers.StraightTrunkPlacer;
-import net.minecraft.world.level.levelgen.feature.trunkplacers.BendingTrunkPlacer;
-import net.minecraft.world.level.levelgen.feature.trunkplacers.CherryTrunkPlacer;
-import net.minecraft.world.level.levelgen.feature.trunkplacers.ForkingTrunkPlacer;
-import net.minecraft.world.level.levelgen.feature.trunkplacers.TrunkPlacer;
 import net.minecraft.world.level.levelgen.feature.featuresize.TwoLayersFeatureSize;
-import net.minecraft.world.level.levelgen.feature.foliageplacers.AcaciaFoliagePlacer;
 import net.minecraft.world.level.levelgen.feature.stateproviders.BlockStateProvider;
 import net.minecraft.world.level.levelgen.feature.stateproviders.RuleBasedStateProvider;
 import net.minecraft.world.level.levelgen.feature.stateproviders.WeightedStateProvider;
@@ -275,8 +265,8 @@ public final class WorldsmithVegetation {
 	 *
 	 * <p>Two roles rather than one, because Minecraft builds a tree from a trunk
 	 * provider and a foliage provider placed by two separate strategies. The
-	 * silhouette selects a proven placer family while the optional bounded fields
-	 * tune its height, crown and trailing leaves.
+	 * two custom placer types consume the authored trunk skeleton and crown volume
+	 * while vanilla TreeFeature still owns collision checks and leaf updates.
 	 */
 	private static ConfiguredFeature<?, ?> tree(FeatureDefinition feature, MaterialResolver resolver) {
 		TreeSpec tree = feature.getTree();
@@ -301,13 +291,37 @@ public final class WorldsmithVegetation {
 				invalidTrunks.stream().map(state -> state.getBlock().toString()).toList()
 			);
 		}
-		TreeShape shape = treeShape(tree);
+		TreeTrunkSpec trunkSpec = tree.getTrunk();
+		TreeCrownSpec crownSpec = tree.getCrown();
+		TreeHeight height = trunkSpec.getHeight();
+		TreeBranchSpec branches = trunkSpec.getBranches();
+		WorldsmithTrunkPlacer trunkPlacer = new WorldsmithTrunkPlacer(
+			height.getMin(),
+			height.getMax() - height.getMin(),
+			0,
+			trunkSpec.getShape(),
+			trunkSpec.getThickness(),
+			(float)trunkSpec.getBend(),
+			branches == null ? 0 : branches.getCount(),
+			branches == null ? 1 : branches.getLength(),
+			branches == null ? 0.6F : (float)branches.getStart(),
+			branches == null ? 0.5F : (float)branches.getUpwardBias()
+		);
+		WorldsmithFoliagePlacer foliagePlacer = new WorldsmithFoliagePlacer(
+			ConstantInt.of(crownSpec.getRadius()),
+			ConstantInt.of(0),
+			crownSpec.getShape(),
+			crownSpec.getHeight(),
+			(float)crownSpec.getDensity(),
+			(float)crownSpec.getIrregularity(),
+			(float)crownSpec.getHangingLeaves()
+		);
 		TreeConfiguration.TreeConfigurationBuilder builder = new TreeConfiguration.TreeConfigurationBuilder(
 			trunk,
-			shape.trunk(),
+			trunkPlacer,
 			foliage,
-			shape.foliage(),
-			shape.size(),
+			foliagePlacer,
+			treeSize(tree),
 			belowTrunkProvider(tree.getSubstrate())
 		).ignoreVines();
 		List<TreeDecorator> decorations = treeDecorators(tree);
@@ -317,83 +331,20 @@ public final class WorldsmithVegetation {
 		return new ConfiguredFeature<>(Feature.TREE, builder.build());
 	}
 
-	/** Maps a semantic, bounded tree specification onto Minecraft's placer vocabulary. */
-	private static TreeShape treeShape(TreeSpec tree) {
-		TreeHeight height = tree.getHeight() == null
-			? new TreeHeight(tree.getSilhouette().getDefaultMinHeight(), tree.getSilhouette().getDefaultMaxHeight())
-			: tree.getHeight();
-		int baseHeight = height.getMin();
-		int heightVariation = height.getMax() - height.getMin();
-		int radius = tree.getCrownRadius() == null
-			? tree.getSilhouette().getDefaultCrownRadius()
-			: tree.getCrownRadius();
-
-		return switch (tree.getSilhouette()) {
-			case CONIFER -> new TreeShape(
-				new StraightTrunkPlacer(baseHeight, heightVariation, 0),
-				new SpruceFoliagePlacer(ConstantInt.of(radius), UniformInt.of(0, 2), UniformInt.of(1, 2)),
-				new TwoLayersFeatureSize(1, 0, 1)
-			);
-			case BLOSSOM -> {
-				TrunkPlacer trunkPlacer = new CherryTrunkPlacer(
-					baseHeight,
-					heightVariation,
-					0,
-					new WeightedListInt(
-						WeightedList.<IntProvider>builder()
-							.add(ConstantInt.of(1), 1)
-							.add(ConstantInt.of(2), 1)
-							.add(ConstantInt.of(3), 1)
-							.build()
-					),
-					UniformInt.of(2, 4),
-					UniformInt.of(-4, -3),
-					UniformInt.of(-1, 0)
-				);
-				yield new TreeShape(
-					trunkPlacer,
-					cherryFoliage(tree, radius, false),
-					new TwoLayersFeatureSize(1, 0, 2)
-				);
-			}
-			// A leaning trunk under a crown that trails: the hanging chances are
-			// what read as a willow rather than as a bent oak.
-			case WEEPING -> new TreeShape(
-				new BendingTrunkPlacer(baseHeight, heightVariation, 0, Math.max(1, baseHeight - 1), UniformInt.of(1, 2)),
-				cherryFoliage(tree, radius, true),
-				new TwoLayersFeatureSize(1, 0, 2)
-			);
-			case UMBRELLA -> new TreeShape(
-				new ForkingTrunkPlacer(baseHeight, heightVariation, 0),
-				new AcaciaFoliagePlacer(ConstantInt.of(radius), ConstantInt.of(0)),
-				new TwoLayersFeatureSize(1, 0, 2)
-			);
-			case SHRUB -> new TreeShape(
-				new StraightTrunkPlacer(baseHeight, heightVariation, 0),
-				new BushFoliagePlacer(ConstantInt.of(radius), ConstantInt.of(0), Math.max(1, radius)),
-				new TwoLayersFeatureSize(1, 0, 1)
-			);
-			case BROADLEAF -> new TreeShape(
-				new StraightTrunkPlacer(baseHeight, heightVariation, 0),
-				new BlobFoliagePlacer(ConstantInt.of(radius), ConstantInt.of(0), Math.max(2, radius + 1)),
-				new TwoLayersFeatureSize(1, 0, 1)
-			);
-		};
-	}
-
-	private static CherryFoliagePlacer cherryFoliage(TreeSpec tree, int radius, boolean weeping) {
-		double defaultHanging = weeping ? 0.75 : 0.16666667;
-		double hanging = tree.getHangingLeaves() == null ? defaultHanging : tree.getHangingLeaves();
-		double extension = weeping ? hanging * 0.8 : Math.min(1.0, hanging * 2.0);
-		return new CherryFoliagePlacer(
-			ConstantInt.of(radius),
-			ConstantInt.of(0),
-			ConstantInt.of(Math.max(4, radius + 1)),
-			weeping ? 0.2F : 0.25F,
-			weeping ? 0.4F : 0.5F,
-			(float)hanging,
-			(float)extension
-		);
+	/** Gives TreeFeature enough clearance for every branch-tip crown. */
+	private static TwoLayersFeatureSize treeSize(TreeSpec tree) {
+		TreeTrunkSpec trunk = tree.getTrunk();
+		TreeCrownSpec crown = tree.getCrown();
+		TreeBranchSpec branches = trunk.getBranches();
+		int branchLength = branches == null ? 0 : branches.getLength();
+		int crownStart = Math.max(1, trunk.getHeight().getMin() - crown.getHeight());
+		int branchStart = branches == null
+			? crownStart
+			: Math.max(1, (int)Math.floor((trunk.getHeight().getMin() - 1) * branches.getStart()));
+		int limit = Math.min(crownStart, branchStart);
+		int lowerRadius = trunk.getThickness() - 1;
+		int upperRadius = Math.min(16, crown.getRadius() + branchLength);
+		return new TwoLayersFeatureSize(limit, lowerRadius, upperRadius);
 	}
 
 	private static BlockStateProvider belowTrunkProvider(TreeSubstrate substrate) {
@@ -419,9 +370,6 @@ public final class WorldsmithVegetation {
 			}
 		}
 		return List.copyOf(decorators);
-	}
-
-	private record TreeShape(TrunkPlacer trunk, FoliagePlacer foliage, FeatureSize size) {
 	}
 
 	/**

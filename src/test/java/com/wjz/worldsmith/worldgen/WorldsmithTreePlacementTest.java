@@ -11,9 +11,13 @@ import com.wjz.worldsmith.core.model.FeatureRecipe;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.TreeDistribution;
-import com.wjz.worldsmith.core.model.TreeSilhouette;
+import com.wjz.worldsmith.core.model.TreeCrownShape;
+import com.wjz.worldsmith.core.model.TreeCrownSpec;
+import com.wjz.worldsmith.core.model.TreeHeight;
 import com.wjz.worldsmith.core.model.TreeSpec;
 import com.wjz.worldsmith.core.model.TreeSubstrate;
+import com.wjz.worldsmith.core.model.TreeTrunkShape;
+import com.wjz.worldsmith.core.model.TreeTrunkSpec;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
@@ -118,7 +122,13 @@ final class WorldsmithTreePlacementTest {
 				MaterialRole.FOLIAGE, new MaterialSelector("leaves", List.of("minecraft:oak_leaves"), List.of(), List.of())
 			),
 			0.5,
-			new TreeSpec(TreeSilhouette.BROADLEAF, distribution, substrate, null, null, null, List.of())
+			new TreeSpec(
+				new TreeTrunkSpec(TreeTrunkShape.STRAIGHT, new TreeHeight(7, 9), 1, 0.0, null),
+				new TreeCrownSpec(TreeCrownShape.ROUND, 3, 4, 0.85, 0.25, 0.0),
+				distribution,
+				substrate,
+				List.of()
+			)
 		);
 	}
 

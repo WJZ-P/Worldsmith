@@ -48,47 +48,78 @@ fails while loading rather than producing a quietly empty world.
 | `AQUATIC_PATCH` | one block on the sea floor | many attempts per chunk, refused unless it is under water | seagrass, kelp beds, coral, anything that makes a seabed something other than bare sand |
 | `HANGING_PATCH` | a short column grown **downward** | scans upward for something to hang from | vines, roots, icicles, moss beards under overhangs and cave ceilings |
 | `FALLEN_LOG` | a log lying on its side, with a stump | a rarity filter | the thing that makes a forest floor read as old rather than as newly placed |
-| `TREE` | a trunk and a crown selected by `tree.silhouette` | tree-specific placement | living woods whose geometry and materials remain independent |
+| `TREE` | a custom trunk skeleton plus a custom crown volume | tree-specific placement | living woods whose geometry and materials remain independent |
 
 ### Trees
 
-`TREE` is the only living-tree recipe. Its required `tree` object names the
-silhouette, while `TRUNK` and `FOLIAGE` name the materials. Choose the silhouette
-by how the tree should look, never by what it is made of - a cherry-wood
-`CONIFER` is a perfectly good alien pine.
-
-| recipe | silhouette |
-| --- | --- |
-| `BROADLEAF` | straight trunk, round crown - the ordinary broadleaf |
-| `CONIFER` | tall straight trunk, narrow tapering crown - spruce, pine, fir |
-| `BLOSSOM` | branching trunk, wide flat crown with gaps and trailing edges - cherry, plum |
-| `WEEPING` | leaning bent trunk under a crown that trails heavily - willow |
-| `UMBRELLA` | forked trunk, flat crown held high and clear of the ground - acacia, savannah |
-| `SHRUB` | one block of trunk under a small bush - undergrowth, dead scrub, tundra growth |
-
-The same silhouette can be tuned without exposing Minecraft placer internals:
+`TREE` is the only living-tree recipe. It combines one independently authored
+trunk path with one crown volume; `TRUNK` and `FOLIAGE` separately name what
+those shapes are made from. These are Worldsmith geometry rules, not aliases for
+vanilla oak or cherry trees.
 
 ```json
 "tree": {
-  "silhouette": "BLOSSOM",
+  "trunk": {
+    "shape": "BRANCHING",
+    "height": { "min": 9, "max": 13 },
+    "thickness": 1,
+    "bend": 0.0,
+    "branches": { "count": 4, "length": 5, "start": 0.55, "upwardBias": 0.65 }
+  },
+  "crown": {
+    "shape": "CLUSTERED",
+    "radius": 4,
+    "height": 6,
+    "density": 0.9,
+    "irregularity": 0.35,
+    "hangingLeaves": 0.2
+  },
   "distribution": "GROVE",
   "substrate": "NATURAL_SOIL",
-  "height": { "min": 7, "max": 11 },
-  "crownRadius": 4,
-  "hangingLeaves": 0.25,
   "decorations": ["LEAF_LITTER"]
 }
 ```
 
-- `height` is optional. `min` is the shortest generated tree and `max` its random upper
-  bound. The silhouette's defaults are used when it is absent. The supported
-  range is deliberately ordinary-tree scale; landmark-sized trees belong to a
-  later landmark grammar rather than pretending to be dense forest scatter.
-- `crownRadius` is optional, from `1..8`. A broad crown also needs enough
-  height beneath it; validation names the required minimum rather than letting
-  the crown sink into the ground.
-- `hangingLeaves` is optional, from `0..1`, and belongs only to `BLOSSOM` and
-  `WEEPING`.
+Trunk `shape` is one of:
+
+| shape | rule |
+| --- | --- |
+| `STRAIGHT` | a vertical main stem; optional branches still work |
+| `BENT` | the main stem gradually walks in one horizontal direction |
+| `TWISTED` | the drift direction rotates as the stem rises |
+| `FORKED` | an upper stem split; requires at least two branches |
+| `BRANCHING` | a straight main stem with an authored set of side branches |
+
+- `height.min` and `height.max` are inclusive. Trees stay within `1..40`, with
+  `min` at most 32 and at most 24 blocks of variation. Forty blocks is already
+  slightly taller than an ordinary large jungle tree; larger landmarks belong
+  to structures.
+- `thickness` is `1` or `2`.
+- `bend` is `0..1` and is used by `BENT` and `TWISTED`.
+- Optional `branches` has `count` `1..8`, `length` `1..8`, `start` `0.2..0.95`
+  as a fraction of trunk height, and `upwardBias` `0..1`. `FORKED` and
+  `BRANCHING` require it; every other trunk may also carry branches.
+
+Crown `shape` is independent from the trunk:
+
+| shape | rule |
+| --- | --- |
+| `ROUND` | an ellipsoidal broadleaf crown |
+| `CONICAL` | narrow at the tip and wider downward |
+| `LAYERED` | alternating wide and narrow tiers |
+| `UMBRELLA` | a shallow, elevated canopy |
+| `WEEPING` | a deep crown intended for trailing leaves |
+| `CLUSTERED` | several overlapping crown lobes around branch tips |
+
+- `radius` is `1..8`, `height` is `1..12`.
+- `density` is the chance to fill positions inside the chosen volume, `0.1..1`.
+- `irregularity` is `0..1` and thins the boundary more than the interior.
+- `hangingLeaves` is `0..1`; it grows one- and two-block extensions from the
+  lower edge of any crown shape.
+- Every trunk shape may combine with every crown shape. Use the prompt as the
+  authority: a twisted trunk with a layered crown and pale leaves is one valid
+  alien tree, not an error to normalize back into a vanilla species.
+
 - `distribution` is required: `SCATTERED`, `GROVE`, `FOREST`, or
   `DENSE_FOREST`. Grove and forest modes use one broad noise field, so trees
   gather into stands with clearings instead of forming a uniform grid.
@@ -130,7 +161,19 @@ from more than one names them instead:
   },
   "density": 0.7,
   "tree": {
-    "silhouette": "BLOSSOM",
+    "trunk": {
+      "shape": "BRANCHING",
+      "height": { "min": 8, "max": 11 },
+      "branches": { "count": 3, "length": 4, "start": 0.6 }
+    },
+    "crown": {
+      "shape": "CLUSTERED",
+      "radius": 4,
+      "height": 5,
+      "density": 0.9,
+      "irregularity": 0.3,
+      "hangingLeaves": 0.2
+    },
     "distribution": "GROVE",
     "substrate": "NATURAL_SOIL",
     "decorations": ["LEAF_LITTER"]

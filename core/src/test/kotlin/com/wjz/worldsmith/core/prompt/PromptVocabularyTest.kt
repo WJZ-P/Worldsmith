@@ -17,10 +17,11 @@ import com.wjz.worldsmith.core.model.SurfaceWater
 import com.wjz.worldsmith.core.model.TemperatureBand
 import com.wjz.worldsmith.core.model.TemperatureVariation
 import com.wjz.worldsmith.core.model.FeatureRecipe
-import com.wjz.worldsmith.core.model.TreeSilhouette
 import com.wjz.worldsmith.core.model.TreeDecoration
 import com.wjz.worldsmith.core.model.TreeDistribution
 import com.wjz.worldsmith.core.model.TreeSubstrate
+import com.wjz.worldsmith.core.model.TreeTrunkShape
+import com.wjz.worldsmith.core.model.TreeCrownShape
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -61,7 +62,8 @@ class PromptVocabularyTest {
         PromptSet.DEFAULT.featurePlan to listOf(
             FeatureRecipe::class.java,
             MaterialRole::class.java,
-            TreeSilhouette::class.java,
+            TreeTrunkShape::class.java,
+            TreeCrownShape::class.java,
             TreeDistribution::class.java,
             TreeSubstrate::class.java,
             TreeDecoration::class.java,

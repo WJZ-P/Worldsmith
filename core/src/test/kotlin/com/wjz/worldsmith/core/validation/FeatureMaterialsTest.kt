@@ -6,12 +6,16 @@ import com.wjz.worldsmith.core.model.MaterialRole
 import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.WeightedMaterial
-import com.wjz.worldsmith.core.model.TreeSilhouette
 import com.wjz.worldsmith.core.model.TreeSpec
 import com.wjz.worldsmith.core.model.TreeDistribution
 import com.wjz.worldsmith.core.model.TreeSubstrate
 import com.wjz.worldsmith.core.model.TreeDecoration
 import com.wjz.worldsmith.core.model.TreeHeight
+import com.wjz.worldsmith.core.model.TreeBranchSpec
+import com.wjz.worldsmith.core.model.TreeTrunkShape
+import com.wjz.worldsmith.core.model.TreeTrunkSpec
+import com.wjz.worldsmith.core.model.TreeCrownShape
+import com.wjz.worldsmith.core.model.TreeCrownSpec
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -33,7 +37,7 @@ class FeatureMaterialsTest {
                 "oak", FeatureRecipe.TREE,
                 materials = mapOf(MaterialRole.TRUNK to selector("wood", "minecraft:oak_log")),
                 density = 0.2,
-                tree = tree(TreeSilhouette.BROADLEAF),
+                tree = tree(),
             ),
         )
 
@@ -56,7 +60,7 @@ class FeatureMaterialsTest {
             "rock_with_crown", FeatureRecipe.BOULDER,
             block = selector("rock", "minecraft:stone"),
             density = 0.3,
-            tree = tree(TreeSilhouette.UMBRELLA),
+            tree = tree(),
         )
 
         assertTrue(FeatureLibraryValidator.validate(library(missing)).any { it.code == "MISSING_TREE_SPEC" })
@@ -64,20 +68,25 @@ class FeatureMaterialsTest {
     }
 
     @Test
-    fun `one TREE recipe carries every silhouette through json`() {
-        TreeSilhouette.entries.forEach { silhouette ->
-            val tree = FeatureDefinition(
-                "tree_${silhouette.name.lowercase()}",
-                FeatureRecipe.TREE,
-                materials = mapOf(
-                    MaterialRole.TRUNK to selector("wood", "minecraft:oak_log"),
-                    MaterialRole.FOLIAGE to selector("leaves", "minecraft:oak_leaves"),
-                ),
-                density = 0.3,
-                tree = tree(silhouette),
-            )
+    fun `one TREE recipe carries every trunk and crown shape through json`() {
+        TreeTrunkShape.entries.forEach { trunkShape ->
+            TreeCrownShape.entries.forEach { crownShape ->
+                val feature = FeatureDefinition(
+                    "tree_${trunkShape.name.lowercase()}_${crownShape.name.lowercase()}",
+                    FeatureRecipe.TREE,
+                    materials = mapOf(
+                        MaterialRole.TRUNK to selector("wood", "minecraft:oak_log"),
+                        MaterialRole.FOLIAGE to selector("leaves", "minecraft:oak_leaves"),
+                    ),
+                    density = 0.3,
+                    tree = tree(trunkShape, crownShape),
+                )
 
-            assertEquals(tree, WorldsmithJson.decode<FeatureLibrary>(WorldsmithJson.encode(library(tree))).features.single())
+                assertEquals(
+                    feature,
+                    WorldsmithJson.decode<FeatureLibrary>(WorldsmithJson.encode(library(feature))).features.single(),
+                )
+            }
         }
     }
 
@@ -94,7 +103,7 @@ class FeatureMaterialsTest {
     }
 
     @Test
-    fun `tree geometry rejects ranges and fields its silhouette does not consume`() {
+    fun `tree geometry rejects parameters outside the authored bounds`() {
         val malformed = FeatureDefinition(
             "malformed_tree",
             FeatureRecipe.TREE,
@@ -104,12 +113,23 @@ class FeatureMaterialsTest {
             ),
             density = 0.5,
             tree = TreeSpec(
-                silhouette = TreeSilhouette.BROADLEAF,
+                trunk = TreeTrunkSpec(
+                    shape = TreeTrunkShape.STRAIGHT,
+                    height = TreeHeight(20, 10),
+                    thickness = 3,
+                    bend = 0.5,
+                    branches = TreeBranchSpec(0, 9, 0.1, 1.5),
+                ),
+                crown = TreeCrownSpec(
+                    shape = TreeCrownShape.ROUND,
+                    radius = 12,
+                    height = 20,
+                    density = 0.0,
+                    irregularity = 1.5,
+                    hangingLeaves = 1.5,
+                ),
                 distribution = TreeDistribution.FOREST,
                 substrate = TreeSubstrate.ANY_SOLID,
-                height = TreeHeight(20, 10),
-                crownRadius = 12,
-                hangingLeaves = 0.5,
                 decorations = listOf(TreeDecoration.VINES, TreeDecoration.VINES),
             ),
         )
@@ -117,16 +137,21 @@ class FeatureMaterialsTest {
         val codes = FeatureLibraryValidator.validate(library(malformed)).map { it.code }
 
         assertTrue("REVERSED_TREE_HEIGHT" in codes, codes.toString())
+        assertTrue("TRUNK_THICKNESS_OUT_OF_RANGE" in codes, codes.toString())
+        assertTrue("UNUSED_TRUNK_BEND" in codes, codes.toString())
+        assertTrue("BRANCH_COUNT_OUT_OF_RANGE" in codes, codes.toString())
         assertTrue("CROWN_RADIUS_OUT_OF_RANGE" in codes, codes.toString())
-        assertTrue("HANGING_LEAVES_NOT_SUPPORTED" in codes, codes.toString())
+        assertTrue("CROWN_HEIGHT_OUT_OF_RANGE" in codes, codes.toString())
+        assertTrue("CROWN_DENSITY_OUT_OF_RANGE" in codes, codes.toString())
+        assertTrue("CROWN_IRREGULARITY_OUT_OF_RANGE" in codes, codes.toString())
+        assertTrue("HANGING_LEAVES_OUT_OF_RANGE" in codes, codes.toString())
         assertTrue("DUPLICATE_TREE_DECORATION" in codes, codes.toString())
 
         val sunkenCrown = malformed.copy(
             id = "sunken_crown",
             tree = malformed.tree!!.copy(
-                height = TreeHeight(4, 6),
-                crownRadius = 8,
-                hangingLeaves = null,
+                trunk = TreeTrunkSpec(TreeTrunkShape.STRAIGHT, TreeHeight(4, 6)),
+                crown = TreeCrownSpec(TreeCrownShape.CONICAL, radius = 3, height = 6),
                 decorations = emptyList(),
             ),
         )
@@ -245,8 +270,23 @@ class FeatureMaterialsTest {
 
     private fun library(vararg features: FeatureDefinition) = FeatureLibrary(features = features.toList())
 
-    private fun tree(silhouette: TreeSilhouette) =
-        TreeSpec(silhouette, TreeDistribution.GROVE, TreeSubstrate.NATURAL_SOIL)
+    private fun tree(
+        trunkShape: TreeTrunkShape = TreeTrunkShape.STRAIGHT,
+        crownShape: TreeCrownShape = TreeCrownShape.ROUND,
+    ): TreeSpec {
+        val branches = when (trunkShape) {
+            TreeTrunkShape.FORKED -> TreeBranchSpec(2, 4, 0.65)
+            TreeTrunkShape.BRANCHING -> TreeBranchSpec(4, 4, 0.55)
+            else -> null
+        }
+        val bend = if (trunkShape == TreeTrunkShape.BENT || trunkShape == TreeTrunkShape.TWISTED) 0.35 else 0.0
+        return TreeSpec(
+            TreeTrunkSpec(trunkShape, TreeHeight(10, 12), bend = bend, branches = branches),
+            TreeCrownSpec(crownShape, radius = 3, height = 4, hangingLeaves = 0.15),
+            TreeDistribution.GROVE,
+            TreeSubstrate.NATURAL_SOIL,
+        )
+    }
 
     private fun selector(role: String, id: String) = MaterialSelector(role, listOf(id))
 }

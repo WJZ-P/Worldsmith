@@ -66,52 +66,6 @@ enum class FeatureRecipe {
         get() = this != ORE_VEIN && this != BOULDER
 }
 
-/** The broad topology of a tree, independent from the blocks it is made of. */
-@Serializable
-enum class TreeSilhouette {
-    BROADLEAF,
-    CONIFER,
-    BLOSSOM,
-    WEEPING,
-    UMBRELLA,
-    SHRUB,
-    ;
-
-    /** Smallest height for which the vanilla placer behind this silhouette is well formed. */
-    val minimumHeight: Int
-        get() = when (this) {
-            BROADLEAF, SHRUB -> 1
-            CONIFER, WEEPING, UMBRELLA -> 3
-            BLOSSOM -> 5
-        }
-
-    val defaultMinHeight: Int
-        get() = when (this) {
-            BROADLEAF -> 4
-            CONIFER -> 6
-            BLOSSOM -> 7
-            WEEPING, UMBRELLA -> 5
-            SHRUB -> 1
-        }
-
-    val defaultMaxHeight: Int
-        get() = when (this) {
-            BROADLEAF -> 6
-            CONIFER -> 9
-            BLOSSOM -> 8
-            WEEPING -> 8
-            UMBRELLA -> 9
-            SHRUB -> 1
-        }
-
-    val defaultCrownRadius: Int
-        get() = when (this) {
-            BLOSSOM -> 4
-            WEEPING -> 3
-            BROADLEAF, CONIFER, UMBRELLA, SHRUB -> 2
-        }
-}
-
 /** Path followed by the centre of a Worldsmith-authored trunk. */
 @Serializable
 enum class TreeTrunkShape {
@@ -165,15 +119,44 @@ data class TreeHeight(
     val max: Int,
 )
 
+@Serializable
+data class TreeBranchSpec(
+    val count: Int,
+    val length: Int,
+    /** Fraction of trunk height below which no branch starts. */
+    val start: Double,
+    /** Chance for each outward branch step to also rise by one block. */
+    val upwardBias: Double = 0.5,
+)
+
+@Serializable
+data class TreeTrunkSpec(
+    val shape: TreeTrunkShape,
+    val height: TreeHeight,
+    val thickness: Int = 1,
+    val bend: Double = 0.0,
+    val branches: TreeBranchSpec? = null,
+)
+
+@Serializable
+data class TreeCrownSpec(
+    val shape: TreeCrownShape,
+    val radius: Int,
+    val height: Int,
+    /** Interior fill chance after the geometric volume is selected. */
+    val density: Double = 0.85,
+    /** Extra thinning toward the crown boundary. */
+    val irregularity: Double = 0.25,
+    val hangingLeaves: Double = 0.0,
+)
+
 /** Configuration owned only by [FeatureRecipe.TREE]. */
 @Serializable
 data class TreeSpec(
-    val silhouette: TreeSilhouette,
+    val trunk: TreeTrunkSpec,
+    val crown: TreeCrownSpec,
     val distribution: TreeDistribution,
     val substrate: TreeSubstrate,
-    val height: TreeHeight? = null,
-    val crownRadius: Int? = null,
-    val hangingLeaves: Double? = null,
     val decorations: List<TreeDecoration> = emptyList(),
 )
 

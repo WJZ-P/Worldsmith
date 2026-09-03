@@ -30,10 +30,15 @@ import com.wjz.worldsmith.core.model.SurfaceRuleDefinition
 import com.wjz.worldsmith.core.model.SurfaceStack
 import com.wjz.worldsmith.core.model.TemperatureBand
 import com.wjz.worldsmith.core.model.FeatureRecipe
-import com.wjz.worldsmith.core.model.TreeSilhouette
 import com.wjz.worldsmith.core.model.TreeSpec
 import com.wjz.worldsmith.core.model.TreeDistribution
 import com.wjz.worldsmith.core.model.TreeSubstrate
+import com.wjz.worldsmith.core.model.TreeHeight
+import com.wjz.worldsmith.core.model.TreeBranchSpec
+import com.wjz.worldsmith.core.model.TreeTrunkShape
+import com.wjz.worldsmith.core.model.TreeTrunkSpec
+import com.wjz.worldsmith.core.model.TreeCrownShape
+import com.wjz.worldsmith.core.model.TreeCrownSpec
 import com.wjz.worldsmith.core.model.WaterFog
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -368,7 +373,12 @@ class BiomePlanValidatorTest {
                 MaterialRole.FOLIAGE to material("leaves", "minecraft:cherry_leaves"),
             ),
             density = 0.3,
-            tree = TreeSpec(TreeSilhouette.BLOSSOM, TreeDistribution.GROVE, TreeSubstrate.NATURAL_SOIL),
+            tree = TreeSpec(
+                TreeTrunkSpec(TreeTrunkShape.BRANCHING, TreeHeight(8, 11), branches = TreeBranchSpec(3, 4, 0.55)),
+                TreeCrownSpec(TreeCrownShape.CLUSTERED, radius = 3, height = 4),
+                TreeDistribution.GROVE,
+                TreeSubstrate.NATURAL_SOIL,
+            ),
         )
         val features = library().copy(features = library().features + tree)
         val living = plan().copy(

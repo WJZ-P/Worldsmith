@@ -4,8 +4,9 @@ import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.MaterialSelector
-import com.wjz.worldsmith.core.model.TreeSilhouette
 import com.wjz.worldsmith.core.model.TreeSpec
+import com.wjz.worldsmith.core.model.TreeCrownShape
+import com.wjz.worldsmith.core.model.TreeTrunkShape
 
 object FeatureLibraryValidator {
     internal val ID = Regex("^[a-z0-9_.-]+$")
@@ -13,9 +14,10 @@ object FeatureLibraryValidator {
     private const val MAX_MATERIAL_WEIGHT = 64
     private const val MAX_TREE_BASE_HEIGHT = 32
     private const val MAX_TREE_HEIGHT_VARIATION = 24
-    private const val MAX_TREE_HEIGHT = MAX_TREE_BASE_HEIGHT + MAX_TREE_HEIGHT_VARIATION
+    private const val MAX_TREE_HEIGHT = 40
     private const val MIN_CROWN_RADIUS = 1
     private const val MAX_CROWN_RADIUS = 8
+    private const val MAX_CROWN_HEIGHT = 12
 
     fun validate(library: FeatureLibrary): List<Diagnostic> = buildList {
         if (library.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
@@ -48,7 +50,7 @@ object FeatureLibraryValidator {
                     error(
                         "$path.tree",
                         "MISSING_TREE_SPEC",
-                        "The TREE recipe must name its silhouette in a tree object",
+                        "The TREE recipe must provide trunk and crown rules in a tree object",
                     ),
                 )
                 !feature.recipe.isTree && feature.tree != null -> add(
@@ -79,68 +81,93 @@ object FeatureLibraryValidator {
     }
 
     private fun validateTree(path: String, tree: TreeSpec): List<Diagnostic> = buildList {
-        tree.height?.let { height ->
-            if (height.min > height.max) {
-                add(error("$path.height", "REVERSED_TREE_HEIGHT", "Tree height minimum must not exceed its maximum"))
+        val trunk = tree.trunk
+        val crown = tree.crown
+        val height = trunk.height
+        if (height.min > height.max) {
+            add(error("$path.trunk.height", "REVERSED_TREE_HEIGHT", "Tree height minimum must not exceed its maximum"))
+        }
+        if (height.min !in 1..MAX_TREE_BASE_HEIGHT || height.max !in 1..MAX_TREE_HEIGHT ||
+            height.max - height.min > MAX_TREE_HEIGHT_VARIATION
+        ) {
+            add(
+                error(
+                    "$path.trunk.height",
+                    "TREE_HEIGHT_OUT_OF_RANGE",
+                    "Tree height must stay within 1..$MAX_TREE_HEIGHT, start by $MAX_TREE_BASE_HEIGHT, " +
+                        "and vary by at most $MAX_TREE_HEIGHT_VARIATION blocks",
+                ),
+            )
+        }
+        if (trunk.thickness !in 1..2) {
+            add(error("$path.trunk.thickness", "TRUNK_THICKNESS_OUT_OF_RANGE", "Trunk thickness must be 1 or 2"))
+        }
+        if (trunk.bend !in 0.0..1.0) {
+            add(error("$path.trunk.bend", "TRUNK_BEND_OUT_OF_RANGE", "Trunk bend must be between 0 and 1"))
+        }
+        if (trunk.bend != 0.0 && trunk.shape != TreeTrunkShape.BENT && trunk.shape != TreeTrunkShape.TWISTED) {
+            add(error("$path.trunk.bend", "UNUSED_TRUNK_BEND", "Only BENT and TWISTED trunk paths consume bend"))
+        }
+        val branches = trunk.branches
+        if ((trunk.shape == TreeTrunkShape.FORKED || trunk.shape == TreeTrunkShape.BRANCHING) && branches == null) {
+            add(error("$path.trunk.branches", "MISSING_TREE_BRANCHES", "${trunk.shape} requires a branches object"))
+        }
+        branches?.let { branch ->
+            val minimumCount = if (trunk.shape == TreeTrunkShape.FORKED) 2 else 1
+            if (branch.count !in minimumCount..8) {
+                add(error("$path.trunk.branches.count", "BRANCH_COUNT_OUT_OF_RANGE", "Branch count must be between $minimumCount and 8"))
             }
-            if (height.min < tree.silhouette.minimumHeight || height.min > MAX_TREE_BASE_HEIGHT) {
-                add(
-                    error(
-                        "$path.height.min",
-                        "TREE_HEIGHT_OUT_OF_RANGE",
-                        "${tree.silhouette} height must start between ${tree.silhouette.minimumHeight} and $MAX_TREE_BASE_HEIGHT",
-                    ),
-                )
+            if (branch.length !in 1..8) {
+                add(error("$path.trunk.branches.length", "BRANCH_LENGTH_OUT_OF_RANGE", "Branch length must be between 1 and 8"))
             }
-            if (height.max > MAX_TREE_HEIGHT || height.max - height.min > MAX_TREE_HEIGHT_VARIATION) {
-                add(
-                    error(
-                        "$path.height.max",
-                        "TREE_HEIGHT_OUT_OF_RANGE",
-                        "Tree height may reach $MAX_TREE_HEIGHT with at most $MAX_TREE_HEIGHT_VARIATION blocks of variation",
-                    ),
-                )
+            if (branch.start !in 0.2..0.95) {
+                add(error("$path.trunk.branches.start", "BRANCH_START_OUT_OF_RANGE", "Branch start must be between 0.2 and 0.95"))
+            }
+            if (branch.upwardBias !in 0.0..1.0) {
+                add(error("$path.trunk.branches.upwardBias", "BRANCH_BIAS_OUT_OF_RANGE", "Branch upward bias must be between 0 and 1"))
             }
         }
-        tree.crownRadius?.let { radius ->
-            if (radius !in MIN_CROWN_RADIUS..MAX_CROWN_RADIUS) {
-                add(
-                    error(
-                        "$path.crownRadius",
-                        "CROWN_RADIUS_OUT_OF_RANGE",
-                        "Crown radius must be between $MIN_CROWN_RADIUS and $MAX_CROWN_RADIUS",
-                    ),
-                )
-            }
+
+        if (crown.radius !in MIN_CROWN_RADIUS..MAX_CROWN_RADIUS) {
+            add(error("$path.crown.radius", "CROWN_RADIUS_OUT_OF_RANGE", "Crown radius must be between 1 and $MAX_CROWN_RADIUS"))
         }
-        val effectiveMinHeight = tree.height?.min ?: tree.silhouette.defaultMinHeight
-        val effectiveRadius = tree.crownRadius ?: tree.silhouette.defaultCrownRadius
-        val minimumForCrown = when (tree.silhouette) {
-            TreeSilhouette.BROADLEAF -> effectiveRadius + 2
-            TreeSilhouette.BLOSSOM -> effectiveRadius + 3
-            TreeSilhouette.WEEPING -> effectiveRadius + 2
-            TreeSilhouette.CONIFER, TreeSilhouette.UMBRELLA -> 3
-            TreeSilhouette.SHRUB -> 1
+        if (crown.height !in 1..MAX_CROWN_HEIGHT) {
+            add(error("$path.crown.height", "CROWN_HEIGHT_OUT_OF_RANGE", "Crown height must be between 1 and $MAX_CROWN_HEIGHT"))
         }
-        if (effectiveMinHeight < minimumForCrown) {
+        if (crown.density !in 0.1..1.0) {
+            add(error("$path.crown.density", "CROWN_DENSITY_OUT_OF_RANGE", "Crown density must be between 0.1 and 1"))
+        }
+        if (crown.irregularity !in 0.0..1.0) {
+            add(error("$path.crown.irregularity", "CROWN_IRREGULARITY_OUT_OF_RANGE", "Crown irregularity must be between 0 and 1"))
+        }
+        if (crown.hangingLeaves !in 0.0..1.0) {
+            add(error("$path.crown.hangingLeaves", "HANGING_LEAVES_OUT_OF_RANGE", "Hanging leaves must be between 0 and 1"))
+        }
+
+        val downwardReach = when (crown.shape) {
+            TreeCrownShape.ROUND -> crown.height / 2
+            TreeCrownShape.CONICAL, TreeCrownShape.LAYERED -> crown.height - 1
+            TreeCrownShape.UMBRELLA -> minOf(3, crown.height - 1)
+            TreeCrownShape.WEEPING -> crown.height - maxOf(1, crown.height / 3)
+            TreeCrownShape.CLUSTERED -> crown.height / 4
+        } + if (crown.hangingLeaves > 0.0) 2 else 0
+        if (height.min <= downwardReach) {
             add(
                 error(
                     path,
                     "TREE_CROWN_EXCEEDS_HEIGHT",
-                    "${tree.silhouette} with crown radius $effectiveRadius needs a minimum height of at least $minimumForCrown",
+                    "The crown reaches $downwardReach blocks downward, so minimum tree height must be greater than that",
                 ),
             )
         }
-        tree.hangingLeaves?.let { chance ->
-            if (chance !in 0.0..1.0) {
-                add(error("$path.hangingLeaves", "HANGING_LEAVES_OUT_OF_RANGE", "Hanging leaves must be between 0 and 1"))
-            }
-            if (tree.silhouette != TreeSilhouette.BLOSSOM && tree.silhouette != TreeSilhouette.WEEPING) {
+        branches?.let { branch ->
+            val lowestAttachment = ((height.min - 1) * branch.start).toInt() + 1
+            if (lowestAttachment <= downwardReach) {
                 add(
                     error(
-                        "$path.hangingLeaves",
-                        "HANGING_LEAVES_NOT_SUPPORTED",
-                        "Only BLOSSOM and WEEPING crowns consume hangingLeaves",
+                        "$path.trunk.branches.start",
+                        "BRANCH_CROWN_REACHES_GROUND",
+                        "The first branch crown reaches the ground; raise branch start or reduce crown height",
                     ),
                 )
             }
