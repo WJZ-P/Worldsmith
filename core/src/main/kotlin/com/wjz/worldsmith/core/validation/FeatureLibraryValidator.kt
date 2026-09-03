@@ -14,7 +14,8 @@ object FeatureLibraryValidator {
     private const val MAX_MATERIAL_WEIGHT = 64
     private const val MAX_TREE_BASE_HEIGHT = 32
     private const val MAX_TREE_HEIGHT_VARIATION = 24
-    private const val MAX_TREE_HEIGHT = 40
+    private const val MAX_TREE_HEIGHT = 36
+    private const val MAX_TREE_TOTAL_HEIGHT = 44
     private const val MIN_CROWN_RADIUS = 1
     private const val MAX_CROWN_RADIUS = 8
     private const val MAX_CROWN_HEIGHT = 12
@@ -157,6 +158,23 @@ object FeatureLibraryValidator {
                     path,
                     "TREE_CROWN_EXCEEDS_HEIGHT",
                     "The crown reaches $downwardReach blocks downward, so minimum tree height must be greater than that",
+                ),
+            )
+        }
+        val branchRise = branches?.takeIf { it.upwardBias > 0.0 }?.length ?: 0
+        val crownRise = when (crown.shape) {
+            TreeCrownShape.ROUND -> crown.height / 2
+            TreeCrownShape.CONICAL, TreeCrownShape.LAYERED -> 0
+            TreeCrownShape.UMBRELLA -> 1
+            TreeCrownShape.WEEPING -> maxOf(1, crown.height / 3)
+            TreeCrownShape.CLUSTERED -> crown.height / 4
+        }
+        if (height.max + branchRise + crownRise > MAX_TREE_TOTAL_HEIGHT) {
+            add(
+                error(
+                    path,
+                    "TREE_TOTAL_HEIGHT_OUT_OF_RANGE",
+                    "Trunk, rising branches and crown may reach at most $MAX_TREE_TOTAL_HEIGHT blocks; larger trees are structures",
                 ),
             )
         }

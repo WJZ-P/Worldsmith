@@ -25,10 +25,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+import java.util.stream.Collectors;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.feature.Feature;
@@ -103,6 +105,66 @@ final class WorldsmithTreeGenerationTest {
 		assertTrue(maxLeafX - minLeafX >= 8, "requested radius produced a crown only " + (maxLeafX - minLeafX) + " blocks wide");
 	}
 
+	@Test
+	void everyNamedTrunkAndCrownRuleProducesDistinctGeometry() {
+		Set<Set<BlockPos>> trunks = new java.util.HashSet<>();
+		for (TreeTrunkShape shape : TreeTrunkShape.values()) {
+			FlatWorld world = generate(treeSpec(shape, TreeCrownShape.ROUND), 71L);
+			trunks.add(positions(world, Blocks.OAK_LOG));
+		}
+		assertTrue(trunks.size() == TreeTrunkShape.values().length, "two trunk rules produced the same skeleton");
+
+		Set<Set<BlockPos>> crowns = new java.util.HashSet<>();
+		for (TreeCrownShape shape : TreeCrownShape.values()) {
+			FlatWorld world = generate(treeSpec(TreeTrunkShape.STRAIGHT, shape), 91L);
+			crowns.add(positions(world, Blocks.OAK_LEAVES));
+		}
+		assertTrue(crowns.size() == TreeCrownShape.values().length, "two crown rules produced the same volume");
+	}
+
+	@Test
+	void bendBranchesAndCrownDensityAreRealControls() {
+		TreeCrownSpec crown = new TreeCrownSpec(TreeCrownShape.ROUND, 4, 6, 0.9, 0.2, 0.0);
+		TreeSpec gentle = spec(new TreeTrunkSpec(TreeTrunkShape.BENT, new TreeHeight(16, 16), 1, 0.15, null), crown);
+		TreeSpec strong = spec(new TreeTrunkSpec(TreeTrunkShape.BENT, new TreeHeight(16, 16), 1, 1.0, null), crown);
+		int gentleSpan = horizontalSpan(positions(generate(gentle, 11L), Blocks.OAK_LOG));
+		int strongSpan = horizontalSpan(positions(generate(strong, 11L), Blocks.OAK_LOG));
+		assertTrue(strongSpan > gentleSpan, "bend did not widen the trunk path: " + gentleSpan + " vs " + strongSpan);
+
+		TreeSpec fewBranches = spec(
+			new TreeTrunkSpec(
+				TreeTrunkShape.BRANCHING,
+				new TreeHeight(14, 14),
+				1,
+				0.0,
+				new TreeBranchSpec(2, 4, 0.6, 0.5)
+			),
+			crown
+		);
+		TreeSpec manyBranches = spec(
+			new TreeTrunkSpec(
+				TreeTrunkShape.BRANCHING,
+				new TreeHeight(14, 14),
+				1,
+				0.0,
+				new TreeBranchSpec(6, 4, 0.6, 0.5)
+			),
+			crown
+		);
+		assertTrue(
+			positions(generate(manyBranches, 23L), Blocks.OAK_LOG).size() > positions(generate(fewBranches, 23L), Blocks.OAK_LOG).size(),
+			"branch count did not add wood"
+		);
+
+		TreeTrunkSpec straight = new TreeTrunkSpec(TreeTrunkShape.STRAIGHT, new TreeHeight(12, 12), 1, 0.0, null);
+		TreeSpec sparse = spec(straight, new TreeCrownSpec(TreeCrownShape.ROUND, 5, 7, 0.25, 0.2, 0.0));
+		TreeSpec dense = spec(straight, new TreeCrownSpec(TreeCrownShape.ROUND, 5, 7, 1.0, 0.2, 0.0));
+		assertTrue(
+			positions(generate(dense, 31L), Blocks.OAK_LEAVES).size() > positions(generate(sparse, 31L), Blocks.OAK_LEAVES).size(),
+			"crown density did not add foliage"
+		);
+	}
+
 	@SuppressWarnings("unchecked")
 	private static boolean place(ConfiguredFeature<?, ?> configured, WorldGenLevel level, RandomSource random) {
 		Feature<TreeConfiguration> feature = (Feature<TreeConfiguration>)configured.feature();
@@ -125,6 +187,10 @@ final class WorldsmithTreeGenerationTest {
 		);
 	}
 
+	private static TreeSpec spec(TreeTrunkSpec trunk, TreeCrownSpec crown) {
+		return new TreeSpec(trunk, crown, TreeDistribution.GROVE, TreeSubstrate.NATURAL_SOIL, List.of());
+	}
+
 	private static TreeSpec treeSpec(TreeTrunkShape trunk, TreeCrownShape crown) {
 		TreeBranchSpec branches = switch (trunk) {
 			case FORKED -> new TreeBranchSpec(2, 4, 0.7, 0.6);
@@ -139,6 +205,27 @@ final class WorldsmithTreeGenerationTest {
 			TreeSubstrate.NATURAL_SOIL,
 			List.of()
 		);
+	}
+
+	private static FlatWorld generate(TreeSpec spec, long seed) {
+		FlatWorld world = new FlatWorld();
+		assertTrue(place(WorldsmithVegetation.configure(tree(spec), new MaterialResolver()), world.level(), RandomSource.create(seed)));
+		return world;
+	}
+
+	private static Set<BlockPos> positions(FlatWorld world, Block block) {
+		return world.placed().entrySet().stream()
+			.filter(entry -> entry.getValue().is(block))
+			.map(Map.Entry::getKey)
+			.collect(Collectors.toUnmodifiableSet());
+	}
+
+	private static int horizontalSpan(Set<BlockPos> positions) {
+		int minX = positions.stream().mapToInt(BlockPos::getX).min().orElseThrow();
+		int maxX = positions.stream().mapToInt(BlockPos::getX).max().orElseThrow();
+		int minZ = positions.stream().mapToInt(BlockPos::getZ).min().orElseThrow();
+		int maxZ = positions.stream().mapToInt(BlockPos::getZ).max().orElseThrow();
+		return Math.max(maxX - minX, maxZ - minZ);
 	}
 
 	/** Only the LevelAccessor surface touched by TreeFeature is modelled. */

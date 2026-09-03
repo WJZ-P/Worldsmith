@@ -3,6 +3,7 @@ package com.wjz.worldsmith.core.feature
 import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.TreeDistribution
+import com.wjz.worldsmith.core.model.TreeSpec
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -47,7 +48,7 @@ object VegetationBudget {
         FeatureRecipe.TREE -> treeMaximumCount(
             feature.tree?.distribution ?: TreeDistribution.SCATTERED,
             density,
-        ).toDouble()
+        ) * (feature.tree?.let(::treeWorkPerTree) ?: 1.0)
     }
 
     /** Noise boundary shared by the compiler and the budget documentation. */
@@ -79,6 +80,24 @@ object VegetationBudget {
     @JvmStatic
     fun treeMaximumCount(distribution: TreeDistribution, density: Double): Int =
         max(treeBelowNoiseCount(distribution, density), treeAboveNoiseCount(distribution, density))
+
+    /**
+     * Approximate placement work relative to one ordinary tree.
+     *
+     * Every branch tip receives a crown, so branch count and crown volume are
+     * multiplicative rather than cosmetic. Charging that work here makes the
+     * existing per-chunk cap protect generation from a dense forest of maximum
+     * sized, many-crowned trees.
+     */
+    @JvmStatic
+    fun treeWorkPerTree(tree: TreeSpec): Double {
+        val branchCount = tree.trunk.branches?.count ?: 0
+        val branchBlocks = branchCount * (tree.trunk.branches?.length ?: 0)
+        val trunkBlocks = tree.trunk.height.max * tree.trunk.thickness * tree.trunk.thickness
+        val crownBox = (2 * tree.crown.radius + 1) * (2 * tree.crown.radius + 1) * tree.crown.height
+        val crownWork = (branchCount + 1) * crownBox * tree.crown.density
+        return max(1.0, (trunkBlocks + branchBlocks + crownWork) / 512.0)
+    }
 
     private fun scaledCount(density: Double, maximum: Int): Int =
         if (density <= 0.0) 0 else max(1, (density * maximum).roundToInt())

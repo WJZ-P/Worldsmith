@@ -81,6 +81,7 @@ public final class WorldsmithFoliagePlacer extends FoliagePlacer {
 					double vertical = this.height <= 1 ? 0.0 : Math.abs(y - (top + bottomY) / 2.0) / (this.height / 2.0);
 					int radius = Math.max(0, (int)Math.round(leafRadius * Math.sqrt(Math.max(0.0, 1.0 - vertical * vertical))));
 					placeLeavesRow(level, foliageSetter, random, config, origin, radius, y, attachment.doubleTrunk());
+					if (y == bottomY) bottomRadius = radius;
 				}
 			}
 			case CONICAL -> {
@@ -96,6 +97,7 @@ public final class WorldsmithFoliagePlacer extends FoliagePlacer {
 				for (int y = 0; y >= bottomY; y--) {
 					int radius = Math.max(1, leafRadius - (Math.abs(y) % 2));
 					placeLeavesRow(level, foliageSetter, random, config, origin, radius, y, attachment.doubleTrunk());
+					if (y == bottomY) bottomRadius = radius;
 				}
 			}
 			case UMBRELLA -> {
@@ -104,6 +106,7 @@ public final class WorldsmithFoliagePlacer extends FoliagePlacer {
 				for (int y = 1; y >= bottomY; y--) {
 					int radius = y == 1 || y == bottomY ? Math.max(1, leafRadius - 1) : leafRadius;
 					placeLeavesRow(level, foliageSetter, random, config, origin, radius, y, attachment.doubleTrunk());
+					if (y == bottomY) bottomRadius = radius;
 				}
 			}
 			case WEEPING -> {

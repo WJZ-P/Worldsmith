@@ -90,10 +90,10 @@ Trunk `shape` is one of:
 | `FORKED` | an upper stem split; requires at least two branches |
 | `BRANCHING` | a straight main stem with an authored set of side branches |
 
-- `height.min` and `height.max` are inclusive. Trees stay within `1..40`, with
-  `min` at most 32 and at most 24 blocks of variation. Forty blocks is already
-  slightly taller than an ordinary large jungle tree; larger landmarks belong
-  to structures.
+- `height.min` and `height.max` are inclusive. Trunks stay within `1..36`, with
+  `min` at most 32 and at most 24 blocks of variation. After rising branches and
+  the upper crown are included, the whole tree may reach at most 44 blocks.
+  Larger landmarks belong to structures.
 - `thickness` is `1` or `2`.
 - `bend` is `0..1` and is used by `BENT` and `TWISTED`.
 - Optional `branches` has `count` `1..8`, `length` `1..8`, `start` `0.2..0.95`
@@ -236,6 +236,8 @@ to the cost and scale of the recipe:
 One biome may spend at most 64 attempts per chunk in total. Exceeding it is the
 `VEGETATION_BUDGET_EXCEEDED` error; the cap exists because an over-eager density
 makes world generation crawl, and a slow world looks nothing like its cause.
+For trees, one attempt is scaled by trunk volume and by every branch-tip crown;
+large many-crowned trees therefore consume more of the same budget.
 
 ## Where each one runs
 

@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.worldgen;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import com.google.gson.JsonElement;
 import com.mojang.serialization.JsonOps;
@@ -48,10 +49,15 @@ final class WorldsmithCustomTreePlacerTest {
 		JsonElement encoded = ConfiguredFeature.DIRECT_CODEC.encodeStart(ops, configured)
 			.getOrThrow(message -> new IllegalStateException("Could not encode custom tree: " + message));
 		String json = encoded.toString();
+		ConfiguredFeature<?, ?> decoded = ConfiguredFeature.DIRECT_CODEC.parse(ops, encoded)
+			.getOrThrow(message -> new IllegalStateException("Could not decode custom tree: " + message));
+		TreeConfiguration decodedTree = (TreeConfiguration)decoded.config();
 
 		assertTrue(json.contains("worldsmith:shaped_trunk"), json);
 		assertTrue(json.contains("worldsmith:shaped_foliage"), json);
 		assertTrue(json.contains("\"shape\":\"branching\""), json);
 		assertTrue(json.contains("\"shape\":\"clustered\""), json);
+		assertInstanceOf(WorldsmithTrunkPlacer.class, decodedTree.trunkPlacer);
+		assertInstanceOf(WorldsmithFoliagePlacer.class, decodedTree.foliagePlacer);
 	}
 }

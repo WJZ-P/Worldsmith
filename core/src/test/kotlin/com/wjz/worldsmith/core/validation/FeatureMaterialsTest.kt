@@ -86,6 +86,7 @@ class FeatureMaterialsTest {
                     feature,
                     WorldsmithJson.decode<FeatureLibrary>(WorldsmithJson.encode(library(feature))).features.single(),
                 )
+                assertEquals(emptyList<Diagnostic>(), FeatureLibraryValidator.validate(library(feature)))
             }
         }
     }
@@ -157,6 +158,23 @@ class FeatureMaterialsTest {
         )
         assertTrue(
             FeatureLibraryValidator.validate(library(sunkenCrown)).any { it.code == "TREE_CROWN_EXCEEDS_HEIGHT" },
+        )
+
+        val tooTall = malformed.copy(
+            id = "too_tall",
+            tree = TreeSpec(
+                TreeTrunkSpec(
+                    TreeTrunkShape.BRANCHING,
+                    TreeHeight(30, 36),
+                    branches = TreeBranchSpec(3, 8, 0.75, 1.0),
+                ),
+                TreeCrownSpec(TreeCrownShape.ROUND, radius = 4, height = 12),
+                TreeDistribution.SCATTERED,
+                TreeSubstrate.NATURAL_SOIL,
+            ),
+        )
+        assertTrue(
+            FeatureLibraryValidator.validate(library(tooTall)).any { it.code == "TREE_TOTAL_HEIGHT_OUT_OF_RANGE" },
         )
     }
 
@@ -276,7 +294,7 @@ class FeatureMaterialsTest {
     ): TreeSpec {
         val branches = when (trunkShape) {
             TreeTrunkShape.FORKED -> TreeBranchSpec(2, 4, 0.65)
-            TreeTrunkShape.BRANCHING -> TreeBranchSpec(4, 4, 0.55)
+            TreeTrunkShape.BRANCHING -> TreeBranchSpec(4, 4, 0.7)
             else -> null
         }
         val bend = if (trunkShape == TreeTrunkShape.BENT || trunkShape == TreeTrunkShape.TWISTED) 0.35 else 0.0

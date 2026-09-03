@@ -4,6 +4,7 @@ import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.TreeCrownShape
 import com.wjz.worldsmith.core.model.TreeCrownSpec
+import com.wjz.worldsmith.core.model.TreeBranchSpec
 import com.wjz.worldsmith.core.model.TreeDistribution
 import com.wjz.worldsmith.core.model.TreeHeight
 import com.wjz.worldsmith.core.model.TreeSpec
@@ -61,6 +62,34 @@ class VegetationBudgetTest {
         assertTrue(
             VegetationBudget.treeMaximumCount(TreeDistribution.DENSE_FOREST, 0.7) >
                 VegetationBudget.treeMaximumCount(TreeDistribution.FOREST, 0.7),
+        )
+    }
+
+    @Test
+    fun `many large branch crowns cost more than one ordinary tree`() {
+        val ordinary = TreeSpec(
+            TreeTrunkSpec(TreeTrunkShape.STRAIGHT, TreeHeight(8, 10)),
+            TreeCrownSpec(TreeCrownShape.ROUND, radius = 3, height = 4),
+            TreeDistribution.FOREST,
+            TreeSubstrate.NATURAL_SOIL,
+        )
+        val elaborate = TreeSpec(
+            TreeTrunkSpec(
+                TreeTrunkShape.BRANCHING,
+                TreeHeight(18, 22),
+                thickness = 2,
+                branches = TreeBranchSpec(7, 7, 0.6),
+            ),
+            TreeCrownSpec(TreeCrownShape.CLUSTERED, radius = 7, height = 10, density = 0.95),
+            TreeDistribution.FOREST,
+            TreeSubstrate.NATURAL_SOIL,
+        )
+
+        assertTrue(VegetationBudget.treeWorkPerTree(elaborate) > VegetationBudget.treeWorkPerTree(ordinary) * 20)
+        val expensive = FeatureDefinition("expensive", FeatureRecipe.TREE, density = 1.0, tree = elaborate)
+        assertTrue(
+            VegetationBudget.attemptsPerChunk(expensive, 1.0) > VegetationBudget.MAX_ATTEMPTS_PER_CHUNK,
+            "a dense forest of maximum branch crowns should cross the chunk budget",
         )
     }
 
