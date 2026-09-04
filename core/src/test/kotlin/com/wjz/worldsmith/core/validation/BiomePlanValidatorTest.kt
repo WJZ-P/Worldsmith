@@ -10,6 +10,7 @@ import com.wjz.worldsmith.core.model.BiomeSky
 import com.wjz.worldsmith.core.model.BiomeTint
 import com.wjz.worldsmith.core.model.BiomeFeatureRef
 import com.wjz.worldsmith.core.model.BiomePlan
+import com.wjz.worldsmith.core.model.BiomeSpatialSettings
 import com.wjz.worldsmith.core.model.ClimateBox
 import com.wjz.worldsmith.core.model.ClimatePlacement
 import com.wjz.worldsmith.core.model.ClimateSlot
@@ -18,6 +19,7 @@ import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.HumidityBand
 import com.wjz.worldsmith.core.model.MaterialRole
 import com.wjz.worldsmith.core.model.MaterialSelector
+import com.wjz.worldsmith.core.model.NumericRange
 import com.wjz.worldsmith.core.model.ReliefBand
 import com.wjz.worldsmith.core.model.SurfaceAltitude
 import com.wjz.worldsmith.core.model.SurfaceAnchorBand
@@ -45,6 +47,123 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class BiomePlanValidatorTest {
+    @Test
+    fun `biome spatial controls have explicit generation bounds`() {
+        val broken = plan().copy(
+            spatial = BiomeSpatialSettings(regionScale = 9.0, boundaryRoughness = -0.1),
+        )
+
+        val codes = BiomePlanValidator.validate(broken, library()).map { it.code }.toSet()
+
+        assertTrue("BIOME_REGION_SCALE_OUT_OF_RANGE" in codes)
+        assertTrue("BIOME_BOUNDARY_ROUGHNESS_OUT_OF_RANGE" in codes)
+    }
+
+    @Test
+    fun `archetype and placement report contradictory land semantics`() {
+        val contradictorySlot = plan().let { source ->
+            source.copy(
+                biomes = source.biomes.map { biome ->
+                    if (biome.id == "abyss") biome.copy(slot = ClimateSlot(ReliefBand.FLATS)) else biome
+                },
+            )
+        }
+        val contradictoryRaw = plan().let { source ->
+            source.copy(
+                biomes = source.biomes.map { biome ->
+                    if (biome.id == "flats_cold") {
+                        biome.copy(
+                            slot = null,
+                            climate = ClimateBox(
+                                continentalness = NumericRange(-1.0f, -0.5f),
+                            ),
+                        )
+                    } else {
+                        biome
+                    }
+                },
+            )
+        }
+
+        assertTrue(
+            BiomePlanValidator.validate(contradictorySlot, library())
+                .any { it.code == "ARCHETYPE_LAND_WATER_MISMATCH" },
+        )
+        assertTrue(
+            BiomePlanValidator.validate(contradictoryRaw, library())
+                .any { it.code == "ARCHETYPE_LAND_WATER_MISMATCH" },
+        )
+    }
+
+    @Test
+    fun `raw archetype overlap must have positive width rather than touch one band endpoint`() {
+        val mismatched = plan().let { source ->
+            source.copy(
+                biomes = source.biomes.map { biome ->
+                    when (biome.id) {
+                        "abyss" -> biome.copy(
+                            slot = null,
+                            climate = ClimateBox(continentalness = NumericRange(-0.455f, -0.19f)),
+                        )
+                        "highland_dry" -> biome.copy(
+                            slot = null,
+                            climate = ClimateBox(
+                                continentalness = NumericRange(-0.11f, 1.0f),
+                                erosion = NumericRange(0.05f, 1.0f),
+                            ),
+                        )
+                        else -> biome
+                    }
+                },
+            )
+        }
+
+        val mismatches = BiomePlanValidator.validate(mismatched, library())
+            .filter { it.code == "ARCHETYPE_RELIEF_MISMATCH" }
+
+        assertTrue(mismatches.size >= 2, mismatches.toString())
+    }
+
+    @Test
+    fun `climate derived tints may be omitted while authored dry foliage is validated`() {
+        val climateTint = plan().let { source ->
+            source.copy(
+                biomes = source.biomes.mapIndexed { index, biome ->
+                    if (index == 0) {
+                        biome.copy(
+                            environment = biome.environment.copy(
+                                tint = biome.environment.tint.copy(grass = null, foliage = null),
+                            ),
+                        )
+                    } else {
+                        biome
+                    }
+                },
+            )
+        }
+        val badDryFoliage = climateTint.let { source ->
+            source.copy(
+                biomes = source.biomes.mapIndexed { index, biome ->
+                    if (index == 0) {
+                        biome.copy(
+                            environment = biome.environment.copy(
+                                tint = biome.environment.tint.copy(dryFoliage = "C0FFEE"),
+                            ),
+                        )
+                    } else {
+                        biome
+                    }
+                },
+            )
+        }
+
+        assertTrue(BiomePlanValidator.validate(climateTint, library()).none { it.severity == DiagnosticSeverity.ERROR })
+        assertTrue(
+            BiomePlanValidator.validate(badDryFoliage, library())
+                .any { it.path.endsWith("dryFoliage") && it.code == "INVALID_COLOR" },
+        )
+    }
+
     @Test
     fun `a biome uses the placements list or the shorthand but not both`() {
         val mixed = plan().let { source ->

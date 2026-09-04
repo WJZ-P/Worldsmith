@@ -13,6 +13,10 @@ import com.wjz.worldsmith.core.model.HydrologyIntent;
 import com.wjz.worldsmith.core.model.RiverFill;
 import com.wjz.worldsmith.core.model.BandEffect;
 import com.wjz.worldsmith.core.model.BandRegion;
+import com.wjz.worldsmith.core.model.Anchor;
+import com.wjz.worldsmith.core.model.AnchorPlacement;
+import com.wjz.worldsmith.core.model.CaveIntent;
+import com.wjz.worldsmith.core.model.CaveVerticalRange;
 import com.wjz.worldsmith.core.model.TerrainBand;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
@@ -122,17 +126,24 @@ final class WorldsmithPackExporterTest {
 
 	@Test
 	void anchorSurfaceConditionCodecRoundTrips() {
-		WorldsmithAnchorConditionSource source = new WorldsmithAnchorConditionSource(
-			0.7, 1.0, 600, 1.2, false, 120, -80, 0, 0.0
+		List<WorldsmithAnchorConditionSource> sources = List.of(
+			new WorldsmithAnchorConditionSource(
+				0.7, 1.0, 600, 1.2, false, false, 120, -80, 0, 0, 0, 0.0
+			),
+			new WorldsmithAnchorConditionSource(
+				0.2, 0.8, 240, 0.9, false, true, -800, 40, 900, -120, 0, 0.0
+			)
 		);
 
-		JsonElement encoded = SurfaceRules.ConditionSource.CODEC.encodeStart(JsonOps.INSTANCE, source)
-			.getOrThrow(message -> new IllegalStateException("Could not encode anchor condition: " + message));
-		SurfaceRules.ConditionSource decoded = SurfaceRules.ConditionSource.CODEC.parse(JsonOps.INSTANCE, encoded)
-			.getOrThrow(message -> new IllegalStateException("Could not decode anchor condition: " + message));
+		for (WorldsmithAnchorConditionSource source : sources) {
+			JsonElement encoded = SurfaceRules.ConditionSource.CODEC.encodeStart(JsonOps.INSTANCE, source)
+				.getOrThrow(message -> new IllegalStateException("Could not encode anchor condition: " + message));
+			SurfaceRules.ConditionSource decoded = SurfaceRules.ConditionSource.CODEC.parse(JsonOps.INSTANCE, encoded)
+				.getOrThrow(message -> new IllegalStateException("Could not decode anchor condition: " + message));
 
-		assertTrue(encoded.toString().contains("worldsmith:anchor"));
-		assertEquals(source, decoded);
+			assertTrue(encoded.toString().contains("worldsmith:anchor"));
+			assertEquals(source, decoded);
+		}
 	}
 
 	@Test
@@ -186,7 +197,7 @@ final class WorldsmithPackExporterTest {
 				0.8,
 				new ReliefDistribution(0.0, 0.0, 1.0),
 				1.6,
-				0.3,
+				new CaveIntent(0.3, 0.3, 0.3, 0.3, new CaveVerticalRange(-56, 192), 0.3),
 				new HydrologyIntent(0.06, 1.4, 1.1, 0.8, RiverFill.FLUID, 0.07, 1.6, 0.9, 1.5),
 				// Non-default so the round trip covers real bands rather than
 				// the branch that compiles them away entirely.
@@ -194,7 +205,14 @@ final class WorldsmithPackExporterTest {
 					new TerrainBand(0.28, 176, 244, BandEffect.ADD, BandRegion.OVER_LAND, null, 1.3, 0.9),
 					new TerrainBand(0.30, -40, 20, BandEffect.CARVE, BandRegion.INLAND, null, 2.0, 1.2)
 				),
-				List.of()
+				List.of(new Anchor(
+					"ridge",
+					new AnchorPlacement.Line(-900, 100, 900, -100),
+					180,
+					45.0,
+					1.2,
+					null
+				))
 			),
 			template.getAquifersEnabled(),
 			template.getOreVeinsEnabled(),

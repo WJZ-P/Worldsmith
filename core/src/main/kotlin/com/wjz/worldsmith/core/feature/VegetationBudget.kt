@@ -38,13 +38,24 @@ object VegetationBudget {
     @JvmStatic
     fun attemptsPerChunk(feature: FeatureDefinition, density: Double): Double = when (feature.recipe) {
         FeatureRecipe.GROUND_PATCH, FeatureRecipe.SURFACE_LAYER, FeatureRecipe.AQUATIC_PATCH ->
-            patchCount(density).toDouble()
-        FeatureRecipe.ORE_VEIN, FeatureRecipe.CAVE_PATCH, FeatureRecipe.HANGING_PATCH ->
-            veinCount(density).toDouble()
+            patchCount(density) * (feature.patch?.attempts ?: 1).toDouble()
+        FeatureRecipe.CAVE_PATCH ->
+            veinCount(density) * (feature.patch?.attempts ?: 1) *
+                max(1.0, (feature.patch?.scanDepth ?: 12) / 12.0)
+        FeatureRecipe.HANGING_PATCH ->
+            veinCount(density) * (feature.patch?.attempts ?: 1) *
+                max(1.0, (feature.patch?.scanDepth ?: 12) / 12.0) *
+                max(1.0, (feature.column?.maxLength ?: 6) / 6.0)
+        FeatureRecipe.ORE_VEIN ->
+            veinCount(density) * max(1.0, (feature.oreVein?.size ?: 33) / 33.0)
         // Listed rather than defaulted: a new recipe should not silently inherit
         // a cost, because being charged wrongly is how a pack slips past the cap.
-        FeatureRecipe.DEAD_TREE, FeatureRecipe.BOULDER, FeatureRecipe.FALLEN_LOG ->
-            if (density <= 0.0) 0.0 else 1.0 / rarity(density)
+        FeatureRecipe.DEAD_TREE ->
+            if (density <= 0.0) 0.0 else max(1.0, (feature.column?.maxLength ?: 5) / 5.0) / rarity(density)
+        FeatureRecipe.BOULDER ->
+            if (density <= 0.0) 0.0 else (feature.boulder?.blobs ?: 1).toDouble() / rarity(density)
+        FeatureRecipe.FALLEN_LOG ->
+            if (density <= 0.0) 0.0 else max(1.0, (feature.fallenLog?.maxLength ?: 6) / 6.0) / rarity(density)
         FeatureRecipe.TREE -> treeMaximumCount(
             feature.tree?.distribution ?: TreeDistribution.SCATTERED,
             density,

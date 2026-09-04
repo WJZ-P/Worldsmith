@@ -3,7 +3,10 @@ package com.wjz.worldsmith.worldgen;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.wjz.worldsmith.core.model.FeatureDefinition;
+import com.wjz.worldsmith.core.model.FeatureFluid;
+import com.wjz.worldsmith.core.model.FeaturePlacementConditions;
 import com.wjz.worldsmith.core.model.FeatureRecipe;
+import com.wjz.worldsmith.core.model.FeatureSubstrate;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.TreeDistribution;
@@ -183,7 +186,9 @@ final class WorldsmithTreeGenerationTest {
 				MaterialRole.FOLIAGE, new MaterialSelector("leaves", List.of("minecraft:oak_leaves"), List.of(), List.of())
 			),
 			0.5,
-			spec
+			spec,
+			null, null, null, null, null,
+			new FeaturePlacementConditions(null, null, FeatureSubstrate.RECIPE_DEFAULT, FeatureFluid.RECIPE_DEFAULT)
 		);
 	}
 

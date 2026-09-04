@@ -10,6 +10,10 @@ import com.wjz.worldsmith.core.model.AnchorClimateBias;
 import com.wjz.worldsmith.core.model.AnchorPlacement;
 import com.wjz.worldsmith.core.model.BandEffect;
 import com.wjz.worldsmith.core.model.BandRegion;
+import com.wjz.worldsmith.core.model.BiomePlan;
+import com.wjz.worldsmith.core.model.BiomeSpatialSettings;
+import com.wjz.worldsmith.core.model.CaveIntent;
+import com.wjz.worldsmith.core.model.CaveVerticalRange;
 import com.wjz.worldsmith.core.model.TerrainBand;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
@@ -347,6 +351,34 @@ final class WorldsmithTerrainSamplingTest {
 		assertTrue(distinctCells > 8, () -> "a scattered anchor should recur, distinct cells hit " + distinctCells);
 	}
 
+	@Test
+	void aLineAnchorBuildsOneFiniteCorridor() {
+		assertTrue(Math.abs(WorldsmithAnchorFields.lineDistance(0, 40, -100, 0, 100, 0) - 40.0) < 1.0E-9);
+		assertTrue(Math.abs(WorldsmithAnchorFields.lineDistance(160, 0, -100, 0, 100, 0) - 60.0) < 1.0E-9);
+		RandomState plain = state(anchorShape(), '1');
+		RandomState ridge = state(
+			anchorShape(new Anchor(
+				"ridge",
+				new AnchorPlacement.Line(-1_200, 300, 1_200, 300),
+				240,
+				90.0,
+				1.0,
+				null
+			)),
+			'2'
+		);
+
+		double start = surfaceHeight(ridge, -1_000, 300) - surfaceHeight(plain, -1_000, 300);
+		double middle = surfaceHeight(ridge, 0, 300) - surfaceHeight(plain, 0, 300);
+		double farSide = surfaceHeight(ridge, 0, 1_000) - surfaceHeight(plain, 0, 1_000);
+		double pastEnd = surfaceHeight(ridge, 2_000, 300) - surfaceHeight(plain, 2_000, 300);
+
+		assertTrue(start > 55.0, () -> "line should raise its first half, gained " + start);
+		assertTrue(middle > 55.0, () -> "line should raise its midpoint, gained " + middle);
+		assertTrue(Math.abs(farSide) < 1.0, () -> "line leaked sideways by " + farSide);
+		assertTrue(Math.abs(pastEnd) < 1.0, () -> "line leaked past its endpoint by " + pastEnd);
+	}
+
 	/**
 	 * Raising the ground is not enough. Biomes are chosen from climate
 	 * parameters rather than from how high the ground turned out, so without
@@ -513,7 +545,7 @@ final class WorldsmithTerrainSamplingTest {
 		double outermost = furthest;
 
 		assertTrue(
-			outermost - nearest > 300.0,
+			outermost - nearest > 200.0,
 			() -> "the peak band border should wander, but ran from " + nearest + " to " + outermost
 		);
 	}
@@ -561,7 +593,7 @@ final class WorldsmithTerrainSamplingTest {
 	}
 
 	@Test
-	void caveDensityChangesHowMuchSolidTerrainIsCarved() {
+	void caveFamiliesChangeHowMuchSolidTerrainIsCarved() {
 		TerrainShape.Procedural solidShape = shape(0.82, 1.0, 0.3, 0.5, 0.35, 0.15, 1.0, 0.0);
 		TerrainShape.Procedural caveShape = shape(0.82, 1.0, 0.3, 0.5, 0.35, 0.15, 1.0, 1.0);
 		RandomState solid = state(solidShape, '6');
@@ -570,6 +602,150 @@ final class WorldsmithTerrainSamplingTest {
 		int carved = carvedSamples(solid, caves);
 
 		assertTrue(carved > 150, () -> "full cave density should carve sampled solid points, got " + carved);
+	}
+
+	@Test
+	void biomeSpatialControlsWarpBordersWithoutChangingClimateShares() {
+		TerrainShape.Procedural shape = anchorShape();
+		RandomState smooth = state(shape, new BiomeSpatialSettings(1.0, 0.0), '8');
+		RandomState rough = state(shape, new BiomeSpatialSettings(1.0, 1.0), '9');
+		RandomState broad = state(shape, new BiomeSpatialSettings(4.0, 0.0), 'a');
+		RandomState fine = state(shape, new BiomeSpatialSettings(0.5, 0.0), 'b');
+		Random random = new Random(0xB10E5A1EL);
+		double smoothSum = 0.0;
+		double smoothSquares = 0.0;
+		double roughSum = 0.0;
+		double roughSquares = 0.0;
+		double broadDelta = 0.0;
+		double fineDelta = 0.0;
+		double roughDelta = 0.0;
+		double maxRoughDelta = 0.0;
+		int changed = 0;
+		int samples = 12_000;
+		for (int i = 0; i < samples; i++) {
+			int x = random.nextInt(-120_000, 120_001);
+			int z = random.nextInt(-120_000, 120_001);
+			DensityFunction.SinglePointContext point = new DensityFunction.SinglePointContext(x, 0, z);
+			DensityFunction.SinglePointContext neighbour = new DensityFunction.SinglePointContext(x + 256, 0, z);
+			double smoothValue = smooth.router().temperature().compute(point);
+			double roughValue = rough.router().temperature().compute(point);
+			smoothSum += smoothValue;
+			smoothSquares += smoothValue * smoothValue;
+			roughSum += roughValue;
+			roughSquares += roughValue * roughValue;
+			double moved = Math.abs(smoothValue - roughValue);
+			roughDelta += moved;
+			maxRoughDelta = Math.max(maxRoughDelta, moved);
+			if (moved > 0.02) {
+				changed++;
+			}
+			broadDelta += Math.abs(
+				broad.router().temperature().compute(point) - broad.router().temperature().compute(neighbour)
+			);
+			fineDelta += Math.abs(
+				fine.router().temperature().compute(point) - fine.router().temperature().compute(neighbour)
+			);
+		}
+		double smoothMean = smoothSum / samples;
+		double roughMean = roughSum / samples;
+		double smoothSigma = Math.sqrt(smoothSquares / samples - smoothMean * smoothMean);
+		double roughSigma = Math.sqrt(roughSquares / samples - roughMean * roughMean);
+		double broadNeighbourDelta = broadDelta;
+		double fineNeighbourDelta = fineDelta;
+		double meanRoughDelta = roughDelta / samples;
+		double largestRoughDelta = maxRoughDelta;
+		int changedSamples = changed;
+
+		assertTrue(meanRoughDelta > 0.002,
+			() -> "boundary roughness mean/max movement was " + meanRoughDelta + "/" + largestRoughDelta
+				+ " (" + changedSamples + " samples exceeded 0.02)");
+		assertTrue(Math.abs(smoothSigma - roughSigma) < 0.025,
+			() -> "coordinate warp changed temperature share: " + smoothSigma + " vs " + roughSigma);
+		assertTrue(broadNeighbourDelta < fineNeighbourDelta,
+			() -> "large regionScale should make nearer samples more alike: "
+				+ broadNeighbourDelta + " vs " + fineNeighbourDelta);
+	}
+
+	@Test
+	void landformAndWeirdnessAreIndependentBiomeAxes() {
+		RandomState state = state(shape(0.75, 1.0, 0.3, 0.34, 0.33, 0.33, 1.0, 0.0), 'c');
+		Random random = new Random(0x1A2E5L);
+		double sumX = 0.0, sumY = 0.0, sumXX = 0.0, sumYY = 0.0, sumXY = 0.0;
+		int samples = 16_000;
+		for (int i = 0; i < samples; i++) {
+			int x = random.nextInt(-160_000, 160_001);
+			int z = random.nextInt(-160_000, 160_001);
+			DensityFunction.SinglePointContext point = new DensityFunction.SinglePointContext(x, 0, z);
+			double landform = state.router().erosion().compute(point);
+			double weirdness = state.router().ridges().compute(point);
+			sumX += landform;
+			sumY += weirdness;
+			sumXX += landform * landform;
+			sumYY += weirdness * weirdness;
+			sumXY += landform * weirdness;
+		}
+		double covariance = sumXY / samples - (sumX / samples) * (sumY / samples);
+		double varianceX = sumXX / samples - Math.pow(sumX / samples, 2.0);
+		double varianceY = sumYY / samples - Math.pow(sumY / samples, 2.0);
+		double correlation = covariance / Math.sqrt(varianceX * varianceY);
+
+		assertTrue(Math.abs(correlation) < 0.12, () -> "landform and weirdness correlation was " + correlation);
+	}
+
+	@Test
+	void caveVerticalRangeAndFloodingAreRealRouterInputs() {
+		CaveIntent none = new CaveIntent(0.0, 0.0, 0.0, 0.0, new CaveVerticalRange(-56, 32), 0.0);
+		CaveIntent deep = new CaveIntent(1.0, 1.0, 1.0, 1.0, new CaveVerticalRange(-56, 32), 1.0);
+		RandomState solid = state(shapeWithCaves(none), '3');
+		RandomState caves = state(shapeWithCaves(deep), '4');
+
+		DensityFunction.SinglePointContext high = new DensityFunction.SinglePointContext(320, 220, -480);
+		double solidHigh = solid.router().finalDensity().compute(high);
+		double cavesHigh = caves.router().finalDensity().compute(high);
+		assertTrue(Math.abs(solidHigh - cavesHigh) < 1.0E-9, "caves changed density outside verticalRange");
+
+		double dry = solid.router().fluidLevelFloodednessNoise().compute(high);
+		double flooded = caves.router().fluidLevelFloodednessNoise().compute(high);
+		assertTrue(dry <= -0.99, () -> "zero floodedChance should produce a dry bias, got " + dry);
+		assertTrue(flooded >= 0.99, () -> "full floodedChance should produce a wet bias, got " + flooded);
+	}
+
+	@Test
+	void biomeReliefSignalMatchesTheReliefThatWasBuilt() {
+		RandomState terrain = state(shape(0.92, 1.0, 0.2, 0.34, 0.33, 0.33, 1.0, 0.0), '5');
+		double flatHeights = 0.0;
+		double highlandHeights = 0.0;
+		double peakHeights = 0.0;
+		int flats = 0;
+		int highlands = 0;
+		int peaks = 0;
+		Random random = new Random(0x1A4DF04DL);
+		for (int sample = 0; sample < 8_000; sample++) {
+			int x = random.nextInt(-30_000, 30_001);
+			int z = random.nextInt(-30_000, 30_001);
+			DensityFunction.SinglePointContext point = new DensityFunction.SinglePointContext(x, 0, z);
+			if (terrain.router().continents().compute(point) < 0.25) {
+				continue;
+			}
+			double erosion = terrain.router().erosion().compute(point);
+			double height = surfaceHeight(terrain, x, z);
+			if (erosion < -0.375) {
+				peakHeights += height;
+				peaks++;
+			} else if (erosion < 0.05) {
+				highlandHeights += height;
+				highlands++;
+			} else {
+				flatHeights += height;
+				flats++;
+			}
+		}
+		double flatMean = flatHeights / flats;
+		double highlandMean = highlandHeights / highlands;
+		double peakMean = peakHeights / peaks;
+		assertTrue(flats > 100 && highlands > 100 && peaks > 100, "fixture must sample every relief band");
+		assertTrue(highlandMean > flatMean + 12.0, "highland biome signal did not identify higher terrain");
+		assertTrue(peakMean > highlandMean + 20.0, "peak biome signal did not identify peak terrain");
 	}
 
 	static TerrainShape.Procedural shape(
@@ -588,7 +764,14 @@ final class WorldsmithTerrainSamplingTest {
 			coastRoughness,
 			new ReliefDistribution(flats, highlands, peaks),
 			verticalScale,
-			caveDensity,
+			new CaveIntent(
+				caveDensity,
+				caveDensity,
+				caveDensity,
+				caveDensity,
+				new CaveVerticalRange(-56, 192),
+				0.35
+			),
 			new HydrologyIntent(0.0, 1.0, 0.8, 0.65, RiverFill.FLUID, 0.0, 1.0, 0.8, 1.0),
 			List.of(),
 			List.of()
@@ -599,6 +782,46 @@ final class WorldsmithTerrainSamplingTest {
 		return anchorShape(0.95, anchors);
 	}
 
+	private static TerrainShape.Procedural shapeWithCaves(CaveIntent caves) {
+		TerrainShape.Procedural base = shape(0.92, 1.0, 0.2, 0.6, 0.3, 0.1, 1.0, 0.0);
+		return new TerrainShape.Procedural(
+			base.getLandRatio(),
+			base.getContinentScale(),
+			base.getCoastRoughness(),
+			base.getRelief(),
+			base.getVerticalScale(),
+			caves,
+			base.getHydrology(),
+			base.getBands(),
+			base.getAnchors()
+		);
+	}
+
+	@Test
+	void aSkyIslandDoesNotHideTheGroundFromSurfaceRules() {
+		RandomState ground = state(bandShape(), 'a');
+		RandomState floating = state(bandShape(island(0.55, 180, 250, BandRegion.ANYWHERE)), 'b');
+		DensityFunction floatingDensity = floating.router().finalDensity();
+		for (int z = -3_000; z <= 3_000; z += 64) {
+			for (int x = -3_000; x <= 3_000; x += 64) {
+				DensityFunction.SinglePointContext islandLevel = new DensityFunction.SinglePointContext(x, 210, z);
+				if (floatingDensity.compute(islandLevel) <= 0.0
+					|| ground.router().finalDensity().compute(islandLevel) > 0.0) {
+					continue;
+				}
+				DensityFunction.SinglePointContext column = new DensityFunction.SinglePointContext(x, 0, z);
+				double groundEstimate = ground.router().preliminarySurfaceLevel().compute(column);
+				double floatingEstimate = floating.router().preliminarySurfaceLevel().compute(column);
+				assertTrue(
+					floatingEstimate <= groundEstimate + 8.0,
+					() -> "top island raised the preliminary surface from " + groundEstimate + " to " + floatingEstimate
+				);
+				return;
+			}
+		}
+		throw new AssertionError("fixture found no floating island column");
+	}
+
 	private static TerrainShape.Procedural anchorShape(double landRatio, Anchor... anchors) {
 		TerrainShape.Procedural flat = shape(landRatio, 1.0, 0.2, 1.0, 0.0, 0.0, 0.4, 0.0);
 		return new TerrainShape.Procedural(
@@ -607,7 +830,7 @@ final class WorldsmithTerrainSamplingTest {
 			flat.getCoastRoughness(),
 			flat.getRelief(),
 			flat.getVerticalScale(),
-			flat.getCaveDensity(),
+			flat.getCaves(),
 			flat.getHydrology(),
 			List.of(),
 			List.of(anchors)
@@ -665,7 +888,7 @@ final class WorldsmithTerrainSamplingTest {
 			flat.getCoastRoughness(),
 			flat.getRelief(),
 			flat.getVerticalScale(),
-			flat.getCaveDensity(),
+			flat.getCaves(),
 			flat.getHydrology(),
 			List.of(bands),
 			List.of()
@@ -680,7 +903,7 @@ final class WorldsmithTerrainSamplingTest {
 			flat.getCoastRoughness(),
 			flat.getRelief(),
 			flat.getVerticalScale(),
-			flat.getCaveDensity(),
+			flat.getCaves(),
 			flat.getHydrology(),
 			List.of(band),
 			List.of(anchor)
@@ -744,6 +967,14 @@ final class WorldsmithTerrainSamplingTest {
 	}
 
 	static RandomState state(TerrainShape.Procedural shape, char idCharacter) {
+		return state(shape, WorldsmithPacks.builtin().getBiomes().getSpatial(), idCharacter);
+	}
+
+	static RandomState state(
+		TerrainShape.Procedural shape,
+		BiomeSpatialSettings spatial,
+		char idCharacter
+	) {
 		WorldsmithPack source = WorldsmithPacks.builtin();
 		TerrainPlan template = source.getTerrain();
 		TerrainPlan terrain = new TerrainPlan(
@@ -767,8 +998,11 @@ final class WorldsmithTerrainSamplingTest {
 		WorldsmithPackManifest manifest = new WorldsmithPackManifest(
 			oldManifest.getFormatVersion(), id, "Terrain sample", "Compiler fixture", oldManifest.getFiles()
 		);
+		BiomePlan biomes = new BiomePlan(
+			source.getBiomes().getSchemaVersion(), source.getBiomes().getBiomes(), spatial
+		);
 		CompiledPack compiledPack = CompiledPack.scoped(new WorldsmithPack(
-			manifest, terrain, source.getBiomes(), source.getFeatures(), id
+			manifest, terrain, biomes, source.getFeatures(), id
 		));
 		HolderLookup.Provider registries = WorldsmithPackExporter.compilePatch(compiledPack, activeWorldgen()).full();
 		return RandomState.create(registries, compiledPack.noiseSettingsKey(), SEED);

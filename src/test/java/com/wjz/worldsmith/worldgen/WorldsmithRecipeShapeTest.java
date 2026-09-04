@@ -7,7 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonElement;
 import com.mojang.serialization.JsonOps;
 import com.wjz.worldsmith.core.model.FeatureDefinition;
+import com.wjz.worldsmith.core.model.FeatureFluid;
+import com.wjz.worldsmith.core.model.FeaturePlacementConditions;
 import com.wjz.worldsmith.core.model.FeatureRecipe;
+import com.wjz.worldsmith.core.model.FeatureSubstrate;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.TreeSpec;
@@ -99,7 +102,9 @@ class WorldsmithRecipeShapeTest {
 				MaterialRole.FOLIAGE, selector(MaterialRole.FOLIAGE)
 			),
 			0.7,
-			tree
+			tree,
+			null, null, null, null, null,
+			defaultPlacement()
 		);
 
 		String json = encoded(WorldsmithVegetation.configure(feature, new MaterialResolver()));
@@ -122,7 +127,11 @@ class WorldsmithRecipeShapeTest {
 			materials.put(role, selector(role));
 		}
 		TreeSpec tree = recipe.isTree() ? treeSpec(TreeTrunkShape.STRAIGHT, TreeCrownShape.ROUND) : null;
-		return new FeatureDefinition("sample", recipe, null, materials, 0.3, tree);
+		return new FeatureDefinition(
+			"sample", recipe, null, materials, 0.3, tree,
+			null, null, null, null, null,
+			defaultPlacement()
+		);
 	}
 
 	private static FeatureDefinition sampleTree(TreeTrunkShape trunk, TreeCrownShape crown) {
@@ -135,8 +144,14 @@ class WorldsmithRecipeShapeTest {
 				MaterialRole.FOLIAGE, selector(MaterialRole.FOLIAGE)
 			),
 			0.3,
-			treeSpec(trunk, crown)
+			treeSpec(trunk, crown),
+			null, null, null, null, null,
+			defaultPlacement()
 		);
+	}
+
+	private static FeaturePlacementConditions defaultPlacement() {
+		return new FeaturePlacementConditions(null, null, FeatureSubstrate.RECIPE_DEFAULT, FeatureFluid.RECIPE_DEFAULT);
 	}
 
 	private static TreeSpec treeSpec(TreeTrunkShape trunk, TreeCrownShape crown) {

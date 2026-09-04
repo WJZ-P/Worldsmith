@@ -7,7 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonElement;
 import com.mojang.serialization.JsonOps;
 import com.wjz.worldsmith.core.model.FeatureDefinition;
+import com.wjz.worldsmith.core.model.FeatureFluid;
+import com.wjz.worldsmith.core.model.FeaturePlacementConditions;
 import com.wjz.worldsmith.core.model.FeatureRecipe;
+import com.wjz.worldsmith.core.model.FeatureSubstrate;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.TreeDistribution;
@@ -128,7 +131,9 @@ final class WorldsmithTreePlacementTest {
 				distribution,
 				substrate,
 				List.of()
-			)
+			),
+			null, null, null, null, null,
+			new FeaturePlacementConditions(null, null, FeatureSubstrate.RECIPE_DEFAULT, FeatureFluid.RECIPE_DEFAULT)
 		);
 	}
 

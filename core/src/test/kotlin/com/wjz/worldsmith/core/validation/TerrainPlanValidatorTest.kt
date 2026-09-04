@@ -3,6 +3,8 @@ package com.wjz.worldsmith.core.validation
 import com.wjz.worldsmith.core.model.Anchor
 import com.wjz.worldsmith.core.model.AnchorClimateBias
 import com.wjz.worldsmith.core.model.AnchorPlacement
+import com.wjz.worldsmith.core.model.CaveIntent
+import com.wjz.worldsmith.core.model.CaveVerticalRange
 import com.wjz.worldsmith.core.model.ReliefDistribution
 import com.wjz.worldsmith.core.model.HydrologyIntent
 import com.wjz.worldsmith.core.model.RiverFill
@@ -24,7 +26,7 @@ class TerrainPlanValidatorTest {
                 coastRoughness = 1.0,
                 relief = ReliefDistribution(flats = 0.0, highlands = 0.0, peaks = 1.0),
                 verticalScale = 4.0,
-                caveDensity = 0.0,
+                caves = CaveIntent(0.0, 1.0, 0.5, 0.25, CaveVerticalRange(-59, 319), 0.0),
                 hydrology = HydrologyIntent(
                     riverCoverage = 0.35,
                     riverWidth = 4.0,
@@ -51,7 +53,7 @@ class TerrainPlanValidatorTest {
                 coastRoughness = -0.1,
                 relief = ReliefDistribution(flats = 0.0, highlands = 0.0, peaks = 0.0),
                 verticalScale = 4.1,
-                caveDensity = -0.1,
+                caves = CaveIntent(-0.1, 1.1, -0.2, 1.2, CaveVerticalRange(100, 20), 1.1),
                 hydrology = HydrologyIntent(
                     riverCoverage = 0.36,
                     riverWidth = 0.24,
@@ -74,7 +76,8 @@ class TerrainPlanValidatorTest {
         assertTrue("COAST_ROUGHNESS_OUT_OF_RANGE" in codes)
         assertTrue("EMPTY_RELIEF_DISTRIBUTION" in codes)
         assertTrue("VERTICAL_SCALE_OUT_OF_RANGE" in codes)
-        assertTrue("CAVE_DENSITY_OUT_OF_RANGE" in codes)
+        assertTrue("CAVE_CONTROL_OUT_OF_RANGE" in codes)
+        assertTrue("REVERSED_CAVE_RANGE" in codes)
         assertTrue("RIVER_COVERAGE_OUT_OF_RANGE" in codes)
         assertTrue("RIVER_WIDTH_OUT_OF_RANGE" in codes)
         assertTrue("RIVER_DEPTH_OUT_OF_RANGE" in codes)
@@ -114,5 +117,33 @@ class TerrainPlanValidatorTest {
         assertTrue("ANCHOR_CLIMATE_STRENGTH_OUT_OF_RANGE" in codes)
         assertTrue("EMPTY_ANCHOR_CLIMATE_BIAS" in codes)
         assertTrue("ANCHOR_CLIMATE_TARGET_OUT_OF_RANGE" in codes)
+    }
+
+    @Test
+    fun `technical height is the same envelope as the overworld dimension type`() {
+        val diagnostics = TerrainPlanValidator.validate(template.copy(minY = -80, height = 400))
+        val codes = diagnostics.map { it.code }.toSet()
+
+        assertTrue("OVERWORLD_MIN_Y_REQUIRED" in codes)
+        assertTrue("OVERWORLD_HEIGHT_REQUIRED" in codes)
+    }
+
+    @Test
+    fun `line and scattered anchor bounds are validated before codec compilation`() {
+        val shape = template.shape as TerrainShape.Procedural
+        val plan = template.copy(
+            shape = shape.copy(
+                anchors = listOf(
+                    Anchor("flat_line", AnchorPlacement.Line(0, 0, 0, 0), 100, 0.0),
+                    Anchor("huge", AnchorPlacement.Fixed(0, 0), 100, 500.0),
+                    Anchor("spacing", AnchorPlacement.Scattered(1_000_001, 0.5), 100, 0.0),
+                ),
+            ),
+        )
+        val codes = TerrainPlanValidator.validate(plan).map { it.code }.toSet()
+
+        assertTrue("ANCHOR_LINE_HAS_NO_LENGTH" in codes)
+        assertTrue("ANCHOR_AMPLITUDE_OUT_OF_RANGE" in codes)
+        assertTrue("ANCHOR_SPACING_OUT_OF_RANGE" in codes)
     }
 }

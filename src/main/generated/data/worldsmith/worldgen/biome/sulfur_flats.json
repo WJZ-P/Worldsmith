@@ -83,6 +83,9 @@
     [
       "minecraft:glow_lichen",
       "worldsmith:vegetation/ash_scrub/sulfur_flats"
+    ],
+    [
+      "minecraft:freeze_top_layer"
     ]
   ],
   "has_precipitation": true,

@@ -44,7 +44,7 @@ class TerrainShapeTest {
             coastRoughness = 0.7,
             relief = ReliefDistribution(flats = 0.2, highlands = 0.3, peaks = 0.5),
             verticalScale = 1.8,
-            caveDensity = 0.15,
+            caves = CaveIntent(0.15, 0.35, 0.1, 0.2, CaveVerticalRange(-48, 180), 0.25),
             hydrology = HydrologyIntent(
                 riverCoverage = 0.08,
                 riverWidth = 1.7,
@@ -76,7 +76,14 @@ class TerrainShapeTest {
               "coastRoughness": 0.2,
               "relief": { "flats": 0.8, "highlands": 0.15, "peaks": 0.05 },
               "verticalScale": 0.9,
-              "caveDensity": 0.3
+              "caves": {
+                "tunnelDensity": 0.3,
+                "cavernDensity": 0.3,
+                "noodleDensity": 0.3,
+                "entranceDensity": 0.3,
+                "verticalRange": { "minY": -56, "maxY": 192 },
+                "floodedChance": 0.2
+              }
             }
         """.trimIndent()
 
@@ -90,5 +97,13 @@ class TerrainShapeTest {
         val terrain = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands").terrain
 
         assertEquals(terrain, WorldsmithJson.decode<TerrainPlan>(WorldsmithJson.encode(terrain)))
+    }
+
+    @Test
+    fun `line anchors preserve both authored endpoints`() {
+        val placement: AnchorPlacement = AnchorPlacement.Line(-1200, 80, 2400, -300)
+
+        assertEquals(placement, WorldsmithJson.decode<AnchorPlacement>(WorldsmithJson.encode(placement)))
+        assertTrue("\"kind\": \"line\"" in WorldsmithJson.encode(placement))
     }
 }

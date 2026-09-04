@@ -74,6 +74,9 @@
     [
       "minecraft:glow_lichen",
       "worldsmith:vegetation/ash_scrub/cinder_shore"
+    ],
+    [
+      "minecraft:freeze_top_layer"
     ]
   ],
   "has_precipitation": true,

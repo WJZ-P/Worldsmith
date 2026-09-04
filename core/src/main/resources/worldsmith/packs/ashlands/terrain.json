@@ -24,7 +24,14 @@
       "peaks": 0.10
     },
     "verticalScale": 1.0,
-    "caveDensity": 0.65,
+    "caves": {
+      "tunnelDensity": 0.65,
+      "cavernDensity": 0.65,
+      "noodleDensity": 0.65,
+      "entranceDensity": 0.65,
+      "verticalRange": { "minY": -56, "maxY": 192 },
+      "floodedChance": 0.35
+    },
     "hydrology": {
       "riverCoverage": 0.05,
       "riverWidth": 1.2,

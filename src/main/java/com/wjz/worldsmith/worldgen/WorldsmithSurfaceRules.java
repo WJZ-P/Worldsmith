@@ -3,6 +3,7 @@ package com.wjz.worldsmith.worldgen;
 import com.wjz.worldsmith.core.model.Anchor;
 import com.wjz.worldsmith.core.model.AnchorPlacement;
 import com.wjz.worldsmith.core.model.HydrologyIntent;
+import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.SurfaceAltitude;
 import com.wjz.worldsmith.core.model.SurfaceAnchorBand;
 import com.wjz.worldsmith.core.model.SurfaceConditions;
@@ -17,11 +18,13 @@ import com.wjz.worldsmith.core.model.SurfaceStack;
 import com.wjz.worldsmith.core.model.SurfaceTemperature;
 import com.wjz.worldsmith.core.model.SurfaceWater;
 import com.wjz.worldsmith.core.model.TerrainShape;
+import com.wjz.worldsmith.core.model.WeightedMaterial;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.Noises;
 import net.minecraft.world.level.levelgen.SurfaceRules;
@@ -45,6 +48,17 @@ public final class WorldsmithSurfaceRules {
 			));
 		}
 
+		// The preset uses the Overworld dimension envelope. Keep its randomized
+		// five-block bedrock floor as a dimension-wide invariant; biome-specific
+		// stacks start above it and therefore cannot accidentally open the void.
+		perBiome.add(0, SurfaceRules.ifTrue(
+			SurfaceRules.verticalGradient(
+				"worldsmith:bedrock_floor",
+				VerticalAnchor.bottom(),
+				VerticalAnchor.aboveBottom(5)
+			),
+			SurfaceRules.state(Blocks.BEDROCK.defaultBlockState())
+		));
 		// Validation requires every Worldsmith biome to own a base stack. Stone
 		// only closes the total rule tree against foreign biomes.
 		perBiome.add(SurfaceRules.state(Blocks.STONE.defaultBlockState()));
@@ -160,13 +174,19 @@ public final class WorldsmithSurfaceRules {
 		if (placement instanceof AnchorPlacement.Fixed fixed) {
 			return new WorldsmithAnchorConditionSource(
 				band.getMin(), band.getMax(), anchor.getRadius(), anchor.getFalloff(),
-				false, fixed.getX(), fixed.getZ(), 0, 0.0
+				false, false, fixed.getX(), fixed.getZ(), 0, 0, 0, 0.0
 			);
 		}
-		AnchorPlacement.Scattered scattered = (AnchorPlacement.Scattered) placement;
+		if (placement instanceof AnchorPlacement.Scattered scattered) {
+			return new WorldsmithAnchorConditionSource(
+				band.getMin(), band.getMax(), anchor.getRadius(), anchor.getFalloff(),
+				true, false, 0, 0, 0, 0, scattered.getSpacing(), scattered.getJitter()
+			);
+		}
+		AnchorPlacement.Line line = (AnchorPlacement.Line) placement;
 		return new WorldsmithAnchorConditionSource(
 			band.getMin(), band.getMax(), anchor.getRadius(), anchor.getFalloff(),
-			true, 0, 0, scattered.getSpacing(), scattered.getJitter()
+			false, true, line.getStartX(), line.getStartZ(), line.getEndX(), line.getEndZ(), 0, 0.0
 		);
 	}
 
@@ -178,18 +198,68 @@ public final class WorldsmithSurfaceRules {
 			cumulativeDepth += layer.getDepth();
 			layers.add(SurfaceRules.ifTrue(
 				SurfaceRules.stoneDepthCheck(cumulativeDepth - 1, false, CaveSurface.FLOOR),
-				SurfaceRules.state(resolver.resolve(layer.getMaterial(), Blocks.STONE))
+				materialRule(layer.getMaterial(), Blocks.STONE, resolver)
 			));
 		}
-		SurfaceRules.RuleSource foundation = SurfaceRules.state(
-			resolver.resolve(stack.getFoundation(), Blocks.STONE)
-		);
+		SurfaceRules.RuleSource foundation = materialRule(stack.getFoundation(), Blocks.STONE, resolver);
 		layers.add(foundation);
 		SurfaceRules.RuleSource nearSurface = SurfaceRules.sequence(layers.toArray(SurfaceRules.RuleSource[]::new));
 		return SurfaceRules.sequence(
 			SurfaceRules.ifTrue(SurfaceRules.abovePreliminarySurface(), nearSurface),
 			SurfaceRules.ifTrue(SurfaceRules.DEEP_UNDER_FLOOR, foundation)
 		);
+	}
+
+	/**
+	 * Turns a weighted surface material into broad deterministic patches.
+	 *
+	 * <p>A surface rule returns one fixed state, unlike a feature's state
+	 * provider. Collapsing a weighted selector to its first entry therefore made
+	 * a valid document lie about the world it produced. Instead, cumulative
+	 * weights divide the existing low-frequency secondary surface noise into
+	 * quantile bands. The last material is unconditional, closing the rule even
+	 * at the noise's rare extremes.
+	 */
+	static SurfaceRules.RuleSource materialRule(
+		MaterialSelector selector,
+		Block fallback,
+		MaterialResolver resolver
+	) {
+		List<WeightedMaterial> weighted = selector.getWeighted();
+		if (weighted.isEmpty()) {
+			return SurfaceRules.state(resolver.resolve(selector, fallback));
+		}
+		if (weighted.size() == 1) {
+			return SurfaceRules.state(resolver.resolve(weighted.getFirst().getMaterial(), fallback));
+		}
+
+		long total = weighted.stream().mapToLong(WeightedMaterial::getWeight).sum();
+		long cumulative = 0L;
+		double lower = -Double.MAX_VALUE;
+		List<SurfaceRules.RuleSource> choices = new ArrayList<>();
+		for (int index = 0; index < weighted.size() - 1; index++) {
+			WeightedMaterial choice = weighted.get(index);
+			cumulative += choice.getWeight();
+			double upper = paletteThreshold(cumulative / (double) total);
+			choices.add(SurfaceRules.ifTrue(
+				SurfaceRules.noiseCondition2d(Noises.SURFACE_SECONDARY, lower, upper),
+				SurfaceRules.state(resolver.resolve(choice.getMaterial(), fallback))
+			));
+			lower = upper;
+		}
+		choices.add(SurfaceRules.state(
+			resolver.resolve(weighted.getLast().getMaterial(), fallback)
+		));
+		return SurfaceRules.sequence(choices.toArray(SurfaceRules.RuleSource[]::new));
+	}
+
+	/**
+	 * NormalNoise targets a deviation of one third. A logistic quantile with the
+	 * same spread is a compact, stable approximation that makes 8:2 describe an
+	 * 8:2 tendency rather than mapping weights linearly onto a bell-shaped field.
+	 */
+	static double paletteThreshold(double cumulativeShare) {
+		return (1.0 / 3.0 / 1.702) * Math.log(cumulativeShare / (1.0 - cumulativeShare));
 	}
 
 	private static ResourceKey<NormalNoise.NoiseParameters> noiseKey(SurfaceNoise noise) {

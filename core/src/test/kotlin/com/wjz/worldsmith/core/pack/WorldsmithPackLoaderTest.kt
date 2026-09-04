@@ -10,6 +10,8 @@ import com.wjz.worldsmith.core.model.SurfaceConditions
 import com.wjz.worldsmith.core.model.SurfaceRuleDefinition
 import com.wjz.worldsmith.core.model.TerrainBand
 import com.wjz.worldsmith.core.model.TerrainShape
+import com.wjz.worldsmith.core.model.BiomeSpatialSettings
+import com.wjz.worldsmith.core.model.VanillaNoisePreset
 import com.wjz.worldsmith.core.validation.WorldsmithPackValidator
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -60,6 +62,19 @@ class WorldsmithPackLoaderTest {
         val diagnostics = WorldsmithPackValidator.validate(pack)
 
         assertTrue(diagnostics.any { it.path == "terrain.seaLevel" && it.code == "SEA_LEVEL_OUT_OF_RANGE" })
+    }
+
+    @Test
+    fun `vanilla passthrough rejects procedural biome spatial controls`() {
+        val original = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
+        val pack = original.copy(
+            terrain = original.terrain.copy(shape = TerrainShape.Vanilla(VanillaNoisePreset.OVERWORLD)),
+            biomes = original.biomes.copy(spatial = BiomeSpatialSettings(regionScale = 2.0, boundaryRoughness = 0.4)),
+        )
+
+        val diagnostics = WorldsmithPackValidator.validate(pack)
+
+        assertTrue(diagnostics.any { it.code == "BIOME_SPATIAL_REQUIRES_PROCEDURAL_TERRAIN" })
     }
 
     @Test

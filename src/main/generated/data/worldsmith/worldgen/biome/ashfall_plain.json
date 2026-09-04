@@ -83,6 +83,9 @@
       "minecraft:glow_lichen",
       "worldsmith:vegetation/ash_scrub",
       "worldsmith:vegetation/dead_oak_trunk"
+    ],
+    [
+      "minecraft:freeze_top_layer"
     ]
   ],
   "has_precipitation": true,

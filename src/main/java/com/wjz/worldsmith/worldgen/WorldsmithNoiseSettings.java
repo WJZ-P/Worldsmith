@@ -6,6 +6,9 @@ import com.wjz.worldsmith.core.model.AnchorClimateBias;
 import com.wjz.worldsmith.core.model.AnchorPlacement;
 import com.wjz.worldsmith.core.model.BandEffect;
 import com.wjz.worldsmith.core.model.BandRegion;
+import com.wjz.worldsmith.core.model.BiomeSpatialSettings;
+import com.wjz.worldsmith.core.model.CaveIntent;
+import com.wjz.worldsmith.core.model.CaveVerticalRange;
 import com.wjz.worldsmith.core.model.TerrainBand;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
@@ -15,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import net.minecraft.core.Holder;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
@@ -59,6 +63,10 @@ public final class WorldsmithNoiseSettings {
 	/** How hard an anchor's climate influence is distorted, and how broad the lobes are. */
 	private static final double ANCHOR_CLIMATE_WARP = 0.55;
 	private static final double ANCHOR_CLIMATE_WARP_SCALE = 220.0;
+	/** Coordinate displacement for rough biome borders; warping preserves each field's marginal distribution. */
+	private static final double BIOME_BOUNDARY_WARP = 16.0;
+	private static final int OVERWORLD_MIN_Y = -64;
+	private static final int OVERWORLD_HEIGHT = 384;
 
 	private WorldsmithNoiseSettings() {
 	}
@@ -69,6 +77,7 @@ public final class WorldsmithNoiseSettings {
 		HolderGetter<Biome> biomes = context.lookup(Registries.BIOME);
 
 		TerrainPlan terrain = pack.terrain();
+		requireOverworldEnvelope(terrain);
 		MaterialResolver resolver = new MaterialResolver();
 		SurfaceRules.RuleSource surfaceRule = WorldsmithSurfaceRules.build(pack, biomes, resolver);
 
@@ -78,7 +87,7 @@ public final class WorldsmithNoiseSettings {
 			),
 			resolver.resolve(terrain.getDefaultBlock(), Blocks.STONE),
 			resolver.resolve(terrain.getDefaultFluid(), Blocks.WATER),
-			router(terrain, functions, noises),
+			router(pack, functions, noises),
 			surfaceRule,
 			terrain.getSpawnTargets().stream().map(CompiledBiomes::climate).toList(),
 			terrain.getSeaLevel(),
@@ -99,10 +108,11 @@ public final class WorldsmithNoiseSettings {
 	 * pack describes.
 	 */
 	private static NoiseRouter router(
-		TerrainPlan terrain,
+		CompiledPack pack,
 		HolderGetter<DensityFunction> functions,
 		HolderGetter<NormalNoise.NoiseParameters> noises
 	) {
+		TerrainPlan terrain = pack.terrain();
 		TerrainShape shape = terrain.getShape();
 		if (shape instanceof TerrainShape.Vanilla vanilla) {
 			VanillaNoisePreset preset = vanilla.getPreset();
@@ -114,7 +124,7 @@ public final class WorldsmithNoiseSettings {
 			);
 		}
 		if (shape instanceof TerrainShape.Procedural procedural) {
-			return proceduralRouter(terrain, procedural, functions, noises);
+			return proceduralRouter(pack, procedural, functions, noises);
 		}
 		throw new IllegalStateException(
 			"Unknown Worldsmith terrain shape " + shape.getClass().getSimpleName()
@@ -131,14 +141,55 @@ public final class WorldsmithNoiseSettings {
 	 * result remains compatible with the rest of overworld generation.
 	 */
 	private static NoiseRouter proceduralRouter(
-		TerrainPlan terrain,
+		CompiledPack pack,
 		TerrainShape.Procedural shape,
 		HolderGetter<DensityFunction> functions,
 		HolderGetter<NormalNoise.NoiseParameters> noises
 	) {
+		TerrainPlan terrain = pack.terrain();
 		NoiseRouter vanilla = NoiseRouterData.overworld(functions, noises, false, false);
 		DensityFunction shiftX = NoiseRouterData.getFunction(functions, NoiseRouterData.SHIFT_X);
 		DensityFunction shiftZ = NoiseRouterData.getFunction(functions, NoiseRouterData.SHIFT_Z);
+		BiomeSpatialSettings spatial = pack.pack().getBiomes().getSpatial();
+		double climateScale = 0.25 / spatial.getRegionScale();
+		DensityFunction temperatureShiftX = shiftX;
+		DensityFunction temperatureShiftZ = shiftZ;
+		DensityFunction humidityShiftX = shiftX;
+		DensityFunction humidityShiftZ = shiftZ;
+		if (spatial.getBoundaryRoughness() > 0.0) {
+			double warpScale = climateScale * 4.0;
+			double warpAmount = BIOME_BOUNDARY_WARP * spatial.getBoundaryRoughness();
+			temperatureShiftX = DensityFunctions.add(shiftX, DensityFunctions.mul(
+				DensityFunctions.shiftedNoise2d(
+					DensityFunctions.zero(), DensityFunctions.zero(), warpScale, noises.getOrThrow(Noises.SURFACE)
+				),
+				DensityFunctions.constant(warpAmount)
+			));
+			temperatureShiftZ = DensityFunctions.add(shiftZ, DensityFunctions.mul(
+				DensityFunctions.shiftedNoise2d(
+					DensityFunctions.zero(), DensityFunctions.zero(), warpScale, noises.getOrThrow(Noises.SURFACE_SECONDARY)
+				),
+				DensityFunctions.constant(warpAmount)
+			));
+			humidityShiftX = DensityFunctions.add(shiftX, DensityFunctions.mul(
+				DensityFunctions.shiftedNoise2d(
+					DensityFunctions.zero(), DensityFunctions.zero(), warpScale, noises.getOrThrow(Noises.JAGGED)
+				),
+				DensityFunctions.constant(warpAmount)
+			));
+			humidityShiftZ = DensityFunctions.add(shiftZ, DensityFunctions.mul(
+				DensityFunctions.shiftedNoise2d(
+					DensityFunctions.zero(), DensityFunctions.zero(), warpScale, noises.getOrThrow(Noises.PATCH)
+				),
+				DensityFunctions.constant(warpAmount)
+			));
+		}
+		DensityFunction temperatureField = DensityFunctions.shiftedNoise2d(
+			temperatureShiftX, temperatureShiftZ, climateScale, noises.getOrThrow(Noises.TEMPERATURE)
+		);
+		DensityFunction humidityField = DensityFunctions.shiftedNoise2d(
+			humidityShiftX, humidityShiftZ, climateScale, noises.getOrThrow(Noises.VEGETATION)
+		);
 
 		double baseScale = 0.25 / shape.getContinentScale();
 		DensityFunction continentBase = DensityFunctions.shiftedNoise2d(
@@ -157,11 +208,21 @@ public final class WorldsmithNoiseSettings {
 			DensityFunctions.mul(coastlineDetail, DensityFunctions.constant(shape.getCoastRoughness() * 0.18))
 		).clamp(-1.2, 1.0);
 
-		DensityFunction erosion = DensityFunctions.shiftedNoise2d(
+		DensityFunction reliefTexture = DensityFunctions.shiftedNoise2d(
 			shiftX, shiftZ, baseScale * 1.6, noises.getOrThrow(Noises.EROSION)
 		);
 		DensityFunction reliefSelector = DensityFunctions.shiftedNoise2d(
 			shiftX, shiftZ, baseScale * 2.2, noises.getOrThrow(Noises.RIDGE)
+		);
+		// Weirdness is a separate biome-texture axis. Reusing reliefSelector here
+		// would make every raw erosion+weirdness box describe a false Cartesian
+		// product. Sampling the same stationary noise far away preserves the
+		// calibrated marginal spread while decorrelating it from landform choice.
+		DensityFunction weirdnessField = DensityFunctions.shiftedNoise2d(
+			DensityFunctions.add(shiftX, DensityFunctions.constant(2_048.0)),
+			DensityFunctions.add(shiftZ, DensityFunctions.constant(-2_048.0)),
+			baseScale * 2.2,
+			noises.getOrThrow(Noises.RIDGE)
 		);
 		DensityFunction localDetail = DensityFunctions.shiftedNoise2d(
 			shiftX, shiftZ, baseScale * 7.0, noises.getOrThrow(Noises.SURFACE_SECONDARY)
@@ -186,10 +247,46 @@ public final class WorldsmithNoiseSettings {
 			DensityFunctions.constant(72.0 * verticalScale),
 			DensityFunctions.mul(localDetail.abs(), DensityFunctions.constant(52.0 * verticalScale))
 		);
-		DensityFunction reliefHeight = DensityFunctions.intervalSelect(
+
+		// The one landform signal consumed by both geometry and biome climate.
+		// The raw selector is partitioned according to the authored shares, then
+		// each partition is mapped safely inside the erosion interval used by the
+		// corresponding biome slot. The small texture preserves variation without
+		// ever letting a flat cell call itself a peak (or vice versa).
+		DensityFunction flatsLandform = DensityFunctions.add(
+			DensityFunctions.constant(0.45),
+			DensityFunctions.mul(reliefTexture, DensityFunctions.constant(0.25))
+		);
+		DensityFunction highlandsLandform = DensityFunctions.add(
+			DensityFunctions.constant(-0.16),
+			DensityFunctions.mul(reliefTexture, DensityFunctions.constant(0.14))
+		);
+		DensityFunction peaksLandform = DensityFunctions.add(
+			DensityFunctions.constant(-0.68),
+			DensityFunctions.mul(reliefTexture, DensityFunctions.constant(0.18))
+		);
+		DensityFunction landform = DensityFunctions.intervalSelect(
 			reliefSelector,
 			thresholds,
-			List.of(flats, highlands, peaks)
+			List.of(flatsLandform, highlandsLandform, peaksLandform)
+		);
+
+		Map<String, DensityFunction> anchorInfluence = new LinkedHashMap<>();
+		for (Anchor anchor : shape.getAnchors()) {
+			anchorInfluence.put(anchor.getId(), DensityFunctions.cache2d(anchorField(anchor, noises)));
+		}
+		// Erosion is Worldsmith's public landform axis. Applying its authored
+		// anchor bias before either consumer means a landmark changes its real
+		// relief and its biome identity together.
+		landform = biasClimate(
+			landform, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getErosion, noises);
+		DoubleArrayList landformEdges = new DoubleArrayList();
+		landformEdges.add(-0.375);
+		landformEdges.add(0.05);
+		DensityFunction reliefHeight = DensityFunctions.intervalSelect(
+			landform,
+			landformEdges,
+			List.of(peaks, highlands, flats)
 		);
 
 		DensityFunction landInput = DensityFunctions.add(continents, DensityFunctions.constant(0.11));
@@ -224,10 +321,6 @@ public final class WorldsmithNoiseSettings {
 		// it raises the ground, carries any explicit climate bias, tells the
 		// surface rules which ring they are painting, and bounds where a band acts.
 		// Behind cache2d because it depends only on X and Z.
-		Map<String, DensityFunction> anchorInfluence = new LinkedHashMap<>();
-		for (Anchor anchor : shape.getAnchors()) {
-			anchorInfluence.put(anchor.getId(), DensityFunctions.cache2d(anchorField(anchor, noises)));
-		}
 		// Anchors land after hydrology so a river cannot cut a landmark in half,
 		// and before baseTerrain so the preliminary surface level and the biome
 		// depth parameter both see the ground that was actually built.
@@ -241,14 +334,13 @@ public final class WorldsmithNoiseSettings {
 			);
 		}
 		DensityFunction temperature = biasClimate(
-			vanilla.temperature(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getTemperature, noises);
+			temperatureField, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getTemperature, noises);
 		DensityFunction humidity = biasClimate(
-			vanilla.vegetation(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getHumidity, noises);
+			humidityField, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getHumidity, noises);
 		DensityFunction biomeContinents = biasClimate(
 			hydrology.continents(), shape.getAnchors(), anchorInfluence, AnchorClimateBias::getContinentalness, noises);
-		erosion = biasClimate(erosion, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getErosion, noises);
 		DensityFunction weirdness = biasClimate(
-			reliefSelector, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getWeirdness, noises);
+			weirdnessField, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getWeirdness, noises);
 
 		int minY = terrain.getMinY();
 		int maxY = minY + terrain.getHeight();
@@ -266,31 +358,8 @@ public final class WorldsmithNoiseSettings {
 			)
 		);
 
-		DensityFunction carvedTerrain = baseTerrain;
-		if (shape.getCaveDensity() > 0.0) {
-			DensityFunction surfaceWithEntrances = DensityFunctions.min(
-				baseTerrain,
-				DensityFunctions.mul(
-					DensityFunctions.constant(5.0),
-					NoiseRouterData.getFunction(functions, NoiseRouterData.ENTRANCES)
-				)
-			);
-			DensityFunction vanillaCaves = DensityFunctions.rangeChoice(
-				baseTerrain,
-				-1_000_000.0,
-				1.5625,
-				surfaceWithEntrances,
-				NoiseRouterData.underground(functions, noises, baseTerrain)
-			);
-			carvedTerrain = DensityFunctions.lerp(
-				DensityFunctions.constant(shape.getCaveDensity()),
-				baseTerrain,
-				vanillaCaves
-			);
-		}
-
 		DensityFunction slidTerrain = NoiseRouterData.slide(
-			carvedTerrain,
+			baseTerrain,
 			minY,
 			terrain.getHeight(),
 			80,
@@ -304,43 +373,106 @@ public final class WorldsmithNoiseSettings {
 		// pushes density negative near the world ceiling, which would erase
 		// anything floating up there; post-processing is what interpolates and
 		// squeezes the field, which islands need as much as the ground does.
-		DensityFunction banded = slidTerrain;
+		DensityFunction authoredTerrain = slidTerrain;
 		for (TerrainBand band : shape.getBands()) {
-			banded = applyBand(banded, band, shiftX, shiftZ, biomeContinents, anchorInfluence, noises);
-		}
-		DensityFunction finalDensity = NoiseRouterData.postProcess(banded);
-		if (shape.getCaveDensity() > 0.0) {
-			DensityFunction noodleCarved = DensityFunctions.min(
-				finalDensity,
-				NoiseRouterData.getFunction(functions, NoiseRouterData.NOODLE)
-			);
-			finalDensity = DensityFunctions.lerp(
-				DensityFunctions.constant(shape.getCaveDensity()),
-				finalDensity,
-				noodleCarved
+			authoredTerrain = applyBand(
+				authoredTerrain, band, shiftX, shiftZ, biomeContinents, anchorInfluence, noises
 			);
 		}
 
-		DensityFunction preliminarySurface = DensityFunctions.findTopSurface(
-			baseTerrain,
+		// Bands are part of the uncarved body, rather than an afterthought added
+		// after caves. Every cave family therefore acts on ground, floating
+		// islands and authored underground bodies in exactly the same order.
+		CaveIntent caves = shape.getCaves();
+		DensityFunction caveWindow = caveWindow(functions, caves.getVerticalRange());
+		DensityFunction carvedTerrain = applyCaveFamily(
+			authoredTerrain,
+			entranceField(noises),
+			caves.getEntranceDensity(),
+			caveWindow
+		);
+		carvedTerrain = applyCaveFamily(
+			carvedTerrain,
+			tunnelField(functions, noises),
+			caves.getTunnelDensity(),
+			caveWindow
+		);
+		carvedTerrain = applyCaveFamily(
+			carvedTerrain,
+			cavernField(functions, noises, authoredTerrain),
+			caves.getCavernDensity(),
+			caveWindow
+		);
+		DensityFunction uncarvedDensity = NoiseRouterData.postProcess(authoredTerrain);
+		DensityFunction finalDensity = NoiseRouterData.postProcess(carvedTerrain);
+		// postProcess places interpolation markers around its input. A Y gate
+		// inside those markers gets blended across cell boundaries and lets caves
+		// leak several blocks beyond verticalRange. Select again outside the
+		// interpolated graph so the authored range is a hard invariant and the
+		// protected bedrock floor always receives the uncarved density.
+		CaveVerticalRange caveRange = caves.getVerticalRange();
+		finalDensity = DensityFunctions.rangeChoice(
+			NoiseRouterData.getFunction(functions, NoiseRouterData.Y),
+			caveRange.getMinY(),
+			caveRange.getMaxY() + 1.0,
+			finalDensity,
+			uncarvedDensity
+		);
+		finalDensity = applyCaveFamily(
+			finalDensity,
+			NoiseRouterData.getFunction(functions, NoiseRouterData.NOODLE),
+			caves.getNoodleDensity(),
+			caveWindow
+		);
+		// Band windows also live inside interpolation and may move a fractional
+		// zero crossing by part of one noise cell when their integer bounds are
+		// not cell-aligned. The public envelope promises five sealed bottom
+		// layers, so enforce solid density outside that envelope at the final,
+		// per-block level. Surface rules then replace those blocks with the usual
+		// randomized bedrock floor.
+		finalDensity = DensityFunctions.rangeChoice(
+			NoiseRouterData.getFunction(functions, NoiseRouterData.Y),
+			minY + 5.0,
+			maxY,
+			finalDensity,
+			DensityFunctions.constant(1.0)
+		);
+
+		DensityFunction basePreliminarySurface = DensityFunctions.findTopSurface(
+			slidTerrain,
 			DensityFunctions.constant(maxY),
 			minY,
 			Math.max(4, terrain.getVerticalNoiseSize() * 4)
 		);
+		DensityFunction authoredPreliminarySurface = DensityFunctions.findTopSurface(
+			authoredTerrain,
+			DensityFunctions.constant(maxY),
+			minY,
+			Math.max(4, terrain.getVerticalNoiseSize() * 4)
+		);
+		// SurfaceRules only evaluates rich top layers from the preliminary level
+		// upward. Using the topmost floating island here would therefore hide the
+		// ordinary ground below it. The lower estimate keeps both surfaces in the
+		// evaluation window, while an authored chasm that removes the original top
+		// can still lower the estimate and expose its floor.
+		DensityFunction preliminarySurface = DensityFunctions.min(
+			basePreliminarySurface,
+			authoredPreliminarySurface
+		);
 		// Climate depth is position relative to the local surface, not absolute
 		// world Y. Reusing the uncarved terrain field keeps it near zero at the
 		// ground even when verticalScale moves that ground far above sea level.
-		DensityFunction depth = baseTerrain.clamp(-1.0, 1.0);
+		DensityFunction depth = authoredTerrain.clamp(-1.0, 1.0);
 
 		return new NoiseRouter(
 			vanilla.barrierNoise(),
-			vanilla.fluidLevelFloodednessNoise(),
+			floodedness(vanilla.fluidLevelFloodednessNoise(), caves.getFloodedChance()),
 			vanilla.fluidLevelSpreadNoise(),
 			vanilla.lavaNoise(),
 			temperature,
 			humidity,
 			biomeContinents,
-			erosion,
+			landform,
 			depth,
 			weirdness,
 			preliminarySurface,
@@ -349,6 +481,159 @@ public final class WorldsmithNoiseSettings {
 			vanilla.veinRidged(),
 			vanilla.veinGap()
 		);
+	}
+
+	private static void requireOverworldEnvelope(TerrainPlan terrain) {
+		if (terrain.getMinY() != OVERWORLD_MIN_Y || terrain.getHeight() != OVERWORLD_HEIGHT) {
+			throw new IllegalArgumentException(
+				"Worldsmith uses the Overworld dimension type and requires minY " + OVERWORLD_MIN_Y
+					+ " with height " + OVERWORLD_HEIGHT
+			);
+		}
+	}
+
+	/** A hard Y gate shared by every cave family; one authored interval, no silent exceptions. */
+	private static DensityFunction caveWindow(
+		HolderGetter<DensityFunction> functions,
+		CaveVerticalRange range
+	) {
+		DensityFunction y = NoiseRouterData.getFunction(functions, NoiseRouterData.Y);
+		return DensityFunctions.rangeChoice(
+			y,
+			range.getMinY(),
+			range.getMaxY() + 1.0,
+			DensityFunctions.constant(1.0),
+			DensityFunctions.zero()
+		);
+	}
+
+	/** Blends one carving family with the current body only inside the requested Y range. */
+	private static DensityFunction applyCaveFamily(
+		DensityFunction terrain,
+		DensityFunction cave,
+		double density,
+		DensityFunction verticalWindow
+	) {
+		if (density <= 0.0) {
+			return terrain;
+		}
+		DensityFunction amount = DensityFunctions.mul(
+			verticalWindow,
+			DensityFunctions.constant(Math.min(1.0, density))
+		);
+		return DensityFunctions.lerp(amount, terrain, DensityFunctions.min(terrain, cave));
+	}
+
+	/** Vanilla's traversable spaghetti family, isolated from its cavern and entrance siblings. */
+	private static DensityFunction tunnelField(
+		HolderGetter<DensityFunction> functions,
+		HolderGetter<NormalNoise.NoiseParameters> noises
+	) {
+		DensityFunction roughness = NoiseRouterData.getFunction(functions, NoiseRouterData.SPAGHETTI_ROUGHNESS_FUNCTION);
+		DensityFunction spaghetti2d = DensityFunctions.add(
+			NoiseRouterData.getFunction(functions, NoiseRouterData.SPAGHETTI_2D),
+			roughness
+		);
+		DensityFunction rarity = DensityFunctions.cacheOnce(
+			DensityFunctions.noise(noises.getOrThrow(Noises.SPAGHETTI_3D_RARITY), 2.0, 1.0)
+		);
+		DensityFunction thickness = DensityFunctions.mappedNoise(
+			noises.getOrThrow(Noises.SPAGHETTI_3D_THICKNESS), -0.065, -0.088
+		);
+		DensityFunction spaghetti3d = DensityFunctions.add(
+			DensityFunctions.max(
+				spaghettiRarity3d(rarity, noises.getOrThrow(Noises.SPAGHETTI_3D_1)),
+				spaghettiRarity3d(rarity, noises.getOrThrow(Noises.SPAGHETTI_3D_2))
+			),
+			thickness
+		).clamp(-1.0, 1.0);
+		return DensityFunctions.min(spaghetti2d, DensityFunctions.add(spaghetti3d, roughness));
+	}
+
+	/** The broad surface-opening field without the 3D tunnel field vanilla folds into ENTRANCES. */
+	private static DensityFunction entranceField(HolderGetter<NormalNoise.NoiseParameters> noises) {
+		return DensityFunctions.cacheOnce(DensityFunctions.mul(
+			DensityFunctions.constant(5.0),
+			DensityFunctions.add(
+				DensityFunctions.add(
+					DensityFunctions.noise(noises.getOrThrow(Noises.CAVE_ENTRANCE), 0.75, 0.5),
+					DensityFunctions.constant(0.37)
+				),
+				DensityFunctions.yClampedGradient(-10, 30, 0.3, 0.0)
+			)
+		));
+	}
+
+	/** Vanilla's quantized 3D spaghetti scale, local so tunnels and entrances remain independent controls. */
+	private static DensityFunction spaghettiRarity3d(
+		DensityFunction rarity,
+		Holder<NormalNoise.NoiseParameters> noise
+	) {
+		DoubleArrayList thresholds = new DoubleArrayList();
+		thresholds.add(-0.5);
+		thresholds.add(0.0);
+		thresholds.add(0.5);
+		return DensityFunctions.intervalSelect(
+			rarity,
+			thresholds,
+			List.of(
+				rarityNoise(noise, 0.75),
+				rarityNoise(noise, 1.0),
+				rarityNoise(noise, 1.5),
+				rarityNoise(noise, 2.0)
+			)
+		).abs();
+	}
+
+	private static DensityFunction rarityNoise(Holder<NormalNoise.NoiseParameters> noise, double rarity) {
+		return DensityFunctions.mul(
+			DensityFunctions.constant(rarity),
+			DensityFunctions.noise(noise, 1.0 / rarity, 1.0 / rarity)
+		);
+	}
+
+	/** Vanilla's broad cheese/layer family, including its solid pillars, as one semantic cavern field. */
+	private static DensityFunction cavernField(
+		HolderGetter<DensityFunction> functions,
+		HolderGetter<NormalNoise.NoiseParameters> noises,
+		DensityFunction terrain
+	) {
+		DensityFunction layers = DensityFunctions.mul(
+			DensityFunctions.constant(4.0),
+			DensityFunctions.noise(noises.getOrThrow(Noises.CAVE_LAYER), 8.0).square()
+		);
+		DensityFunction cheese = DensityFunctions.noise(noises.getOrThrow(Noises.CAVE_CHEESE), 0.6666666666666666);
+		DensityFunction solidifiedCheese = DensityFunctions.add(
+			DensityFunctions.add(DensityFunctions.constant(0.27), cheese).clamp(-1.0, 1.0),
+			DensityFunctions.add(
+				DensityFunctions.constant(1.5),
+				DensityFunctions.mul(DensityFunctions.constant(-0.64), terrain)
+			).clamp(0.0, 0.5)
+		);
+		DensityFunction caverns = DensityFunctions.add(layers, solidifiedCheese);
+		DensityFunction rawPillars = NoiseRouterData.getFunction(functions, NoiseRouterData.PILLARS);
+		DensityFunction pillars = DensityFunctions.rangeChoice(
+			rawPillars,
+			-1_000_000.0,
+			0.03,
+			DensityFunctions.constant(-1_000_000.0),
+			rawPillars
+		);
+		return DensityFunctions.max(caverns, pillars);
+	}
+
+	/** Biases the aquifer's floodedness field while retaining its spatial variation at intermediate values. */
+	private static DensityFunction floodedness(DensityFunction vanilla, double chance) {
+		if (chance <= 0.0) {
+			return DensityFunctions.constant(-1.0);
+		}
+		if (chance >= 1.0) {
+			return DensityFunctions.constant(1.0);
+		}
+		return DensityFunctions.add(
+			DensityFunctions.mul(vanilla, DensityFunctions.constant(0.75)),
+			DensityFunctions.constant((chance - 0.5) * 2.0)
+		).clamp(-1.0, 1.0);
 	}
 
 	/** Applies one explicitly authored climate target through the shared influence field. */
@@ -451,6 +736,17 @@ public final class WorldsmithNoiseSettings {
 				anchor.getRadius(),
 				anchor.getFalloff(),
 				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.JITTER_NOISE)),
+				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.SILHOUETTE_NOISE))
+			);
+		}
+		if (placement instanceof AnchorPlacement.Line line) {
+			return new WorldsmithAnchorFields.Line(
+				line.getStartX(),
+				line.getStartZ(),
+				line.getEndX(),
+				line.getEndZ(),
+				anchor.getRadius(),
+				anchor.getFalloff(),
 				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.SILHOUETTE_NOISE))
 			);
 		}

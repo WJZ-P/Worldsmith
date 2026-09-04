@@ -20,8 +20,11 @@ record WorldsmithAnchorConditionSource(
 	int radius,
 	double falloff,
 	boolean scattered,
+	boolean line,
 	int x,
 	int z,
+	int endX,
+	int endZ,
 	int spacing,
 	double jitter
 ) implements SurfaceRules.ConditionSource {
@@ -32,8 +35,11 @@ record WorldsmithAnchorConditionSource(
 				Codec.INT.fieldOf("radius").forGetter(WorldsmithAnchorConditionSource::radius),
 				Codec.DOUBLE.fieldOf("falloff").forGetter(WorldsmithAnchorConditionSource::falloff),
 				Codec.BOOL.fieldOf("scattered").forGetter(WorldsmithAnchorConditionSource::scattered),
+				Codec.BOOL.fieldOf("line").forGetter(WorldsmithAnchorConditionSource::line),
 				Codec.INT.fieldOf("x").forGetter(WorldsmithAnchorConditionSource::x),
 				Codec.INT.fieldOf("z").forGetter(WorldsmithAnchorConditionSource::z),
+				Codec.INT.fieldOf("end_x").forGetter(WorldsmithAnchorConditionSource::endX),
+				Codec.INT.fieldOf("end_z").forGetter(WorldsmithAnchorConditionSource::endZ),
 				Codec.INT.fieldOf("spacing").forGetter(WorldsmithAnchorConditionSource::spacing),
 				Codec.DOUBLE.fieldOf("jitter").forGetter(WorldsmithAnchorConditionSource::jitter)
 			)
@@ -77,7 +83,9 @@ record WorldsmithAnchorConditionSource(
 	) {
 		double distance = this.scattered
 			? WorldsmithAnchorFields.latticeDistance(blockX, blockZ, this.spacing, this.jitter, jitterNoise)
-			: WorldsmithAnchorFields.pointDistance(blockX, blockZ, this.x, this.z);
+			: this.line
+				? WorldsmithAnchorFields.lineDistance(blockX, blockZ, this.x, this.z, this.endX, this.endZ)
+				: WorldsmithAnchorFields.pointDistance(blockX, blockZ, this.x, this.z);
 		double influence = WorldsmithAnchorFields.profile(
 			WorldsmithAnchorFields.warpDistance(blockX, blockZ, distance, this.radius, silhouetteNoise),
 			this.radius,

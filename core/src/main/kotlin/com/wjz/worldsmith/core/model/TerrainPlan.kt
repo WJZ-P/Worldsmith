@@ -65,6 +65,31 @@ data class HydrologyIntent(
     val oceanDepth: Double,
 )
 
+/** Inclusive vertical interval in which authored cave families may carve. */
+@Serializable
+data class CaveVerticalRange(
+    val minY: Int,
+    val maxY: Int,
+)
+
+/**
+ * Independent controls for the cave families used by the target adapter.
+ *
+ * Keeping these separate matters visually: broad caverns, traversable tunnels,
+ * tiny noodles and openings at the surface are different design decisions.
+ * [floodedChance] biases the aquifer field rather than pretending water is a
+ * carving operation.
+ */
+@Serializable
+data class CaveIntent(
+    val tunnelDensity: Double,
+    val cavernDensity: Double,
+    val noodleDensity: Double,
+    val entranceDensity: Double,
+    val verticalRange: CaveVerticalRange,
+    val floodedChance: Double,
+)
+
 /**
  * How the shape of the land is decided.
  *
@@ -78,8 +103,8 @@ data class HydrologyIntent(
  * How the instances of one anchor are positioned.
  *
  * <p>A closed set rather than a number with a magic value, because the two
- * cases genuinely need different data: a fixed anchor must say where it is and
- * a scattered one must not.
+ * cases genuinely need different data: a fixed anchor names one point, a line
+ * names two endpoints, and a scattered anchor owns lattice spacing instead.
  */
 @Serializable
 sealed interface AnchorPlacement {
@@ -105,6 +130,20 @@ sealed interface AnchorPlacement {
     @Serializable
     @SerialName("scattered")
     data class Scattered(val spacing: Int, val jitter: Double = 0.6) : AnchorPlacement
+
+    /**
+     * One authored corridor between two points. Its [Anchor.radius] is the
+     * influence width around the segment, making it suitable for a mountain
+     * chain, fault, causeway or linear basin rather than a circular landmark.
+     */
+    @Serializable
+    @SerialName("line")
+    data class Line(
+        val startX: Int,
+        val startZ: Int,
+        val endX: Int,
+        val endZ: Int,
+    ) : AnchorPlacement
 }
 
 /**
@@ -226,7 +265,7 @@ sealed interface TerrainShape {
         val coastRoughness: Double,
         val relief: ReliefDistribution,
         val verticalScale: Double,
-        val caveDensity: Double,
+        val caves: CaveIntent,
         val hydrology: HydrologyIntent,
         val bands: List<TerrainBand> = emptyList(),
         val anchors: List<Anchor> = emptyList(),

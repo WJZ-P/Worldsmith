@@ -19,7 +19,7 @@ import net.minecraft.world.level.levelgen.synth.NormalNoise;
  * none exposes the raw X or Z of the point being evaluated, so "distance from
  * that place" cannot be written at all with the vanilla vocabulary.
  *
- * <p>These two supply it. Both answer the same question - how far is the nearest
+ * <p>These fields supply it. All answer the same question - how far is the nearest
  * anchor - and differ only in how the anchors are found, which is exactly the
  * split vanilla already makes for structures between a fixed set of positions
  * and a jittered lattice that repeats forever.
@@ -145,6 +145,25 @@ public final class WorldsmithAnchorFields {
 		return Math.sqrt(dx * dx + dz * dz);
 	}
 
+	/** Distance to the nearest point on a finite authored line segment. */
+	public static double lineDistance(
+		int x, int z, int startX, int startZ, int endX, int endZ
+	) {
+		double dx = endX - (double) startX;
+		double dz = endZ - (double) startZ;
+		double lengthSquared = dx * dx + dz * dz;
+		if (lengthSquared <= 0.0) {
+			return pointDistance(x, z, startX, startZ);
+		}
+		double t = ((x - (double) startX) * dx + (z - (double) startZ) * dz) / lengthSquared;
+		t = Mth.clamp(t, 0.0, 1.0);
+		double nearestX = startX + t * dx;
+		double nearestZ = startZ + t * dz;
+		double offsetX = x - nearestX;
+		double offsetZ = z - nearestZ;
+		return Math.sqrt(offsetX * offsetX + offsetZ * offsetZ);
+	}
+
 	/** One anchor at an authored position, for the place a player should be able to find. */
 	public record Point(int x, int z, int radius, double falloff, DensityFunction.NoiseHolder silhouetteNoise)
 		implements DensityFunction {
@@ -182,6 +201,76 @@ public final class WorldsmithAnchorFields {
 			return new Point(
 				this.x,
 				this.z,
+				this.radius,
+				this.falloff,
+				visitor.visitNoise(this.silhouetteNoise)
+			);
+		}
+
+		@Override
+		public double minValue() {
+			return 0.0;
+		}
+
+		@Override
+		public double maxValue() {
+			return 1.0;
+		}
+
+		@Override
+		public KeyDispatchDataCodec<? extends DensityFunction> codec() {
+			return CODEC;
+		}
+	}
+
+	/** A finite ridge, trench or corridor whose radius is measured from a line segment. */
+	public record Line(
+		int startX,
+		int startZ,
+		int endX,
+		int endZ,
+		int radius,
+		double falloff,
+		DensityFunction.NoiseHolder silhouetteNoise
+	) implements DensityFunction {
+		private static final MapCodec<Line> DATA_CODEC = RecordCodecBuilder.mapCodec(
+			instance -> instance.group(
+					Codec.INT.fieldOf("start_x").forGetter(Line::startX),
+					Codec.INT.fieldOf("start_z").forGetter(Line::startZ),
+					Codec.INT.fieldOf("end_x").forGetter(Line::endX),
+					Codec.INT.fieldOf("end_z").forGetter(Line::endZ),
+					Codec.intRange(1, 100_000).fieldOf("radius").forGetter(Line::radius),
+					Codec.doubleRange(0.05, 8.0).fieldOf("falloff").forGetter(Line::falloff),
+					DensityFunction.NoiseHolder.CODEC.fieldOf("silhouette_noise").forGetter(Line::silhouetteNoise)
+				)
+				.apply(instance, Line::new)
+		);
+		public static final KeyDispatchDataCodec<Line> CODEC = KeyDispatchDataCodec.of(DATA_CODEC);
+
+		@Override
+		public double compute(DensityFunction.FunctionContext context) {
+			int x = context.blockX();
+			int z = context.blockZ();
+			double distance = lineDistance(x, z, this.startX, this.startZ, this.endX, this.endZ);
+			return profile(
+				warpDistance(x, z, distance, this.radius, this.silhouetteNoise::getValue),
+				this.radius,
+				this.falloff
+			);
+		}
+
+		@Override
+		public void fillArray(double[] output, DensityFunction.ContextProvider contextProvider) {
+			contextProvider.fillAllDirectly(output, this);
+		}
+
+		@Override
+		public DensityFunction mapChildren(DensityFunction.Visitor visitor) {
+			return new Line(
+				this.startX,
+				this.startZ,
+				this.endX,
+				this.endZ,
 				this.radius,
 				this.falloff,
 				visitor.visitNoise(this.silhouetteNoise)

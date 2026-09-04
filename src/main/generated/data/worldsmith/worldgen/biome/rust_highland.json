@@ -75,6 +75,9 @@
     [
       "minecraft:glow_lichen",
       "worldsmith:vegetation/ash_scrub/rust_highland"
+    ],
+    [
+      "minecraft:freeze_top_layer"
     ]
   ],
   "has_precipitation": true,

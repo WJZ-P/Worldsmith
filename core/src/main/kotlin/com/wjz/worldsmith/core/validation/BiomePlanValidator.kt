@@ -3,6 +3,7 @@ package com.wjz.worldsmith.core.validation
 import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.feature.VegetationBudget
 import com.wjz.worldsmith.core.model.BiomeDefinition
+import com.wjz.worldsmith.core.model.BiomeArchetypeRole
 import com.wjz.worldsmith.core.model.AmbientParticleSpec
 import com.wjz.worldsmith.core.model.BiomeEnvironment
 import com.wjz.worldsmith.core.model.BiomeFog
@@ -87,6 +88,24 @@ object BiomePlanValidator {
         if (plan.biomes.isEmpty()) {
             add(error("biomes", "EMPTY_BIOME_PLAN", "A pack must define at least one biome"))
         }
+        if (plan.spatial.regionScale !in MIN_REGION_SCALE..MAX_REGION_SCALE) {
+            add(
+                error(
+                    "spatial.regionScale",
+                    "BIOME_REGION_SCALE_OUT_OF_RANGE",
+                    "Biome region scale must be between $MIN_REGION_SCALE and $MAX_REGION_SCALE",
+                ),
+            )
+        }
+        if (plan.spatial.boundaryRoughness !in 0.0..1.0) {
+            add(
+                error(
+                    "spatial.boundaryRoughness",
+                    "BIOME_BOUNDARY_ROUGHNESS_OUT_OF_RANGE",
+                    "Biome boundary roughness must be between 0 and 1",
+                ),
+            )
+        }
 
         plan.biomes.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys.sorted().forEach { id ->
             add(error("biomes[" + id + "]", "DUPLICATE_BIOME", "Biome id must be unique"))
@@ -138,7 +157,14 @@ object BiomePlanValidator {
             }
         }
         biome.allPlacements.forEachIndexed { index, placement ->
-            placement.climate?.let { addAll(validateClimate(path + ".placements[" + index + "].climate", it)) }
+            val placementPath = if (biome.placements.isEmpty()) path else "$path.placements[$index]"
+            placement.climate?.let {
+                addAll(validateClimate("$placementPath.climate", it))
+                addAll(validateRawArchetype("$placementPath.climate", biome.archetype, it))
+            }
+            placement.slot?.let {
+                addAll(validateSlotArchetype("$placementPath.slot", biome.archetype, it.relief))
+            }
         }
 
         // Bands are turned into one span, so a gap would make the box cover a
@@ -224,6 +250,100 @@ object BiomePlanValidator {
         addAll(rgb("$path.grass", tint.grass))
         addAll(rgb("$path.foliage", tint.foliage))
         addAll(rgb("$path.water", tint.water))
+        addAll(rgb("$path.dryFoliage", tint.dryFoliage))
+    }
+
+    /**
+     * Archetypes drive tags and gameplay assumptions while placement drives
+     * where the biome actually appears. A mismatch is legal but almost always
+     * means the model changed one side and forgot the other, so it is reported
+     * rather than silently creating an ocean tagged as a mountain.
+     */
+    private fun validateSlotArchetype(
+        path: String,
+        archetype: BiomeArchetypeRole,
+        relief: ReliefBand,
+    ): List<Diagnostic> = buildList {
+        if (archetype.isLand != relief.isLand) {
+            add(
+                warning(
+                    path,
+                    "ARCHETYPE_LAND_WATER_MISMATCH",
+                    "$archetype is ${if (archetype.isLand) "land" else "open water"}, but $relief is " +
+                        "${if (relief.isLand) "land" else "open water"}",
+                ),
+            )
+        }
+
+        val expected = when (archetype) {
+            BiomeArchetypeRole.DEEP_OCEAN -> setOf(ReliefBand.DEEP_WATER)
+            BiomeArchetypeRole.OCEAN -> setOf(ReliefBand.SHALLOW_WATER, ReliefBand.DEEP_WATER)
+            BiomeArchetypeRole.BEACH -> setOf(ReliefBand.COAST)
+            BiomeArchetypeRole.MOUNTAIN -> setOf(ReliefBand.PEAKS)
+            BiomeArchetypeRole.HILL -> setOf(ReliefBand.HIGHLAND)
+            BiomeArchetypeRole.LOWLAND -> setOf(ReliefBand.FLATS)
+        }
+        if (relief !in expected) {
+            add(
+                warning(
+                    path,
+                    "ARCHETYPE_RELIEF_MISMATCH",
+                    "$archetype normally belongs in ${expected.joinToString(" or ")}, not $relief. " +
+                        "Keep this only when the unusual gameplay role is deliberate.",
+                ),
+            )
+        }
+    }
+
+    /** Raw boxes receive the same semantic check using the slot boundary values. */
+    private fun validateRawArchetype(
+        path: String,
+        archetype: BiomeArchetypeRole,
+        climate: ClimateBox,
+    ): List<Diagnostic> = buildList {
+        val continents = climate.continentalness
+        if (!archetype.isLand && continents.max > LAND_EDGE) {
+            add(
+                warning(
+                    "$path.continentalness",
+                    "ARCHETYPE_LAND_WATER_MISMATCH",
+                    "$archetype claims continentalness above $LAND_EDGE, so it can be selected over inland ground.",
+                ),
+            )
+        }
+        if (archetype.isLand && continents.min < OCEAN_EDGE) {
+            add(
+                warning(
+                    "$path.continentalness",
+                    "ARCHETYPE_LAND_WATER_MISMATCH",
+                    "$archetype claims continentalness below $OCEAN_EDGE, so it can be selected over open water.",
+                ),
+            )
+        }
+
+        val expectedRelief = when (archetype) {
+            BiomeArchetypeRole.DEEP_OCEAN ->
+                continents.min < DEEP_OCEAN_EDGE
+            BiomeArchetypeRole.OCEAN ->
+                continents.min < OCEAN_EDGE
+            BiomeArchetypeRole.BEACH ->
+                continents.min < LAND_EDGE && continents.max > OCEAN_EDGE
+            BiomeArchetypeRole.MOUNTAIN ->
+                climate.erosion.min < PEAK_EROSION_EDGE
+            BiomeArchetypeRole.HILL ->
+                climate.erosion.min < FLAT_EROSION_EDGE && climate.erosion.max > PEAK_EROSION_EDGE
+            BiomeArchetypeRole.LOWLAND ->
+                climate.erosion.max > FLAT_EROSION_EDGE
+        }
+        if (!expectedRelief) {
+            add(
+                warning(
+                    path,
+                    "ARCHETYPE_RELIEF_MISMATCH",
+                    "$archetype raw climate box does not overlap the climate range associated with that gameplay role.",
+                ),
+            )
+        }
     }
 
     private fun validateFog(path: String, fog: BiomeFog): List<Diagnostic> = buildList {
@@ -568,5 +688,12 @@ object BiomePlanValidator {
     private const val MAX_SURFACE_DEPTH = 8
     private const val MIN_SURFACE_Y = -2048
     private const val MAX_SURFACE_Y = 2048
+    private const val MIN_REGION_SCALE = 0.25
+    private const val MAX_REGION_SCALE = 8.0
+    private const val DEEP_OCEAN_EDGE = -0.455f
+    private const val OCEAN_EDGE = -0.19f
+    private const val LAND_EDGE = -0.11f
+    private const val PEAK_EROSION_EDGE = -0.375f
+    private const val FLAT_EROSION_EDGE = 0.05f
 
 }

@@ -36,8 +36,24 @@ object WorldsmithPackValidator {
         addAll(TerrainPlanValidator.validate(pack.terrain).map { it.prefixed("terrain") })
         addAll(FeatureLibraryValidator.validate(pack.features).map { it.prefixed("features") })
         addAll(BiomePlanValidator.validate(pack.biomes, pack.features).map { it.prefixed("biomes") })
+        addAll(validateBiomeTerrainLinks(pack))
         addAll(validateSurfaceTerrainLinks(pack))
         addAll(validateAnchorReferences(pack))
+    }
+
+    private fun validateBiomeTerrainLinks(pack: WorldsmithPack): List<Diagnostic> = buildList {
+        val spatial = pack.biomes.spatial
+        if (pack.terrain.shape !is TerrainShape.Procedural &&
+            (spatial.regionScale != 1.0 || spatial.boundaryRoughness != 0.0)
+        ) {
+            add(
+                error(
+                    "biomes.spatial",
+                    "BIOME_SPATIAL_REQUIRES_PROCEDURAL_TERRAIN",
+                    "Non-default biome spatial controls require procedural terrain",
+                ),
+            )
+        }
     }
 
     /**

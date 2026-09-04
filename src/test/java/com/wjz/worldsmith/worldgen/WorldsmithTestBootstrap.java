@@ -29,6 +29,7 @@ final class WorldsmithTestBootstrap {
 		MappedRegistry<?> densityFunctions = (MappedRegistry<?>)BuiltInRegistries.DENSITY_FUNCTION_TYPE;
 		MappedRegistry<?> trunkPlacers = (MappedRegistry<?>)BuiltInRegistries.TRUNK_PLACER_TYPE;
 		MappedRegistry<?> foliagePlacers = (MappedRegistry<?>)BuiltInRegistries.FOLIAGE_PLACER_TYPE;
+		MappedRegistry<?> placementModifiers = (MappedRegistry<?>)BuiltInRegistries.PLACEMENT_MODIFIER_TYPE;
 		try {
 			Field frozen = MappedRegistry.class.getDeclaredField("frozen");
 			frozen.setAccessible(true);
@@ -36,6 +37,7 @@ final class WorldsmithTestBootstrap {
 			frozen.setBoolean(densityFunctions, false);
 			frozen.setBoolean(trunkPlacers, false);
 			frozen.setBoolean(foliagePlacers, false);
+			frozen.setBoolean(placementModifiers, false);
 			WorldsmithWorldgen.initialize();
 			Method bindValue = Holder.Reference.class.getDeclaredMethod("bindValue", Object.class);
 			bindValue.setAccessible(true);
@@ -47,10 +49,14 @@ final class WorldsmithTestBootstrap {
 				WorldsmithAnchorFields.Point.CODEC.codec(), bindValue);
 			bind(densityFunctions, Registries.DENSITY_FUNCTION_TYPE, "anchor_grid",
 				WorldsmithAnchorFields.Grid.CODEC.codec(), bindValue);
+			bind(densityFunctions, Registries.DENSITY_FUNCTION_TYPE, "anchor_line",
+				WorldsmithAnchorFields.Line.CODEC.codec(), bindValue);
 			bind(trunkPlacers, Registries.TRUNK_PLACER_TYPE, "shaped_trunk",
 				WorldsmithTreePlacerTypes.trunk(), bindValue);
 			bind(foliagePlacers, Registries.FOLIAGE_PLACER_TYPE, "shaped_foliage",
 				WorldsmithTreePlacerTypes.foliage(), bindValue);
+			bind(placementModifiers, Registries.PLACEMENT_MODIFIER_TYPE, "height_range_filter",
+				WorldsmithPlacementModifierTypes.heightRangeFilter(), bindValue);
 			// Fabric performs the ordinary final freeze after mod registration.
 			// The plain test registry was already frozen once, so restore the flag
 			// directly instead of rebuilding its already-bound tag set.
@@ -58,6 +64,7 @@ final class WorldsmithTestBootstrap {
 			frozen.setBoolean(densityFunctions, true);
 			frozen.setBoolean(trunkPlacers, true);
 			frozen.setBoolean(foliagePlacers, true);
+			frozen.setBoolean(placementModifiers, true);
 		} catch (ReflectiveOperationException failure) {
 			throw new IllegalStateException("Could not open the test registries", failure);
 		}

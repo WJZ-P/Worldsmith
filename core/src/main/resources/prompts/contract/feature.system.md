@@ -25,7 +25,8 @@ number of biomes, so the shape and material are written once and compiled once.
 - `block` is shorthand for the sole material role of a recipe that needs only
   one. A selector has a
   required `semanticRole` plus at least one of `preferredIds` or `requiredTags`.
-  Semantic role first; ids are hints.
+  Semantic role first; ids are hints. Every block id and tag id is namespaced,
+  for example `minecraft:stone` and `minecraft:logs`; tag ids do not carry `#`.
 - `materials` replaces `block` for a recipe built from more than one material,
   keyed by role. Never write both.
 - `density` is `0..1`. Its meaning depends on the recipe; see below.
@@ -39,16 +40,90 @@ fails while loading rather than producing a quietly empty world.
 
 | recipe | shape | placement | use it for |
 | --- | --- | --- | --- |
-| `GROUND_PATCH` | one block on the surface | many attempts per chunk, only into air | grass, dead bush, ash tufts, mushrooms, coral - the cover that makes a biome look like a place rather than a texture |
-| `DEAD_TREE` | a vertical column 2-5 blocks tall | a rarity filter | bare trunks, spars, masts, stone pillars and cactus columns |
-| `BOULDER` | an irregular blob | a rarity filter, on ground that accepts it | rocks, slag lumps, ice chunks, bone piles, rubble |
-| `ORE_VEIN` | a vein of about 33 blocks cut into stone | underground, from near bedrock up to y 64 | a mineral that belongs to this place - ore, crystal, buried ice, a seam of something wrong |
-| `CAVE_PATCH` | one block standing on a cave floor | underground, dropped into open air and walked down onto solid ground | glowing moss, crystal shards, fungus, bones - what a player finds by going down |
+| `GROUND_PATCH` | a configurable cluster on the surface | many attempts per chunk | grass, dead bush, ash tufts, mushrooms, coral - the cover that makes a biome look like a place rather than a texture |
+| `DEAD_TREE` | a configurable vertical column | a rarity filter | bare trunks, spars, masts, stone pillars and cactus columns |
+| `BOULDER` | one or more overlapping irregular blobs | a rarity filter, on ground that accepts it | rocks, slag lumps, ice chunks, bone piles, rubble |
+| `ORE_VEIN` | a configurable vein cut into stone | an authored underground Y range | a mineral that belongs to this place - ore, crystal, buried ice, a seam of something wrong |
+| `CAVE_PATCH` | a configurable cluster standing on a cave floor | an authored Y range and downward scan | glowing moss, crystal shards, fungus, bones - what a player finds by going down |
 | `SURFACE_LAYER` | one block on the ground | the same as a ground patch, but placed after everything else | settled ash, drifted petals, snow, dust - cover that lies **on top of** the trunks and boulders rather than beside them |
-| `AQUATIC_PATCH` | one block on the sea floor | many attempts per chunk, refused unless it is under water | seagrass, kelp beds, coral, anything that makes a seabed something other than bare sand |
-| `HANGING_PATCH` | a short column grown **downward** | scans upward for something to hang from | vines, roots, icicles, moss beards under overhangs and cave ceilings |
-| `FALLEN_LOG` | a log lying on its side, with a stump | a rarity filter | the thing that makes a forest floor read as old rather than as newly placed |
+| `AQUATIC_PATCH` | a configurable cluster on the sea floor | many attempts per chunk, under water by default | seagrass, kelp beds, coral, anything that makes a seabed something other than bare sand |
+| `HANGING_PATCH` | configurable columns grown **downward** | scans upward for something to hang from | vines, roots, icicles, moss beards under overhangs and cave ceilings |
+| `FALLEN_LOG` | a configurable log lying on its side, with a stump | a rarity filter | the thing that makes a forest floor read as old rather than as newly placed |
 | `TREE` | a custom trunk skeleton plus a custom crown volume | tree-specific placement | living woods whose geometry and materials remain independent |
+
+### Non-tree shape controls
+
+Every object is optional; omission keeps the documented default. A shape object
+on a recipe that does not consume it is an error rather than ignored output.
+
+Patch recipes (`GROUND_PATCH`, `CAVE_PATCH`, `SURFACE_LAYER`,
+`AQUATIC_PATCH`, and `HANGING_PATCH`) may carry:
+
+```json
+"patch": {
+  "attempts": 7,
+  "horizontalSpread": 4,
+  "verticalSpread": 2,
+  "scanDepth": 18
+}
+```
+
+- `attempts` is `1..32`: how many blocks or columns one cluster tries.
+- `horizontalSpread` is `0..8`. More than one attempt needs spatial spread.
+- `verticalSpread` is `0..8` and belongs only to `CAVE_PATCH` and
+  `HANGING_PATCH`; surface recipes always re-find their surface after the
+  horizontal offset.
+- `scanDepth` is `1..32` and belongs only to cave and hanging patches. It is how
+  far the origin searches down for a floor or up for a ceiling.
+
+Other recipe-owned geometry is direct:
+
+```json
+"boulder":  { "blobs": 4, "spread": 3 }
+"oreVein":  { "size": 48, "discardChanceOnAirExposure": 0.6 }
+"column":   { "minLength": 3, "maxLength": 10 }
+"fallenLog": { "minLength": 6, "maxLength": 12 }
+```
+
+- `boulder.blobs` is `1..8` and `spread` is `0..8`. Nearby blobs overlap into
+  a larger, less regular rock formation instead of scaling one perfect sphere.
+- `oreVein.size` is `1..64`; `discardChanceOnAirExposure` is `0..1` and hides
+  that share of blocks exposed to a cave, useful for rare minerals.
+- `column` belongs to `DEAD_TREE` and `HANGING_PATCH`, with lengths `1..16`.
+- `fallenLog` belongs only to `FALLEN_LOG`, with horizontal log lengths `1..14`;
+  the compiler accounts for Minecraft's two-block stump gap itself.
+
+### Non-tree placement conditions
+
+Every non-tree recipe may carry a `placement` object:
+
+```json
+"placement": {
+  "minY": 70,
+  "maxY": 180,
+  "substrate": "STONE",
+  "fluid": "DRY"
+}
+```
+
+- `minY` and `maxY` are optional absolute block heights within `-64..319`.
+  On surface recipes they filter the surface already found; they never replace
+  it with a random floating Y. On ore and cave recipes they also constrain the
+  sampled underground origin.
+- `substrate` is `RECIPE_DEFAULT`, `NATURAL_SOIL`, `SAND`, `STONE`, or
+  `ANY_SOLID`. It checks the support below ordinary features and the attachment
+  above a hanging patch.
+- `fluid` is `RECIPE_DEFAULT`, `DRY`, `SUBMERGED`, `SHALLOW_WATER`, or `ANY`.
+  `SHALLOW_WATER` requires water at the feature and air within four blocks.
+- `ORE_VEIN` replaces its stone target rather than standing on a substrate, so
+  it accepts no substrate override and only `RECIPE_DEFAULT` or `ANY` fluid.
+- `TREE` keeps these concerns in `tree.distribution` and `tree.substrate`; do
+  not give it this general placement object.
+
+An anchor or terrain-region condition is not part of this placement object yet:
+decoration runs after density routing and has no direct access to the shared
+terrain influence field. Such a condition must be connected to that field, not
+approximated with a second unrelated noise source.
 
 ### Trees
 
@@ -184,6 +259,13 @@ from more than one names them instead:
 A role the recipe does not read is rejected rather than ignored, because effort
 spent on a material that never reaches the world is worse than an error.
 
+`requiredTags` are intersected against the block tags already loaded in the
+active Minecraft registry. They may name vanilla tags, loader/mod tags, or
+Worldsmith tags that were registered before this pack is compiled. Several tags
+mean the chosen block must satisfy all of them. A brand-new tag declared only
+inside the same not-yet-exported generated pack is outside this single-stage
+lookup; register/load that tag first or use explicit `preferredIds`.
+
 ## One role, several blocks
 
 A selector may pick between alternatives per block instead of naming one:
@@ -220,9 +302,9 @@ fallen wood means nothing interrupts it.
 `density: 0` disables any feature exactly. Positive density is mapped according
 to the cost and scale of the recipe:
 
-- `GROUND_PATCH`, `SURFACE_LAYER` and `AQUATIC_PATCH` become an attempt count per
-  chunk, `0..24`. `0.1` is scattered tufts, `0.4` is ordinary cover, `1.0` is a
-  carpet.
+- `GROUND_PATCH`, `SURFACE_LAYER` and `AQUATIC_PATCH` become a cluster count per
+  chunk, `0..24`. Each cluster then spends `patch.attempts`; `0.1` is scattered
+  tufts, `0.4` is ordinary cover, `1.0` is a carpet when the patch is small.
 - `DEAD_TREE`, `BOULDER` and `FALLEN_LOG` remain rare props: positive density
   ranges from roughly one attempt every 32 chunks to one each chunk.
 - `TREE` reads `tree.distribution`. `SCATTERED` treats density as the chance of
@@ -230,14 +312,17 @@ to the cost and scale of the recipe:
   noise field. `FOREST` places up to 4 in clearings and 10 in wooded chunks;
   `DENSE_FOREST` raises those ceilings to 8 and 16. Density scales the counts.
 - `ORE_VEIN`, `CAVE_PATCH` and `HANGING_PATCH` become a vein or cluster count per
-  chunk, `0..16`. `0.25` is roughly as common as vanilla iron; above `0.6` a
-  player will not be able to walk a cave without seeing it.
+  chunk, `0..16`. Cave and hanging clusters multiply by `patch.attempts`; large
+  ore veins are charged in proportion to their size. `0.25` is roughly as
+  common as vanilla iron for a default-size vein.
 
 One biome may spend at most 64 attempts per chunk in total. Exceeding it is the
 `VEGETATION_BUDGET_EXCEEDED` error; the cap exists because an over-eager density
 makes world generation crawl, and a slow world looks nothing like its cause.
 For trees, one attempt is scaled by trunk volume and by every branch-tip crown;
-large many-crowned trees therefore consume more of the same budget.
+large many-crowned trees therefore consume more of the same budget. Boulder
+blob count, column/fallen-log length, cave scan depth and patch cluster size are
+charged too.
 
 ## Where each one runs
 

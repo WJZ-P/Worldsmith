@@ -4,10 +4,14 @@ import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.WeightedMaterial;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.util.random.WeightedList;
 import net.minecraft.world.level.block.state.BlockState;
@@ -24,9 +28,10 @@ import net.minecraft.world.level.levelgen.feature.stateproviders.WeightedStatePr
  * supplied block and are reported rather than thrown, so one bad id does not
  * take down a whole world.
  *
- * <p>Stage one resolves {@code preferredIds} only. Tag-based selection needs a
- * registry lookup that is not available while bootstrapping dynamic registries,
- * so {@code requiredTags} is recorded as unresolved for now.
+ * <p>Required tags are read from the live static block registry. That includes
+ * vanilla, loader and mod-defined tags already present in the active resource
+ * set. A tag authored inside the same not-yet-exported runtime pack would need
+ * a two-phase reload and is deliberately outside this resolver's contract.
  */
 public final class MaterialResolver {
 	private final List<String> problems = new ArrayList<>();
@@ -38,6 +43,8 @@ public final class MaterialResolver {
 			// than reporting a false fallback against the empty outer selector.
 			return this.resolve(selector.getWeighted().getFirst().getMaterial(), fallback);
 		}
+		List<TagKey<Block>> requiredTags = this.tags(selector);
+		boolean tagsValid = requiredTags.size() == selector.getRequiredTags().size();
 		for (String id : selector.getPreferredIds()) {
 			Identifier parsed = Identifier.tryParse(id);
 			if (parsed == null) {
@@ -45,19 +52,52 @@ public final class MaterialResolver {
 				continue;
 			}
 			Optional<Block> block = BuiltInRegistries.BLOCK.getOptional(parsed);
-			if (block.isPresent()) {
+			if (block.isPresent() && tagsValid && matchesAll(block.get(), requiredTags)) {
 				return block.get().defaultBlockState();
 			}
-			this.problems.add("'" + id + "' is not a registered block (role " + selector.getSemanticRole() + ")");
+			if (block.isEmpty()) {
+				this.problems.add("'" + id + "' is not a registered block (role " + selector.getSemanticRole() + ")");
+			} else if (tagsValid) {
+				this.problems.add("'" + id + "' does not satisfy required tags " + selector.getRequiredTags()
+					+ " (role " + selector.getSemanticRole() + ")");
+			}
 		}
 
-		if (!selector.getRequiredTags().isEmpty()) {
-			this.problems.add("tag-only selector for role " + selector.getSemanticRole() + " is not supported in stage one");
+		if (!requiredTags.isEmpty() && tagsValid) {
+			Optional<Block> tagged = BuiltInRegistries.BLOCK.listElements()
+				.filter(holder -> requiredTags.stream().allMatch(holder::is))
+				.sorted(Comparator.comparing(holder -> holder.key().identifier().toString()))
+				.map(Holder.Reference::value)
+				.findFirst();
+			if (tagged.isPresent()) {
+				return tagged.get().defaultBlockState();
+			}
+			this.problems.add("no registered block satisfies required tags " + selector.getRequiredTags()
+				+ " (role " + selector.getSemanticRole() + ")");
 		} else if (selector.getPreferredIds().isEmpty()) {
 			this.problems.add("selector for role " + selector.getSemanticRole() + " lists no preferred ids");
 		}
 
 		return fallback.defaultBlockState();
+	}
+
+	private List<TagKey<Block>> tags(MaterialSelector selector) {
+		List<TagKey<Block>> tags = new ArrayList<>();
+		for (String id : selector.getRequiredTags()) {
+			Identifier parsed = Identifier.tryParse(id);
+			if (parsed == null) {
+				this.problems.add("'" + id + "' is not a valid block tag identifier (role "
+					+ selector.getSemanticRole() + ")");
+				continue;
+			}
+			tags.add(TagKey.create(Registries.BLOCK, parsed));
+		}
+		return List.copyOf(tags);
+	}
+
+	private static boolean matchesAll(Block block, List<TagKey<Block>> tags) {
+		Holder.Reference<Block> holder = block.builtInRegistryHolder();
+		return tags.stream().allMatch(holder::is);
 	}
 
 	/**

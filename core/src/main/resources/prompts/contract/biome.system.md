@@ -46,6 +46,32 @@ silently include the middle band and is rejected.
 
 Slots are names, not quotas. A world may use one slot, several slots, or none.
 
+### Spatial character
+
+The plan has one optional world-wide `spatial` object for procedural terrain:
+
+```json
+"spatial": {
+  "regionScale": 1.8,
+  "boundaryRoughness": 0.25
+}
+```
+
+- `regionScale` is `0.25..8.0` relative to vanilla. Values above one make broad,
+  continuous provinces; values below one make small, frequently changing
+  patches. This changes patch diameter, not a biome's share of climate space.
+- `boundaryRoughness` is `0..1`. Zero leaves smooth large-scale temperature and
+  humidity borders; higher values fold finer independent noise into them, making
+  ragged ecotones and small enclaves. It does not mean "more biomes".
+
+Use these as character, not compensation for poorly chosen climate boxes. An
+oasis still needs its own narrow placement; scale only decides how that climate
+field is arranged across the map.
+
+Keep both values at their defaults for a vanilla passthrough terrain shape;
+the pack validator rejects non-default spatial controls there rather than
+silently ignoring them.
+
 #### A band held by one biome is that biome forever
 
 `relief` is altitude, and a band is world-sized: `FLATS` is every flat place in
@@ -87,6 +113,25 @@ Broad ranges make a biome theme dominant; narrow ranges make it rare. Gaps are
 valid: Minecraft assigns them to the nearest declared biome. Avoid identical
 overlapping boxes because their tie would make one biome effectively hidden.
 
+`depth` is signed distance relative to the local terrain surface, not world Y:
+it is near zero at the exposed ground, positive inside solid ground, and
+negative above it. Leave it broad for an ordinary surface biome. A positive
+range can select an underground/cave biome; pair it with the other axes so it
+does not win on the surface. It follows local mountains and valleys, so it is
+not an altitude control.
+
+`erosion` is Worldsmith's shared landform axis: the terrain compiler and the
+semantic `FLATS`/`HIGHLAND`/`PEAKS` bands read the same field. Constraining it is
+how a raw box follows one of those relief characters. `weirdness` remains an
+independent horizontal texture/variation axis, useful for splitting two biomes
+inside the same temperature, humidity, and relief region. It is not rarity,
+cave density, or a vertical coordinate. Use `altitude` in surface rules for an
+absolute snow line, and use the terrain contract for cave geometry.
+
+`offset` is a nearest-neighbour distance penalty. Raising it makes a box less
+competitive everywhere; it is useful only for subtle tie-breaking and is a poor
+substitute for authoring the actual ranges.
+
 ## Requirements
 
 - Give every biome an `archetype` naming its gameplay role. It is one of
@@ -108,6 +153,11 @@ overlapping boxes because their tie would make one biome effectively hidden.
   which carry alpha and are `#AARRGGBB`. Read them as the mood of the place, not
   as realistic pigment. Vary them: biomes that differ in height or temperature
   should not resolve to the same palette.
+- `environment.tint.water` is required. `grass`, `foliage`, and `dryFoliage` are
+  optional overrides; omit any of them to let Minecraft derive that colour from
+  `behavior.temperature` and `behavior.downfall`. `grassModifier` defaults to
+  `NONE` and may be `DARK_FOREST` or `SWAMP`; modifiers act after the derived or
+  overridden grass colour, so use one only for that recognisable spatial effect.
 - `environment` is grouped by what changes together. `tint` colours blocks;
   `fog`, `sky` and `light` are environment attributes, which fade across biome
   borders and stack with day, night and weather rather than replacing them.
@@ -200,6 +250,22 @@ by a foundation material:
 }
 ```
 
+A surface material may use the same `weighted` selector as a feature material:
+
+```json
+"material": {
+  "semanticRole": "mottled_moor",
+  "weighted": [
+    { "material": { "semanticRole": "dark_soil", "preferredIds": ["minecraft:podzol"] }, "weight": 4 },
+    { "material": { "semanticRole": "pale_stone", "preferredIds": ["minecraft:calcite"] }, "weight": 1 }
+  ]
+}
+```
+
+On a surface these weights become coherent low-frequency patches rather than a
+random choice for every block. Weights express relative tendency, not an exact
+percentage of visible area. The palette works in both layers and foundations.
+
 Each layer depth is `1..8`; one stack totals at most 8 blocks. Every rule has
 a unique lowercase id and at least one condition. Available conditions are:
 
@@ -223,17 +289,19 @@ cliffs. Return this semantic grammar rather than Minecraft SurfaceRules nodes.
 
 ## Output
 
-Return one JSON object with exactly two fields and no surrounding prose:
+Return one `BiomePlan` JSON object and no surrounding prose:
 
 ```json
 {
-  "biomes":   { "schemaVersion": 1, "biomes": [ ... ] },
-  "features": { "schemaVersion": 1, "features": [ ... ] }
+  "schemaVersion": 1,
+  "spatial": { "regionScale": 1.0, "boundaryRoughness": 0.0 },
+  "biomes": [ ... ]
 }
 ```
 
-`biomes` is a `BiomePlan` and `features` is a `FeatureLibrary`. Declare every
-feature a biome references.
+The MCP workflow receives the terrain, biome, and feature documents separately.
+This document therefore contains feature references by id, while definitions
+belong only in the independently submitted `FeatureLibrary`.
 
 If your answer is rejected you will be given the exact problems and your own
 previous document. Repair that document rather than starting over: keep every

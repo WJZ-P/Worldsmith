@@ -75,6 +75,9 @@
       "minecraft:glow_lichen",
       "worldsmith:vegetation/ash_scrub/tar_mire",
       "worldsmith:vegetation/dead_oak_trunk/tar_mire"
+    ],
+    [
+      "minecraft:freeze_top_layer"
     ]
   ],
   "has_precipitation": true,

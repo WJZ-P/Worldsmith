@@ -76,6 +76,9 @@
     ],
     [
       "minecraft:glow_lichen"
+    ],
+    [
+      "minecraft:freeze_top_layer"
     ]
   ],
   "has_precipitation": true,

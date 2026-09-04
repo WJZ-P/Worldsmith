@@ -4,6 +4,7 @@ import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.AmbientParticleSpec;
 import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeEnvironment;
+import com.wjz.worldsmith.core.model.BiomeGrassColorModifier;
 import com.wjz.worldsmith.core.model.TemperatureVariation;
 import com.wjz.worldsmith.core.model.BiomeFog;
 import com.wjz.worldsmith.core.model.BiomeLight;
@@ -39,10 +40,9 @@ import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 /**
  * Turns one pack biome into a registrable {@link Biome}.
  *
- * <p>Colours are always written as explicit overrides rather than being derived
- * from temperature and downfall. Those two fields still drive whether snow falls
- * and whether water freezes, so letting them also pick the grass tint would tie
- * the palette to the weather. Overriding keeps the two independent.
+	 * <p>Grass, foliage and dry-foliage colours are explicit only when the pack
+	 * authors an override. Leaving one absent deliberately restores Minecraft's
+	 * temperature/downfall palette, while water remains required by the biome codec.
  *
  * <p>An environment block lands in two different places: grass, foliage and
  * water colours are biome special effects, while fog, sky and particles are
@@ -50,9 +50,6 @@ import net.minecraft.world.level.levelgen.placement.PlacedFeature;
  * changes fade in rather than switching at the boundary.
  */
 public final class BiomeCompiler {
-	/** Below this, vanilla treats a biome as snowy. */
-	private static final float FREEZING_TEMPERATURE = 0.15F;
-
 	private BiomeCompiler() {
 	}
 
@@ -69,9 +66,9 @@ public final class BiomeCompiler {
 
 		BiomeGenerationSettings.Builder generation = new BiomeGenerationSettings.Builder(placedFeatures, carvers);
 
-		// Procedural terrain owns cave density in its NoiseRouter. Adding the
+		// Procedural terrain owns every cave family in its NoiseRouter. Adding the
 		// legacy configured carvers as well would punch full-strength caves even
-		// when caveDensity is zero. Vanilla passthrough shapes retain those carvers;
+		// when all authored densities are zero. Vanilla passthrough shapes retain those carvers;
 		// both paths keep the ordinary underground and surface lava lakes.
 		if (pack.terrain().getShape() instanceof TerrainShape.Vanilla) {
 			BiomeDefaultFeatures.addDefaultCarversAndLakes(generation);
@@ -85,9 +82,11 @@ public final class BiomeCompiler {
 		BiomeDefaultFeatures.addDefaultOres(generation);
 		BiomeDefaultFeatures.addDefaultSoftDisks(generation);
 		BiomeDefaultFeatures.addDefaultSprings(generation);
-		if (definition.getBehavior().getTemperature() < FREEZING_TEMPERATURE) {
-			BiomeDefaultFeatures.addSurfaceFreezing(generation);
-		}
+		// The feature performs Minecraft's position-aware temperature check at
+		// placement time. Registering it for every overworld biome is what lets a
+		// temperate mountain acquire a natural high-altitude snow line; filtering
+		// here by the biome's base temperature loses that altitude correction.
+		BiomeDefaultFeatures.addSurfaceFreezing(generation);
 
 		Map<String, FeatureDefinition> library = new LinkedHashMap<>();
 		pack.features().getFeatures().forEach(feature -> library.put(feature.getId(), feature));
@@ -105,6 +104,18 @@ public final class BiomeCompiler {
 		}
 
 		BiomeEnvironment environment = definition.getEnvironment();
+		BiomeSpecialEffects.Builder effects = new BiomeSpecialEffects.Builder()
+			.waterColor(rgb(environment.getTint().getWater()))
+			.grassColorModifier(grassModifier(environment.getTint().getGrassModifier()));
+		if (environment.getTint().getGrass() != null) {
+			effects.grassColorOverride(rgb(environment.getTint().getGrass()));
+		}
+		if (environment.getTint().getFoliage() != null) {
+			effects.foliageColorOverride(rgb(environment.getTint().getFoliage()));
+		}
+		if (environment.getTint().getDryFoliage() != null) {
+			effects.dryFoliageColorOverride(rgb(environment.getTint().getDryFoliage()));
+		}
 		Biome.BiomeBuilder builder = new Biome.BiomeBuilder()
 			.hasPrecipitation(definition.getBehavior().getHasPrecipitation())
 			.temperature(definition.getBehavior().getTemperature())
@@ -114,13 +125,7 @@ public final class BiomeCompiler {
 					? Biome.TemperatureModifier.FROZEN
 					: Biome.TemperatureModifier.NONE
 			)
-			.specialEffects(
-				new BiomeSpecialEffects.Builder()
-					.waterColor(rgb(environment.getTint().getWater()))
-					.grassColorOverride(rgb(environment.getTint().getGrass()))
-					.foliageColorOverride(rgb(environment.getTint().getFoliage()))
-					.build()
-			);
+			.specialEffects(effects.build());
 
 		builder = fog(builder, environment.getFog());
 		builder = sky(builder, environment.getSky());
@@ -135,6 +140,14 @@ public final class BiomeCompiler {
 			.mobSpawnSettings(mobs.build())
 			.generationSettings(generation.build())
 			.build();
+	}
+
+	private static BiomeSpecialEffects.GrassColorModifier grassModifier(BiomeGrassColorModifier modifier) {
+		return switch (modifier) {
+			case NONE -> BiomeSpecialEffects.GrassColorModifier.NONE;
+			case DARK_FOREST -> BiomeSpecialEffects.GrassColorModifier.DARK_FOREST;
+			case SWAMP -> BiomeSpecialEffects.GrassColorModifier.SWAMP;
+		};
 	}
 
 	private static Biome.BiomeBuilder fog(Biome.BiomeBuilder builder, BiomeFog fog) {

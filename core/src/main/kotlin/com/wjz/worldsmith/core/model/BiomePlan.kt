@@ -210,10 +210,22 @@ data class WaterFog(
  * interpolate across a border nor respond to weather.
  */
 @Serializable
+enum class BiomeGrassColorModifier {
+    NONE,
+    DARK_FOREST,
+    SWAMP,
+}
+
+@Serializable
 data class BiomeTint(
-    val grass: String,
-    val foliage: String,
+    /** Null lets Minecraft derive the colour from temperature and downfall. */
+    val grass: String? = null,
+    /** Null lets Minecraft derive the colour from temperature and downfall. */
+    val foliage: String? = null,
     val water: String,
+    /** Null uses Minecraft's climate-derived dry-leaf colour. */
+    val dryFoliage: String? = null,
+    val grassModifier: BiomeGrassColorModifier = BiomeGrassColorModifier.NONE,
 )
 
 /**
@@ -361,7 +373,16 @@ data class BiomeDefinition(
 }
 
 @Serializable
+data class BiomeSpatialSettings(
+    /** Multiplier relative to vanilla biome diameter; larger values make broader regions. */
+    val regionScale: Double = 1.0,
+    /** Amount of independent fine noise folded into temperature and humidity borders. */
+    val boundaryRoughness: Double = 0.0,
+)
+
+@Serializable
 data class BiomePlan(
     val schemaVersion: Int = WorldsmithCore.BLUEPRINT_SCHEMA_VERSION,
     val biomes: List<BiomeDefinition>,
+    val spatial: BiomeSpatialSettings = BiomeSpatialSettings(),
 )

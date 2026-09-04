@@ -112,6 +112,82 @@ enum class TreeDecoration {
     LEAF_LITTER,
 }
 
+/** What the block immediately supporting a non-tree feature must be. */
+@Serializable
+enum class FeatureSubstrate {
+    /** Keep the recipe's established placement rule. */
+    RECIPE_DEFAULT,
+    NATURAL_SOIL,
+    SAND,
+    STONE,
+    ANY_SOLID,
+}
+
+/** Which fluid environment accepts the origin of a non-tree feature. */
+@Serializable
+enum class FeatureFluid {
+    /** Keep the recipe's established dry, aquatic, or underground rule. */
+    RECIPE_DEFAULT,
+    DRY,
+    SUBMERGED,
+    SHALLOW_WATER,
+    /** Accept either air or water; solid origins such as ore still use their recipe target. */
+    ANY,
+}
+
+/**
+ * Conditions shared by non-tree scatter recipes.
+ *
+ * Absolute height is deliberately a filter after the recipe has found its
+ * surface or cave attachment. It therefore changes where a feature is allowed,
+ * not the distribution of the terrain beneath it.
+ */
+@Serializable
+data class FeaturePlacementConditions(
+    val minY: Int? = null,
+    val maxY: Int? = null,
+    val substrate: FeatureSubstrate = FeatureSubstrate.RECIPE_DEFAULT,
+    val fluid: FeatureFluid = FeatureFluid.RECIPE_DEFAULT,
+)
+
+/** Several nearby blocks produced by one patch attempt. */
+@Serializable
+data class FeaturePatchSpec(
+    val attempts: Int = 1,
+    val horizontalSpread: Int = 0,
+    val verticalSpread: Int = 0,
+    /** Distance searched for a cave floor or ceiling; ignored by surface patches. */
+    val scanDepth: Int = 12,
+)
+
+/** A formation made from one or more overlapping vanilla-style rock blobs. */
+@Serializable
+data class BoulderSpec(
+    val blobs: Int = 1,
+    val spread: Int = 0,
+)
+
+/** Shape of one ore vein before density decides how many are attempted. */
+@Serializable
+data class OreVeinSpec(
+    val size: Int = 33,
+    val discardChanceOnAirExposure: Double = 0.0,
+)
+
+/** Inclusive length range for a vertical bare or hanging column. */
+@Serializable
+data class ColumnSpec(
+    val minLength: Int,
+    val maxLength: Int,
+)
+
+/** Inclusive length range for the horizontal part of a fallen tree. */
+@Serializable
+data class FallenLogSpec(
+    val minLength: Int = 3,
+    val maxLength: Int = 6,
+)
+
 /** Inclusive nominal height range sampled before the crown is placed. */
 @Serializable
 data class TreeHeight(
@@ -173,6 +249,13 @@ data class FeatureDefinition(
     val materials: Map<MaterialRole, MaterialSelector> = emptyMap(),
     val density: Double,
     val tree: TreeSpec? = null,
+    /** Cluster geometry for patch recipes, including hanging columns. */
+    val patch: FeaturePatchSpec? = null,
+    val boulder: BoulderSpec? = null,
+    val oreVein: OreVeinSpec? = null,
+    val column: ColumnSpec? = null,
+    val fallenLog: FallenLogSpec? = null,
+    val placement: FeaturePlacementConditions = FeaturePlacementConditions(),
 ) {
     /**
      * Every material this feature declares, whichever form the author wrote.

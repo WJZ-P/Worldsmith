@@ -43,7 +43,11 @@ final class WorldsmithFeatureOrderTest {
 		List<BiomeDefinition> definitions = new ArrayList<>(source.getBiomes().getBiomes());
 		definitions.set(0, withFeatures(definitions.get(0), List.of(first, second)));
 		definitions.set(1, withFeatures(definitions.get(1), List.of(second, first)));
-		BiomePlan biomes = new BiomePlan(source.getBiomes().getSchemaVersion(), List.copyOf(definitions));
+		BiomePlan biomes = new BiomePlan(
+			source.getBiomes().getSchemaVersion(),
+			List.copyOf(definitions),
+			source.getBiomes().getSpatial()
+		);
 
 		String id = "f".repeat(64);
 		WorldsmithPackManifest oldManifest = source.getManifest();

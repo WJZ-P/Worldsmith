@@ -2,7 +2,11 @@ package com.wjz.worldsmith.core.validation
 
 import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.model.FeatureDefinition
+import com.wjz.worldsmith.core.model.FeatureFluid
 import com.wjz.worldsmith.core.model.FeatureLibrary
+import com.wjz.worldsmith.core.model.FeaturePlacementConditions
+import com.wjz.worldsmith.core.model.FeatureRecipe
+import com.wjz.worldsmith.core.model.FeatureSubstrate
 import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.TreeSpec
 import com.wjz.worldsmith.core.model.TreeCrownShape
@@ -10,6 +14,7 @@ import com.wjz.worldsmith.core.model.TreeTrunkShape
 
 object FeatureLibraryValidator {
     internal val ID = Regex("^[a-z0-9_.-]+$")
+    internal val NAMESPACED_ID = Regex("^[a-z0-9_.-]+:[a-z0-9/._-]+$")
     private const val MAX_WEIGHTED_ENTRIES = 8
     private const val MAX_MATERIAL_WEIGHT = 64
     private const val MAX_TREE_BASE_HEIGHT = 32
@@ -19,6 +24,8 @@ object FeatureLibraryValidator {
     private const val MIN_CROWN_RADIUS = 1
     private const val MAX_CROWN_RADIUS = 8
     private const val MAX_CROWN_HEIGHT = 12
+    private const val MIN_WORLD_Y = -64
+    private const val MAX_WORLD_Y = 319
 
     fun validate(library: FeatureLibrary): List<Diagnostic> = buildList {
         if (library.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
@@ -63,6 +70,8 @@ object FeatureLibraryValidator {
                 )
             }
             feature.tree?.let { addAll(validateTree("$path.tree", it)) }
+            addAll(validateShape(path, feature))
+            addAll(validatePlacement("$path.placement", feature))
             addAll(validateRoles(path, feature))
             feature.allMaterials.forEach { (role, selector) ->
                 val rolePath = if (feature.materials.isEmpty()) "$path.block" else "$path.materials.$role"
@@ -77,6 +86,116 @@ object FeatureLibraryValidator {
                         ),
                     )
                 }
+            }
+        }
+    }
+
+    private fun validateShape(path: String, feature: FeatureDefinition): List<Diagnostic> = buildList {
+        val patchRecipes = setOf(
+            FeatureRecipe.GROUND_PATCH,
+            FeatureRecipe.CAVE_PATCH,
+            FeatureRecipe.SURFACE_LAYER,
+            FeatureRecipe.AQUATIC_PATCH,
+            FeatureRecipe.HANGING_PATCH,
+        )
+        feature.patch?.let { patch ->
+            if (feature.recipe !in patchRecipes) {
+                add(error("$path.patch", "UNUSED_PATCH_SPEC", "The ${feature.recipe} recipe never reads patch geometry"))
+            }
+            if (patch.attempts !in 1..32) {
+                add(error("$path.patch.attempts", "PATCH_ATTEMPTS_OUT_OF_RANGE", "Patch attempts must be between 1 and 32"))
+            }
+            if (patch.horizontalSpread !in 0..8) {
+                add(error("$path.patch.horizontalSpread", "PATCH_SPREAD_OUT_OF_RANGE", "Horizontal patch spread must be between 0 and 8"))
+            }
+            if (patch.verticalSpread !in 0..8) {
+                add(error("$path.patch.verticalSpread", "PATCH_VERTICAL_SPREAD_OUT_OF_RANGE", "Vertical patch spread must be between 0 and 8"))
+            }
+            if (patch.scanDepth !in 1..32) {
+                add(error("$path.patch.scanDepth", "PATCH_SCAN_DEPTH_OUT_OF_RANGE", "Cave scan depth must be between 1 and 32"))
+            }
+            if (patch.attempts > 1 && patch.horizontalSpread == 0 && patch.verticalSpread == 0) {
+                add(error("$path.patch", "PATCH_ATTEMPTS_NEED_SPREAD", "Repeated patch attempts need horizontal or vertical spread to affect more than one block"))
+            }
+            if (feature.recipe !in setOf(FeatureRecipe.CAVE_PATCH, FeatureRecipe.HANGING_PATCH)) {
+                if (patch.verticalSpread != 0) {
+                    add(error("$path.patch.verticalSpread", "UNUSED_PATCH_VERTICAL_SPREAD", "Only cave and hanging patches use vertical spread"))
+                }
+                if (patch.scanDepth != 12) {
+                    add(error("$path.patch.scanDepth", "UNUSED_PATCH_SCAN_DEPTH", "Only cave and hanging patches use scan depth"))
+                }
+            }
+        }
+        feature.boulder?.let { boulder ->
+            if (feature.recipe != FeatureRecipe.BOULDER) {
+                add(error("$path.boulder", "UNUSED_BOULDER_SPEC", "Only BOULDER reads boulder geometry"))
+            }
+            if (boulder.blobs !in 1..8) {
+                add(error("$path.boulder.blobs", "BOULDER_BLOBS_OUT_OF_RANGE", "A boulder formation may contain 1 to 8 blobs"))
+            }
+            if (boulder.spread !in 0..8) {
+                add(error("$path.boulder.spread", "BOULDER_SPREAD_OUT_OF_RANGE", "Boulder spread must be between 0 and 8"))
+            }
+        }
+        feature.oreVein?.let { vein ->
+            if (feature.recipe != FeatureRecipe.ORE_VEIN) {
+                add(error("$path.oreVein", "UNUSED_ORE_VEIN_SPEC", "Only ORE_VEIN reads ore vein geometry"))
+            }
+            if (vein.size !in 1..64) {
+                add(error("$path.oreVein.size", "ORE_SIZE_OUT_OF_RANGE", "Ore vein size must be between 1 and 64"))
+            }
+            if (vein.discardChanceOnAirExposure !in 0.0..1.0) {
+                add(error("$path.oreVein.discardChanceOnAirExposure", "ORE_EXPOSURE_OUT_OF_RANGE", "Ore exposure discard chance must be between 0 and 1"))
+            }
+        }
+        feature.column?.let { column ->
+            if (feature.recipe != FeatureRecipe.DEAD_TREE && feature.recipe != FeatureRecipe.HANGING_PATCH) {
+                add(error("$path.column", "UNUSED_COLUMN_SPEC", "Only DEAD_TREE and HANGING_PATCH read column length"))
+            }
+            if (column.minLength > column.maxLength) {
+                add(error("$path.column", "REVERSED_COLUMN_LENGTH", "Column minimum length must not exceed its maximum"))
+            }
+            if (column.minLength !in 1..16 || column.maxLength !in 1..16) {
+                add(error("$path.column", "COLUMN_LENGTH_OUT_OF_RANGE", "Column length must stay between 1 and 16"))
+            }
+        }
+        feature.fallenLog?.let { log ->
+            if (feature.recipe != FeatureRecipe.FALLEN_LOG) {
+                add(error("$path.fallenLog", "UNUSED_FALLEN_LOG_SPEC", "Only FALLEN_LOG reads fallen-log length"))
+            }
+            if (log.minLength > log.maxLength) {
+                add(error("$path.fallenLog", "REVERSED_FALLEN_LOG_LENGTH", "Fallen-log minimum length must not exceed its maximum"))
+            }
+            if (log.minLength !in 1..14 || log.maxLength !in 1..14) {
+                add(error("$path.fallenLog", "FALLEN_LOG_LENGTH_OUT_OF_RANGE", "Fallen-log length must stay between 1 and 14"))
+            }
+        }
+    }
+
+    private fun validatePlacement(path: String, feature: FeatureDefinition): List<Diagnostic> = buildList {
+        val placement = feature.placement
+        if (feature.recipe == FeatureRecipe.TREE && placement != FeaturePlacementConditions()) {
+            add(error(path, "TREE_PLACEMENT_IS_SEPARATE", "TREE keeps its distribution and substrate inside the tree object"))
+        }
+        placement.minY?.let { minY ->
+            if (minY !in MIN_WORLD_Y..MAX_WORLD_Y) {
+                add(error("$path.minY", "FEATURE_HEIGHT_OUT_OF_RANGE", "Feature height must stay within $MIN_WORLD_Y..$MAX_WORLD_Y"))
+            }
+        }
+        placement.maxY?.let { maxY ->
+            if (maxY !in MIN_WORLD_Y..MAX_WORLD_Y) {
+                add(error("$path.maxY", "FEATURE_HEIGHT_OUT_OF_RANGE", "Feature height must stay within $MIN_WORLD_Y..$MAX_WORLD_Y"))
+            }
+        }
+        if (placement.minY != null && placement.maxY != null && placement.minY > placement.maxY) {
+            add(error(path, "REVERSED_FEATURE_HEIGHT", "Feature minimum Y must not exceed maximum Y"))
+        }
+        if (feature.recipe == FeatureRecipe.ORE_VEIN) {
+            if (placement.substrate != FeatureSubstrate.RECIPE_DEFAULT) {
+                add(error("$path.substrate", "ORE_TARGET_IS_NOT_SUBSTRATE", "ORE_VEIN replaces its stone target; it does not use a supporting substrate"))
+            }
+            if (placement.fluid != FeatureFluid.RECIPE_DEFAULT && placement.fluid != FeatureFluid.ANY) {
+                add(error("$path.fluid", "ORE_FLUID_NOT_SUPPORTED", "ORE_VEIN is embedded in solid rock and only accepts RECIPE_DEFAULT or ANY"))
             }
         }
     }
@@ -229,6 +348,16 @@ object FeatureLibraryValidator {
     internal fun validateMaterial(path: String, selector: MaterialSelector): List<Diagnostic> = buildList {
         if (selector.semanticRole.isBlank()) {
             add(error("$path.semanticRole", "EMPTY_SEMANTIC_ROLE", "Material selector must name a semantic role"))
+        }
+        selector.preferredIds.forEachIndexed { index, id ->
+            if (!NAMESPACED_ID.matches(id)) {
+                add(error("$path.preferredIds[$index]", "INVALID_BLOCK_ID", "Block id must be a namespaced identifier such as minecraft:stone"))
+            }
+        }
+        selector.requiredTags.forEachIndexed { index, id ->
+            if (!NAMESPACED_ID.matches(id)) {
+                add(error("$path.requiredTags[$index]", "INVALID_BLOCK_TAG_ID", "Block tag id must be namespaced without a leading #, such as minecraft:logs"))
+            }
         }
         if (selector.weighted.isEmpty()) {
             if (selector.preferredIds.isEmpty() && selector.requiredTags.isEmpty()) {

@@ -74,6 +74,9 @@
     [
       "minecraft:glow_lichen",
       "worldsmith:vegetation/ash_scrub/salt_shore"
+    ],
+    [
+      "minecraft:freeze_top_layer"
     ]
   ],
   "has_precipitation": true,

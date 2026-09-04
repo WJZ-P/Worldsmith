@@ -3,6 +3,7 @@ package com.wjz.worldsmith.core.ai
 import com.wjz.worldsmith.core.model.BiomePlan
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.model.PromptSet
+import com.wjz.worldsmith.core.model.PromptTemplateRef
 import com.wjz.worldsmith.core.model.WorldGenerationRequest
 import com.wjz.worldsmith.core.prompt.ClasspathPromptTemplateRepository
 import com.wjz.worldsmith.core.prompt.PromptTemplateRepository
@@ -54,7 +55,14 @@ class PackGenerationAgent(
         request: WorldGenerationRequest,
         promptSet: PromptSet = PromptSet.DEFAULT,
     ): PackGenerationResult {
-        val systemPrompt = templates.load(promptSet.biomePlan).systemPrompt
+        // This combined in-process transport asks for two documents in one response.
+        // Keep that transport wrapper out of either document contract: MCP
+        // clients submit BiomePlan and FeatureLibrary independently.
+        val systemPrompt = listOf(
+            templates.load(promptSet.biomePlan).systemPrompt,
+            templates.load(promptSet.featurePlan).systemPrompt,
+            templates.load(PACK_OUTPUT_PROMPT).systemPrompt,
+        ).joinToString("\n\n")
         var userPrompt = request.playerPrompt
         var lastDiagnostics: List<Diagnostic> = emptyList()
 
@@ -120,5 +128,6 @@ class PackGenerationAgent(
 
     companion object {
         const val DEFAULT_MAX_ATTEMPTS: Int = 3
+        private val PACK_OUTPUT_PROMPT = PromptTemplateRef("pack_generation")
     }
 }

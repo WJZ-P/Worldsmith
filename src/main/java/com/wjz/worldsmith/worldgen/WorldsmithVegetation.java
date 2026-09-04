@@ -5,10 +5,18 @@ import com.wjz.worldsmith.core.feature.VegetationBudget;
 import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeFeatureRef;
 import com.wjz.worldsmith.core.model.FeatureDefinition;
+import com.wjz.worldsmith.core.model.FeatureFluid;
 import com.wjz.worldsmith.core.model.FeatureLibrary;
+import com.wjz.worldsmith.core.model.FeaturePatchSpec;
+import com.wjz.worldsmith.core.model.FeaturePlacementConditions;
 import com.wjz.worldsmith.core.model.MaterialRole;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.FeatureRecipe;
+import com.wjz.worldsmith.core.model.BoulderSpec;
+import com.wjz.worldsmith.core.model.ColumnSpec;
+import com.wjz.worldsmith.core.model.FallenLogSpec;
+import com.wjz.worldsmith.core.model.FeatureSubstrate;
+import com.wjz.worldsmith.core.model.OreVeinSpec;
 import com.wjz.worldsmith.core.model.TreeSpec;
 import com.wjz.worldsmith.core.model.TreeBranchSpec;
 import com.wjz.worldsmith.core.model.TreeCrownSpec;
@@ -18,6 +26,7 @@ import com.wjz.worldsmith.core.model.TreeHeight;
 import com.wjz.worldsmith.core.model.TreeSubstrate;
 import com.wjz.worldsmith.core.model.TreeTrunkSpec;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,14 +94,9 @@ import net.minecraft.world.level.levelgen.placement.RarityFilter;
  * one hard-coded geometry.
  */
 public final class WorldsmithVegetation {
-	/** Vanilla's common ore size; a vein of roughly this many blocks. */
-	private static final int ORE_VEIN_SIZE = 33;
 	/** Ore and cave decoration stay below the ordinary surface. */
 	private static final int ORE_VEIN_CEILING = 64;
-	/** How far down a cave patch looks for a floor before giving up. */
-	private static final int CAVE_SCAN_DEPTH = 12;
-	/** How far a hanging growth reaches down from what it is attached to. */
-	private static final int HANGING_LENGTH = 6;
+	private static final int DEFAULT_SCAN_DEPTH = 12;
 
 	private WorldsmithVegetation() {
 	}
@@ -196,11 +200,14 @@ public final class WorldsmithVegetation {
 			return tree(feature, resolver);
 		}
 		if (feature.getRecipe() == FeatureRecipe.FALLEN_LOG) {
+			FallenLogSpec log = fallenLog(feature);
 			return new ConfiguredFeature<>(
 				Feature.FALLEN_TREE,
 				new FallenTreeConfiguration.FallenTreeConfigurationBuilder(
 					resolver.resolveProvider(material(feature, MaterialRole.TRUNK), Blocks.OAK_LOG),
-					UniformInt.of(3, 6)
+					// FallenTreeFeature reserves two configuration blocks for the
+					// stump gap; expose the horizontal log itself to pack authors.
+					UniformInt.of(log.getMinLength() + 2, log.getMaxLength() + 2)
 				).build()
 			);
 		}
@@ -217,6 +224,7 @@ public final class WorldsmithVegetation {
 				new SimpleBlockConfiguration(provider)
 			);
 			case DEAD_TREE -> {
+				ColumnSpec column = column(feature, 2, 5);
 				// The half of the survivability check core cannot make. It knows
 				// whether a land biome grows something tree-shaped; only here is
 				// it knowable whether that shape is actually wood, and a trunk of
@@ -231,17 +239,30 @@ public final class WorldsmithVegetation {
 				}
 				yield new ConfiguredFeature<>(
 					Feature.BLOCK_COLUMN,
-					BlockColumnConfiguration.simple(UniformInt.of(2, 5), provider)
+					new BlockColumnConfiguration(
+						List.of(BlockColumnConfiguration.layer(UniformInt.of(column.getMinLength(), column.getMaxLength()), provider)),
+						Direction.UP,
+						columnMedium(feature),
+						false
+					)
 				);
 			}
 			case BOULDER -> new ConfiguredFeature<>(
 				Feature.BLOCK_BLOB,
-				new BlockBlobConfiguration(state, BlockPredicate.matchesTag(BlockTags.FOREST_ROCK_CAN_PLACE_ON))
+				new BlockBlobConfiguration(state, boulderGround(feature.getPlacement().getSubstrate()))
 			);
-			case ORE_VEIN -> new ConfiguredFeature<>(
-				Feature.ORE,
-				new OreConfiguration(new TagMatchTest(BlockTags.STONE_ORE_REPLACEABLES), state, ORE_VEIN_SIZE)
-			);
+			case ORE_VEIN -> {
+				OreVeinSpec vein = oreVein(feature);
+				yield new ConfiguredFeature<>(
+					Feature.ORE,
+					new OreConfiguration(
+						new TagMatchTest(BlockTags.STONE_ORE_REPLACEABLES),
+						state,
+						vein.getSize(),
+						(float)vein.getDiscardChanceOnAirExposure()
+					)
+				);
+			}
 			case CAVE_PATCH, SURFACE_LAYER, AQUATIC_PATCH -> new ConfiguredFeature<>(
 				Feature.SIMPLE_BLOCK,
 				new SimpleBlockConfiguration(provider)
@@ -251,13 +272,58 @@ public final class WorldsmithVegetation {
 			case HANGING_PATCH -> new ConfiguredFeature<>(
 				Feature.BLOCK_COLUMN,
 				new BlockColumnConfiguration(
-					List.of(BlockColumnConfiguration.layer(UniformInt.of(1, HANGING_LENGTH), provider)),
+					List.of(BlockColumnConfiguration.layer(columnProvider(feature, 1, 6), provider)),
 					Direction.DOWN,
-					BlockPredicate.ONLY_IN_AIR_PREDICATE,
+					columnMedium(feature),
 					true
 				)
 			);
 		};
+	}
+
+	private static FeaturePatchSpec patch(FeatureDefinition feature) {
+		return feature.getPatch() == null
+			? new FeaturePatchSpec(1, 0, 0, DEFAULT_SCAN_DEPTH)
+			: feature.getPatch();
+	}
+
+	private static BoulderSpec boulder(FeatureDefinition feature) {
+		return feature.getBoulder() == null ? new BoulderSpec(1, 0) : feature.getBoulder();
+	}
+
+	private static OreVeinSpec oreVein(FeatureDefinition feature) {
+		return feature.getOreVein() == null ? new OreVeinSpec(33, 0.0) : feature.getOreVein();
+	}
+
+	private static ColumnSpec column(FeatureDefinition feature, int defaultMin, int defaultMax) {
+		return feature.getColumn() == null ? new ColumnSpec(defaultMin, defaultMax) : feature.getColumn();
+	}
+
+	private static IntProvider columnProvider(FeatureDefinition feature, int defaultMin, int defaultMax) {
+		ColumnSpec column = column(feature, defaultMin, defaultMax);
+		return UniformInt.of(column.getMinLength(), column.getMaxLength());
+	}
+
+	private static FallenLogSpec fallenLog(FeatureDefinition feature) {
+		return feature.getFallenLog() == null ? new FallenLogSpec(3, 6) : feature.getFallenLog();
+	}
+
+	/** The predicate BlockBlobFeature evaluates while descending toward its support. */
+	private static BlockPredicate boulderGround(FeatureSubstrate substrate) {
+		return switch (substrate) {
+			case RECIPE_DEFAULT -> BlockPredicate.matchesTag(BlockTags.FOREST_ROCK_CAN_PLACE_ON);
+			case NATURAL_SOIL -> BlockPredicate.matchesTag(BlockTags.DIRT);
+			case SAND -> BlockPredicate.matchesTag(BlockTags.SAND);
+			case STONE -> BlockPredicate.matchesTag(BlockTags.BASE_STONE_OVERWORLD);
+			case ANY_SOLID -> BlockPredicate.solid();
+		};
+	}
+
+	private static BlockPredicate columnMedium(FeatureDefinition feature) {
+		FeatureFluid fluid = resolvedFluid(feature, FeatureFluid.DRY);
+		return fluid == FeatureFluid.DRY
+			? BlockPredicate.ONLY_IN_AIR_PREDICATE
+			: BlockPredicate.ONLY_IN_AIR_OR_WATER_PREDICATE;
 	}
 
 	/**
@@ -390,86 +456,208 @@ public final class WorldsmithVegetation {
 
 	static List<PlacementModifier> place(FeatureDefinition feature, double density) {
 		return switch (feature.getRecipe()) {
-			case GROUND_PATCH -> List.of(
-				CountPlacement.of(VegetationBudget.patchCount(density)),
-				InSquarePlacement.spread(),
-				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
-				BiomeFilter.biome(),
-				BlockPredicateFilter.forPredicate(BlockPredicate.ONLY_IN_AIR_PREDICATE)
-			);
-			case DEAD_TREE, BOULDER -> List.of(
-				rareAttempt(density),
-				InSquarePlacement.spread(),
-				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
-				BiomeFilter.biome()
-			);
+			case GROUND_PATCH, SURFACE_LAYER -> surfacePatchPlacement(feature, density, FeatureFluid.DRY);
+			case AQUATIC_PATCH -> surfacePatchPlacement(feature, density, FeatureFluid.SUBMERGED);
+			case DEAD_TREE, FALLEN_LOG -> singleSurfacePlacement(feature, density);
+			case BOULDER -> boulderPlacement(feature, density);
 			case TREE -> treePlacement(feature, density);
-			// FallenTreeFeature already searches for a sturdy floor and tolerates
-			// short gaps along the log. Applying a living oak sapling's soil rule
-			// here would erase fallen wood from stone, sand and wintry ground.
-			case FALLEN_LOG -> List.of(
-				rareAttempt(density),
-				InSquarePlacement.spread(),
-				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
-				BiomeFilter.biome()
+			case ORE_VEIN -> orePlacement(feature, density);
+			case CAVE_PATCH -> cavePatchPlacement(feature, density);
+			case HANGING_PATCH -> hangingPatchPlacement(feature, density);
+		};
+	}
+
+	private static List<PlacementModifier> surfacePatchPlacement(
+		FeatureDefinition feature,
+		double density,
+		FeatureFluid recipeFluid
+	) {
+		FeaturePatchSpec patch = patch(feature);
+		List<PlacementModifier> modifiers = new ArrayList<>();
+		modifiers.add(CountPlacement.of(VegetationBudget.patchCount(density)));
+		modifiers.add(InSquarePlacement.spread());
+		addPatchScatter(modifiers, patch, false);
+		modifiers.add(surfaceHeightmap(feature, recipeFluid));
+		finishPlacement(modifiers, feature, recipeFluid, false);
+		return List.copyOf(modifiers);
+	}
+
+	private static List<PlacementModifier> singleSurfacePlacement(FeatureDefinition feature, double density) {
+		List<PlacementModifier> modifiers = new ArrayList<>();
+		modifiers.add(rareAttempt(density));
+		modifiers.add(InSquarePlacement.spread());
+		modifiers.add(surfaceHeightmap(feature, FeatureFluid.DRY));
+		finishPlacement(modifiers, feature, FeatureFluid.DRY, false);
+		return List.copyOf(modifiers);
+	}
+
+	private static List<PlacementModifier> boulderPlacement(FeatureDefinition feature, double density) {
+		BoulderSpec shape = boulder(feature);
+		List<PlacementModifier> modifiers = new ArrayList<>();
+		modifiers.add(rareAttempt(density));
+		modifiers.add(InSquarePlacement.spread());
+		if (shape.getBlobs() > 1) {
+			modifiers.add(CountPlacement.of(shape.getBlobs()));
+		}
+		if (shape.getSpread() > 0) {
+			modifiers.add(RandomOffsetPlacement.horizontal(UniformInt.of(-shape.getSpread(), shape.getSpread())));
+		}
+		modifiers.add(surfaceHeightmap(feature, FeatureFluid.DRY));
+		finishPlacement(modifiers, feature, FeatureFluid.DRY, false);
+		return List.copyOf(modifiers);
+	}
+
+	private static List<PlacementModifier> orePlacement(FeatureDefinition feature, double density) {
+		List<PlacementModifier> modifiers = new ArrayList<>();
+		modifiers.add(CountPlacement.of(VegetationBudget.veinCount(density)));
+		modifiers.add(InSquarePlacement.spread());
+		modifiers.add(undergroundHeight(feature));
+		modifiers.add(BiomeFilter.biome());
+		return List.copyOf(modifiers);
+	}
+
+	private static List<PlacementModifier> cavePatchPlacement(FeatureDefinition feature, double density) {
+		FeaturePatchSpec patch = patch(feature);
+		FeatureFluid fluid = resolvedFluid(feature, FeatureFluid.DRY);
+		List<PlacementModifier> modifiers = new ArrayList<>();
+		modifiers.add(CountPlacement.of(VegetationBudget.veinCount(density)));
+		modifiers.add(InSquarePlacement.spread());
+		modifiers.add(undergroundHeight(feature));
+		addPatchScatter(modifiers, patch, true);
+		modifiers.add(EnvironmentScanPlacement.scanningFor(
+			Direction.DOWN,
+			BlockPredicate.solid(),
+			scanMedium(fluid),
+			patch.getScanDepth()
+		));
+		modifiers.add(RandomOffsetPlacement.vertical(ConstantInt.of(1)));
+		finishPlacement(modifiers, feature, FeatureFluid.DRY, false);
+		return List.copyOf(modifiers);
+	}
+
+	private static List<PlacementModifier> hangingPatchPlacement(FeatureDefinition feature, double density) {
+		FeaturePatchSpec patch = patch(feature);
+		FeatureFluid fluid = resolvedFluid(feature, FeatureFluid.DRY);
+		List<PlacementModifier> modifiers = new ArrayList<>();
+		modifiers.add(CountPlacement.of(VegetationBudget.veinCount(density)));
+		modifiers.add(InSquarePlacement.spread());
+		FeaturePlacementConditions placement = feature.getPlacement();
+		if (placement.getMinY() == null && placement.getMaxY() == null) {
+			modifiers.add(PlacementUtils.FULL_RANGE);
+		} else {
+			modifiers.add(authoredHeight(placement, -64, 319));
+		}
+		addPatchScatter(modifiers, patch, true);
+		modifiers.add(EnvironmentScanPlacement.scanningFor(
+			Direction.UP,
+			BlockPredicate.solid(),
+			scanMedium(fluid),
+			patch.getScanDepth()
+		));
+		modifiers.add(RandomOffsetPlacement.vertical(ConstantInt.of(-1)));
+		finishPlacement(modifiers, feature, FeatureFluid.DRY, true);
+		return List.copyOf(modifiers);
+	}
+
+	private static void addPatchScatter(List<PlacementModifier> modifiers, FeaturePatchSpec patch, boolean vertical) {
+		if (patch.getAttempts() > 1) {
+			modifiers.add(CountPlacement.of(patch.getAttempts()));
+		}
+		int horizontal = patch.getHorizontalSpread();
+		int verticalSpread = vertical ? patch.getVerticalSpread() : 0;
+		if (horizontal > 0 || verticalSpread > 0) {
+			modifiers.add(RandomOffsetPlacement.of(
+				horizontal == 0 ? ConstantInt.of(0) : UniformInt.of(-horizontal, horizontal),
+				verticalSpread == 0 ? ConstantInt.of(0) : UniformInt.of(-verticalSpread, verticalSpread)
+			));
+		}
+	}
+
+	private static PlacementModifier undergroundHeight(FeatureDefinition feature) {
+		FeaturePlacementConditions placement = feature.getPlacement();
+		return placement.getMinY() == null && placement.getMaxY() == null
+			? HeightRangePlacement.uniform(VerticalAnchor.aboveBottom(8), VerticalAnchor.absolute(ORE_VEIN_CEILING))
+			: authoredHeight(placement, -64, 319);
+	}
+
+	private static PlacementModifier authoredHeight(FeaturePlacementConditions placement, int defaultMin, int defaultMax) {
+		int minY = placement.getMinY() == null ? defaultMin : placement.getMinY();
+		int maxY = placement.getMaxY() == null ? defaultMax : placement.getMaxY();
+		return HeightRangePlacement.uniform(VerticalAnchor.absolute(minY), VerticalAnchor.absolute(maxY));
+	}
+
+	private static PlacementModifier surfaceHeightmap(FeatureDefinition feature, FeatureFluid recipeFluid) {
+		FeatureFluid fluid = resolvedFluid(feature, recipeFluid);
+		return fluid == FeatureFluid.SUBMERGED || fluid == FeatureFluid.SHALLOW_WATER || fluid == FeatureFluid.ANY
+			? PlacementUtils.HEIGHTMAP_OCEAN_FLOOR
+			: PlacementUtils.HEIGHTMAP_WORLD_SURFACE;
+	}
+
+	private static void finishPlacement(
+		List<PlacementModifier> modifiers,
+		FeatureDefinition feature,
+		FeatureFluid recipeFluid,
+		boolean hanging
+	) {
+		modifiers.add(BiomeFilter.biome());
+		FeaturePlacementConditions placement = feature.getPlacement();
+		if (placement.getMinY() != null || placement.getMaxY() != null) {
+			modifiers.add(WorldsmithHeightRangeFilter.of(
+				placement.getMinY() == null ? -64 : placement.getMinY(),
+				placement.getMaxY() == null ? 319 : placement.getMaxY()
+			));
+		}
+		if (placement.getSubstrate() != FeatureSubstrate.RECIPE_DEFAULT) {
+			modifiers.add(BlockPredicateFilter.forPredicate(substratePredicate(placement.getSubstrate(), hanging)));
+		}
+		BlockPredicate fluid = fluidPredicate(resolvedFluid(feature, recipeFluid));
+		if (fluid != null) {
+			modifiers.add(BlockPredicateFilter.forPredicate(fluid));
+		}
+	}
+
+	private static FeatureFluid resolvedFluid(FeatureDefinition feature, FeatureFluid recipeFluid) {
+		FeatureFluid authored = feature.getPlacement().getFluid();
+		return authored == FeatureFluid.RECIPE_DEFAULT ? recipeFluid : authored;
+	}
+
+	private static BlockPredicate scanMedium(FeatureFluid fluid) {
+		return fluid == FeatureFluid.DRY
+			? BlockPredicate.ONLY_IN_AIR_PREDICATE
+			: BlockPredicate.ONLY_IN_AIR_OR_WATER_PREDICATE;
+	}
+
+	private static BlockPredicate fluidPredicate(FeatureFluid fluid) {
+		return switch (fluid) {
+			case RECIPE_DEFAULT -> throw new IllegalStateException("recipe fluid was not resolved");
+			// WORLD_SURFACE_WG reports the air block above a liquid surface too.
+			// Checking only the origin would therefore let a nominally dry patch,
+			// log or boulder float on water. Reject every fluid directly below the
+			// origin while preserving snow layers and other non-fluid decoration.
+			case DRY -> BlockPredicate.allOf(
+				BlockPredicate.ONLY_IN_AIR_PREDICATE,
+				BlockPredicate.noFluid(new BlockPos(0, -1, 0))
 			);
-			// Mirrors vanilla's commonOrePlacement, which is a count, a spread, a
-			// height range and the biome filter, in that order.
-			case ORE_VEIN -> List.of(
-				CountPlacement.of(VegetationBudget.veinCount(density)),
-				InSquarePlacement.spread(),
-				HeightRangePlacement.uniform(VerticalAnchor.aboveBottom(8), VerticalAnchor.absolute(ORE_VEIN_CEILING)),
-				BiomeFilter.biome()
+			case SUBMERGED -> BlockPredicate.matchesFluids(Fluids.WATER);
+			case SHALLOW_WATER -> BlockPredicate.allOf(
+				BlockPredicate.matchesFluids(Fluids.WATER),
+				BlockPredicate.matchesTag(new BlockPos(0, 4, 0), BlockTags.AIR)
 			);
-			// Dropped into the open underground and then walked down onto the
-			// first solid surface, which is what puts it on a cave floor rather
-			// than inside the rock.
-			case CAVE_PATCH -> List.of(
-				CountPlacement.of(VegetationBudget.veinCount(density)),
-				InSquarePlacement.spread(),
-				HeightRangePlacement.uniform(VerticalAnchor.aboveBottom(8), VerticalAnchor.absolute(ORE_VEIN_CEILING)),
-				EnvironmentScanPlacement.scanningFor(
-					Direction.DOWN,
-					BlockPredicate.solid(),
-					BlockPredicate.ONLY_IN_AIR_PREDICATE,
-					CAVE_SCAN_DEPTH
-				),
-				RandomOffsetPlacement.vertical(ConstantInt.of(1)),
-				BiomeFilter.biome()
-			);
-			// Same shape as a ground patch; the difference is the step it runs
-			// in, which is after everything else has been placed.
-			// Placed on the sea floor and then refused unless it is actually under
-			// water, so a coastal biome does not sprout kelp on its beach.
-			case AQUATIC_PATCH -> List.of(
-				CountPlacement.of(VegetationBudget.patchCount(density)),
-				InSquarePlacement.spread(),
-				PlacementUtils.HEIGHTMAP_OCEAN_FLOOR,
-				BiomeFilter.biome(),
-				BlockPredicateFilter.forPredicate(BlockPredicate.matchesFluids(Fluids.WATER))
-			);
-			// Scans upward for something to hang from, so it lands on cave
-			// ceilings and the underside of overhangs rather than in open air.
-			case HANGING_PATCH -> List.of(
-				CountPlacement.of(VegetationBudget.veinCount(density)),
-				InSquarePlacement.spread(),
-				PlacementUtils.FULL_RANGE,
-				EnvironmentScanPlacement.scanningFor(
-					Direction.UP,
-					BlockPredicate.solid(),
-					BlockPredicate.ONLY_IN_AIR_PREDICATE,
-					CAVE_SCAN_DEPTH
-				),
-				RandomOffsetPlacement.vertical(ConstantInt.of(-1)),
-				BiomeFilter.biome()
-			);
-			case SURFACE_LAYER -> List.of(
-				CountPlacement.of(VegetationBudget.patchCount(density)),
-				InSquarePlacement.spread(),
-				PlacementUtils.HEIGHTMAP_WORLD_SURFACE,
-				BiomeFilter.biome(),
-				BlockPredicateFilter.forPredicate(BlockPredicate.ONLY_IN_AIR_PREDICATE)
-			);
+			// For scatter recipes ANY means either dry air or water, not lava or
+			// every modded fluid. Ores bypass this origin filter and retain their
+			// solid replacement target as documented by FeatureFluid.
+			case ANY -> BlockPredicate.ONLY_IN_AIR_OR_WATER_PREDICATE;
+		};
+	}
+
+	private static BlockPredicate substratePredicate(FeatureSubstrate substrate, boolean hanging) {
+		BlockPos support = hanging ? new BlockPos(0, 1, 0) : new BlockPos(0, -1, 0);
+		return switch (substrate) {
+			case RECIPE_DEFAULT -> throw new IllegalStateException("default substrate needs no predicate");
+			case NATURAL_SOIL -> BlockPredicate.matchesTag(support, BlockTags.DIRT);
+			case SAND -> BlockPredicate.matchesTag(support, BlockTags.SAND);
+			case STONE -> BlockPredicate.matchesTag(support, BlockTags.BASE_STONE_OVERWORLD);
+			case ANY_SOLID -> BlockPredicate.hasSturdyFace(support, hanging ? Direction.DOWN : Direction.UP);
 		};
 	}
 

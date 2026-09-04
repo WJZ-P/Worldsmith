@@ -10,10 +10,15 @@ import com.wjz.worldsmith.core.model.TerrainPlan
 import com.wjz.worldsmith.core.model.TerrainShape
 
 object TerrainPlanValidator {
+    const val OVERWORLD_MIN_Y = -64
+    const val OVERWORLD_HEIGHT = 384
+    const val OVERWORLD_MAX_Y = OVERWORLD_MIN_Y + OVERWORLD_HEIGHT - 1
     private const val MIN_BAND_HEIGHT = 24
     private const val MAX_ANCHORS = 8
     private const val MIN_ANCHOR_RADIUS = 32
     private const val MAX_ANCHOR_RADIUS = 100_000
+    private const val MIN_ANCHOR_SPACING = 64
+    private const val MAX_ANCHOR_SPACING = 1_000_000
     /** Beyond this a lone anchor is designed and never seen. */
     private const val MAX_REACHABLE_DISTANCE = 20_000
     private val ANCHOR_ID = Regex("^[a-z0-9_]+$")
@@ -22,11 +27,11 @@ object TerrainPlanValidator {
         if (plan.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
             add(error("schemaVersion", "UNSUPPORTED_SCHEMA", "Unsupported terrain schema ${plan.schemaVersion}"))
         }
-        if (plan.minY % 16 != 0) {
-            add(error("minY", "MIN_Y_ALIGNMENT", "Minimum Y must be divisible by 16"))
+        if (plan.minY != OVERWORLD_MIN_Y) {
+            add(error("minY", "OVERWORLD_MIN_Y_REQUIRED", "Worldsmith currently uses the Overworld dimension type, so minY must be $OVERWORLD_MIN_Y"))
         }
-        if (plan.height <= 0 || plan.height % 16 != 0) {
-            add(error("height", "HEIGHT_ALIGNMENT", "Height must be positive and divisible by 16"))
+        if (plan.height != OVERWORLD_HEIGHT) {
+            add(error("height", "OVERWORLD_HEIGHT_REQUIRED", "Worldsmith currently uses the Overworld dimension type, so height must be $OVERWORLD_HEIGHT"))
         }
         if (plan.horizontalNoiseSize !in 1..4 || plan.verticalNoiseSize !in 1..4) {
             add(error("noiseSize", "NOISE_SIZE_OUT_OF_RANGE", "Noise sizes must be between 1 and 4"))
@@ -67,11 +72,9 @@ object TerrainPlanValidator {
                 if (shape.verticalScale !in 0.1..4.0) {
                     add(error("shape.verticalScale", "VERTICAL_SCALE_OUT_OF_RANGE", "Vertical scale must be between 0.1 and 4"))
                 }
-                if (shape.caveDensity !in 0.0..1.0) {
-                    add(error("shape.caveDensity", "CAVE_DENSITY_OUT_OF_RANGE", "Cave density must be between 0 and 1"))
-                }
+                addAll(validateCaves(shape, plan))
                 addAll(validateBands(shape.bands, plan))
-                addAll(validateAnchors(shape.anchors))
+                addAll(validateAnchors(shape.anchors, plan))
                 val hydrology = shape.hydrology
                 if (hydrology.riverCoverage !in 0.0..0.35) {
                     add(error("shape.hydrology.riverCoverage", "RIVER_COVERAGE_OUT_OF_RANGE", "River coverage must be between 0 and 0.35"))
@@ -106,6 +109,33 @@ object TerrainPlanValidator {
         }
         plan.spawnTargets.forEachIndexed { index, target ->
             addAll(BiomePlanValidator.validateClimate("spawnTargets[$index]", target))
+        }
+    }
+
+    private fun validateCaves(shape: TerrainShape.Procedural, plan: TerrainPlan): List<Diagnostic> = buildList {
+        val caves = shape.caves
+        listOf(
+            "tunnelDensity" to caves.tunnelDensity,
+            "cavernDensity" to caves.cavernDensity,
+            "noodleDensity" to caves.noodleDensity,
+            "entranceDensity" to caves.entranceDensity,
+            "floodedChance" to caves.floodedChance,
+        ).forEach { (name, value) ->
+            if (value !in 0.0..1.0) {
+                add(error("shape.caves.$name", "CAVE_CONTROL_OUT_OF_RANGE", "$name must be between 0 and 1"))
+            }
+        }
+        val range = caves.verticalRange
+        if (range.minY > range.maxY) {
+            add(error("shape.caves.verticalRange", "REVERSED_CAVE_RANGE", "Cave minimum Y must not exceed maximum Y"))
+        }
+        val worldMax = plan.minY + plan.height - 1
+        val carveFloor = plan.minY + 5
+        if (range.minY < carveFloor || range.maxY > worldMax) {
+            add(error("shape.caves.verticalRange", "CAVE_RANGE_OUTSIDE_WORLD", "Cave range must stay inside $carveFloor..$worldMax so the bedrock floor remains sealed"))
+        }
+        if (!plan.aquifersEnabled && caves.floodedChance > 0.0) {
+            add(error("shape.caves.floodedChance", "FLOODING_REQUIRES_AQUIFERS", "Flooded cave chance must be zero while aquifers are disabled"))
         }
     }
 
@@ -177,10 +207,13 @@ object TerrainPlanValidator {
                     ),
                 )
             }
+            if (band.effect == BandEffect.CARVE && band.minY < plan.minY + 5) {
+                add(error(path, "BAND_CARVES_BEDROCK_FLOOR", "A carving band must start at or above ${plan.minY + 5} so the bedrock floor remains sealed"))
+            }
         }
     }
 
-    private fun validateAnchors(anchors: List<Anchor>): List<Diagnostic> = buildList {
+    private fun validateAnchors(anchors: List<Anchor>, plan: TerrainPlan): List<Diagnostic> = buildList {
         if (anchors.size > MAX_ANCHORS) {
             add(error("shape.anchors", "TOO_MANY_ANCHORS", "A world may define at most $MAX_ANCHORS anchors"))
         }
@@ -203,6 +236,9 @@ object TerrainPlanValidator {
             }
             if (anchor.falloff !in 0.05..8.0) {
                 add(error("$path.falloff", "ANCHOR_FALLOFF_OUT_OF_RANGE", "Anchor falloff must be between 0.05 and 8"))
+            }
+            if (anchor.amplitude !in -plan.height.toDouble()..plan.height.toDouble()) {
+                add(error("$path.amplitude", "ANCHOR_AMPLITUDE_OUT_OF_RANGE", "Anchor amplitude must stay within plus or minus the world height (${plan.height})"))
             }
             anchor.climateBias?.let { bias ->
                 if (bias.strength !in 0.0..1.0) {
@@ -244,6 +280,9 @@ object TerrainPlanValidator {
                     if (placement.jitter !in 0.0..1.0) {
                         add(error("$path.placement.jitter", "ANCHOR_JITTER_OUT_OF_RANGE", "Jitter must be between 0 and 1"))
                     }
+                    if (placement.spacing !in MIN_ANCHOR_SPACING..MAX_ANCHOR_SPACING) {
+                        add(error("$path.placement.spacing", "ANCHOR_SPACING_OUT_OF_RANGE", "Spacing must be between $MIN_ANCHOR_SPACING and $MAX_ANCHOR_SPACING blocks"))
+                    }
                     // The compiler only searches the nine lattice cells around a
                     // point, which is exact while instances cannot reach past a
                     // neighbouring cell.
@@ -258,8 +297,37 @@ object TerrainPlanValidator {
                         )
                     }
                 }
+
+                is AnchorPlacement.Line -> {
+                    if (placement.startX == placement.endX && placement.startZ == placement.endZ) {
+                        add(error("$path.placement", "ANCHOR_LINE_HAS_NO_LENGTH", "A line anchor needs two different endpoints"))
+                    }
+                    val reach = distanceFromOriginToSegment(placement)
+                    if (reach > MAX_REACHABLE_DISTANCE) {
+                        add(
+                            warning(
+                                "$path.placement",
+                                "ANCHOR_UNREACHABLE",
+                                "Anchor '${anchor.id}' never comes within ${reach.toInt()} blocks of the origin; move the line nearer spawn or use scattered landmarks.",
+                            ),
+                        )
+                    }
+                }
             }
         }
+    }
+
+    private fun distanceFromOriginToSegment(line: AnchorPlacement.Line): Double {
+        val ax = line.startX.toDouble()
+        val az = line.startZ.toDouble()
+        val dx = line.endX.toDouble() - ax
+        val dz = line.endZ.toDouble() - az
+        val lengthSquared = dx * dx + dz * dz
+        if (lengthSquared == 0.0) return kotlin.math.sqrt(ax * ax + az * az)
+        val t = (-(ax * dx + az * dz) / lengthSquared).coerceIn(0.0, 1.0)
+        val x = ax + t * dx
+        val z = az + t * dz
+        return kotlin.math.sqrt(x * x + z * z)
     }
 
     private fun warning(path: String, code: String, message: String) =

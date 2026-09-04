@@ -3,6 +3,8 @@ package com.wjz.worldsmith.core.prompt
 import com.wjz.worldsmith.core.model.BandEffect
 import com.wjz.worldsmith.core.model.BandRegion
 import com.wjz.worldsmith.core.model.BiomeArchetypeRole
+import com.wjz.worldsmith.core.model.BiomeGrassColorModifier
+import com.wjz.worldsmith.core.model.FeatureFluid
 import com.wjz.worldsmith.core.model.HumidityBand
 import com.wjz.worldsmith.core.model.MaterialRole
 import com.wjz.worldsmith.core.model.PromptSet
@@ -17,6 +19,7 @@ import com.wjz.worldsmith.core.model.SurfaceWater
 import com.wjz.worldsmith.core.model.TemperatureBand
 import com.wjz.worldsmith.core.model.TemperatureVariation
 import com.wjz.worldsmith.core.model.FeatureRecipe
+import com.wjz.worldsmith.core.model.FeatureSubstrate
 import com.wjz.worldsmith.core.model.TreeDecoration
 import com.wjz.worldsmith.core.model.TreeDistribution
 import com.wjz.worldsmith.core.model.TreeSubstrate
@@ -58,9 +61,12 @@ class PromptVocabularyTest {
             SurfaceNoise::class.java,
             SurfaceHydrology::class.java,
             TemperatureVariation::class.java,
+            BiomeGrassColorModifier::class.java,
         ),
         PromptSet.DEFAULT.featurePlan to listOf(
             FeatureRecipe::class.java,
+            FeatureSubstrate::class.java,
+            FeatureFluid::class.java,
             MaterialRole::class.java,
             TreeTrunkShape::class.java,
             TreeCrownShape::class.java,
@@ -79,7 +85,7 @@ class PromptVocabularyTest {
      * one part of the check that a rename can still walk past.
      */
     private val notVocabulary = setOf(
-        "JSON", "ASCII", "RRGGBB", "AARRGGBB",
+        "JSON", "ASCII", "RRGGBB", "AARRGGBB", "MCP",
         "NO_WOOD_IN_WORLD", "NO_WOOD_ON_LAND", "VEGETATION_BUDGET_EXCEEDED",
     )
 

@@ -6,13 +6,17 @@ import com.wjz.worldsmith.core.model.BiomeDefinition
 import com.wjz.worldsmith.core.model.BiomeEnvironment
 import com.wjz.worldsmith.core.model.BiomeFog
 import com.wjz.worldsmith.core.model.BiomePlan
+import com.wjz.worldsmith.core.model.BiomeSpatialSettings
 import com.wjz.worldsmith.core.model.BiomeSky
 import com.wjz.worldsmith.core.model.BiomeTint
 import com.wjz.worldsmith.core.model.ClimatePlacement
 import com.wjz.worldsmith.core.model.ClimateSlot
 import com.wjz.worldsmith.core.model.HumidityBand
+import com.wjz.worldsmith.core.model.HydrologyIntent
 import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.ReliefBand
+import com.wjz.worldsmith.core.model.ReliefDistribution
+import com.wjz.worldsmith.core.model.RiverFill
 import com.wjz.worldsmith.core.model.SurfaceDefinition
 import com.wjz.worldsmith.core.model.SurfaceLayer
 import com.wjz.worldsmith.core.model.SurfaceStack
@@ -80,6 +84,56 @@ class BiomeDistributionAnalyzerTest {
     }
 
     @Test
+    fun `fluid rivers and lakes contribute to the reported aquatic share`() {
+        val shape = terrain.shape as com.wjz.worldsmith.core.model.TerrainShape.Procedural
+        val dry = terrain.copy(
+            shape = shape.copy(
+                hydrology = shape.hydrology.copy(
+                    riverCoverage = 0.0,
+                    lakeDensity = 0.0,
+                ),
+            ),
+        )
+        val wet = terrain.copy(
+            shape = shape.copy(
+                hydrology = HydrologyIntent(
+                    riverCoverage = 0.35,
+                    riverWidth = 1.0,
+                    riverDepth = 0.8,
+                    riverMeander = 0.6,
+                    riverFill = RiverFill.FLUID,
+                    lakeDensity = 0.35,
+                    lakeScale = 1.0,
+                    lakeDepth = 0.8,
+                    oceanDepth = 1.0,
+                ),
+            ),
+        )
+
+        val dryReport = BiomeDistributionAnalyzer.analyze(plan(*everyRelief()), dry)
+        val wetReport = BiomeDistributionAnalyzer.analyze(plan(*everyRelief()), wet)
+
+        assertTrue(wetReport.landShare < dryReport.landShare - 0.15, "$dryReport vs $wetReport")
+        assertTrue(wetReport.notes.any { "aquatic share" in it })
+    }
+
+    @Test
+    fun `land biome shares follow the authored relief mixture`() {
+        val shape = terrain.shape as com.wjz.worldsmith.core.model.TerrainShape.Procedural
+        val authored = terrain.copy(
+            shape = shape.copy(relief = ReliefDistribution(flats = 0.20, highlands = 0.30, peaks = 0.50)),
+        )
+
+        val report = BiomeDistributionAnalyzer.analyze(plan(*everyRelief()), authored)
+        val shares = report.biomes.associate { it.id to it.share }
+        val inland = shares.getValue("flats") + shares.getValue("highland") + shares.getValue("peaks")
+
+        assertTrue(kotlin.math.abs(shares.getValue("flats") / inland - 0.20) < 0.04, shares.toString())
+        assertTrue(kotlin.math.abs(shares.getValue("highland") / inland - 0.30) < 0.04, shares.toString())
+        assertTrue(kotlin.math.abs(shares.getValue("peaks") / inland - 0.50) < 0.04, shares.toString())
+    }
+
+    @Test
     fun `one biome may hold two regions that are not neighbours`() {
         val split = BiomeDistributionAnalyzer.analyze(
             plan(
@@ -124,6 +178,17 @@ class BiomeDistributionAnalyzerTest {
         // or every edit looks like it changed something.
         assertEquals(first.biomes, second.biomes)
         assertEquals(first.borders, second.borders)
+    }
+
+    @Test
+    fun `spatial controls are not misreported as changing marginal shares`() {
+        val plan = plan(*everyRelief()).copy(
+            spatial = BiomeSpatialSettings(regionScale = 3.0, boundaryRoughness = 0.6),
+        )
+
+        val report = BiomeDistributionAnalyzer.analyze(plan, terrain)
+
+        assertTrue(report.notes.any { "patch diameter" in it && "not marginal climate shares" in it })
     }
 
     private fun everyRelief(): Array<BiomeDefinition> = ReliefBand.entries

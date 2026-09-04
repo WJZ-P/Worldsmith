@@ -50,9 +50,11 @@ data class DistributionReport(
  * roughly a fourteenth of the world while `COLD`, which looks like its mirror,
  * takes a third. Nothing an author or a model can read off the document says so.
  *
- * <p>The sampling is Monte Carlo over the six climate axes, and each axis is
- * drawn from a distribution measured against the real noise router rather than
- * assumed - see the constants below and the mod-side test that re-measures them.
+ * <p>The sampling is Monte Carlo over the six climate axes. Continuous axes are
+ * drawn from distributions measured against the real noise router; procedural
+ * erosion is instead the same authored flat/highland/peak mixture as the terrain
+ * compiler, with measured noise inside each band. See the constants below and
+ * the mod-side test that re-measures them.
  * The result is a share of climate space, which is not identical to a share of
  * the ground a player walks: it takes no account of a biome sitting where the
  * terrain happens to put more surface. It is close enough to answer the
@@ -80,13 +82,22 @@ object BiomeDistributionAnalyzer {
     const val TEMPERATURE_SIGMA: Double = 0.383
     const val HUMIDITY_SIGMA: Double = 0.240
     const val CONTINENTALNESS_SIGMA: Double = 0.371
-    const val EROSION_SIGMA: Double = 0.302
+    /** Spread of the raw erosion texture before procedural landform remapping. */
+    const val LANDFORM_TEXTURE_SIGMA: Double = 0.302
+    const val FLATS_LANDFORM_CENTER: Double = 0.45
+    const val FLATS_LANDFORM_TEXTURE: Double = 0.25
+    const val HIGHLANDS_LANDFORM_CENTER: Double = -0.16
+    const val HIGHLANDS_LANDFORM_TEXTURE: Double = 0.14
+    const val PEAKS_LANDFORM_CENTER: Double = -0.68
+    const val PEAKS_LANDFORM_TEXTURE: Double = 0.18
     const val WEIRDNESS_SIGMA: Double = 0.343
+    /** Marginal depth spread, retained for calibration against the live router. */
     const val DEPTH_SIGMA: Double = 0.354
 
-    /** Depth tracks continentalness closely; the fit is over the same measurement. */
-    private const val DEPTH_FROM_CONTINENTALNESS = 0.82
-    private const val DEPTH_OFFSET = 0.143
+    /** Conditional depth fit measured together with the marginal spread above. */
+    const val DEPTH_CONTINENTALNESS_SLOPE: Double = 0.838
+    const val DEPTH_INTERCEPT: Double = 0.146
+    const val DEPTH_RESIDUAL_SIGMA: Double = 0.165
 
     /** Continentalness above this is land, matching the semantic band table. */
     private const val COAST_EDGE = -0.11
@@ -117,13 +128,22 @@ object BiomeDistributionAnalyzer {
         var land = 0
 
         repeat(samples) {
-            val continentalness = normal(random, bias, CONTINENTALNESS_SIGMA)
+            val baseContinentalness = normal(random, bias, CONTINENTALNESS_SIGMA)
+            val continentalness = sampleHydrology(random, baseContinentalness, terrain)
             val point = doubleArrayOf(
                 normal(random, 0.0, TEMPERATURE_SIGMA),
                 normal(random, 0.0, HUMIDITY_SIGMA),
                 continentalness,
-                normal(random, 0.0, EROSION_SIGMA),
-                normal(random, DEPTH_FROM_CONTINENTALNESS * bias + DEPTH_OFFSET, DEPTH_SIGMA),
+                sampleLandform(random, terrain),
+                // Depth follows the continentalness of this position, not the
+                // world-wide land-ratio bias. Using the bias here erased their
+                // measured correlation and badly overestimated cave boxes on
+                // oceanic worlds.
+                normal(
+                    random,
+                    DEPTH_CONTINENTALNESS_SLOPE * continentalness + DEPTH_INTERCEPT,
+                    DEPTH_RESIDUAL_SIGMA,
+                ),
                 normal(random, 0.0, WEIRDNESS_SIGMA),
             )
             if (continentalness > COAST_EDGE) {
@@ -188,6 +208,33 @@ object BiomeDistributionAnalyzer {
                         "so they exist in the document and nowhere in the world.",
                 )
             }
+            if (plan.spatial.regionScale != 1.0 || plan.spatial.boundaryRoughness != 0.0) {
+                add(
+                    "Spatial settings change biome patch diameter and border shape, not marginal climate shares; " +
+                        "this report therefore keeps the same share model and does not predict contiguous region size.",
+                )
+            }
+            val procedural = terrain.shape as? TerrainShape.Procedural
+            if (procedural != null) {
+                if (procedural.anchors.any { it.climateBias != null }) {
+                    add(
+                        "Anchor climate biases create local landmark biomes that this global climate-space sample " +
+                            "does not spatially place; inspect those anchors separately.",
+                    )
+                }
+                if (procedural.hydrology.riverCoverage > 0.0 || procedural.hydrology.lakeDensity > 0.0) {
+                    add(
+                        "River and lake biome signals are estimated as independent statistical masks at their authored " +
+                            "coverage; the report includes their aquatic share but not their exact spatial overlap.",
+                    )
+                }
+                if (procedural.bands.isNotEmpty()) {
+                    add(
+                        "Added or carved terrain bands can introduce extra vertical surfaces; their local depth " +
+                            "distribution is omitted from this single-layer estimate.",
+                    )
+                }
+            }
         }
 
         return DistributionReport(
@@ -229,7 +276,7 @@ object BiomeDistributionAnalyzer {
     }
 
     private fun missDistance(range: NumericRange, value: Double): Double =
-        max(0.0, max(range.min - value, value - range.max)).toDouble()
+        max(0.0, max(range.min - value, value - range.max))
 
     /**
      * Where the continentalness field is centred once the pack's land ratio is
@@ -243,6 +290,70 @@ object BiomeDistributionAnalyzer {
             landRatio <= 0.0 -> -2.0
             landRatio >= 1.0 -> 2.0
             else -> COAST_EDGE + (CONTINENTALNESS_SIGMA / 1.702) * ln(landRatio / (1.0 - landRatio))
+        }
+    }
+
+    /**
+     * Mirrors the procedural compiler's authored relief mixture.
+     *
+     * The selector first chooses FLATS/HIGHLANDS/PEAKS according to the
+     * document's relief weights. A separate erosion noise then adds the small
+     * within-band texture used by WorldsmithNoiseSettings. Treating the result
+     * as one normal distribution makes the analyzer invent the wrong relief
+     * shares and, consequently, the wrong biome shares.
+     */
+    private fun sampleLandform(random: Random, terrain: TerrainPlan): Double {
+        val shape = terrain.shape
+        if (shape !is TerrainShape.Procedural) {
+            return normal(random, 0.0, LANDFORM_TEXTURE_SIGMA)
+        }
+
+        val relief = shape.relief
+        val total = relief.flats + relief.highlands + relief.peaks
+        if (total <= 0.0) {
+            return normal(random, 0.0, LANDFORM_TEXTURE_SIGMA)
+        }
+        val selected = random.nextDouble() * total
+        val texture = normal(random, 0.0, LANDFORM_TEXTURE_SIGMA)
+        return when {
+            selected < relief.flats ->
+                FLATS_LANDFORM_CENTER + texture * FLATS_LANDFORM_TEXTURE
+            selected < relief.flats + relief.highlands ->
+                HIGHLANDS_LANDFORM_CENTER + texture * HIGHLANDS_LANDFORM_TEXTURE
+            else ->
+                PEAKS_LANDFORM_CENTER + texture * PEAKS_LANDFORM_TEXTURE
+        }
+    }
+
+    /**
+     * Statistical counterpart of WorldsmithHydrology.waterBiomeSignal.
+     *
+     * Coverage describes the positive route/basin mask. Within that mask the
+     * compiler promotes the inner part to water and keeps a short coast bank;
+     * sampling the normalized strength here captures the large change in
+     * aquatic shares without pretending this climate-space analyzer knows the
+     * actual X/Z overlap of a river and a lake.
+     */
+    private fun sampleHydrology(random: Random, base: Double, terrain: TerrainPlan): Double {
+        val shape = terrain.shape as? TerrainShape.Procedural ?: return base
+        if (base <= -0.09) return base
+
+        var result = base
+        val hydrology = shape.hydrology
+        if (hydrology.riverFill == com.wjz.worldsmith.core.model.RiverFill.FLUID) {
+            result = sampleWaterMask(random, result, hydrology.riverCoverage, -0.30)
+        }
+        result = sampleWaterMask(random, result, hydrology.lakeDensity, -0.38)
+        return result
+    }
+
+    private fun sampleWaterMask(random: Random, current: Double, coverage: Double, water: Double): Double {
+        if (coverage <= 0.0 || random.nextDouble() >= coverage) return current
+        val normalizedStrength = random.nextDouble()
+        return when {
+            normalizedStrength >= 0.24 -> water
+            normalizedStrength >= 0.15 -> -0.15
+            else -> current
         }
     }
 

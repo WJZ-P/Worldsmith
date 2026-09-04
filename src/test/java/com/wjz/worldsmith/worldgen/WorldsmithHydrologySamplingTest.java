@@ -7,6 +7,8 @@ import com.wjz.worldsmith.core.model.ReliefDistribution;
 import com.wjz.worldsmith.core.model.RiverFill;
 import com.wjz.worldsmith.core.model.BandEffect;
 import com.wjz.worldsmith.core.model.BandRegion;
+import com.wjz.worldsmith.core.model.CaveIntent;
+import com.wjz.worldsmith.core.model.CaveVerticalRange;
 import com.wjz.worldsmith.core.model.TerrainBand;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
@@ -156,7 +158,7 @@ final class WorldsmithHydrologySamplingTest {
 			0.35,
 			new ReliefDistribution(1.0, 0.0, 0.0),
 			1.0,
-			0.0,
+			new CaveIntent(0.0, 0.0, 0.0, 0.0, new CaveVerticalRange(-56, 192), 0.0),
 			hydrology,
 			List.of(),
 			List.of()

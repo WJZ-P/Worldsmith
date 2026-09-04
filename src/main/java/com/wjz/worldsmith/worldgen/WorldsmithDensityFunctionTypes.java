@@ -28,6 +28,11 @@ final class WorldsmithDensityFunctionTypes {
 			Worldsmith.id("anchor_grid"),
 			(MapCodec<? extends DensityFunction>) WorldsmithAnchorFields.Grid.CODEC.codec()
 		);
+		Registry.register(
+			BuiltInRegistries.DENSITY_FUNCTION_TYPE,
+			Worldsmith.id("anchor_line"),
+			(MapCodec<? extends DensityFunction>) WorldsmithAnchorFields.Line.CODEC.codec()
+		);
 		initialized = true;
 	}
 
