@@ -28,7 +28,10 @@ final class WorldsmithCustomTreePlacerTest {
 	@Test
 	void customTrunkAndCrownEncodeAsWorldsmithRegistryTypes() {
 		WorldsmithTrunkPlacer trunk = new WorldsmithTrunkPlacer(
-			8, 3, 0, TreeTrunkShape.BRANCHING, 1, 0.25F, 4, 5, 0.45F, 0.55F
+			8, 3, 0,
+			TreeTrunkShape.BRANCHING,
+			1, 0.25F, 0.0F, 0, 1, 0,
+			4, 5, 0.45F, 0.55F, 1.0F, 0.2F
 		);
 		WorldsmithFoliagePlacer foliage = new WorldsmithFoliagePlacer(
 			ConstantInt.of(4), ConstantInt.of(0), TreeCrownShape.CLUSTERED, 6, 0.85F, 0.4F, 0.2F

@@ -19,11 +19,13 @@ import com.wjz.worldsmith.core.model.FeatureSubstrate;
 import com.wjz.worldsmith.core.model.OreVeinSpec;
 import com.wjz.worldsmith.core.model.TreeSpec;
 import com.wjz.worldsmith.core.model.TreeBranchSpec;
+import com.wjz.worldsmith.core.model.TreeCrownShape;
 import com.wjz.worldsmith.core.model.TreeCrownSpec;
 import com.wjz.worldsmith.core.model.TreeDecoration;
 import com.wjz.worldsmith.core.model.TreeDistribution;
 import com.wjz.worldsmith.core.model.TreeHeight;
 import com.wjz.worldsmith.core.model.TreeSubstrate;
+import com.wjz.worldsmith.core.model.TreeTrunkShape;
 import com.wjz.worldsmith.core.model.TreeTrunkSpec;
 import java.util.Comparator;
 import java.util.ArrayList;
@@ -361,6 +363,7 @@ public final class WorldsmithVegetation {
 		TreeCrownSpec crownSpec = tree.getCrown();
 		TreeHeight height = trunkSpec.getHeight();
 		TreeBranchSpec branches = trunkSpec.getBranches();
+		int clearancePadding = treeVerticalPadding(tree);
 		WorldsmithTrunkPlacer trunkPlacer = new WorldsmithTrunkPlacer(
 			height.getMin(),
 			height.getMax() - height.getMin(),
@@ -368,10 +371,16 @@ public final class WorldsmithVegetation {
 			trunkSpec.getShape(),
 			trunkSpec.getThickness(),
 			(float)trunkSpec.getBend(),
+			(float)trunkSpec.getTaper(),
+			trunkSpec.getFlare(),
+			trunkSpec.getStems(),
+			clearancePadding,
 			branches == null ? 0 : branches.getCount(),
 			branches == null ? 1 : branches.getLength(),
 			branches == null ? 0.6F : (float)branches.getStart(),
-			branches == null ? 0.5F : (float)branches.getUpwardBias()
+			branches == null ? 0.5F : (float)branches.getUpwardBias(),
+			branches == null ? 1.0F : (float)branches.getSpread(),
+			branches == null ? 0.0F : (float)branches.getLengthVariation()
 		);
 		WorldsmithFoliagePlacer foliagePlacer = new WorldsmithFoliagePlacer(
 			ConstantInt.of(crownSpec.getRadius()),
@@ -397,20 +406,79 @@ public final class WorldsmithVegetation {
 		return new ConfiguredFeature<>(Feature.TREE, builder.build());
 	}
 
-	/** Gives TreeFeature enough clearance for every branch-tip crown. */
+	/** Gives vanilla TreeFeature one conservative box covering every authored block. */
 	private static TwoLayersFeatureSize treeSize(TreeSpec tree) {
+		int reach = treeHorizontalReach(tree);
+		if (reach > 16) {
+			throw new IllegalArgumentException("Tree horizontal reach " + reach + " exceeds vanilla clearance limit 16");
+		}
+		// The root row only owns its footprint and flare, so a nearby one-block
+		// slope must not reject an otherwise valid tree. From Y=1 upward the full
+		// conservative reach applies to curved stems, branches and crowns.
+		return new TwoLayersFeatureSize(1, treeBaseReach(tree), reach);
+	}
+
+	static int treeHorizontalReach(TreeSpec tree) {
 		TreeTrunkSpec trunk = tree.getTrunk();
-		TreeCrownSpec crown = tree.getCrown();
 		TreeBranchSpec branches = trunk.getBranches();
-		int branchLength = branches == null ? 0 : branches.getLength();
-		int crownStart = Math.max(1, trunk.getHeight().getMin() - crown.getHeight());
-		int branchStart = branches == null
-			? crownStart
-			: Math.max(1, (int)Math.floor((trunk.getHeight().getMin() - 1) * branches.getStart()));
-		int limit = Math.min(crownStart, branchStart);
-		int lowerRadius = trunk.getThickness() - 1;
-		int upperRadius = Math.min(16, crown.getRadius() + branchLength);
-		return new TwoLayersFeatureSize(limit, lowerRadius, upperRadius);
+		int drift = 0;
+		if (trunk.getShape() == TreeTrunkShape.BENT || trunk.getShape() == TreeTrunkShape.TWISTED ||
+			trunk.getShape() == TreeTrunkShape.CROOKED) {
+			int interval = Math.max(2, Math.round(7.0F - (float)trunk.getBend() * 5.0F));
+			drift = (trunk.getHeight().getMax() - 1) / interval;
+		}
+		int stemReach = trunk.getShape() == TreeTrunkShape.MULTI_STEM
+			? Math.min(2, Math.max(1, trunk.getHeight().getMax() / 8))
+			: 0;
+		int branchReach = branches == null ? 0 : branches.getLength();
+		int pathReach = Math.max(drift + branchReach, stemReach);
+		int footprint = trunk.getThickness() - 1;
+		return Math.max(treeBaseReach(tree), footprint + pathReach + crownHorizontalReach(tree.getCrown()));
+	}
+
+	private static int treeBaseReach(TreeSpec tree) {
+		TreeTrunkSpec trunk = tree.getTrunk();
+		int footprint = trunk.getThickness() - 1;
+		int reach = footprint + trunk.getFlare();
+		if (trunk.getHeight().getMin() <= 1 && trunk.getBranches() != null) {
+			reach = Math.max(reach, footprint + trunk.getBranches().getLength());
+		}
+		return reach;
+	}
+
+	static int treeVerticalPadding(TreeSpec tree) {
+		TreeTrunkSpec trunk = tree.getTrunk();
+		TreeBranchSpec branches = trunk.getBranches();
+		int nominalHeight = trunk.getHeight().getMax();
+		int highestAttachment = nominalHeight;
+		if (trunk.getShape() == TreeTrunkShape.FORKED && branches != null) {
+			int split = Math.round((nominalHeight - 1) * (float)branches.getStart()) + 1;
+			highestAttachment = Math.max(highestAttachment, split + branches.getLength());
+		} else if (branches != null && branches.getUpwardBias() > 0.0) {
+			highestAttachment += branches.getLength();
+		}
+		return Math.max(0, highestAttachment + crownVerticalRise(tree.getCrown()) - nominalHeight);
+	}
+
+	private static int crownHorizontalReach(TreeCrownSpec crown) {
+		return switch (crown.getShape()) {
+			case CLUSTERED -> Math.max(
+				crown.getRadius(),
+				Math.max(1, crown.getRadius() - 1) + Math.max(1, crown.getRadius() / 2 + 1)
+			);
+			case WINDSWEPT -> crown.getRadius() + Math.round((float)(0.9 * crown.getRadius()));
+			default -> crown.getRadius();
+		};
+	}
+
+	private static int crownVerticalRise(TreeCrownSpec crown) {
+		return switch (crown.getShape()) {
+			case ROUND, CLUSTERED -> crown.getHeight() / 2;
+			case CONICAL, LAYERED -> 0;
+			case UMBRELLA, PAGODA -> 1;
+			case WEEPING, WINDSWEPT -> Math.max(1, crown.getHeight() / 3);
+			case COLUMNAR -> Math.max(1, crown.getHeight() / 4);
+		};
 	}
 
 	private static BlockStateProvider belowTrunkProvider(TreeSubstrate substrate) {

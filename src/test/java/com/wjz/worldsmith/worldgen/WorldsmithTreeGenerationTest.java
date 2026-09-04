@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.worldgen;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import com.wjz.worldsmith.core.model.FeatureDefinition;
 import com.wjz.worldsmith.core.model.FeatureFluid;
@@ -78,7 +79,10 @@ final class WorldsmithTreeGenerationTest {
 				new TreeHeight(12, 12),
 				1,
 				0.0,
-				new TreeBranchSpec(4, 5, 0.6, 0.6)
+				new TreeBranchSpec(4, 5, 0.6, 0.6, 1.0, 0.0),
+				0.0,
+				0,
+				1
 			),
 			new TreeCrownSpec(TreeCrownShape.ROUND, 5, 6, 0.9, 0.25, 0.0),
 			TreeDistribution.GROVE,
@@ -109,6 +113,34 @@ final class WorldsmithTreeGenerationTest {
 	}
 
 	@Test
+	void vanillaTreeFeaturePreflightsTheWholeCustomGeometry() {
+		TreeSpec wideAndTall = spec(
+			new TreeTrunkSpec(
+				TreeTrunkShape.BRANCHING,
+				new TreeHeight(10, 10),
+				1,
+				0.0,
+				new TreeBranchSpec(4, 5, 0.55, 1.0, 1.0, 0.0),
+				0.0,
+				0,
+				1
+			),
+			new TreeCrownSpec(TreeCrownShape.ROUND, 4, 6, 1.0, 0.0, 0.0)
+		);
+		ConfiguredFeature<?, ?> configured = WorldsmithVegetation.configure(tree(wideAndTall), new MaterialResolver());
+
+		FlatWorld sideBlocked = new FlatWorld();
+		sideBlocked.placed().put(new BlockPos(9, 3, 0), Blocks.STONE.defaultBlockState());
+		assertFalse(place(configured, sideBlocked.level(), RandomSource.create(131L)));
+		assertTrue(positions(sideBlocked, Blocks.OAK_LOG).isEmpty(), "side obstacle left a partial trunk");
+
+		FlatWorld topBlocked = new FlatWorld();
+		topBlocked.placed().put(new BlockPos(0, 15, 0), Blocks.STONE.defaultBlockState());
+		assertFalse(place(configured, topBlocked.level(), RandomSource.create(137L)));
+		assertTrue(positions(topBlocked, Blocks.OAK_LOG).isEmpty(), "high obstacle left a partial trunk");
+	}
+
+	@Test
 	void everyNamedTrunkAndCrownRuleProducesDistinctGeometry() {
 		Set<Set<BlockPos>> trunks = new java.util.HashSet<>();
 		for (TreeTrunkShape shape : TreeTrunkShape.values()) {
@@ -126,10 +158,88 @@ final class WorldsmithTreeGenerationTest {
 	}
 
 	@Test
+	void extendedCrownRulesHaveTheirPromisedSilhouettes() {
+		TreeTrunkSpec trunk = new TreeTrunkSpec(
+			TreeTrunkShape.STRAIGHT,
+			new TreeHeight(16, 16),
+			1,
+			0.0,
+			null,
+			0.0,
+			0,
+			1
+		);
+		Set<BlockPos> oneLayerUmbrella = positions(
+			generate(spec(trunk, crown(TreeCrownShape.UMBRELLA, 4, 1)), 97L),
+			Blocks.OAK_LEAVES
+		);
+		Set<BlockPos> fourLayerUmbrella = positions(
+			generate(spec(trunk, crown(TreeCrownShape.UMBRELLA, 4, 4)), 97L),
+			Blocks.OAK_LEAVES
+		);
+		assertTrue(
+			oneLayerUmbrella.stream().map(BlockPos::getY).distinct().count() == 1,
+			"UMBRELLA height 1 did not produce exactly one foliage layer"
+		);
+		assertTrue(
+			fourLayerUmbrella.stream().map(BlockPos::getY).distinct().count() == 4,
+			"UMBRELLA height 4 did not produce exactly four foliage layers"
+		);
+
+		Set<BlockPos> columnar = positions(
+			generate(spec(trunk, crown(TreeCrownShape.COLUMNAR, 4, 10)), 101L),
+			Blocks.OAK_LEAVES
+		);
+		assertTrue(verticalSpan(columnar) > horizontalSpan(columnar), "COLUMNAR was not taller than it was wide");
+
+		Set<BlockPos> pagoda = positions(
+			generate(spec(trunk, crown(TreeCrownShape.PAGODA, 5, 10)), 103L),
+			Blocks.OAK_LEAVES
+		);
+		List<Integer> pagodaRows = pagoda.stream()
+			.collect(Collectors.groupingBy(BlockPos::getY, Collectors.counting()))
+			.entrySet().stream()
+			.sorted(Map.Entry.<Integer, Long>comparingByKey().reversed())
+			.map(entry -> entry.getValue().intValue())
+			.toList();
+		long insetRows = java.util.stream.IntStream.range(1, pagodaRows.size() - 1)
+			.filter(index -> pagodaRows.get(index) < pagodaRows.get(index - 1) && pagodaRows.get(index) < pagodaRows.get(index + 1))
+			.count();
+		assertTrue(insetRows >= 2, "PAGODA did not create repeated inset rows: " + pagodaRows);
+
+		Set<BlockPos> windswept = positions(
+			generate(spec(trunk, crown(TreeCrownShape.WINDSWEPT, 5, 9)), 107L),
+			Blocks.OAK_LEAVES
+		);
+		int lowest = windswept.stream().mapToInt(BlockPos::getY).min().orElseThrow();
+		int highest = windswept.stream().mapToInt(BlockPos::getY).max().orElseThrow();
+		double[] bottomCentre = horizontalCentre(windswept, lowest);
+		double[] topCentre = horizontalCentre(windswept, highest);
+		double drift = Math.hypot(topCentre[0] - bottomCentre[0], topCentre[1] - bottomCentre[1]);
+		assertTrue(drift >= 3.0, "WINDSWEPT crown drifted only " + drift + " blocks");
+	}
+
+	@Test
+	void umbrellaHeightControlsItsFullNarrowingUnderside() {
+		TreeTrunkSpec trunk = new TreeTrunkSpec(
+			TreeTrunkShape.STRAIGHT, new TreeHeight(16, 16), 1, 0.0, null, 0.0, 0, 1
+		);
+		Set<BlockPos> shortCrown = positions(
+			generate(spec(trunk, crown(TreeCrownShape.UMBRELLA, 5, 4)), 109L), Blocks.OAK_LEAVES
+		);
+		Set<BlockPos> tallCrown = positions(
+			generate(spec(trunk, crown(TreeCrownShape.UMBRELLA, 5, 9)), 109L), Blocks.OAK_LEAVES
+		);
+
+		assertTrue(verticalSpan(tallCrown) >= verticalSpan(shortCrown) + 5,
+			"UMBRELLA height was capped instead of adding layers");
+	}
+
+	@Test
 	void bendBranchesAndCrownDensityAreRealControls() {
 		TreeCrownSpec crown = new TreeCrownSpec(TreeCrownShape.ROUND, 4, 6, 0.9, 0.2, 0.0);
-		TreeSpec gentle = spec(new TreeTrunkSpec(TreeTrunkShape.BENT, new TreeHeight(16, 16), 1, 0.15, null), crown);
-		TreeSpec strong = spec(new TreeTrunkSpec(TreeTrunkShape.BENT, new TreeHeight(16, 16), 1, 1.0, null), crown);
+		TreeSpec gentle = spec(new TreeTrunkSpec(TreeTrunkShape.BENT, new TreeHeight(16, 16), 1, 0.15, null, 0.0, 0, 1), crown);
+		TreeSpec strong = spec(new TreeTrunkSpec(TreeTrunkShape.BENT, new TreeHeight(16, 16), 1, 1.0, null, 0.0, 0, 1), crown);
 		int gentleSpan = horizontalSpan(positions(generate(gentle, 11L), Blocks.OAK_LOG));
 		int strongSpan = horizontalSpan(positions(generate(strong, 11L), Blocks.OAK_LOG));
 		assertTrue(strongSpan > gentleSpan, "bend did not widen the trunk path: " + gentleSpan + " vs " + strongSpan);
@@ -140,7 +250,10 @@ final class WorldsmithTreeGenerationTest {
 				new TreeHeight(14, 14),
 				1,
 				0.0,
-				new TreeBranchSpec(2, 4, 0.6, 0.5)
+				new TreeBranchSpec(2, 4, 0.6, 0.5, 1.0, 0.0),
+				0.0,
+				0,
+				1
 			),
 			crown
 		);
@@ -150,7 +263,10 @@ final class WorldsmithTreeGenerationTest {
 				new TreeHeight(14, 14),
 				1,
 				0.0,
-				new TreeBranchSpec(6, 4, 0.6, 0.5)
+				new TreeBranchSpec(6, 4, 0.6, 0.5, 1.0, 0.0),
+				0.0,
+				0,
+				1
 			),
 			crown
 		);
@@ -159,7 +275,7 @@ final class WorldsmithTreeGenerationTest {
 			"branch count did not add wood"
 		);
 
-		TreeTrunkSpec straight = new TreeTrunkSpec(TreeTrunkShape.STRAIGHT, new TreeHeight(12, 12), 1, 0.0, null);
+		TreeTrunkSpec straight = new TreeTrunkSpec(TreeTrunkShape.STRAIGHT, new TreeHeight(12, 12), 1, 0.0, null, 0.0, 0, 1);
 		TreeSpec sparse = spec(straight, new TreeCrownSpec(TreeCrownShape.ROUND, 5, 7, 0.25, 0.2, 0.0));
 		TreeSpec dense = spec(straight, new TreeCrownSpec(TreeCrownShape.ROUND, 5, 7, 1.0, 0.2, 0.0));
 		assertTrue(
@@ -198,13 +314,17 @@ final class WorldsmithTreeGenerationTest {
 
 	private static TreeSpec treeSpec(TreeTrunkShape trunk, TreeCrownShape crown) {
 		TreeBranchSpec branches = switch (trunk) {
-			case FORKED -> new TreeBranchSpec(2, 4, 0.7, 0.6);
-			case BRANCHING -> new TreeBranchSpec(4, 4, 0.6, 0.5);
+			case FORKED -> new TreeBranchSpec(2, 4, 0.7, 0.6, 1.0, 0.2);
+			case BRANCHING -> new TreeBranchSpec(4, 4, 0.6, 0.5, 0.75, 0.3);
 			default -> null;
 		};
-		double bend = trunk == TreeTrunkShape.BENT || trunk == TreeTrunkShape.TWISTED ? 0.35 : 0.0;
+		double bend = trunk == TreeTrunkShape.BENT || trunk == TreeTrunkShape.TWISTED ||
+			trunk == TreeTrunkShape.CROOKED ? 0.35 : 0.0;
+		int thickness = trunk == TreeTrunkShape.TAPERED ? 2 : 1;
+		double taper = trunk == TreeTrunkShape.TAPERED ? 0.55 : 0.0;
+		int stems = trunk == TreeTrunkShape.MULTI_STEM ? 3 : 1;
 		return new TreeSpec(
-			new TreeTrunkSpec(trunk, new TreeHeight(10, 12), 1, bend, branches),
+			new TreeTrunkSpec(trunk, new TreeHeight(10, 12), thickness, bend, branches, taper, 0, stems),
 			new TreeCrownSpec(crown, 3, 4, 0.9, 0.2, 0.0),
 			TreeDistribution.GROVE,
 			TreeSubstrate.NATURAL_SOIL,
@@ -231,6 +351,24 @@ final class WorldsmithTreeGenerationTest {
 		int minZ = positions.stream().mapToInt(BlockPos::getZ).min().orElseThrow();
 		int maxZ = positions.stream().mapToInt(BlockPos::getZ).max().orElseThrow();
 		return Math.max(maxX - minX, maxZ - minZ);
+	}
+
+	private static int verticalSpan(Set<BlockPos> positions) {
+		int minY = positions.stream().mapToInt(BlockPos::getY).min().orElseThrow();
+		int maxY = positions.stream().mapToInt(BlockPos::getY).max().orElseThrow();
+		return maxY - minY;
+	}
+
+	private static double[] horizontalCentre(Set<BlockPos> positions, int y) {
+		var row = positions.stream().filter(pos -> pos.getY() == y).toList();
+		return new double[] {
+			row.stream().mapToInt(BlockPos::getX).average().orElseThrow(),
+			row.stream().mapToInt(BlockPos::getZ).average().orElseThrow(),
+		};
+	}
+
+	private static TreeCrownSpec crown(TreeCrownShape shape, int radius, int height) {
+		return new TreeCrownSpec(shape, radius, height, 1.0, 0.0, 0.0);
 	}
 
 	/** Only the LevelAccessor surface touched by TreeFeature is modelled. */

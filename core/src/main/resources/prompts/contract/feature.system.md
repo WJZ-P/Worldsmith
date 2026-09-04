@@ -139,7 +139,17 @@ vanilla oak or cherry trees.
     "height": { "min": 9, "max": 13 },
     "thickness": 1,
     "bend": 0.0,
-    "branches": { "count": 4, "length": 5, "start": 0.55, "upwardBias": 0.65 }
+    "branches": {
+      "count": 4,
+      "length": 5,
+      "start": 0.55,
+      "upwardBias": 0.65,
+      "spread": 0.8,
+      "lengthVariation": 0.25
+    },
+    "taper": 0.0,
+    "flare": 1,
+    "stems": 1
   },
   "crown": {
     "shape": "CLUSTERED",
@@ -162,18 +172,40 @@ Trunk `shape` is one of:
 | `STRAIGHT` | a vertical main stem; optional branches still work |
 | `BENT` | the main stem gradually walks in one horizontal direction |
 | `TWISTED` | the drift direction rotates as the stem rises |
-| `FORKED` | an upper stem split; requires at least two branches |
+| `TAPERED` | a 2x2 lower stem narrows to a 1x1 upper stem |
+| `CROOKED` | an irregular stem changes drift direction instead of following one arc |
+| `FORKED` | several main forks separate at `start` and keep climbing |
 | `BRANCHING` | a straight main stem with an authored set of side branches |
+| `MULTI_STEM` | two to four complete stems leave one shared root origin |
 
 - `height.min` and `height.max` are inclusive. Trunks stay within `1..36`, with
   `min` at most 32 and at most 24 blocks of variation. After rising branches and
   the upper crown are included, the whole tree may reach at most 44 blocks.
   Larger landmarks belong to structures.
 - `thickness` is `1` or `2`.
-- `bend` is `0..1` and is used by `BENT` and `TWISTED`.
+- `bend` is `0..1` and is used by `BENT`, `TWISTED`, and `CROOKED`; those
+  three shapes require a value greater than zero so their path is not silently
+  identical to `STRAIGHT`.
+- `TAPERED` requires `thickness: 2` and `taper` greater than zero. `taper` is
+  `0..1`: it is the upper fraction of the trunk that has narrowed to 1x1. No
+  other trunk shape consumes it.
+- `flare` is `0..2` on every shape. It extends four roots horizontally by that
+  many blocks from the trunk base; use it for old, heavy trees rather than as a
+  substitute for trunk thickness.
+- `stems` is `2..4` on `MULTI_STEM` and must remain `1` on every other shape.
+  Each stem receives its own crown attachment. `MULTI_STEM` does not carry a
+  `branches` object: stems describe its split directly.
 - Optional `branches` has `count` `1..8`, `length` `1..8`, `start` `0.2..0.95`
-  as a fraction of trunk height, and `upwardBias` `0..1`. `FORKED` and
-  `BRANCHING` require it; every other trunk may also carry branches.
+  as a fraction of trunk height, `upwardBias` `0..1`, angular `spread` `0..1`,
+  and `lengthVariation` `0..1`. Variation may shorten an individual branch by
+  that fraction but never grows one beyond `length`. `spread: 0` groups branches
+  near one direction; `spread: 1` distributes them around the stem. `FORKED`
+  and `BRANCHING` require this object; every non-`MULTI_STEM` trunk may carry it.
+  For `FORKED`, `count` is the number of main forks, `start` is their split
+  height and `length` is how long those forks continue outward while rising.
+  `upwardBias` controls their exact slope, but they rise at least every other
+  step. Their highest possible attachment is split height plus `length`, rather
+  than full nominal `height` plus `length`.
 
 Crown `shape` is independent from the trunk:
 
@@ -182,11 +214,21 @@ Crown `shape` is independent from the trunk:
 | `ROUND` | an ellipsoidal broadleaf crown |
 | `CONICAL` | narrow at the tip and wider downward |
 | `LAYERED` | alternating wide and narrow tiers |
-| `UMBRELLA` | a shallow, elevated canopy |
+| `UMBRELLA` | an elevated parasol whose extra height extends a narrowing underside |
 | `WEEPING` | a deep crown intended for trailing leaves |
-| `CLUSTERED` | several overlapping crown lobes around branch tips |
+| `CLUSTERED` | one full-height central crown plus smaller overlapping side lobes |
+| `COLUMNAR` | a narrow vertical spindle, suitable for cypress-like silhouettes |
+| `PAGODA` | discrete horizontal eaves that narrow toward the top |
+| `WINDSWEPT` | each layer shifts with one world-seed-derived prevailing direction shared by the whole world, making asymmetric wind-cut forests |
 
 - `radius` is `1..8`, `height` is `1..12`.
+- Every crown shape consumes the full authored `height`; it is never accepted
+  and then silently capped to a smaller number of layers.
+- The validator combines trunk drift, stem separation, branch length and the
+  crown's widest offset. That total horizontal reach must stay within 16 blocks,
+  the bounded medium-tree clearance Minecraft can preflight atomically. Reduce
+  bend, branches or crown radius when `TREE_HORIZONTAL_REACH_OUT_OF_RANGE`
+  appears; larger silhouettes belong to the later structure layer.
 - `density` is the chance to fill positions inside the chosen volume, `0.1..1`.
 - `irregularity` is `0..1` and thins the boundary more than the interior.
 - `hangingLeaves` is `0..1`; it grows one- and two-block extensions from the
@@ -194,6 +236,10 @@ Crown `shape` is independent from the trunk:
 - Every trunk shape may combine with every crown shape. Use the prompt as the
   authority: a twisted trunk with a layered crown and pale leaves is one valid
   alien tree, not an error to normalize back into a vanilla species.
+- These rules extend vanilla rather than replace it: vanilla logs and leaves
+  remain valid materials, while the Worldsmith trunk and crown placers provide
+  silhouettes the vanilla tree presets do not expose. Choose geometry from the
+  requested world's visual language, not from the nearest vanilla species name.
 
 - `distribution` is required: `SCATTERED`, `GROVE`, `FOREST`, or
   `DENSE_FOREST`. Grove and forest modes use one broad noise field, so trees
@@ -239,7 +285,14 @@ from more than one names them instead:
     "trunk": {
       "shape": "BRANCHING",
       "height": { "min": 8, "max": 11 },
-      "branches": { "count": 3, "length": 4, "start": 0.6 }
+      "branches": {
+        "count": 3,
+        "length": 4,
+        "start": 0.6,
+        "spread": 0.75,
+        "lengthVariation": 0.3
+      },
+      "flare": 1
     },
     "crown": {
       "shape": "CLUSTERED",

@@ -4,6 +4,7 @@ import com.wjz.worldsmith.core.model.FeatureDefinition
 import com.wjz.worldsmith.core.model.FeatureRecipe
 import com.wjz.worldsmith.core.model.TreeDistribution
 import com.wjz.worldsmith.core.model.TreeSpec
+import com.wjz.worldsmith.core.model.TreeTrunkShape
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -104,10 +105,19 @@ object VegetationBudget {
     fun treeWorkPerTree(tree: TreeSpec): Double {
         val branchCount = tree.trunk.branches?.count ?: 0
         val branchBlocks = branchCount * (tree.trunk.branches?.length ?: 0)
-        val trunkBlocks = tree.trunk.height.max * tree.trunk.thickness * tree.trunk.thickness
+        val stemCount = if (tree.trunk.shape == TreeTrunkShape.MULTI_STEM) tree.trunk.stems else 1
+        val trunkBlocks = tree.trunk.height.max * tree.trunk.thickness * tree.trunk.thickness * stemCount
+        // A radius-N flare places roots along four horizontal rays. It
+        // is small next to a crown but must not become free in a dense forest.
+        val flareBlocks = tree.trunk.flare * 4
         val crownBox = (2 * tree.crown.radius + 1) * (2 * tree.crown.radius + 1) * tree.crown.height
-        val crownWork = (branchCount + 1) * crownBox * tree.crown.density
-        return max(1.0, (trunkBlocks + branchBlocks + crownWork) / 512.0)
+        val crownCount = when (tree.trunk.shape) {
+            TreeTrunkShape.MULTI_STEM -> tree.trunk.stems
+            TreeTrunkShape.FORKED -> branchCount
+            else -> branchCount + 1
+        }
+        val crownWork = crownCount * crownBox * tree.crown.density
+        return max(1.0, (trunkBlocks + branchBlocks + flareBlocks + crownWork) / 512.0)
     }
 
     private fun scaledCount(density: Double, maximum: Int): Int =

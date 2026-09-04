@@ -119,7 +119,10 @@ class FeatureMaterialsTest {
                     height = TreeHeight(20, 10),
                     thickness = 3,
                     bend = 0.5,
-                    branches = TreeBranchSpec(0, 9, 0.1, 1.5),
+                    branches = TreeBranchSpec(0, 9, 0.1, 1.5, spread = -0.1, lengthVariation = 1.5),
+                    taper = 1.5,
+                    flare = 3,
+                    stems = 3,
                 ),
                 crown = TreeCrownSpec(
                     shape = TreeCrownShape.ROUND,
@@ -140,7 +143,13 @@ class FeatureMaterialsTest {
         assertTrue("REVERSED_TREE_HEIGHT" in codes, codes.toString())
         assertTrue("TRUNK_THICKNESS_OUT_OF_RANGE" in codes, codes.toString())
         assertTrue("UNUSED_TRUNK_BEND" in codes, codes.toString())
+        assertTrue("TRUNK_TAPER_OUT_OF_RANGE" in codes, codes.toString())
+        assertTrue("UNUSED_TRUNK_TAPER" in codes, codes.toString())
+        assertTrue("TRUNK_FLARE_OUT_OF_RANGE" in codes, codes.toString())
+        assertTrue("UNUSED_TRUNK_STEMS" in codes, codes.toString())
         assertTrue("BRANCH_COUNT_OUT_OF_RANGE" in codes, codes.toString())
+        assertTrue("BRANCH_SPREAD_OUT_OF_RANGE" in codes, codes.toString())
+        assertTrue("BRANCH_LENGTH_VARIATION_OUT_OF_RANGE" in codes, codes.toString())
         assertTrue("CROWN_RADIUS_OUT_OF_RANGE" in codes, codes.toString())
         assertTrue("CROWN_HEIGHT_OUT_OF_RANGE" in codes, codes.toString())
         assertTrue("CROWN_DENSITY_OUT_OF_RANGE" in codes, codes.toString())
@@ -176,6 +185,66 @@ class FeatureMaterialsTest {
         assertTrue(
             FeatureLibraryValidator.validate(library(tooTall)).any { it.code == "TREE_TOTAL_HEIGHT_OUT_OF_RANGE" },
         )
+    }
+
+    @Test
+    fun `shape-owned trunk controls reject inert combinations`() {
+        val tapered = tree().copy(
+            trunk = TreeTrunkSpec(TreeTrunkShape.TAPERED, TreeHeight(10, 12), thickness = 1),
+        )
+        val multiStem = tree().copy(
+            trunk = TreeTrunkSpec(
+                TreeTrunkShape.MULTI_STEM,
+                TreeHeight(10, 12),
+                branches = TreeBranchSpec(2, 4, 0.6),
+                stems = 1,
+            ),
+        )
+        val motionlessBent = tree().copy(
+            trunk = TreeTrunkSpec(TreeTrunkShape.BENT, TreeHeight(10, 12)),
+        )
+
+        val taperedCodes = FeatureLibraryValidator.validate(library(treeFeature("tapered", tapered))).map { it.code }
+        val multiCodes = FeatureLibraryValidator.validate(library(treeFeature("multi", multiStem))).map { it.code }
+        val bentCodes = FeatureLibraryValidator.validate(library(treeFeature("bent", motionlessBent))).map { it.code }
+
+        assertTrue("TAPERED_TRUNK_REQUIRES_THICKNESS" in taperedCodes, taperedCodes.toString())
+        assertTrue("TAPERED_TRUNK_REQUIRES_TAPER" in taperedCodes, taperedCodes.toString())
+        assertTrue("MULTI_STEM_COUNT_OUT_OF_RANGE" in multiCodes, multiCodes.toString())
+        assertTrue("UNUSED_MULTI_STEM_BRANCHES" in multiCodes, multiCodes.toString())
+        assertTrue("BENDING_TRUNK_REQUIRES_BEND" in bentCodes, bentCodes.toString())
+    }
+
+    @Test
+    fun `fork total height begins at its authored split rather than the discarded upper stem`() {
+        val fork = tree().copy(
+            trunk = TreeTrunkSpec(
+                TreeTrunkShape.FORKED,
+                TreeHeight(30, 36),
+                branches = TreeBranchSpec(2, 8, 0.2, upwardBias = 1.0),
+            ),
+        )
+
+        val codes = FeatureLibraryValidator.validate(library(treeFeature("high_fork", fork))).map { it.code }
+
+        assertTrue("TREE_TOTAL_HEIGHT_OUT_OF_RANGE" !in codes, codes.toString())
+    }
+
+    @Test
+    fun `medium tree clearance rejects a silhouette wider than Minecraft can preflight`() {
+        val tooWide = tree().copy(
+            trunk = TreeTrunkSpec(
+                TreeTrunkShape.BRANCHING,
+                TreeHeight(18, 22),
+                thickness = 2,
+                branches = TreeBranchSpec(6, 8, 0.55),
+            ),
+            crown = TreeCrownSpec(TreeCrownShape.CLUSTERED, radius = 8, height = 8),
+        )
+
+        val codes = FeatureLibraryValidator.validate(library(treeFeature("too_wide", tooWide))).map { it.code }
+
+        assertTrue("TREE_HORIZONTAL_REACH_OUT_OF_RANGE" in codes, codes.toString())
     }
 
     @Test
@@ -293,18 +362,38 @@ class FeatureMaterialsTest {
         crownShape: TreeCrownShape = TreeCrownShape.ROUND,
     ): TreeSpec {
         val branches = when (trunkShape) {
-            TreeTrunkShape.FORKED -> TreeBranchSpec(2, 4, 0.65)
-            TreeTrunkShape.BRANCHING -> TreeBranchSpec(4, 4, 0.7)
+            TreeTrunkShape.FORKED -> TreeBranchSpec(2, 4, 0.65, spread = 0.8, lengthVariation = 0.25)
+            TreeTrunkShape.BRANCHING -> TreeBranchSpec(4, 4, 0.7, spread = 0.65, lengthVariation = 0.35)
             else -> null
         }
-        val bend = if (trunkShape == TreeTrunkShape.BENT || trunkShape == TreeTrunkShape.TWISTED) 0.35 else 0.0
+        val bend = if (trunkShape in setOf(TreeTrunkShape.BENT, TreeTrunkShape.TWISTED, TreeTrunkShape.CROOKED)) 0.35 else 0.0
         return TreeSpec(
-            TreeTrunkSpec(trunkShape, TreeHeight(10, 12), bend = bend, branches = branches),
+            TreeTrunkSpec(
+                trunkShape,
+                TreeHeight(10, 12),
+                thickness = if (trunkShape == TreeTrunkShape.TAPERED) 2 else 1,
+                bend = bend,
+                branches = branches,
+                taper = if (trunkShape == TreeTrunkShape.TAPERED) 0.55 else 0.0,
+                flare = 1,
+                stems = if (trunkShape == TreeTrunkShape.MULTI_STEM) 3 else 1,
+            ),
             TreeCrownSpec(crownShape, radius = 3, height = 4, hangingLeaves = 0.15),
             TreeDistribution.GROVE,
             TreeSubstrate.NATURAL_SOIL,
         )
     }
+
+    private fun treeFeature(id: String, spec: TreeSpec) = FeatureDefinition(
+        id,
+        FeatureRecipe.TREE,
+        materials = mapOf(
+            MaterialRole.TRUNK to selector("wood", "minecraft:oak_log"),
+            MaterialRole.FOLIAGE to selector("leaves", "minecraft:oak_leaves"),
+        ),
+        density = 0.3,
+        tree = spec,
+    )
 
     private fun selector(role: String, id: String) = MaterialSelector(role, listOf(id))
 }

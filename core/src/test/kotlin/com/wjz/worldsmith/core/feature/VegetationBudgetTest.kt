@@ -93,6 +93,24 @@ class VegetationBudgetTest {
         )
     }
 
+    @Test
+    fun `multiple stems and root flare are charged rather than cosmetic`() {
+        val crown = TreeCrownSpec(TreeCrownShape.COLUMNAR, radius = 5, height = 9, density = 0.9)
+        val straight = TreeSpec(
+            TreeTrunkSpec(TreeTrunkShape.STRAIGHT, TreeHeight(14, 16), thickness = 2),
+            crown,
+            TreeDistribution.FOREST,
+            TreeSubstrate.NATURAL_SOIL,
+        )
+        val flared = straight.copy(trunk = straight.trunk.copy(flare = 2))
+        val multiStem = straight.copy(
+            trunk = straight.trunk.copy(shape = TreeTrunkShape.MULTI_STEM, thickness = 1, stems = 4),
+        )
+
+        assertTrue(VegetationBudget.treeWorkPerTree(flared) > VegetationBudget.treeWorkPerTree(straight))
+        assertTrue(VegetationBudget.treeWorkPerTree(multiStem) > VegetationBudget.treeWorkPerTree(straight))
+    }
+
     private fun feature(recipe: FeatureRecipe) = FeatureDefinition(
         id = "sample",
         recipe = recipe,

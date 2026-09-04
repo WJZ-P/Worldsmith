@@ -72,8 +72,14 @@ enum class TreeTrunkShape {
     STRAIGHT,
     BENT,
     TWISTED,
+    /** A thick lower stem that deliberately narrows into a one-block upper stem. */
+    TAPERED,
+    /** A stem that changes drift direction at irregular intervals. */
+    CROOKED,
     FORKED,
     BRANCHING,
+    /** Several complete stems share one root origin and separate as they rise. */
+    MULTI_STEM,
 }
 
 /** Volume rule used by the Worldsmith foliage placer around every branch tip. */
@@ -85,6 +91,9 @@ enum class TreeCrownShape {
     UMBRELLA,
     WEEPING,
     CLUSTERED,
+    COLUMNAR,
+    PAGODA,
+    WINDSWEPT,
 }
 
 /** How trees occupy chunks rather than what one tree looks like. */
@@ -203,6 +212,10 @@ data class TreeBranchSpec(
     val start: Double,
     /** Chance for each outward branch step to also rise by one block. */
     val upwardBias: Double = 0.5,
+    /** Angular spread: 0 keeps branches near one direction, 1 distributes them around the trunk. */
+    val spread: Double = 1.0,
+    /** Maximum fraction by which an individual branch may be shortened. */
+    val lengthVariation: Double = 0.0,
 )
 
 @Serializable
@@ -212,6 +225,12 @@ data class TreeTrunkSpec(
     val thickness: Int = 1,
     val bend: Double = 0.0,
     val branches: TreeBranchSpec? = null,
+    /** Upper fraction that narrows from a 2x2 footprint to 1x1. */
+    val taper: Double = 0.0,
+    /** Horizontal root-flare reach from the base, from zero to two blocks. */
+    val flare: Int = 0,
+    /** Number of complete stems for [TreeTrunkShape.MULTI_STEM]; one for every other shape. */
+    val stems: Int = 1,
 )
 
 @Serializable

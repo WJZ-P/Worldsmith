@@ -11,6 +11,7 @@ import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.TreeSpec
 import com.wjz.worldsmith.core.model.TreeCrownShape
 import com.wjz.worldsmith.core.model.TreeTrunkShape
+import kotlin.math.roundToInt
 
 object FeatureLibraryValidator {
     internal val ID = Regex("^[a-z0-9_.-]+$")
@@ -24,6 +25,7 @@ object FeatureLibraryValidator {
     private const val MIN_CROWN_RADIUS = 1
     private const val MAX_CROWN_RADIUS = 8
     private const val MAX_CROWN_HEIGHT = 12
+    private const val MAX_TREE_HORIZONTAL_REACH = 16
     private const val MIN_WORLD_Y = -64
     private const val MAX_WORLD_Y = 319
 
@@ -225,8 +227,38 @@ object FeatureLibraryValidator {
         if (trunk.bend !in 0.0..1.0) {
             add(error("$path.trunk.bend", "TRUNK_BEND_OUT_OF_RANGE", "Trunk bend must be between 0 and 1"))
         }
-        if (trunk.bend != 0.0 && trunk.shape != TreeTrunkShape.BENT && trunk.shape != TreeTrunkShape.TWISTED) {
-            add(error("$path.trunk.bend", "UNUSED_TRUNK_BEND", "Only BENT and TWISTED trunk paths consume bend"))
+        val bendingShapes = setOf(TreeTrunkShape.BENT, TreeTrunkShape.TWISTED, TreeTrunkShape.CROOKED)
+        if (trunk.shape in bendingShapes && trunk.bend <= 0.0) {
+            add(error("$path.trunk.bend", "BENDING_TRUNK_REQUIRES_BEND", "${trunk.shape} needs a positive bend strength"))
+        }
+        if (trunk.bend != 0.0 && trunk.shape !in bendingShapes) {
+            add(error("$path.trunk.bend", "UNUSED_TRUNK_BEND", "Only BENT, TWISTED and CROOKED trunk paths consume bend"))
+        }
+        if (trunk.taper !in 0.0..1.0) {
+            add(error("$path.trunk.taper", "TRUNK_TAPER_OUT_OF_RANGE", "Trunk taper must be between 0 and 1"))
+        }
+        if (trunk.shape == TreeTrunkShape.TAPERED) {
+            if (trunk.thickness != 2) {
+                add(error("$path.trunk.thickness", "TAPERED_TRUNK_REQUIRES_THICKNESS", "TAPERED needs a 2x2 lower trunk to narrow from"))
+            }
+            if (trunk.taper <= 0.0) {
+                add(error("$path.trunk.taper", "TAPERED_TRUNK_REQUIRES_TAPER", "TAPERED needs a positive taper fraction"))
+            }
+        } else if (trunk.taper != 0.0) {
+            add(error("$path.trunk.taper", "UNUSED_TRUNK_TAPER", "Only TAPERED consumes taper"))
+        }
+        if (trunk.flare !in 0..2) {
+            add(error("$path.trunk.flare", "TRUNK_FLARE_OUT_OF_RANGE", "Root flare must reach zero to two blocks from the base"))
+        }
+        if (trunk.shape == TreeTrunkShape.MULTI_STEM) {
+            if (trunk.stems !in 2..4) {
+                add(error("$path.trunk.stems", "MULTI_STEM_COUNT_OUT_OF_RANGE", "MULTI_STEM needs between 2 and 4 stems"))
+            }
+            if (trunk.branches != null) {
+                add(error("$path.trunk.branches", "UNUSED_MULTI_STEM_BRANCHES", "MULTI_STEM uses stems rather than a branches object"))
+            }
+        } else if (trunk.stems != 1) {
+            add(error("$path.trunk.stems", "UNUSED_TRUNK_STEMS", "Only MULTI_STEM consumes stems"))
         }
         val branches = trunk.branches
         if ((trunk.shape == TreeTrunkShape.FORKED || trunk.shape == TreeTrunkShape.BRANCHING) && branches == null) {
@@ -245,6 +277,12 @@ object FeatureLibraryValidator {
             }
             if (branch.upwardBias !in 0.0..1.0) {
                 add(error("$path.trunk.branches.upwardBias", "BRANCH_BIAS_OUT_OF_RANGE", "Branch upward bias must be between 0 and 1"))
+            }
+            if (branch.spread !in 0.0..1.0) {
+                add(error("$path.trunk.branches.spread", "BRANCH_SPREAD_OUT_OF_RANGE", "Branch angular spread must be between 0 and 1"))
+            }
+            if (branch.lengthVariation !in 0.0..1.0) {
+                add(error("$path.trunk.branches.lengthVariation", "BRANCH_LENGTH_VARIATION_OUT_OF_RANGE", "Branch length variation must be between 0 and 1"))
             }
         }
 
@@ -267,9 +305,12 @@ object FeatureLibraryValidator {
         val downwardReach = when (crown.shape) {
             TreeCrownShape.ROUND -> crown.height / 2
             TreeCrownShape.CONICAL, TreeCrownShape.LAYERED -> crown.height - 1
-            TreeCrownShape.UMBRELLA -> minOf(3, crown.height - 1)
+            TreeCrownShape.COLUMNAR -> maxOf(0, crown.height - maxOf(1, crown.height / 4) - 1)
+            TreeCrownShape.PAGODA -> maxOf(0, crown.height - 2)
+            TreeCrownShape.UMBRELLA -> maxOf(0, crown.height - 2)
             TreeCrownShape.WEEPING -> crown.height - maxOf(1, crown.height / 3)
-            TreeCrownShape.CLUSTERED -> crown.height / 4
+            TreeCrownShape.CLUSTERED -> maxOf(0, crown.height - crown.height / 2 - 1)
+            TreeCrownShape.WINDSWEPT -> maxOf(0, crown.height - maxOf(1, crown.height / 3) - 1)
         } + if (crown.hangingLeaves > 0.0) 2 else 0
         if (height.min <= downwardReach) {
             add(
@@ -284,11 +325,19 @@ object FeatureLibraryValidator {
         val crownRise = when (crown.shape) {
             TreeCrownShape.ROUND -> crown.height / 2
             TreeCrownShape.CONICAL, TreeCrownShape.LAYERED -> 0
+            TreeCrownShape.COLUMNAR -> maxOf(1, crown.height / 4)
+            TreeCrownShape.PAGODA -> 1
             TreeCrownShape.UMBRELLA -> 1
             TreeCrownShape.WEEPING -> maxOf(1, crown.height / 3)
-            TreeCrownShape.CLUSTERED -> crown.height / 4
+            TreeCrownShape.CLUSTERED -> crown.height / 2
+            TreeCrownShape.WINDSWEPT -> maxOf(1, crown.height / 3)
         }
-        if (height.max + branchRise + crownRise > MAX_TREE_TOTAL_HEIGHT) {
+        val highestAttachment = if (trunk.shape == TreeTrunkShape.FORKED && branches != null) {
+            ((height.max - 1) * branches.start).roundToInt() + 1 + branches.length
+        } else {
+            height.max + branchRise
+        }
+        if (highestAttachment + crownRise > MAX_TREE_TOTAL_HEIGHT) {
             add(
                 error(
                     path,
@@ -309,9 +358,52 @@ object FeatureLibraryValidator {
                 )
             }
         }
+        val horizontalReach = treeHorizontalReach(tree)
+        if (horizontalReach > MAX_TREE_HORIZONTAL_REACH) {
+            add(
+                error(
+                    path,
+                    "TREE_HORIZONTAL_REACH_OUT_OF_RANGE",
+                    "Combined trunk drift, branches and crown reach $horizontalReach blocks; " +
+                        "medium trees must stay within $MAX_TREE_HORIZONTAL_REACH so Minecraft can preflight the whole shape",
+                ),
+            )
+        }
         tree.decorations.groupingBy { it }.eachCount().filterValues { it > 1 }.keys.forEach { decoration ->
             add(error("$path.decorations", "DUPLICATE_TREE_DECORATION", "$decoration is listed more than once"))
         }
+    }
+
+    private fun treeHorizontalReach(tree: TreeSpec): Int {
+        val trunk = tree.trunk
+        val branches = trunk.branches
+        val drift = if (trunk.shape in setOf(TreeTrunkShape.BENT, TreeTrunkShape.TWISTED, TreeTrunkShape.CROOKED)) {
+            val interval = maxOf(2, (7.0 - trunk.bend * 5.0).roundToInt())
+            maxOf(0, trunk.height.max - 1) / interval
+        } else {
+            0
+        }
+        val stemReach = if (trunk.shape == TreeTrunkShape.MULTI_STEM) {
+            minOf(2, maxOf(1, trunk.height.max / 8))
+        } else {
+            0
+        }
+        val branchReach = branches?.length ?: 0
+        val pathReach = maxOf(drift + branchReach, stemReach)
+        val crownReach = when (tree.crown.shape) {
+            TreeCrownShape.CLUSTERED -> maxOf(
+                tree.crown.radius,
+                maxOf(1, tree.crown.radius - 1) + maxOf(1, tree.crown.radius / 2 + 1),
+            )
+            TreeCrownShape.WINDSWEPT -> tree.crown.radius + (tree.crown.radius * 0.9).roundToInt()
+            else -> tree.crown.radius
+        }
+        val footprint = trunk.thickness - 1
+        val baseReach = maxOf(
+            footprint + trunk.flare,
+            if (trunk.height.min <= 1 && branches != null) footprint + branches.length else 0,
+        )
+        return maxOf(baseReach, footprint + pathReach + crownReach)
     }
 
     /**

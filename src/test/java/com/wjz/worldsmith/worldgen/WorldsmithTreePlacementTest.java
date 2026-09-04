@@ -126,7 +126,7 @@ final class WorldsmithTreePlacementTest {
 			),
 			0.5,
 			new TreeSpec(
-				new TreeTrunkSpec(TreeTrunkShape.STRAIGHT, new TreeHeight(7, 9), 1, 0.0, null),
+				new TreeTrunkSpec(TreeTrunkShape.STRAIGHT, new TreeHeight(7, 9), 1, 0.0, null, 0.0, 0, 1),
 				new TreeCrownSpec(TreeCrownShape.ROUND, 3, 4, 0.85, 0.25, 0.0),
 				distribution,
 				substrate,

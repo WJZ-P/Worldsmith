@@ -86,7 +86,10 @@ class WorldsmithRecipeShapeTest {
 				new TreeHeight(10, 14),
 				2,
 				0.0,
-				new TreeBranchSpec(4, 5, 0.55, 0.7)
+				new TreeBranchSpec(4, 5, 0.55, 0.7, 0.8, 0.25),
+				0.0,
+				1,
+				1
 			),
 			new TreeCrownSpec(TreeCrownShape.CLUSTERED, 6, 7, 0.9, 0.45, 0.8),
 			TreeDistribution.FOREST,
@@ -113,6 +116,10 @@ class WorldsmithRecipeShapeTest {
 		assertTrue(json.contains("\"height_rand_a\":4"), json);
 		assertTrue(json.contains("\"radius\":6"), json);
 		assertTrue(json.contains("\"branch_count\":4"), json);
+		assertTrue(json.contains("\"branch_spread\":0.8"), json);
+		assertTrue(json.contains("\"branch_length_variation\":0.25"), json);
+		assertTrue(json.contains("\"clearance_padding\":8"), json);
+		assertTrue(json.contains("\"upper_size\":15"), json);
 		assertTrue(json.contains("\"hanging_leaves\":0.8"), json);
 		assertTrue(json.contains("worldsmith:shaped_trunk"), json);
 		assertTrue(json.contains("worldsmith:shaped_foliage"), json);
@@ -156,13 +163,23 @@ class WorldsmithRecipeShapeTest {
 
 	private static TreeSpec treeSpec(TreeTrunkShape trunk, TreeCrownShape crown) {
 		TreeBranchSpec branches = switch (trunk) {
-			case FORKED -> new TreeBranchSpec(2, 4, 0.7, 0.6);
-			case BRANCHING -> new TreeBranchSpec(4, 4, 0.6, 0.5);
+			case FORKED -> new TreeBranchSpec(2, 4, 0.7, 0.6, 1.0, 0.2);
+			case BRANCHING -> new TreeBranchSpec(4, 4, 0.6, 0.5, 0.75, 0.3);
 			default -> null;
 		};
-		double bend = trunk == TreeTrunkShape.BENT || trunk == TreeTrunkShape.TWISTED ? 0.35 : 0.0;
+		double bend = trunk == TreeTrunkShape.BENT || trunk == TreeTrunkShape.TWISTED ||
+			trunk == TreeTrunkShape.CROOKED ? 0.35 : 0.0;
 		return new TreeSpec(
-			new TreeTrunkSpec(trunk, new TreeHeight(10, 12), 1, bend, branches),
+			new TreeTrunkSpec(
+				trunk,
+				new TreeHeight(10, 12),
+				trunk == TreeTrunkShape.TAPERED ? 2 : 1,
+				bend,
+				branches,
+				trunk == TreeTrunkShape.TAPERED ? 0.55 : 0.0,
+				1,
+				trunk == TreeTrunkShape.MULTI_STEM ? 3 : 1
+			),
 			new TreeCrownSpec(crown, 3, 4, 0.85, 0.25, 0.15),
 			TreeDistribution.GROVE,
 			TreeSubstrate.NATURAL_SOIL,

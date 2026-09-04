@@ -5,6 +5,8 @@ import com.wjz.worldsmith.core.model.TerrainPlan
 import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.VanillaNoisePreset
 import com.wjz.worldsmith.core.model.FeatureRecipe
+import com.wjz.worldsmith.core.model.TreeCrownShape
+import com.wjz.worldsmith.core.model.TreeTrunkShape
 import com.wjz.worldsmith.core.prompt.StyleCatalog
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import kotlinx.serialization.json.JsonNull
@@ -119,6 +121,15 @@ class WorldsmithWorkflowTest {
         val featureContract = contracts.text("feature")
         FeatureRecipe.entries.forEach {
             assertTrue(it.name in featureContract, "the feature contract never names ${it.name}")
+        }
+        TreeTrunkShape.entries.forEach {
+            assertTrue(it.name in featureContract, "the feature contract never names trunk shape ${it.name}")
+        }
+        TreeCrownShape.entries.forEach {
+            assertTrue(it.name in featureContract, "the feature contract never names crown shape ${it.name}")
+        }
+        listOf("taper", "flare", "stems", "spread", "lengthVariation").forEach {
+            assertTrue(it in featureContract, "the feature contract never explains tree control $it")
         }
 
         val placement = brief.getValue("climatePlacement").jsonObject

@@ -71,6 +71,7 @@ public final class WorldsmithFoliagePlacer extends FoliagePlacer {
 		int offset
 	) {
 		BlockPos origin = attachment.pos().above(offset);
+		BlockPos hangingOrigin = origin;
 		int bottomY = 0;
 		int bottomRadius = leafRadius;
 		switch (this.shape) {
@@ -101,10 +102,14 @@ public final class WorldsmithFoliagePlacer extends FoliagePlacer {
 				}
 			}
 			case UMBRELLA -> {
-				int layers = Math.min(4, this.height);
-				bottomY = 1 - layers;
+				bottomY = 2 - this.height;
 				for (int y = 1; y >= bottomY; y--) {
-					int radius = y == 1 || y == bottomY ? Math.max(1, leafRadius - 1) : leafRadius;
+					int depth = 1 - y;
+					// The upper two rows form the broad parasol. Additional authored
+					// height grows a progressively narrower underside instead of being
+					// silently capped at four layers.
+					int inset = depth == 0 ? 1 : Math.max(0, (depth - 1) / 2);
+					int radius = Math.max(1, leafRadius - inset);
 					placeLeavesRow(level, foliageSetter, random, config, origin, radius, y, attachment.doubleTrunk());
 					if (y == bottomY) bottomRadius = radius;
 				}
@@ -119,14 +124,79 @@ public final class WorldsmithFoliagePlacer extends FoliagePlacer {
 			}
 			case CLUSTERED -> {
 				int lobeRadius = Math.max(1, leafRadius / 2 + 1);
-				int lobeHeight = Math.max(2, this.height / 2);
-				placeBlob(level, foliageSetter, random, config, origin, leafRadius, lobeHeight, attachment.doubleTrunk());
+				int lobeHeight = Math.max(1, (int)Math.ceil(this.height * 0.65));
+				int mainTop = this.height / 2;
+				int mainBottom = mainTop - this.height + 1;
+				int lobeTop = lobeHeight / 2;
+				int lobeBottom = lobeTop - lobeHeight + 1;
+				placeBlob(level, foliageSetter, random, config, origin, leafRadius, this.height, attachment.doubleTrunk());
 				for (Direction direction : Direction.Plane.HORIZONTAL) {
-					BlockPos lobe = origin.relative(direction, Math.max(1, leafRadius - 1)).offset(0, random.nextInt(3) - 1, 0);
+					int requestedOffset = random.nextInt(3) - 1;
+					int verticalOffset = Math.max(
+						mainBottom - lobeBottom,
+						Math.min(mainTop - lobeTop, requestedOffset)
+					);
+					BlockPos lobe = origin.relative(direction, Math.max(1, leafRadius - 1)).offset(0, verticalOffset, 0);
 					placeBlob(level, foliageSetter, random, config, lobe, lobeRadius, lobeHeight, false);
 				}
-				bottomY = -(lobeHeight / 2);
-				bottomRadius = lobeRadius;
+				bottomY = mainBottom;
+				bottomRadius = Math.max(1, leafRadius / 2);
+			}
+			case COLUMNAR -> {
+				int top = Math.max(1, this.height / 4);
+				bottomY = top - this.height + 1;
+				for (int y = top; y >= bottomY; y--) {
+					double position = this.height <= 1 ? 0.5 : (y - bottomY) / (double)(this.height - 1);
+					// A long capsule rather than a rescaled ROUND crown: its middle
+					// keeps the requested radius while both ends close decisively.
+					double endDistance = Math.min(position, 1.0 - position) * 2.0;
+					double scale = 0.42 + 0.58 * Math.sqrt(Math.max(0.0, endDistance));
+					int radius = Math.max(1, (int)Math.round(leafRadius * scale));
+					placeLeavesRow(level, foliageSetter, random, config, origin, radius, y, attachment.doubleTrunk());
+					if (y == bottomY) bottomRadius = radius;
+				}
+			}
+			case PAGODA -> {
+				int top = 1;
+				bottomY = top - this.height + 1;
+				for (int y = top; y >= bottomY; y--) {
+					int depth = top - y;
+					double descent = this.height <= 1 ? 1.0 : depth / (double)(this.height - 1);
+					int tierRadius = Math.max(1, (int)Math.ceil(leafRadius * (0.35 + 0.65 * descent)));
+					// Wide eaves alternate with a sharply inset row. Unlike LAYERED,
+					// every successive tier also grows broader toward the ground.
+					int radius = depth % 2 == 0 ? tierRadius : Math.max(1, tierRadius - 2);
+					placeLeavesRow(level, foliageSetter, random, config, origin, radius, y, attachment.doubleTrunk());
+					if (y == bottomY) bottomRadius = radius;
+				}
+			}
+			case WINDSWEPT -> {
+				// One world has one prevailing wind. Choosing from the world seed,
+				// rather than once per foliage attachment, keeps every branch crown
+				// of one tree (and every tree in a wind-shaped forest) leaning the
+				// same way.
+				long worldSeed = level.getSeed();
+				long windSeed = worldSeed ^ (worldSeed >>> 32);
+				Direction wind = switch (Math.floorMod((int)windSeed, 4)) {
+					case 0 -> Direction.NORTH;
+					case 1 -> Direction.EAST;
+					case 2 -> Direction.SOUTH;
+					default -> Direction.WEST;
+				};
+				int top = Math.max(1, this.height / 3);
+				bottomY = top - this.height + 1;
+				for (int y = top; y >= bottomY; y--) {
+					double position = this.height <= 1 ? 0.0 : (y - bottomY) / (double)(this.height - 1);
+					double middle = 1.0 - Math.abs(position * 2.0 - 1.0);
+					int radius = Math.max(1, (int)Math.round(leafRadius * (0.55 + 0.45 * middle)));
+					int drift = (int)Math.round(leafRadius * 0.9 * position);
+					BlockPos sweptOrigin = origin.relative(wind, drift);
+					placeLeavesRow(level, foliageSetter, random, config, sweptOrigin, radius, y, attachment.doubleTrunk());
+					if (y == bottomY) {
+						bottomRadius = radius;
+						hangingOrigin = sweptOrigin;
+					}
+				}
 			}
 		}
 
@@ -136,7 +206,7 @@ public final class WorldsmithFoliagePlacer extends FoliagePlacer {
 				foliageSetter,
 				random,
 				config,
-				origin,
+				hangingOrigin,
 				bottomRadius,
 				bottomY,
 				attachment.doubleTrunk(),

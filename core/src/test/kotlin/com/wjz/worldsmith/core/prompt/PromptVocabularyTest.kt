@@ -87,6 +87,7 @@ class PromptVocabularyTest {
     private val notVocabulary = setOf(
         "JSON", "ASCII", "RRGGBB", "AARRGGBB", "MCP",
         "NO_WOOD_IN_WORLD", "NO_WOOD_ON_LAND", "VEGETATION_BUDGET_EXCEEDED",
+        "TREE_HORIZONTAL_REACH_OUT_OF_RANGE",
     )
 
     private val screamingCase = Regex("\\b[A-Z][A-Z_]{2,}\\b")
