@@ -27,6 +27,13 @@ enum class RoofStyle { FLAT, GABLE, HIP }
 @Serializable
 enum class RoofAxis { X, Z }
 
+@Serializable enum class BuildFacing(val dx: Int, val dz: Int) {
+    NORTH(0,-1), EAST(1,0), SOUTH(0,1), WEST(-1,0);
+    fun rotate(turns: Int) = entries[Math.floorMod(ordinal + turns, 4)]
+}
+@Serializable data class RoofKnot(val at: Double, val height: Double)
+@Serializable data class BuildPoint2(val x: Int, val z: Int)
+
 /** A bounded building language, not executable code. Array order is explicit overwrite order. */
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
@@ -52,7 +59,7 @@ sealed interface BuildOperation {
     data class Line(override val id: String, val from: BuildPos, val to: BuildPos, val material: String) : BuildOperation
 
     @Serializable @SerialName("ROOF")
-    data class Roof(
+    data class Roof @JvmOverloads constructor(
         override val id: String,
         val from: BuildPos,
         val to: BuildPos,
@@ -61,7 +68,35 @@ sealed interface BuildOperation {
         val ridgeAxis: RoofAxis = RoofAxis.Z,
         /** Optional stair palette entry; facing/half/shape are generated, ridge uses material. */
         val stairMaterial: String? = null,
+        val profile: List<RoofKnot> = emptyList(),
     ) : BuildOperation
+
+    @Serializable @SerialName("ELLIPSOID")
+    data class Ellipsoid(override val id:String, val from:BuildPos, val to:BuildPos, val material:String, val thickness:Int=0) : BuildOperation
+
+    /** topScale=1 is a cylinder; 0 is a cone. The box determines the elliptical base. */
+    @Serializable @SerialName("CYLINDER")
+    data class Cylinder(override val id:String, val from:BuildPos, val to:BuildPos, val material:String, val topScale:Double=1.0, val thickness:Int=0) : BuildOperation
+
+    @Serializable @SerialName("POLYGON")
+    data class Polygon(override val id:String, val points:List<BuildPoint2>, val minY:Int, val maxY:Int, val material:String) : BuildOperation
+
+    @Serializable @SerialName("ARCH")
+    data class Arch(override val id:String, val from:BuildPos, val to:BuildPos, val springY:Int, val material:String, val thickness:Int=1, val spanAxis:RoofAxis=RoofAxis.X) : BuildOperation
+
+    /** Quadratic/cubic Bezier, with a radius of zero producing a six-connected single-voxel beam. */
+    @Serializable @SerialName("CURVE")
+    data class Curve(override val id:String, val points:List<BuildPos>, val material:String, val radius:Double=0.0) : BuildOperation
+
+    @Serializable @SerialName("DOOR")
+    data class Door(override val id:String, val at:BuildPos, val material:String, val facing:BuildFacing, val hinge:String="left", val open:Boolean=false) : BuildOperation
+
+    /** at is the first step block; facing points uphill, width grows to its right. */
+    @Serializable @SerialName("STAIRCASE")
+    data class Staircase(override val id:String, val at:BuildPos, val facing:BuildFacing, val steps:Int, val material:String, val width:Int=1, val headroom:Int=3, val fillMaterial:String?=null) : BuildOperation
+
+    @Serializable @SerialName("CHOOSE")
+    data class Choose(override val id:String, val choices:List<WeightedModule>, val at:BuildPos=BuildPos(0,0,0), val rotation:BuildRotation=BuildRotation.NONE) : BuildOperation
 
     @Serializable @SerialName("REPEAT")
     data class Repeat(override val id: String, val count: Int, val step: BuildPos, val build: List<BuildOperation>) : BuildOperation
@@ -72,7 +107,7 @@ sealed interface BuildOperation {
 }
 
 @Serializable
-data class StructureBlueprint(
+data class StructureBlueprint @JvmOverloads constructor(
     val schemaVersion: Int = 1,
     val id: String,
     val size: BuildPos,
@@ -83,10 +118,17 @@ data class StructureBlueprint(
     val modules: Map<String, List<BuildOperation>> = emptyMap(),
     /** Volumes kept clear of Worldsmith vegetation, including entrances and yards. */
     val keepClear: List<BuildBox> = emptyList(),
+    val access: StructureAccess? = null,
+    val variation: StructureVariation = StructureVariation(),
+    val ports: List<StructurePort> = emptyList(),
+    val interactions: List<StructureInteraction> = emptyList(),
 )
 
 @Serializable
-enum class StructureSurface { LAND_SURFACE, OCEAN_FLOOR }
+enum class StructureSurface { LAND_SURFACE, OCEAN_FLOOR, WATER_SURFACE, SKY_SURFACE, CAVE_FLOOR, CAVE_CEILING }
+
+@Serializable data class StructureHeightRange(val minY:Int,val maxY:Int)
+@Serializable data class StructureEarthwork(val maxCut:Int=2,val maxBlocks:Int=4096)
 
 @Serializable
 enum class FoundationMode { NONE, FILL, PILLARS }
@@ -101,10 +143,15 @@ data class StructureFoundation(
 )
 
 @Serializable
-data class StructureTerrainFit(
+data class StructureTerrainFit @JvmOverloads constructor(
     val surface: StructureSurface = StructureSurface.LAND_SURFACE,
     val maxHeightDifference: Int = 3,
     val foundation: StructureFoundation = StructureFoundation(),
+    val verticalRange:StructureHeightRange?=null,
+    val layer:Int=0,
+    val searchRadius:Int=0,
+    val earthwork:StructureEarthwork?=null,
+    val minAirBelow:Int=8,
 )
 
 /** Optional link to a terrain anchor; never implies a required landmark or a forced successful start. */
@@ -131,20 +178,20 @@ data class StructurePlacement(
 )
 
 @Serializable
-data class WorldStructureDefinition(val id: String, val blueprint: StructureBlueprint, val placement: StructurePlacement)
+data class WorldStructureDefinition @JvmOverloads constructor(val id: String, val blueprint: StructureBlueprint, val placement: StructurePlacement, val assembly:StructureAssembly?=null)
 
 /** In-memory/MCP document; portable disk storage keeps each blueprint in its own file. */
 @Serializable
 data class StructureLibrary(val schemaVersion: Int = 1, val structures: List<WorldStructureDefinition> = emptyList())
 
 @Serializable
-data class StructureIndexEntry(val id: String, val blueprint: String, val placement: StructurePlacement)
+data class StructureIndexEntry(val id: String, val blueprint: String, val placement: StructurePlacement, val assembly:StructureAssemblyIndex?=null)
 
 @Serializable
 data class StructureIndex(val schemaVersion: Int = 1, val structures: List<StructureIndexEntry> = emptyList())
 
 /** AIR is explicit. Missing coordinates mean KEEP, never implicit air. */
-data class StructureVoxel(val position: BuildPos, val material: BuildMaterial, val quarterTurns: Int = 0)
+data class StructureVoxel(val position: BuildPos, val material: BuildMaterial, val quarterTurns: Int = 0, val passable:Boolean=false)
 
 data class CompiledStructure(
     val id: String,
@@ -154,4 +201,5 @@ data class CompiledStructure(
     val keepClear: List<BuildBox>,
     val expandedWork: Int,
     val diagnostics: List<com.wjz.worldsmith.core.validation.Diagnostic> = emptyList(),
+    val interactions: List<StructureInteraction> = emptyList(),
 )

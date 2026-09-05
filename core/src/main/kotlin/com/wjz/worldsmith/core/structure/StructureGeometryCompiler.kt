@@ -19,19 +19,28 @@ object StructureGeometryCompiler {
     private val BLOCK = Regex("^[a-z0-9_.-]+:[a-z0-9_./-]+$")
     private val AIR = BuildMaterial("minecraft:air")
 
-    @JvmStatic
-    fun compile(blueprint: StructureBlueprint): CompiledStructure = Builder(blueprint).compile()
+    @JvmStatic @JvmOverloads
+    fun compile(blueprint: StructureBlueprint, variant:Int=0): CompiledStructure = Builder(blueprint,variant).compile()
 
-    private class Builder(val blueprint: StructureBlueprint) {
+    @JvmStatic fun compileVariants(blueprint:StructureBlueprint):List<CompiledStructure> {
+        StructureVariationCompiler.validate(blueprint)
+        return (0 until blueprint.variation.count).map {compile(blueprint,it)}
+    }
+
+    private class Builder(val blueprint: StructureBlueprint, val variant:Int) {
         val cells = LinkedHashMap<BuildPos, StructureVoxel>()
         val writers = HashMap<BuildPos, String>()
         val writtenOperations = linkedSetOf<String>()
         val lastClears = HashMap<BuildPos, String>()
         var work = 0
         var operations = 0
+        val seed=blueprint.variation.seed xor blueprint.id.hashCode().toLong() xor (variant.toLong()*-7046029254386353131L)
+        val selectedPalette by lazy {StructureVariationCompiler.palette(blueprint,seed)}
 
         fun compile(): CompiledStructure {
             check(blueprint.schemaVersion == 1, "schemaVersion", "UNSUPPORTED_SCHEMA", "Structure schema must be 1")
+            StructureVariationCompiler.validate(blueprint)
+            check(variant in 0 until blueprint.variation.count,"variant","INVALID_VARIANT","Variant index must lie inside variation.count")
             check(blueprint.id.matches(Regex("^[a-z0-9_][a-z0-9_-]{0,63}$")), "id", "INVALID_STRUCTURE_ID", "Use a short lowercase identifier without path separators")
             val size = blueprint.size
             check(listOf(size.x, size.y, size.z).all { it in 1..MAX_DIMENSION }, "size", "STRUCTURE_SIZE_OUT_OF_RANGE", "Each dimension must be 1..$MAX_DIMENSION")
@@ -47,11 +56,16 @@ object StructureGeometryCompiler {
             check(blueprint.build.isNotEmpty(), "build", "EMPTY_STRUCTURE_BUILD", "A structure needs build operations")
             validateModuleGraph()
             execute(blueprint.build, Transform(), "build", 0)
+            val navigation=StructureNavigation.inspect(blueprint,cells.values)
+            val before=navigation.diagnostics+StructureContentChecks.validate(blueprint,cells)
+            before.firstOrNull {it.severity==DiagnosticSeverity.ERROR}?.let {throw StructureBuildException(it)}
+            val weathered=StructureVariationCompiler.decay(blueprint,cells,selectedPalette,seed,navigation.protectedCells)
+            cells.clear();cells.putAll(weathered)
             check(cells.values.any { !it.material.isAir() }, "build", "EMPTY_STRUCTURE", "The final template must contain solid authored content")
             check(blueprint.keepClear.size <= 32, "keepClear", "TOO_MANY_CLEAR_VOLUMES", "At most 32 clearance boxes")
             blueprint.keepClear.forEachIndexed { i, box -> box(box.from, box.to, "keepClear[$i]"); point(box.from,"keepClear[$i].from"); point(box.to,"keepClear[$i].to") }
             return CompiledStructure(blueprint.id, blueprint.size, blueprint.origin,
-                cells.entries.sortedWith(compareBy({ it.key.y }, { it.key.z }, { it.key.x })).map { it.value }, blueprint.keepClear, work, qualityDiagnostics())
+                cells.entries.sortedWith(compareBy({ it.key.y }, { it.key.z }, { it.key.x })).map { it.value }, blueprint.keepClear, work, qualityDiagnostics(),blueprint.interactions)
         }
 
         fun qualityDiagnostics(): List<Diagnostic> {
@@ -85,6 +99,10 @@ object StructureGeometryCompiler {
                 ops.forEach { op -> when(op) {
                     is BuildOperation.Instance -> visit(op.module, depth + 1)
                     is BuildOperation.Repeat -> visitOps(op.build, depth + 1, visit)
+                    is BuildOperation.Choose -> {
+                        check(op.choices.size in 1..16 && op.choices.all {it.weight in 1..10000},"modules","INVALID_MODULE_CHOICE","CHOOSE needs 1..16 modules with positive weights")
+                        op.choices.forEach {visit(it.module,depth+1)}
+                    }
                     else -> Unit
                 } }
             }
@@ -149,6 +167,18 @@ object StructureGeometryCompiler {
                         val module = blueprint.modules[op.module] ?: fail(at,"UNKNOWN_STRUCTURE_MODULE","Unknown module '${op.module}'")
                         execute(module,transform.then(op.at,op.rotation.ordinal),"$at.${op.module}",depth+1)
                     }
+                    is BuildOperation.Choose -> {
+                        local(op.at,at)
+                        val choice=StructureVariationCompiler.choose(op.choices,WeightedModule::weight,seed,at)
+                        execute(blueprint.modules.getValue(choice.module),transform.then(op.at,op.rotation.ordinal),"$at.${choice.module}",depth+1)
+                    }
+                    else -> try {
+                        StructurePrimitives.emit(op,{p,key,props,passable ->
+                            val m=key?.let {material(it,at)} ?: AIR
+                            emit(p,m.copy(properties=m.properties+props),transform,at,passable=passable && (m.block!="minecraft:iron_door" || props["open"]=="true"))
+                        },{check(++work<=MAX_WORK,at,"STRUCTURE_WORK_BUDGET","Primitive sampling exceeds the shared work budget")})
+                    } catch(failure:StructureBuildException) {throw failure}
+                    catch(failure:IllegalArgumentException) {fail(at,"INVALID_STRUCTURE_SHAPE",failure.message ?: "Invalid shape parameters")}
                 }
             }
         }
@@ -161,21 +191,43 @@ object StructureGeometryCompiler {
             if(op.style==RoofStyle.FLAT) check(rise==0 && op.stairMaterial==null,path,"FLAT_ROOF_HEIGHT","FLAT roof has one Y layer and no stair material")
             else check(half>0 && rise in 1..half,path,"ROOF_SLOPE_OUT_OF_RANGE","Roof rise must be 1..half its cross-span, so steps remain connected")
             check(op.style==RoofStyle.GABLE || op.ridgeAxis==RoofAxis.Z,path,"UNUSED_ROOF_AXIS","Only GABLE consumes ridgeAxis; leave it omitted for FLAT/HIP")
+            if(op.profile.isNotEmpty())check(op.style!=RoofStyle.FLAT && op.profile.size in 2..16 && op.profile.first().at==0.0 && op.profile.last().at==1.0 && op.profile.last().height==1.0 && op.profile.all {it.at in 0.0..1.0 && it.height in 0.0..1.0} && op.profile.zipWithNext().all {(a,b)->a.at<b.at},path,"INVALID_ROOF_PROFILE","Roof profile needs 2..16 ordered knots from at=0 to at=1, heights 0..1 and a full-height ridge")
+            fun height(distance:Int):Int {
+                if(op.style==RoofStyle.FLAT)return op.from.y
+                if(op.profile.isEmpty())return op.from.y+min(rise,distance*rise/half)
+                val t=distance.toDouble()/half
+                val pair=op.profile.zipWithNext().firstOrNull {(a,b)->t>=a.at && t<=b.at} ?: (op.profile[op.profile.lastIndex-1] to op.profile.last())
+                val (a,b)=pair;return op.from.y+(rise*(a.height+(b.height-a.height)*(t-a.at)/(b.at-a.at))).roundToInt()
+            }
+            if(op.style!=RoofStyle.FLAT)check((0 until half).all {abs(height(it+1)-height(it))<=1},path,"ROOF_PROFILE_DISCONNECTED","Adjacent roof bands must differ by at most one block")
             val ridge=material(op.material,path)
             val stair=op.stairMaterial?.let { material(it,path) }
             for(x in op.from.x..op.to.x) for(z in op.from.z..op.to.z) {
                 val dx=min(x-op.from.x,op.to.x-x); val dz=min(z-op.from.z,op.to.z-z)
                 val distance=when(op.style){RoofStyle.FLAT->0;RoofStyle.GABLE->if(op.ridgeAxis==RoofAxis.Z)dx else dz;RoofStyle.HIP->min(dx,dz)}
-                val y=if(op.style==RoofStyle.FLAT)op.from.y else op.from.y+min(rise, distance*rise/half)
-                val facing=if(op.style==RoofStyle.GABLE && op.ridgeAxis==RoofAxis.Z || op.style==RoofStyle.HIP && dx<=dz) {
+                val y=height(distance)
+                var facing=if(op.style==RoofStyle.GABLE && op.ridgeAxis==RoofAxis.Z || op.style==RoofStyle.HIP && dx<=dz) {
                     if(x-op.from.x <= op.to.x-x)"east" else "west"
                 } else {if(z-op.from.z <= op.to.z-z)"south" else "north"}
+                if(distance<half && height(distance+1)<y)facing=when(facing){"east"->"west";"west"->"east";"north"->"south";else->"north"}
                 val block=if(stair!=null && y<op.to.y) stair.copy(properties=stair.properties+mapOf("facing" to facing,"half" to "bottom","shape" to "straight")) else ridge
+                // A one-block rise otherwise only touches the next band at an
+                // edge. Back the higher band inside the declared roof box so
+                // slopes form a six-connected shell instead of diagonal cracks.
+                val lowerNeighbour=listOf(x-1 to z,x+1 to z,x to z-1,x to z+1).any {(nx,nz)->
+                    if(nx !in op.from.x..op.to.x || nz !in op.from.z..op.to.z)false
+                    else {
+                        val ndx=min(nx-op.from.x,op.to.x-nx);val ndz=min(nz-op.from.z,op.to.z-nz)
+                        val nd=when(op.style){RoofStyle.FLAT->0;RoofStyle.GABLE->if(op.ridgeAxis==RoofAxis.Z)ndx else ndz;RoofStyle.HIP->min(ndx,ndz)}
+                        height(nd)<y
+                    }
+                }
+                if(lowerNeighbour && y>op.from.y)emit(BuildPos(x,y-1,z),ridge,transform,path)
                 emit(BuildPos(x,y,z),block,transform,path)
             }
         }
 
-        fun material(key: String,path: String)=blueprint.palette[key] ?: fail(path,"UNKNOWN_STRUCTURE_MATERIAL","Unknown palette entry '$key'")
+        fun material(key: String,path: String)=selectedPalette[key] ?: fail(path,"UNKNOWN_STRUCTURE_MATERIAL","Unknown palette entry '$key'")
         fun local(p: BuildPos,path: String) = check(listOf(p.x,p.y,p.z).all { it in -128..128 },path,"BUILD_COORDINATE_OUT_OF_RANGE","Local operation coordinates must stay within -128..128")
         fun point(p: BuildPos,path: String) = check(p.x in 0 until blueprint.size.x && p.y in 0 until blueprint.size.y && p.z in 0 until blueprint.size.z,path,"STRUCTURE_BOUNDS_EXCEEDED","Position $p is outside size ${blueprint.size}")
         fun box(from: BuildPos,to: BuildPos,path: String) { local(from,path);local(to,path);check(from.x<=to.x && from.y<=to.y && from.z<=to.z,path,"REVERSED_BUILD_BOX","Box from must not exceed to on any axis") }
@@ -185,12 +237,12 @@ object StructureGeometryCompiler {
             check(count+work<=MAX_WORK,path,"STRUCTURE_WORK_BUDGET","Construction exceeds $MAX_WORK voxel visits")
             for(y in from.y..to.y) for(z in from.z..to.z) for(x in from.x..to.x) action(BuildPos(x,y,z))
         }
-        fun emit(p: BuildPos,m: BuildMaterial,t: Transform,path: String, clear: Boolean = false) {
+        fun emit(p: BuildPos,m: BuildMaterial,t: Transform,path: String, clear: Boolean = false,passable:Boolean=false) {
             local(p,path)
             check(++work<=MAX_WORK,path,"STRUCTURE_WORK_BUDGET","Construction exceeds $MAX_WORK voxel visits")
             val actual=t.apply(p)
             point(actual,path)
-            cells[actual]=StructureVoxel(actual,m,t.rotation)
+            cells[actual]=StructureVoxel(actual,m,t.rotation,passable)
             writers[actual] = path
             writtenOperations += path
             if (clear) lastClears[actual] = path

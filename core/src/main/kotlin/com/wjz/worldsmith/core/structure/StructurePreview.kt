@@ -126,7 +126,22 @@ object StructurePreview {
         val components = listOf((value shr 16) and 255,(value shr 8) and 255,value and 255)
         return "#"+components.joinToString("") { (it*amount).roundToInt().coerceIn(0,255).toString(16).padStart(2,'0') }
     }
-    private fun color(block:String):String = when {
+    private val dyes=mapOf("white" to "#deded6","orange" to "#d58132","magenta" to "#b665b8","light_blue" to "#6aaac9","yellow" to "#ddc14d","lime" to "#8cab46","pink" to "#d996ae","gray" to "#676b70","light_gray" to "#a7aba6","cyan" to "#458f98","purple" to "#9261b2","blue" to "#566da5","brown" to "#886244","green" to "#617c44","red" to "#b6574c","black" to "#363b41")
+    private fun color(block:String):String {
+        val name=block.substringAfter(':')
+        val dye=dyes.entries.firstOrNull {(key,_)->name.startsWith(key+"_")}
+        if(dye!=null && listOf("glass","wool","concrete","terracotta","banner","carpet").any {it in name})return dye.value
+        return when {
+        name=="water" || name=="bubble_column" -> "#367bc1"
+        name=="lava" -> "#e77431"
+        "leaves" in block || "moss" in block -> "#628451"
+        "deepslate" in block || "blackstone" in block -> "#535660"
+        "calcite" in block || "quartz" in block -> "#e1dccd"
+        "amethyst" in block -> "#a375c0"
+        "copper" in block -> if("oxidized" in block)"#509c86" else if("weathered" in block)"#74957b" else "#b87955"
+        "nether_brick" in block -> "#553a43"
+        "bricks" in block && "stone" !in block -> "#a56654"
+        "prismarine" in block -> "#55968d"
         "dark_oak" in block -> "#604432"
         "spruce" in block -> "#826143"
         "cherry" in block -> "#dba8a0"
@@ -135,7 +150,6 @@ object StructurePreview {
         "red_terracotta" in block -> "#a45446"
         "glass" in block -> "#8dc2c3"
         "lantern" in block || "glowstone" in block -> "#f3bf54"
-        "moss" in block || "leaves" in block -> "#628451"
         "stone" in block || "andesite" in block -> "#90999a"
         else -> {
             // HSL(32%, 62%) as RGB so every material supports depth/face shading.
@@ -146,5 +160,6 @@ object StructurePreview {
                 (channel * 255).roundToInt().toString(16).padStart(2,'0')
             }
         }
+    }
     }
 }

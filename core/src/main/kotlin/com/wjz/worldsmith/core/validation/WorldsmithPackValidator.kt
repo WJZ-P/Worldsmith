@@ -40,6 +40,12 @@ object WorldsmithPackValidator {
         addAll(FeatureLibraryValidator.validate(pack.features).map { it.prefixed("features") })
         addAll(BiomePlanValidator.validate(pack.biomes, pack.features).map { it.prefixed("biomes") })
         addAll(StructureValidator.validate(pack.structures, pack.biomes).map { it.prefixed("structures") })
+        pack.structures.structures.forEachIndexed {i,s->
+            s.placement.terrainFit.verticalRange?.let {range->
+                if(range.maxY<pack.terrain.minY || range.minY>=pack.terrain.minY+pack.terrain.height)
+                    add(error("structures.structures[$i].placement.terrainFit.verticalRange","UNREACHABLE_STRUCTURE_HEIGHT","Structure height window does not intersect this world's vertical extent"))
+            }
+        }
         addAll(validateBiomeTerrainLinks(pack))
         addAll(validateSurfaceTerrainLinks(pack))
         addAll(validateAnchorReferences(pack))

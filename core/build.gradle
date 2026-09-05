@@ -53,7 +53,8 @@ tasks.register('previewStructure', JavaExec) {
 	workingDir rootProject.projectDir
 	args((findProperty('blueprintFile') ?: file('src/main/resources/worldsmith/structures/forest_shrine.json').absolutePath),
 		(findProperty('previewFile') ?: rootProject.file('build/structure-previews/forest_shrine.svg').absolutePath),
-		(findProperty('sliceY') ?: ''), (findProperty('cutaway') ?: 'false'))
+		(findProperty('sliceY') ?: ''), (findProperty('cutaway') ?: 'false'),
+		(findProperty('variant') ?: '0'), (findProperty('assembly') ?: 'false'))
 }
 
 java {

@@ -54,8 +54,12 @@ class StructureGeometryTest {
         assertTrue("\"op\": \"ROOF\"" in text)
         val roundtrip=WorldsmithJson.decode<StructureBlueprint>(text)
         val c=StructureGeometryCompiler.compile(roundtrip)
-        assertEquals(81,c.voxels.size)
+        assertEquals(81,c.voxels.map {it.position.x to it.position.z}.distinct().size)
+        assertTrue(c.voxels.size>81,"sloping roof bands need backing blocks")
         assertEquals(setOf(4,5,6,7,8),c.voxels.map {it.position.y}.toSet())
+        val unseen=c.voxels.map {it.position}.toMutableSet();val queue=java.util.ArrayDeque<BuildPos>();queue.add(unseen.first());unseen.remove(queue.first)
+        while(queue.isNotEmpty()) {val p=queue.removeFirst();for(d in listOf(BuildPos(1,0,0),BuildPos(-1,0,0),BuildPos(0,1,0),BuildPos(0,-1,0),BuildPos(0,0,1),BuildPos(0,0,-1))) {val next=BuildPos(p.x+d.x,p.y+d.y,p.z+d.z);if(unseen.remove(next))queue.add(next)}}
+        assertTrue(unseen.isEmpty(),"roof bands must be six-connected, not touch only at diagonal edges")
     }
 
     @Test fun `example is executable and preview is well formed XML`() {
