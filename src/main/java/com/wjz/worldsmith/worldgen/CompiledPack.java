@@ -5,6 +5,8 @@ import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.FeatureLibrary;
 import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
+import com.wjz.worldsmith.core.structure.CompiledStructureCatalog;
+import com.wjz.worldsmith.core.structure.StructureCatalogCompiler;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,10 +36,12 @@ public final class CompiledPack {
 	private final String resourcePrefix;
 	private final List<CompiledBiome> biomes;
 	private final Map<String, CompiledBiome> byId;
+	private final CompiledStructureCatalog structures;
 
 	private CompiledPack(WorldsmithPack pack, String resourcePrefix) {
 		this.pack = pack;
 		this.resourcePrefix = resourcePrefix;
+		this.structures = StructureCatalogCompiler.compile(pack.getStructures());
 		this.biomes = CompiledBiomes.compile(pack.getBiomes(), this::biomeKey);
 		Map<String, CompiledBiome> index = new LinkedHashMap<>();
 		this.biomes.forEach(biome -> index.put(biome.id(), biome));
@@ -102,6 +106,8 @@ public final class CompiledPack {
 		return this.pack.getManifest().getDisplayName();
 	}
 
+	public CompiledStructureCatalog structures() { return this.structures; }
+
 	public boolean scoped() {
 		return !this.resourcePrefix.isEmpty();
 	}
@@ -130,7 +136,9 @@ public final class CompiledPack {
 		return ResourceKey.create(Registries.WORLD_PRESET, resourceId("wasteland"));
 	}
 
-	public Identifier structureTemplateId(String id) { return resourceId("buildings/" + id); }
+	public Identifier structureTemplateId(String id) { return structureTemplateId(id,0); }
+	public Identifier structureTemplateId(String id,int variant) { return resourceId("buildings/" + id + "/" + variant); }
+	public Identifier structureLootId(String id,int interaction) { return resourceId("buildings/" + id + "/loot_" + interaction); }
 	public ResourceKey<Structure> structureKey(String id) { return ResourceKey.create(Registries.STRUCTURE, resourceId("buildings/" + id)); }
 	public ResourceKey<StructureSet> structureSetKey(String id) { return ResourceKey.create(Registries.STRUCTURE_SET, resourceId("buildings/" + id)); }
 

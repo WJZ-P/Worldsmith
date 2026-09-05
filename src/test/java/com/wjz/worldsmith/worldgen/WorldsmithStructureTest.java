@@ -70,7 +70,7 @@ final class WorldsmithStructureTest {
         var vanilla=VanillaRegistries.createLookup();
         var compiled=WorldsmithPackExporter.compilePatch(pack,vanilla);
         Path output=temp.resolve("export");
-        int written=WorldsmithPackExporter.write(pack,compiled.patches(),output);
+        int written=WorldsmithPackExporter.write(pack,compiled,output);
         assertEquals(55,written,"normal 52 files plus structure, structure set and NBT");
         Identifier id=pack.structureTemplateId("forest_shrine");
         Path nbt=output.resolve("data/worldsmith/structure/"+id.getPath()+".nbt");
@@ -86,13 +86,13 @@ final class WorldsmithStructureTest {
 
     @Test void templateAssetsParticipateInDatagenCaching() throws Exception {
         Map<Path,byte[]> cached=new LinkedHashMap<>();
-        int written=WorldsmithStructureTemplates.write(pack(),temp,(path,bytes,hash)->{
+        int written=WorldsmithStructureTemplates.write(pack(),VanillaRegistries.createLookup(),temp,(path,bytes,hash)->{
             assertNotNull(hash);
             cached.put(path,bytes);
         });
         assertEquals(1,written);
         assertEquals(1,cached.size());
-        assertTrue(cached.keySet().iterator().next().toString().endsWith("forest_shrine.nbt"));
+        assertTrue(cached.keySet().iterator().next().endsWith(Path.of("forest_shrine","0.nbt")));
         assertTrue(cached.values().iterator().next().length>100);
     }
 
@@ -125,12 +125,12 @@ final class WorldsmithStructureTest {
     @Test void piecesClipWritesToEachChunkAndRemainStableInReverseOrder() throws Exception {
         var geometry=StructureGeometryCompiler.compile(example());
         Identifier id=Identifier.fromNamespaceAndPath("worldsmith","test/shrine");
-        var config=new WorldsmithTemplateStructure.Settings(id,new BlockPos(15,13,19),new BlockPos(7,0,9),List.of(Rotation.NONE),"LAND_SURFACE",4,"FILL",Blocks.STONE_BRICKS.defaultBlockState(),6,List.of(BlockPos.ZERO),List.of(new BoundingBox(0,0,0,14,12,18)),List.of(BlockPos.ZERO),testLayout(id,new BlockPos(15,13,19),new BlockPos(7,0,9)));
+        var config=WorldsmithStructureFixtures.settings(id,new BlockPos(15,13,19),new BlockPos(7,0,9),List.of(Rotation.NONE),"LAND_SURFACE",4,"FILL",Blocks.STONE_BRICKS.defaultBlockState(),6,List.of(BlockPos.ZERO),List.of(new BoundingBox(0,0,0,14,12,18)),List.of(BlockPos.ZERO),testLayout(id,new BlockPos(15,13,19),new BlockPos(7,0,9)));
         try(var storage=LevelStorageSource.createDefault(temp).createAccess("piece-test")) {
             var manager=new StructureTemplateManager(ResourceManager.Empty.INSTANCE,storage,DataFixers.getDataFixer(),BuiltInRegistries.BLOCK);
             manager.getOrCreate(id).load(BuiltInRegistries.BLOCK,WorldsmithStructureTemplates.encode(geometry));
-            var a=new WorldsmithTemplatePiece(manager,config,new BlockPos(9,70,9),Rotation.NONE,List.of(new BoundingBox(10,68,10,10,69,10)));
-            var b=new WorldsmithTemplatePiece(manager,config,new BlockPos(9,70,9),Rotation.NONE,List.of(new BoundingBox(10,68,10,10,69,10)));
+            var a=new WorldsmithTemplatePiece(manager,config.plans().getFirst().parts().getFirst(),config.site().foundationState(),new BlockPos(9,70,9),Rotation.NONE,List.of(new BoundingBox(10,68,10,10,69,10)),List.of(),2L);
+            var b=new WorldsmithTemplatePiece(manager,config.plans().getFirst().parts().getFirst(),config.site().foundationState(),new BlockPos(9,70,9),Rotation.NONE,List.of(new BoundingBox(10,68,10,10,69,10)),List.of(),2L);
             List<ChunkPos> chunks=List.of(new ChunkPos(0,0),new ChunkPos(1,0),new ChunkPos(0,1),new ChunkPos(1,1));
             FlatWorld forward=new FlatWorld(),reverse=new FlatWorld();
             for(ChunkPos chunk:chunks)place(a,forward,chunk);
@@ -143,17 +143,17 @@ final class WorldsmithStructureTest {
     }
 
     @Test void terrainFitIsBoundedAndRejectsWaterCliffsAndMissingSupports() {
-        var config=new WorldsmithTemplateStructure.Settings(Identifier.fromNamespaceAndPath("worldsmith","test/probe"),new BlockPos(5,8,5),new BlockPos(2,0,2),List.of(Rotation.NONE),"LAND_SURFACE",4,"FILL",Blocks.STONE.defaultBlockState(),3,List.of(new BlockPos(0,0,0),new BlockPos(4,0,4)),List.of(new BoundingBox(0,0,0,4,7,4)),List.of(new BlockPos(0,0,0),new BlockPos(4,0,4)),testLayout(Identifier.fromNamespaceAndPath("worldsmith","test/probe"),new BlockPos(5,8,5),new BlockPos(2,0,2)));
-        var slope=WorldsmithTerrainProbe.probe(config,BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(x<0?65:67,x<0?65:67));
+        var config=WorldsmithStructureFixtures.settings(Identifier.fromNamespaceAndPath("worldsmith","test/probe"),new BlockPos(5,8,5),new BlockPos(2,0,2),List.of(Rotation.NONE),"LAND_SURFACE",4,"FILL",Blocks.STONE.defaultBlockState(),3,List.of(new BlockPos(0,0,0),new BlockPos(4,0,4)),List.of(new BoundingBox(0,0,0,4,7,4)),List.of(new BlockPos(0,0,0),new BlockPos(4,0,4)),testLayout(Identifier.fromNamespaceAndPath("worldsmith","test/probe"),new BlockPos(5,8,5),new BlockPos(2,0,2)));
+        var slope=WorldsmithTerrainProbe.probe(config.plans().getFirst(),config.site(),BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(x<0?65:67,x<0?65:67));
         assertTrue(slope.accepted());
         assertEquals(67,slope.plan().position().getY());
         assertEquals(1,slope.plan().foundations().size());
         assertEquals(65,slope.plan().foundations().getFirst().minY());
         assertEquals(66,slope.plan().foundations().getFirst().maxY());
-        assertEquals(WorldsmithTerrainProbe.Rejection.WRONG_FLUID,WorldsmithTerrainProbe.probe(config,BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(58,63)).rejection());
-        assertEquals(WorldsmithTerrainProbe.Rejection.EXCESSIVE_SLOPE,WorldsmithTerrainProbe.probe(config,BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(x<0?60:80,x<0?60:80)).rejection());
-        assertEquals(WorldsmithTerrainProbe.Rejection.MISSING_SUPPORT,WorldsmithTerrainProbe.probe(config,BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(x<0?63:67,x<0?63:67)).rejection());
-        assertEquals(WorldsmithTerrainProbe.Rejection.OUTSIDE_WORLD,WorldsmithTerrainProbe.probe(config,BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(318,318)).rejection());
+        assertEquals(WorldsmithTerrainProbe.Rejection.WRONG_FLUID,WorldsmithTerrainProbe.probe(config.plans().getFirst(),config.site(),BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(58,63)).rejection());
+        assertEquals(WorldsmithTerrainProbe.Rejection.EXCESSIVE_SLOPE,WorldsmithTerrainProbe.probe(config.plans().getFirst(),config.site(),BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(x<0?60:80,x<0?60:80)).rejection());
+        assertEquals(WorldsmithTerrainProbe.Rejection.MISSING_SUPPORT,WorldsmithTerrainProbe.probe(config.plans().getFirst(),config.site(),BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(x<0?63:67,x<0?63:67)).rejection());
+        assertEquals(WorldsmithTerrainProbe.Rejection.OUTSIDE_WORLD,WorldsmithTerrainProbe.probe(config.plans().getFirst(),config.site(),BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(318,318)).rejection());
     }
 
     @Test void moduleRotationsUseMinecraftStateTransformsRatherThanStringGuesses() {
@@ -171,7 +171,7 @@ final class WorldsmithStructureTest {
             WorldsmithStructureLayout.envelope(size,origin,List.of(Rotation.NONE),2),Optional.empty());
     }
 
-    private static void place(WorldsmithTemplatePiece piece,FlatWorld world,ChunkPos chunk) {
+    static void place(WorldsmithTemplatePiece piece,FlatWorld world,ChunkPos chunk) {
         world.clip=new BoundingBox(chunk.getMinBlockX(),-64,chunk.getMinBlockZ(),chunk.getMaxBlockX(),319,chunk.getMaxBlockZ());
         piece.postProcess(world.level,null,null,RandomSource.create(2L),world.clip,chunk,BlockPos.ZERO);
     }
@@ -187,17 +187,26 @@ final class WorldsmithStructureTest {
         return CompiledPack.scoped(new WorldsmithPack(new WorldsmithPackManifest(1,id,"Shrine fixture","Test",m.getFiles()),terrain,source.getBiomes(),source.getFeatures(),id,library));
     }
 
-    private static final class FlatWorld implements InvocationHandler {
+    static final class FlatWorld implements InvocationHandler {
         final Map<BlockPos,BlockState> states=new LinkedHashMap<>();
+        final Map<BlockPos,net.minecraft.world.level.block.entity.BlockEntity> entities=new LinkedHashMap<>();
+        final List<List<Object>> scheduledTicks=new java.util.ArrayList<>();
+        final int ground;
+        final RegistryAccess registries;
+        FlatWorld(){this(68,RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY));}
+        FlatWorld(int ground,RegistryAccess registries){this.ground=ground;this.registries=registries;}
         BoundingBox clip;
         final WorldGenLevel level=(WorldGenLevel)Proxy.newProxyInstance(WorldGenLevel.class.getClassLoader(),new Class<?>[]{WorldGenLevel.class},this);
-        BlockState state(BlockPos pos) {return states.getOrDefault(pos,pos.getY()<68?Blocks.STONE.defaultBlockState():Blocks.AIR.defaultBlockState());}
+        BlockState state(BlockPos pos) {return states.getOrDefault(pos,pos.getY()<ground?Blocks.STONE.defaultBlockState():Blocks.AIR.defaultBlockState());}
         @Override @SuppressWarnings("unchecked") public Object invoke(Object p,Method m,Object[] args) throws Throwable {
             String name=m.getName();
             if(name.equals("getBlockState"))return state((BlockPos)args[0]);
             if(name.equals("getFluidState"))return state((BlockPos)args[0]).getFluidState();
-            if(name.equals("setBlock")) {BlockPos pos=((BlockPos)args[0]).immutable();assertTrue(clip.isInside(pos),"template wrote outside current chunk: "+pos);states.put(pos,(BlockState)args[1]);return true;}
-            if(name.equals("getBlockEntity"))return null;
+            if(name.equals("setBlock")) {BlockPos pos=((BlockPos)args[0]).immutable();assertTrue(clip.isInside(pos),"template wrote outside current chunk: "+pos);var next=(BlockState)args[1];var previous=state(pos);states.put(pos,next);
+                if(previous.getBlock()!=next.getBlock()){entities.remove(pos);if(next.getBlock() instanceof EntityBlock factory){var entity=factory.newBlockEntity(pos,next);if(entity!=null)entities.put(pos,entity);}}return true;}
+            if(name.equals("getBlockEntity"))return entities.get(args[0]);
+            if(name.equals("registryAccess"))return registries;
+            if(name.equals("scheduleTick")){scheduledTicks.add(List.of(args));return null;}
             if(name.equals("getRandom"))return RandomSource.create(1L);
             if(name.equals("getMinY"))return -64;
             if(name.equals("getMaxY"))return 319;

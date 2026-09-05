@@ -79,7 +79,7 @@ final class WorldsmithStructureOptimizationTest {
         var ends=List.of(new BlockPos(0,0,0),new BlockPos(4,0,4));
         var footprint=List.of(new BlockPos(0,0,0),new BlockPos(2,0,2),new BlockPos(4,0,4));
         var settings=settings(new BlockPos(5,8,5),"PILLARS",footprint,ends);
-        var result=WorldsmithTerrainProbe.probe(settings,BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->
+        var result=WorldsmithTerrainProbe.probe(settings.plans().getFirst(),settings.site(),BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->
             new WorldsmithTerrainProbe.Column(x==2 && z==2?80:65,x==2 && z==2?80:65));
         assertEquals(WorldsmithTerrainProbe.Rejection.EXCESSIVE_SLOPE,result.rejection());
     }
@@ -91,9 +91,9 @@ final class WorldsmithStructureOptimizationTest {
         var sampler=new WorldsmithTerrainProbe.CachedSampler((x,z)->{
             reads.incrementAndGet();return new WorldsmithTerrainProbe.Column(65,65);
         });
-        assertTrue(WorldsmithTerrainProbe.probe(settings,BlockPos.ZERO,Rotation.NONE,-64,319,sampler).accepted());
+        assertTrue(WorldsmithTerrainProbe.probe(settings.plans().getFirst(),settings.site(),BlockPos.ZERO,Rotation.NONE,-64,319,sampler).accepted());
         assertEquals(3,reads.get(),"support fitting resampled the footprint");
-        assertTrue(WorldsmithTerrainProbe.probe(settings,BlockPos.ZERO,Rotation.CLOCKWISE_90,-64,319,sampler).accepted());
+        assertTrue(WorldsmithTerrainProbe.probe(settings.plans().getFirst(),settings.site(),BlockPos.ZERO,Rotation.CLOCKWISE_90,-64,319,sampler).accepted());
         assertEquals(5,reads.get(),"rotated candidate did not share its origin sample");
     }
 
@@ -101,7 +101,7 @@ final class WorldsmithStructureOptimizationTest {
         List<BlockPos> footprint=new ArrayList<>();
         for(int x=0;x<64;x++)for(int z=0;z<64;z++)footprint.add(new BlockPos(x,0,z));
         var settings=settings(new BlockPos(64,8,64),"FILL",footprint,footprint);
-        var result=WorldsmithTerrainProbe.probe(settings,BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->{
+        var result=WorldsmithTerrainProbe.probe(settings.plans().getFirst(),settings.site(),BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->{
             int y=x==0 && z==0?68:64;
             return new WorldsmithTerrainProbe.Column(y,y);
         });
@@ -130,8 +130,8 @@ final class WorldsmithStructureOptimizationTest {
         var json=WorldsmithTemplateStructure.Settings.CODEC.encodeStart(JsonOps.INSTANCE,config).getOrThrow().getAsJsonObject();
         var missingSupport=json.deepCopy();
         var incomplete=new JsonArray();
-        incomplete.add(json.getAsJsonArray("footprint").get(0));
-        missingSupport.add("footprint",incomplete);
+        incomplete.add(json.getAsJsonArray("plans").get(0).getAsJsonObject().getAsJsonArray("footprint").get(0));
+        missingSupport.getAsJsonArray("plans").get(0).getAsJsonObject().add("footprint",incomplete);
         assertTrue(WorldsmithTemplateStructure.Settings.CODEC.parse(JsonOps.INSTANCE,missingSupport).error().isPresent());
         var undersized=json.deepCopy();
         undersized.getAsJsonObject("layout").add("envelope",JsonParser.parseString("[0,0,0,1,0,1]"));
@@ -168,7 +168,7 @@ final class WorldsmithStructureOptimizationTest {
             // One native candidate per 4096-chunk cell, same salt: both compete
             // at (0,0), with no nearby self-candidate. The id breaks the rank tie.
             var layout=new WorldsmithStructureLayout.Member(id,"same_pack",4096,4095,56,envelope,Optional.empty());
-            var config=new WorldsmithTemplateStructure.Settings(template,size,BlockPos.ZERO,List.of(Rotation.NONE),surface,0,"NONE",
+            var config=WorldsmithStructureFixtures.settings(template,size,BlockPos.ZERO,List.of(Rotation.NONE),surface,0,"NONE",
                 Blocks.STONE.defaultBlockState(),0,List.of(BlockPos.ZERO),List.of(new BoundingBox(0,0,0,14,12,18)),List.of(BlockPos.ZERO),layout);
             var structure=new WorldsmithTemplateStructure(new Structure.StructureSettings(HolderSet.direct(biome)),config);
             registry.register(ResourceKey.create(Registries.STRUCTURE,id),structure,RegistrationInfo.BUILT_IN);
@@ -193,7 +193,7 @@ final class WorldsmithStructureOptimizationTest {
     private static WorldsmithTemplateStructure.Settings settings(BlockPos size,String mode,List<BlockPos> footprint,List<BlockPos> supports) {
         var id=Identifier.fromNamespaceAndPath("worldsmith","test/fit");
         var member=member("fit",24,8,146,size,BlockPos.ZERO);
-        return new WorldsmithTemplateStructure.Settings(id,size,BlockPos.ZERO,List.of(Rotation.values()),"LAND_SURFACE",4,mode,
+        return WorldsmithStructureFixtures.settings(id,size,BlockPos.ZERO,List.of(Rotation.values()),"LAND_SURFACE",4,mode,
             Blocks.STONE_BRICKS.defaultBlockState(),6,supports,List.of(new BoundingBox(0,0,0,size.getX()-1,size.getY()-1,size.getZ()-1)),footprint,member);
     }
 }

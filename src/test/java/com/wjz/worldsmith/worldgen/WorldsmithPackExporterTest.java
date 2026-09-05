@@ -91,7 +91,7 @@ final class WorldsmithPackExporterTest {
 		CompiledPack pack = WorldsmithPacks.builtinCompiled();
 		RegistrySetBuilder.PatchedRegistries compiled = WorldsmithPackExporter.compilePatch(pack, vanilla);
 		Path output = this.tempDirectory.resolve("readback");
-		WorldsmithPackExporter.write(pack, compiled.patches(), output);
+		WorldsmithPackExporter.write(pack, compiled, output);
 		RegistryOps<JsonElement> ops = compiled.full().createSerializationContext(JsonOps.INSTANCE);
 		String surfaceGrammar = readJson(
 			output.resolve("data/worldsmith/worldgen/noise_settings/wasteland.json")
@@ -157,7 +157,7 @@ final class WorldsmithPackExporterTest {
 		RegistrySetBuilder.PatchedRegistries compiled = WorldsmithPackExporter.compilePatch(runtime, activeWorldgen);
 		Path output = this.tempDirectory.resolve("scoped");
 
-		assertEquals(52, WorldsmithPackExporter.write(runtime, compiled.patches(), output));
+		assertEquals(52, WorldsmithPackExporter.write(runtime, compiled, output));
 		String prefix = "generated/" + runtime.id();
 		assertTrue(Files.isRegularFile(
 			output.resolve("data/worldsmith/worldgen/biome").resolve(prefix).resolve("abyss.json")
@@ -241,7 +241,7 @@ final class WorldsmithPackExporterTest {
 		RegistrySetBuilder.PatchedRegistries compiled = WorldsmithPackExporter.compilePatch(runtime, activeWorldgen);
 		Path output = this.tempDirectory.resolve("procedural");
 
-		assertEquals(52, WorldsmithPackExporter.write(runtime, compiled.patches(), output));
+		assertEquals(52, WorldsmithPackExporter.write(runtime, compiled, output));
 		JsonElement proceduralBiome = readJson(
 			output.resolve("data/worldsmith/worldgen/biome/generated")
 				.resolve(id)

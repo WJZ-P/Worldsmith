@@ -41,10 +41,10 @@ final class WorldsmithStructureAnchorTest {
     }
 
     @Test void optionalRandomModeStillUsesTheNativePlacementAndUnchangedCandidateArithmetic() {
-        var source=WorldsmithPacks.builtinCompiled();
+        var source=pack(new AnchorPlacement.Fixed(-31,17),null);
         var definition=new WorldStructureDefinition("house",blueprint(),new com.wjz.worldsmith.core.structure.StructurePlacement(
             List.of(source.biomes().getFirst().definition().getId()),24,8,List.of(BuildRotation.NONE),new StructureTerrainFit(StructureSurface.LAND_SURFACE,3,new StructureFoundation(FoundationMode.NONE,null,0,List.of())),2,null));
-        var layout=WorldsmithStructures.layout(source,definition);
+        var layout=WorldsmithStructures.layout(source,source.pack().getStructures().getStructures().getFirst());
         assertTrue(layout.anchor().isEmpty());
         var nativePlacement=assertInstanceOf(RandomSpreadStructurePlacement.class,layout.placement());
         for (int x:new int[]{-49,-24,-1,0,27,91}) {
@@ -122,7 +122,7 @@ final class WorldsmithStructureAnchorTest {
         var encoded=net.minecraft.world.level.levelgen.structure.placement.StructurePlacement.CODEC.encodeStart(ops,grid).getOrThrow();
         assertEquals(grid.anchor(),assertInstanceOf(WorldsmithAnchorStructurePlacement.class,
             net.minecraft.world.level.levelgen.structure.placement.StructurePlacement.CODEC.parse(ops,encoded).getOrThrow()).anchor());
-        assertEquals(55,WorldsmithPackExporter.write(pack,compiled.patches(),temp));
+        assertEquals(55,WorldsmithPackExporter.write(pack,compiled,temp));
         assertTrue(Files.exists(temp.resolve("data/worldsmith/structure/"+pack.structureTemplateId("floor").getPath()+".nbt")));
     }
 
@@ -141,7 +141,7 @@ final class WorldsmithStructureAnchorTest {
             var stub=structure.findGenerationPoint(context).orElseThrow();
             assertEquals(-26,stub.position().getX());assertEquals(15,stub.position().getZ());
             var piece=(WorldsmithTemplatePiece)stub.getPiecesBuilder().build().pieces().getFirst();
-            var pivot=piece.templatePosition().offset(structure.templateSettings().origin().rotate(piece.getRotation()));
+            var pivot=piece.templatePosition().subtract(structure.templateSettings().plans().getFirst().parts().getFirst().offset().rotate(piece.getRotation()));
             assertEquals(stub.position(),pivot);
             var serial=new net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext(ResourceManager.Empty.INSTANCE,registryAccess,manager);
             var restored=new WorldsmithTemplatePiece(serial,piece.createTag(serial));

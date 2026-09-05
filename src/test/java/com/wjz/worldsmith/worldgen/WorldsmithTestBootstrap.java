@@ -82,6 +82,10 @@ final class WorldsmithTestBootstrap {
 		} catch (ReflectiveOperationException failure) {
 			throw new IllegalStateException("Could not open the test registries", failure);
 		}
+		// 26.2 binds item prototypes after registry bootstrap. Run the native
+		// initializers, rather than faking stack sizes with empty component maps.
+		BuiltInRegistries.DATA_COMPONENT_INITIALIZERS.build(net.minecraft.data.registries.VanillaRegistries.createLookup())
+			.forEach(net.minecraft.core.component.DataComponentInitializers.PendingComponents::apply);
 		bootstrapped = true;
 	}
 

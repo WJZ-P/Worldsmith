@@ -36,7 +36,7 @@ public final class WorldsmithStructureLayout {
         ).apply(i, Member::new)).validate(m -> {
             if (m.separation >= m.spacing) return DataResult.error(() -> "Spacing must exceed separation");
             if (m.scope.isBlank() || m.scope.length() > 64 || m.envelope.minY() != 0 || m.envelope.maxY() != 0 ||
-                m.envelope.minX() < -80 || m.envelope.minZ() < -80 || m.envelope.maxX() > 80 || m.envelope.maxZ() > 80) {
+                m.envelope.minX() < -128 || m.envelope.minZ() < -128 || m.envelope.maxX() > 128 || m.envelope.maxZ() > 128) {
                 return DataResult.error(() -> "Invalid bounded layout envelope");
             }
             return DataResult.success(m);

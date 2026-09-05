@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.worldgen;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,84 +10,148 @@ import net.minecraft.world.level.NoiseColumn;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.material.Fluids;
 
-/** Bounded, side-effect-free site fitting, shared by generation and diagnostic tests. */
+/** Bounded column-only placement. Never asks worldgen to load another chunk. */
 public final class WorldsmithTerrainProbe {
-    public static final int MAX_FOUNDATION_BLOCKS = 4096;
-    public enum Rejection { WRONG_FLUID, EXCESSIVE_SLOPE, OUTSIDE_WORLD, MISSING_SUPPORT, FOUNDATION_BUDGET }
-    public record Column(int groundY, int surfaceY) {}
-    public record Plan(BlockPos position, List<BoundingBox> foundations) {}
-    public record Result(Plan plan, Rejection rejection) {
-        public boolean accepted() { return this.plan != null; }
+    public static final int MAX_FOUNDATION_BLOCKS=4096;
+    public static final int MAX_COLUMNS=12288;
+    public enum Rejection { WRONG_FLUID, EXCESSIVE_SLOPE, OUTSIDE_WORLD, MISSING_SUPPORT, FOUNDATION_BUDGET, NO_SURFACE, OBSTRUCTED }
+    /** floorY is first air, ceilingY first solid above, or worldMax+1 for open sky. */
+    public record AirSpan(int floorY,int ceilingY,boolean solidFloor,boolean waterFloor,int supportY,int airBelow) {}
+    public record Column(int groundY,int surfaceY,boolean water,List<AirSpan> spans) {
+        public Column(int groundY,int surfaceY){this(groundY,surfaceY,surfaceY>groundY,List.of());}
     }
-    @FunctionalInterface public interface Sampler { Column sample(int x, int z); }
-
-    /** One candidate (including its rotations), never a world-wide growing cache. */
+    public record Plan(BlockPos position,List<BoundingBox> foundations,List<BoundingBox> cuts) {}
+    public record Result(Plan plan,Rejection rejection){public boolean accepted(){return plan!=null;}}
+    @FunctionalInterface public interface Sampler {Column sample(int x,int z);}
+    public static final class ProbeBudgetExceeded extends RuntimeException {}
     public static final class CachedSampler implements Sampler {
-        private final Sampler source;
-        private final Map<Long, Column> columns = new HashMap<>();
-        public CachedSampler(Sampler source) { this.source = source; }
-        @Override public Column sample(int x, int z) {
-            long key = ((long) x << 32) | (z & 0xffffffffL);
-            return columns.computeIfAbsent(key, ignored -> source.sample(x, z));
+        private final Sampler source;private final Map<Long,Column> columns=new HashMap<>();
+        public CachedSampler(Sampler source){this.source=source;}
+        @Override public Column sample(int x,int z){
+            long key=((long)x<<32)|(z&0xffffffffL);var cached=columns.get(key);if(cached!=null)return cached;
+            if(columns.size()>=MAX_COLUMNS)throw new ProbeBudgetExceeded();
+            var value=source.sample(x,z);columns.put(key,value);return value;
         }
-        public int sampledColumns() { return columns.size(); }
+        public int sampledColumns(){return columns.size();}
     }
-
+    private record Surface(int y,int ground,int ceiling) {}
     private WorldsmithTerrainProbe() {}
 
-    /** The two vanilla heightmap predicates derived from ONE noise column. */
-    public static Column readColumn(NoiseColumn column, int worldMin, int worldMax) {
-        int ground = worldMin, surface = worldMin;
-        boolean foundGround = false, foundSurface = false;
-        for (int y = worldMax; y >= worldMin; y--) {
-            var state = column.getBlock(y);
-            if (!foundSurface && Heightmap.Types.WORLD_SURFACE_WG.isOpaque().test(state)) {
-                surface = y + 1;
-                foundSurface = true;
+    public static Column readColumn(NoiseColumn column,int worldMin,int worldMax){return readColumn(column,worldMin,worldMax,null,1);}
+    public static Column readColumn(NoiseColumn column,int worldMin,int worldMax,WorldsmithStructureSite site,int height) {
+        int ground=worldMin,surface=worldMin;boolean water=false;
+        for(int y=worldMax;y>=worldMin;y--){
+            var block=column.getBlock(y);
+            if(surface==worldMin&&Heightmap.Types.WORLD_SURFACE_WG.isOpaque().test(block)){
+                surface=y+1;water=block.getFluidState().is(Fluids.WATER)||block.getFluidState().is(Fluids.FLOWING_WATER);
             }
-            if (!foundGround && Heightmap.Types.OCEAN_FLOOR_WG.isOpaque().test(state)) {
-                ground = y + 1;
-                foundGround = true;
-            }
-            if (foundGround && foundSurface) break;
+            if(Heightmap.Types.OCEAN_FLOOR_WG.isOpaque().test(block)){ground=y+1;break;}
         }
-        return new Column(ground, surface);
+        // Land/ocean fitting needs just the two native heightmaps. Special sites
+        // also retain bounded air intervals, not thousands of full NoiseColumns.
+        if(site!=null&&(site.surface().equals("LAND_SURFACE")||site.surface().equals("OCEAN_FLOOR")))return new Column(ground,surface,water,List.of());
+        List<AirSpan> spans=new ArrayList<>();
+        int start=Integer.MIN_VALUE,lastSolidTop=worldMin,previousAir=0,airBelowRun=0;boolean previousSolid=false,previousWater=false,solidFloor=false,waterFloor=false;
+        int support=worldMin,below=0;
+        for(int y=worldMin;y<=worldMax+1;y++) {
+            boolean air=y<=worldMax&&column.getBlock(y).isAir();
+            if(air) {
+                if(start==Integer.MIN_VALUE){start=y;solidFloor=previousSolid;waterFloor=previousWater;support=lastSolidTop;below=airBelowRun;}
+                previousAir++;previousSolid=false;previousWater=false;
+            } else {
+                if(start!=Integer.MIN_VALUE){
+                    var span=new AirSpan(start,y,solidFloor,waterFloor,support,below);
+                    if(y-start>=height && (site==null||matches(site,span,worldMax)))spans.add(span);
+                    start=Integer.MIN_VALUE;
+                }
+                if(y<=worldMax) {
+                    var block=column.getBlock(y);boolean solid=Heightmap.Types.OCEAN_FLOOR_WG.isOpaque().test(block);
+                    if(solid){if(!previousSolid)airBelowRun=previousAir;lastSolidTop=y+1;}
+                    previousSolid=solid;previousWater=block.getFluidState().is(Fluids.WATER)||block.getFluidState().is(Fluids.FLOWING_WATER);previousAir=0;
+                }
+            }
+        }
+        var ordered=spans.stream().sorted(Comparator.comparingInt(AirSpan::floorY).reversed()).limit(128).toList();
+        return new Column(ground,surface,water,ordered);
+    }
+    private static boolean matches(WorldsmithStructureSite s,AirSpan p,int worldMax) {
+        if(s.surface().equals("CAVE_CEILING"))return p.ceilingY<=worldMax&&p.ceilingY>=s.minY()&&p.ceilingY<=s.maxY();
+        if(p.floorY<s.minY()||p.floorY>s.maxY())return false;
+        return switch(s.surface()){
+            case "SKY_SURFACE" -> p.solidFloor&&p.airBelow>=s.minAirBelow();
+            case "CAVE_FLOOR" -> p.solidFloor&&p.ceilingY<=worldMax;
+            case "WATER_SURFACE" -> p.waterFloor;
+            default -> true;
+        };
+    }
+    private static List<Surface> surfaces(WorldsmithStructureSite site,Column c,int worldMax,int height) {
+        if(site.surface().equals("LAND_SURFACE"))return c.surfaceY==c.groundY&&inRange(site,c.groundY)?List.of(new Surface(c.groundY,c.groundY,worldMax+1)):List.of();
+        if(site.surface().equals("OCEAN_FLOOR"))return c.surfaceY>c.groundY&&inRange(site,c.groundY)?List.of(new Surface(c.groundY,c.groundY,worldMax+1)):List.of();
+        if(site.surface().equals("WATER_SURFACE")&&c.spans.isEmpty())return c.water&&c.surfaceY>c.groundY&&inRange(site,c.surfaceY)?List.of(new Surface(c.surfaceY,c.groundY,worldMax+1)):List.of();
+        return c.spans.stream().filter(p->p.ceilingY-p.floorY>=height&&matches(site,p,worldMax))
+            .map(p->new Surface(site.surface().equals("CAVE_CEILING")?p.ceilingY:p.floorY,site.surface().equals("WATER_SURFACE")?p.supportY:p.floorY,p.ceilingY))
+            .sorted(Comparator.comparingInt(Surface::y).reversed()).toList();
+    }
+    private static boolean inRange(WorldsmithStructureSite s,int y){return y>=s.minY()&&y<=s.maxY();}
+
+    /** Nearest-first coarse grid including the search boundary, capped at 16 pivots. */
+    public static List<BlockPos> sites(BlockPos nominal,int radius) {
+        List<BlockPos> result=new ArrayList<>();result.add(nominal);
+        int step=Math.max(1,(radius+1)/2);
+        if(radius>0)for(int x=-radius;x<=radius;x++)for(int z=-radius;z<=radius;z++){
+            if(x==0&&z==0||x*x+z*z>radius*radius)continue;
+            if(x%step==0&&z%step==0)result.add(nominal.offset(x,0,z));
+        }
+        if(radius>0){result.add(nominal.offset(radius,0,0));result.add(nominal.offset(-radius,0,0));result.add(nominal.offset(0,0,radius));result.add(nominal.offset(0,0,-radius));}
+        return result.stream().distinct().sorted(Comparator.comparingDouble((BlockPos p)->nominal.distSqr(p)).thenComparingInt(p->p.getX()).thenComparingInt(p->p.getZ())).limit(16).toList();
     }
 
-    public static Result probe(WorldsmithTemplateStructure.Settings config, BlockPos anchor, Rotation rotation,
-        int worldMin, int worldMax, Sampler sampler) {
-        BlockPos translated = anchor.atY(0).subtract(config.origin().rotate(rotation));
-        Sampler cached = sampler instanceof CachedSampler ? sampler : new CachedSampler(sampler);
-        int min = Integer.MAX_VALUE, max = Integer.MIN_VALUE;
-        for (BlockPos local : config.footprint()) {
-            BlockPos pos = local.rotate(rotation).offset(translated);
-            Column column = cached.sample(pos.getX(), pos.getZ());
-            if (config.surface().equals("LAND_SURFACE") && column.surfaceY() > column.groundY() ||
-                config.surface().equals("OCEAN_FLOOR") && column.surfaceY() <= column.groundY()) return rejected(Rejection.WRONG_FLUID);
-            min = Math.min(min, column.groundY());
-            max = Math.max(max, column.groundY());
-            if (max - min > config.maxHeightDifference()) return rejected(Rejection.EXCESSIVE_SLOPE);
+    public static Result probe(WorldsmithStructurePlan plan,WorldsmithStructureSite site,BlockPos anchor,Rotation rotation,int worldMin,int worldMax,Sampler sampler) {
+        Sampler cached=sampler instanceof CachedSampler?sampler:new CachedSampler(sampler);
+        Map<Long,Surface> selected=new HashMap<>();List<Integer> levels=new ArrayList<>();
+        int min=Integer.MAX_VALUE,max=Integer.MIN_VALUE;Integer reference=null;
+        for(var local:plan.footprint()) {
+            BlockPos pos=local.rotate(rotation).offset(anchor.atY(0));
+            var c=cached.sample(pos.getX(),pos.getZ());
+            var candidates=surfaces(site,c,worldMax,plan.height());
+            if(candidates.isEmpty())return rejected(site.surface().equals("LAND_SURFACE")||site.surface().equals("OCEAN_FLOOR")?Rejection.WRONG_FLUID:Rejection.NO_SURFACE);
+            Surface chosen;
+            if(reference==null){if(site.layer()>=candidates.size())return rejected(Rejection.NO_SURFACE);chosen=candidates.get(site.layer());reference=chosen.y;}
+            else {int target=reference;chosen=candidates.stream().min(Comparator.comparingInt(p->Math.abs(p.y-target))).orElseThrow();}
+            selected.put(WorldsmithStructurePlan.columnKey(local),chosen);levels.add(chosen.y);
+            min=Math.min(min,chosen.y);max=Math.max(max,chosen.y);
+            if(max-min>site.maxHeightDifference())return rejected(Rejection.EXCESSIVE_SLOPE);
         }
-        if (max == Integer.MIN_VALUE) return rejected(Rejection.MISSING_SUPPORT);
-        if (min < worldMin + 1 || max + config.size().getY() > worldMax + 1) return rejected(Rejection.OUTSIDE_WORLD);
-
-        List<BoundingBox> columns = new ArrayList<>();
-        int fillBlocks = 0;
-        for (BlockPos local : config.supports()) {
-            BlockPos point = local.rotate(rotation).offset(translated);
-            int ground = cached.sample(point.getX(), point.getZ()).groundY();
-            int gap = max - ground;
-            if (gap < 0 || config.foundation().equals("NONE") && gap != 0 ||
-                !config.foundation().equals("NONE") && gap > config.maxDepth()) return rejected(Rejection.MISSING_SUPPORT);
-            if (!config.foundation().equals("NONE") && gap > 0) {
-                fillBlocks += gap;
-                if (fillBlocks > MAX_FOUNDATION_BLOCKS) return rejected(Rejection.FOUNDATION_BUDGET);
-                columns.add(new BoundingBox(point.getX(), ground, point.getZ(), point.getX(), max - 1, point.getZ()));
+        if(levels.isEmpty())return rejected(Rejection.MISSING_SUPPORT);
+        boolean ceiling=site.surface().equals("CAVE_CEILING");
+        int base=ceiling?min-plan.height():max;
+        if(site.maxCut()>0){levels.sort(Integer::compare);base=levels.get(levels.size()/2);}
+        if(base<worldMin+1||base+plan.height()>worldMax+1)return rejected(Rejection.OUTSIDE_WORLD);
+        List<BoundingBox> fills=new ArrayList<>(),cuts=new ArrayList<>();int work=0;
+        for(var local:plan.footprint()) {
+            var selectedSurface=selected.get(WorldsmithStructurePlan.columnKey(local));
+            if(base+local.getY()>=selectedSurface.ceiling)return rejected(Rejection.OBSTRUCTED);
+            if(ceiling&&base<selectedSurface.ground)return rejected(Rejection.OBSTRUCTED);
+            int cut=selectedSurface.ground-base;
+            if(!ceiling&&cut>0){
+                if(site.maxCut()==0||cut>site.maxCut())return rejected(Rejection.EXCESSIVE_SLOPE);
+                work+=cut;if(work>site.maxBlocks())return rejected(Rejection.FOUNDATION_BUDGET);
+                BlockPos p=local.rotate(rotation).offset(anchor.atY(0));cuts.add(new BoundingBox(p.getX(),base,p.getZ(),p.getX(),selectedSurface.ground-1,p.getZ()));
             }
         }
-        return new Result(new Plan(new BlockPos(translated.getX(), max, translated.getZ()), List.copyOf(columns)), null);
+        if(!ceiling)for(var local:plan.supports()) {
+            var surface=selected.get(WorldsmithStructurePlan.columnKey(local));
+            int gap=base+local.getY()-surface.ground;
+            boolean floating=site.surface().equals("WATER_SURFACE")&&site.foundation().equals("NONE");
+            if(!floating&&site.foundation().equals("NONE")&&gap!=0 || !site.foundation().equals("NONE")&&gap>site.maxDepth())return rejected(Rejection.MISSING_SUPPORT);
+            if(!site.foundation().equals("NONE")&&gap>0){
+                work+=gap;if(work>site.maxBlocks())return rejected(Rejection.FOUNDATION_BUDGET);
+                BlockPos p=local.rotate(rotation).offset(anchor.atY(0));fills.add(new BoundingBox(p.getX(),surface.ground,p.getZ(),p.getX(),base+local.getY()-1,p.getZ()));
+            }
+        }
+        return new Result(new Plan(anchor.atY(base),List.copyOf(fills),List.copyOf(cuts)),null);
     }
-
-    private static Result rejected(Rejection rejection) { return new Result(null, rejection); }
+    private static Result rejected(Rejection rejection){return new Result(null,rejection);}
 }

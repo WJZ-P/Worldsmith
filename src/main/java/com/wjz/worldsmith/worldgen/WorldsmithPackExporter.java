@@ -138,11 +138,12 @@ public final class WorldsmithPackExporter {
 	 * @return the number of files written
 	 */
 	public static int export(CompiledPack pack, HolderLookup.Provider registries, Path root) throws IOException {
-		return write(pack, compile(pack, registries), root);
+		return write(pack, compilePatch(pack, registries), root);
 	}
 
 	/** Split out so a caller that already resolved the pack does not do it twice. */
-	public static int write(CompiledPack pack, HolderLookup.Provider provider, Path root) throws IOException {
+	public static int write(CompiledPack pack, RegistrySetBuilder.PatchedRegistries compiled, Path root) throws IOException {
+		HolderLookup.Provider provider=compiled.patches();
 		// Must come from the provider rather than RegistryOps.create: a provider
 		// built by RegistrySetBuilder overrides this to hand out its own holder
 		// owner, and holders made during a bootstrap belong to that owner. Going
@@ -158,7 +159,7 @@ public final class WorldsmithPackExporter {
 			written += writeRegistry(root, ops, provider, capture(registry));
 		}
 		written += writeTags(root, pack);
-		written += WorldsmithStructureTemplates.write(pack, root);
+		written += WorldsmithStructureTemplates.write(pack, compiled.full(), root, null);
 		return written;
 	}
 

@@ -4,6 +4,12 @@ import com.wjz.worldsmith.core.structure.BuildMaterial;
 import com.wjz.worldsmith.core.structure.CompiledStructure;
 import com.wjz.worldsmith.core.structure.StructureGeometryCompiler;
 import com.wjz.worldsmith.core.structure.StructureVoxel;
+import com.wjz.worldsmith.core.structure.StructureInteraction;
+import com.google.gson.GsonBuilder;
+import com.mojang.serialization.JsonOps;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.world.level.storage.loot.LootTable;
+import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import java.io.ByteArrayOutputStream;
 import com.google.common.hash.Hashing;
@@ -54,6 +60,10 @@ public final class WorldsmithStructureTemplates {
     }
 
     public static CompoundTag encode(CompiledStructure geometry) {
+        return encode(geometry,null,null);
+    }
+
+    public static CompoundTag encode(CompiledStructure geometry,HolderLookup.Provider registries,CompiledPack pack) {
         CompoundTag root = new CompoundTag();
         root.putInt("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());
         root.put("size", ints(geometry.getSize().getX(), geometry.getSize().getY(), geometry.getSize().getZ()));
@@ -62,6 +72,8 @@ public final class WorldsmithStructureTemplates {
         ListTag blocks = new ListTag();
         Map<BlockState, Integer> ids = new LinkedHashMap<>();
         Map<BuildMaterial, BlockState> states = new LinkedHashMap<>();
+        Map<com.wjz.worldsmith.core.structure.BuildPos,Integer> interactions=new LinkedHashMap<>();
+        for(int i=0;i<geometry.getInteractions().size();i++)interactions.put(geometry.getInteractions().get(i).getAt(),i);
         for (StructureVoxel voxel : geometry.getVoxels()) {
             BlockState state = states.computeIfAbsent(voxel.getMaterial(), WorldsmithStructureTemplates::resolve)
                 .rotate(Rotation.values()[voxel.getQuarterTurns()]);
@@ -69,6 +81,13 @@ public final class WorldsmithStructureTemplates {
             CompoundTag block = new CompoundTag();
             block.put("pos", ints(voxel.getPosition().getX(), voxel.getPosition().getY(), voxel.getPosition().getZ()));
             block.putInt("state", index);
+            Integer interaction=interactions.get(voxel.getPosition());
+            if(interaction!=null) {
+                if(registries==null)throw new IllegalArgumentException("Block entity content requires registry-aware export");
+                var pos=voxel.getPosition();var payload=geometry.getInteractions().get(interaction);
+                block.put("nbt",WorldsmithStructureInteractions.encode(payload,state,new net.minecraft.core.BlockPos(pos.getX(),pos.getY(),pos.getZ()),registries,
+                    pack==null?null:pack.structureLootId(geometry.getId(),interaction)));
+            }
             blocks.add(block);
         }
         root.put("palette", palette);
@@ -79,18 +98,14 @@ public final class WorldsmithStructureTemplates {
         return template.save(new CompoundTag());
     }
 
-    public static int write(CompiledPack pack, Path root) throws IOException {
-        return write(pack, root, null);
-    }
-
-    public static int write(CompiledPack pack, Path root, CachedOutput cache) throws IOException {
+    public static int write(CompiledPack pack, HolderLookup.Provider registries, Path root, CachedOutput cache) throws IOException {
         int count = 0;
-        for (var blueprint : pack.pack().getStructures().getStructures().stream()
-            .map(s -> s.getBlueprint()).distinct().toList()) {
-            Identifier id = pack.structureTemplateId(blueprint.getId());
+        for(var entry:pack.structures().getTemplates().entrySet())for(int variant=0;variant<entry.getValue().size();variant++) {
+            var geometry=entry.getValue().get(variant);
+            Identifier id=pack.structureTemplateId(entry.getKey(),variant);
             Path target = root.resolve("data").resolve(id.getNamespace()).resolve("structure").resolve(id.getPath() + ".nbt");
             Files.createDirectories(target.getParent());
-            var tag=encode(StructureGeometryCompiler.compile(blueprint));
+            var tag=encode(geometry,registries,pack);
             if(cache==null) {
                 NbtIo.writeCompressed(tag, target);
             } else {
@@ -99,6 +114,18 @@ public final class WorldsmithStructureTemplates {
                 byte[] bytes=buffer.toByteArray();
                 cache.writeIfNeeded(target,bytes,Hashing.sha1().hashBytes(bytes));
             }
+            count++;
+        }
+        for(var blueprint:pack.structures().getBlueprints().values())for(int i=0;i<blueprint.getInteractions().size();i++) {
+            if(!(blueprint.getInteractions().get(i) instanceof StructureInteraction.Container container)||container.getLoot()==null)continue;
+            var table=WorldsmithStructureInteractions.loot(container.getLoot());
+            var ops=registries.createSerializationContext(JsonOps.INSTANCE);
+            var json=LootTable.DIRECT_CODEC.encodeStart(ops,table).getOrThrow();
+            LootTable.DIRECT_CODEC.parse(ops,json).getOrThrow();
+            Identifier id=pack.structureLootId(blueprint.getId(),i);
+            Path path=root.resolve("data").resolve(id.getNamespace()).resolve("loot_table").resolve(id.getPath()+".json");
+            byte[] bytes=new GsonBuilder().setPrettyPrinting().create().toJson(json).getBytes(StandardCharsets.UTF_8);
+            if(cache==null){Files.createDirectories(path.getParent());Files.write(path,bytes);}else cache.writeIfNeeded(path,bytes,Hashing.sha1().hashBytes(bytes));
             count++;
         }
         return count;
