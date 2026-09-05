@@ -24,6 +24,9 @@ object StructureGeometryCompiler {
 
     private class Builder(val blueprint: StructureBlueprint) {
         val cells = LinkedHashMap<BuildPos, StructureVoxel>()
+        val writers = HashMap<BuildPos, String>()
+        val writtenOperations = linkedSetOf<String>()
+        val lastClears = HashMap<BuildPos, String>()
         var work = 0
         var operations = 0
 
@@ -37,25 +40,48 @@ object StructureGeometryCompiler {
             check(blueprint.palette.isNotEmpty() && blueprint.palette.size <= 128, "palette", "STRUCTURE_PALETTE_SIZE", "Declare 1..128 palette entries")
             blueprint.palette.forEach { (key, value) ->
                 check(ID.matches(key), "palette.$key", "INVALID_MATERIAL_NAME", "Palette keys must be short lowercase identifiers")
-                check(BLOCK.matches(value.block), "palette.$key.block", "INVALID_BLOCK_ID", "Use a namespaced block id")
-                check(value.properties.size <= 16 && value.properties.all { (k, v) -> k.matches(Regex("[a-z0-9_]+")) && v.matches(Regex("[a-z0-9_]+")) }, "palette.$key.properties", "INVALID_BLOCK_PROPERTIES", "Properties must be a small string map")
+                check(value.block.length <= 160 && BLOCK.matches(value.block), "palette.$key.block", "INVALID_BLOCK_ID", "Use a namespaced block id, at most 160 characters")
+                check(value.properties.size <= 16 && value.properties.all { (k, v) -> k.length <= 64 && v.length <= 64 && k.matches(Regex("[a-z0-9_]+")) && v.matches(Regex("[a-z0-9_]+")) }, "palette.$key.properties", "INVALID_BLOCK_PROPERTIES", "Properties must be a small string map with short keys and values")
             }
             check(blueprint.modules.size <= 64, "modules", "TOO_MANY_MODULES", "At most 64 local modules")
             check(blueprint.build.isNotEmpty(), "build", "EMPTY_STRUCTURE_BUILD", "A structure needs build operations")
             validateModuleGraph()
             execute(blueprint.build, Transform(), "build", 0)
-            check(cells.values.any { it.material.block != "minecraft:air" }, "build", "EMPTY_STRUCTURE", "The final template must contain solid authored content")
+            check(cells.values.any { !it.material.isAir() }, "build", "EMPTY_STRUCTURE", "The final template must contain solid authored content")
             check(blueprint.keepClear.size <= 32, "keepClear", "TOO_MANY_CLEAR_VOLUMES", "At most 32 clearance boxes")
             blueprint.keepClear.forEachIndexed { i, box -> box(box.from, box.to, "keepClear[$i]"); point(box.from,"keepClear[$i].from"); point(box.to,"keepClear[$i].to") }
             return CompiledStructure(blueprint.id, blueprint.size, blueprint.origin,
-                cells.entries.sortedWith(compareBy({ it.key.y }, { it.key.z }, { it.key.x })).map { it.value }, blueprint.keepClear, work)
+                cells.entries.sortedWith(compareBy({ it.key.y }, { it.key.z }, { it.key.x })).map { it.value }, blueprint.keepClear, work, qualityDiagnostics())
+        }
+
+        fun qualityDiagnostics(): List<Diagnostic> {
+            val diagnostics = mutableListOf<Diagnostic>()
+            val visible = writers.values.toHashSet()
+            writtenOperations.filter { it !in visible }.forEach { path ->
+                diagnostics += Diagnostic(path, "OPERATION_FULLY_OVERWRITTEN", DiagnosticSeverity.WARNING,
+                    "Every cell written by this operation was overwritten later; keep it only when this is intentional")
+            }
+            val refilled = lastClears.entries.filter { !cells.getValue(it.key).material.isAir() }
+                .groupingBy { it.value }.eachCount()
+            refilled.forEach { (path, count) ->
+                diagnostics += Diagnostic(path, "CLEAR_REGION_REFILLED", DiagnosticSeverity.WARNING,
+                    "$count cleared cells were filled again later; inspect the opening, room or passage")
+            }
+            return if (diagnostics.size <= 64) diagnostics else diagnostics.take(64) + Diagnostic(
+                "build", "MORE_STRUCTURE_WARNINGS", DiagnosticSeverity.WARNING,
+                "${diagnostics.size - 64} additional overwrite warnings omitted; repair the first group and inspect again",
+            )
         }
 
         fun validateModuleGraph() {
             val visited = mutableSetOf<String>()
             val visiting = mutableSetOf<String>()
+            var declaredOperations = 0
             fun visitOps(ops: List<BuildOperation>, depth: Int, visit: (String, Int) -> Unit) {
                 check(depth <= 8, "modules", "STRUCTURE_RECURSION_LIMIT", "Module and repeat depth must stay within 8")
+                declaredOperations += ops.size
+                check(declaredOperations <= MAX_OPERATIONS, "build", "STRUCTURE_DECLARATION_BUDGET", "Declared operations, including unused modules, must stay within $MAX_OPERATIONS")
+                check(ops.map { it.id }.toSet().size == ops.size, "build", "DUPLICATE_BUILD_OPERATION", "Operation ids must be unique within every declared list")
                 ops.forEach { op -> when(op) {
                     is BuildOperation.Instance -> visit(op.module, depth + 1)
                     is BuildOperation.Repeat -> visitOps(op.build, depth + 1, visit)
@@ -66,6 +92,7 @@ object StructureGeometryCompiler {
                 check(depth <= 8, "modules.$name", "STRUCTURE_RECURSION_LIMIT", "Module depth exceeds 8")
                 check(name !in visiting, "modules.$name", "STRUCTURE_MODULE_CYCLE", "Module '$name' references itself through an instance chain")
                 val ops = blueprint.modules[name] ?: fail("modules.$name", "UNKNOWN_STRUCTURE_MODULE", "Unknown module '$name'")
+                check(ID.matches(name) && ops.isNotEmpty(), "modules.$name", "INVALID_STRUCTURE_MODULE", "Modules need a short lowercase name and non-empty build list")
                 if (name in visited) return
                 visiting += name
                 visitOps(ops, depth, ::visit)
@@ -86,7 +113,7 @@ object StructureGeometryCompiler {
                 when(op) {
                     is BuildOperation.SetBlock -> emit(op.at, material(op.material,at), transform, at)
                     is BuildOperation.Fill -> each(op.from,op.to,at) { emit(it,material(op.material,at),transform,at) }
-                    is BuildOperation.Clear -> each(op.from,op.to,at) { emit(it,AIR,transform,at) }
+                    is BuildOperation.Clear -> each(op.from,op.to,at) { emit(it,AIR,transform,at, true) }
                     is BuildOperation.Shell -> {
                         box(op.from,op.to,at)
                         val smallest = minOf(op.to.x-op.from.x+1,op.to.y-op.from.y+1,op.to.z-op.from.z+1)
@@ -113,6 +140,7 @@ object StructureGeometryCompiler {
                     is BuildOperation.Roof -> roof(op,transform,at)
                     is BuildOperation.Repeat -> {
                         check(op.count in 1..64,at,"STRUCTURE_REPEAT_LIMIT","Repeat count must be 1..64")
+                        check(op.build.isNotEmpty(),at,"EMPTY_STRUCTURE_REPEAT","A repeat needs a non-empty build list")
                         local(op.step,at)
                         for(i in 0 until op.count) execute(op.build,transform.then(BuildPos(op.step.x*i,op.step.y*i,op.step.z*i),0),"$at.repeat[$i]",depth+1)
                     }
@@ -157,12 +185,15 @@ object StructureGeometryCompiler {
             check(count+work<=MAX_WORK,path,"STRUCTURE_WORK_BUDGET","Construction exceeds $MAX_WORK voxel visits")
             for(y in from.y..to.y) for(z in from.z..to.z) for(x in from.x..to.x) action(BuildPos(x,y,z))
         }
-        fun emit(p: BuildPos,m: BuildMaterial,t: Transform,path: String) {
+        fun emit(p: BuildPos,m: BuildMaterial,t: Transform,path: String, clear: Boolean = false) {
             local(p,path)
             check(++work<=MAX_WORK,path,"STRUCTURE_WORK_BUDGET","Construction exceeds $MAX_WORK voxel visits")
             val actual=t.apply(p)
             point(actual,path)
             cells[actual]=StructureVoxel(actual,m,t.rotation)
+            writers[actual] = path
+            writtenOperations += path
+            if (clear) lastClears[actual] = path
             check(cells.size<=MAX_VOXELS,path,"STRUCTURE_VOXEL_BUDGET","Template exceeds $MAX_VOXELS authored cells")
         }
     }

@@ -87,13 +87,13 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         McpTool(
             name = "worldsmith_validate_structure", title = "Validate a structure blueprint",
             description = "Check and expand one bounded construction blueprint in Core, without Minecraft. Returns geometry counts and exact diagnostics.",
-            inputSchema = objectSchema(mapOf("blueprint" to documentSchema("StructureBlueprint")), listOf("blueprint")),
+            inputSchema = structureInspectionSchema(false),
             readOnly = true, handler = { inspectStructure(it, false) },
         ),
         McpTool(
             name = "worldsmith_preview_structure", title = "Preview a structure blueprint",
-            description = "Write a three-view SVG schematic for one validated blueprint. This is a geometry preview, not an in-game screenshot; no Minecraft compiler is run.",
-            inputSchema = objectSchema(mapOf("blueprint" to documentSchema("StructureBlueprint")), listOf("blueprint")),
+            description = "Write orthographic and isometric SVG views, optionally cut away above sliceY. This is a geometry preview, not an in-game screenshot; no Minecraft compiler is run.",
+            inputSchema = structureInspectionSchema(true),
             readOnly = false, handler = { inspectStructure(it, true) },
         ),
         McpTool(
@@ -290,27 +290,39 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         return McpToolResult.success(buildJsonObject {
             put("sessionId", sessionId); put("id", structure.id); put("draftCount", updated.structures.size)
             put("geometryValid", true); put("placementValidated", false)
+            put("diagnostics", diagnosticsJson(diagnostics))
             put("nextTool", WorldsmithWorkflow.WRITE_TOOL)
         }, "Structure draft saved; biome references and placement are checked when the whole pack is written.")
     }
 
     private fun inspectStructure(arguments: JsonObject, preview: Boolean): McpToolResult {
         val blueprint = decode<StructureBlueprint>(requiredObject(arguments, "blueprint"))
-        val diagnostics = StructureValidator.validateBlueprint(blueprint)
-        if (diagnostics.isNotEmpty()) return McpToolResult.error("Structure geometry needs repair", buildJsonObject { put("valid", false); put("diagnostics", diagnosticsJson(diagnostics)) })
-        val geometry = StructureGeometryCompiler.compile(blueprint)
+        val geometry = try { StructureGeometryCompiler.compile(blueprint) } catch (failure: StructureBuildException) {
+            return McpToolResult.error("Structure geometry needs repair", buildJsonObject { put("valid", false); put("diagnostics", diagnosticsJson(listOf(failure.diagnostic))) })
+        }
+        val requestedSlice = arguments["sliceY"]?.jsonPrimitive?.contentOrNull
+        val slice = requestedSlice?.toIntOrNull() ?: minOf(2, blueprint.size.y - 1)
+        if (requestedSlice != null && requestedSlice.toIntOrNull() == null || slice !in 0 until blueprint.size.y) {
+            return McpToolResult.error("sliceY must be an integer inside 0..${blueprint.size.y-1}")
+        }
+        val cutawayArgument = arguments["cutaway"]?.jsonPrimitive?.contentOrNull
+        if (cutawayArgument != null && cutawayArgument.toBooleanStrictOrNull() == null) return McpToolResult.error("cutaway must be true or false")
+        val cutaway = cutawayArgument?.toBooleanStrict() ?: false
         val result = buildJsonObject {
             put("valid", true); put("id", blueprint.id); put("cells", geometry.voxels.size)
-            put("solidCells", geometry.voxels.count { it.material.block != "minecraft:air" })
-            put("explicitAirCells", geometry.voxels.count { it.material.block == "minecraft:air" })
+            put("solidCells", geometry.voxels.count { !it.material.isAir() })
+            put("explicitAirCells", geometry.voxels.count { it.material.isAir() })
             put("expandedWork", geometry.expandedWork); put("minecraftCompiled", false)
-            put("floorPlan", StructurePreview.floorPlan(geometry))
+            put("diagnostics", diagnosticsJson(geometry.diagnostics))
+            put("sliceY", slice)
+            put("floorPlan", StructurePreview.floorPlan(geometry, slice))
             if (preview) {
                 val directory = packDirectory.resolveSibling("structure-previews")
                 Files.createDirectories(directory)
-                val path = directory.resolve(blueprint.id + ".svg")
-                Files.writeString(path, StructurePreview.svg(geometry), StandardCharsets.UTF_8)
-                put("previewPath", path.toString()); put("previewType", "orthographic-schematic")
+                val path = directory.resolve(blueprint.id + if (cutaway) "-cutaway-$slice.svg" else ".svg")
+                Files.writeString(path, StructurePreview.svg(geometry, slice, cutaway), StandardCharsets.UTF_8)
+                put("previewPath", path.toString()); put("previewType", "orthographic-isometric-schematic")
+                put("cutaway", cutaway)
             }
         }
         return McpToolResult.success(result)
@@ -327,6 +339,15 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             )
         }
     }
+
+    private fun structureInspectionSchema(preview: Boolean): JsonObject = objectSchema(
+        buildMap {
+            put("blueprint", documentSchema("StructureBlueprint"))
+            put("sliceY", buildJsonObject { put("type", "integer"); put("minimum", 0); put("maximum", 63); put("description", "Local Y floor-plan layer; default min(2, size.y-1).") })
+            if (preview) put("cutaway", buildJsonObject { put("type", "boolean"); put("description", "Hide cells above sliceY in all SVG views; defaults to false.") })
+        },
+        listOf("blueprint"),
+    )
 
     /** Placement vocabulary, explicitly presented as optional rather than a quota. */
     private fun climatePlacementJson(): JsonObject = buildJsonObject {

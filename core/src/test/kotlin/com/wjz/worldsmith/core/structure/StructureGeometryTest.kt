@@ -92,4 +92,47 @@ class StructureGeometryTest {
         assertTrue("UNKNOWN_STRUCTURE_BIOME" in codes)
         assertTrue("INVALID_STRUCTURE_SPACING" in codes)
     }
+
+    @Test fun `refilled openings and overwritten operations produce repairable warnings`() {
+        val b=blueprint(listOf(
+            BuildOperation.Fill("floor",BuildPos(0,0,0),BuildPos(4,0,4),"stone"),
+            BuildOperation.Clear("opening",BuildPos(2,1,2),BuildPos(2,2,2)),
+            BuildOperation.Fill("oops_wall",BuildPos(2,1,2),BuildPos(2,2,2),"stone"),
+        ))
+        val diagnostics=StructureValidator.validateBlueprint(b)
+        assertTrue(diagnostics.any { it.code=="CLEAR_REGION_REFILLED" && "opening" in it.path })
+        assertTrue(diagnostics.any { it.code=="OPERATION_FULLY_OVERWRITTEN" })
+        assertTrue(diagnostics.all { it.severity==com.wjz.worldsmith.core.validation.DiagnosticSeverity.WARNING })
+    }
+
+    @Test fun `unused module declarations also count toward bounded input size`() {
+        val operations=(0..StructureGeometryCompiler.MAX_OPERATIONS).map {
+            BuildOperation.SetBlock("set_$it",BuildPos(0,0,0),"stone")
+        }
+        val b=blueprint(listOf(BuildOperation.SetBlock("root",BuildPos(0,0,0),"stone")),mapOf("unused" to operations))
+        assertEquals("STRUCTURE_DECLARATION_BUDGET",StructureValidator.validateBlueprint(b).single().code)
+    }
+
+    @Test fun `all Minecraft air variants remain air in geometry checks`() {
+        val b=blueprint(listOf(BuildOperation.SetBlock("air",BuildPos(0,0,0),"stone")))
+            .copy(palette=mapOf("stone" to BuildMaterial("minecraft:cave_air")))
+        assertEquals("EMPTY_STRUCTURE",StructureValidator.validateBlueprint(b).single().code)
+    }
+
+    @Test fun `isometric preview and chosen cutaway layer show the actual compiled geometry`() {
+        val b=blueprint(listOf(
+            BuildOperation.Shell("room",BuildPos(0,0,0),BuildPos(6,5,6),"stone"),
+            BuildOperation.Clear("entry",BuildPos(2,1,0),BuildPos(3,3,0)),
+        ))
+        val geometry=StructureGeometryCompiler.compile(b)
+        val full=StructurePreview.svg(geometry)
+        val cut=StructurePreview.svg(geometry,2,true)
+        assertTrue(full.contains("ISOMETRIC"))
+        assertTrue(full.contains("<polygon"))
+        assertTrue(cut.contains("CUTAWAY: Y &lt;= 2"))
+        assertNotEquals(full,cut)
+        assertTrue(StructurePreview.floorPlan(geometry,4).startsWith("Local Y=4"))
+        assertThrows(IllegalArgumentException::class.java) { StructurePreview.svg(geometry,12,true) }
+        javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(cut.byteInputStream())
+    }
 }

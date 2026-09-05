@@ -50,8 +50,10 @@ tasks.register('previewStructure', JavaExec) {
 	dependsOn classes
 	classpath = sourceSets.main.runtimeClasspath
 	mainClass = 'com.wjz.worldsmith.core.structure.StructurePreviewCli'
+	workingDir rootProject.projectDir
 	args((findProperty('blueprintFile') ?: file('src/main/resources/worldsmith/structures/forest_shrine.json').absolutePath),
-		(findProperty('previewFile') ?: rootProject.file('build/structure-previews/forest_shrine.svg').absolutePath))
+		(findProperty('previewFile') ?: rootProject.file('build/structure-previews/forest_shrine.svg').absolutePath),
+		(findProperty('sliceY') ?: ''), (findProperty('cutaway') ?: 'false'))
 }
 
 java {

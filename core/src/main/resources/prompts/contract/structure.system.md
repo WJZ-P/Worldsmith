@@ -17,11 +17,15 @@ preserves every other draft. Modifying a draft invalidates the previous saved re
 
 `worldsmith_get_structure_example` returns a complete, executable shrine blueprint.
 `worldsmith_validate_structure` checks a blueprint without running Minecraft.
-`worldsmith_preview_structure` additionally writes a top/front/right SVG schematic:
-it is geometry, not a textured in-game screenshot.
-Both inspection tools also return a text `floorPlan`, so a remote caller can
-check local Y=2 even without reading local SVG files. This is one slice, not a
-proof that every level is navigable. Final Minecraft block-state
+`worldsmith_preview_structure` additionally writes top/front/right and isometric
+SVG views of the compiled voxels: these are schematics, not textured in-game screenshots.
+Both inspection tools accept `sliceY` and return a text `floorPlan` of that local
+Y layer (default 2, or the highest layer for shorter blueprints). Preview also
+accepts `cutaway: true` to remove cells above `sliceY` from all SVG views. Inspect
+each inhabited floor rather than only the exterior roof. Isometric rendering is
+capped at 16000 exposed faces; excessive detail omits that view, not validation.
+Lower the cutaway slice to inspect a dense building. A slice is not a proof that
+every level is navigable. Final Minecraft block-state
 resolution happens during world-creation export. Never claim the preview proves a world was played.
 
 ## Blueprint
@@ -70,6 +74,10 @@ commands and arbitrary scripts are not fields of this first structure grammar.
 
 Every operation has a unique `id` within its own list. Operations execute in array
 order; later writes override earlier ones. Carve openings after walls, then add frames.
+Inspection returns nonblocking `diagnostics`: `OPERATION_FULLY_OVERWRITTEN` means
+an operation has no surviving cells; `CLEAR_REGION_REFILLED` means a later write
+filled an explicitly cleared opening or space. Review these warnings before
+saving. Deliberate framing can be valid; warnings are not automatic rejection.
 
 | op | required geometry and meaning |
 | --- | --- |
@@ -93,8 +101,9 @@ Modules are maps from local names to operation lists and share the blueprint's
 palette. Their coordinates may be negative; the expanded final result must fit.
 Rotation is around local (0,0,0), then translated by `at`:
 `NONE`, `CLOCKWISE_90`, `CLOCKWISE_180`, `COUNTERCLOCKWISE_90`.
-Module cycles are errors. Repeat count is 1..64; total nesting at most 8;
-expanded operations at most 2048; voxel visits at most 524288; final authored cells
+Module cycles are errors. Repeat count is 1..64 with a nonempty body; total nesting
+at most 8; declared operations (including unused modules) and expanded operations
+are each capped at 2048; voxel visits at most 524288; final authored cells
 at most 131072; each size component at most 64. Large-world infrastructure and
 Jigsaw settlement assembly are future layers, not free-form fields to invent.
 
@@ -105,6 +114,7 @@ Jigsaw settlement assembly are future layers, not free-form fields to invent.
   "biomes": ["sakura_forest", "willow_hills"],
   "spacingChunks": 24,
   "separationChunks": 8,
+  "clearanceBlocks": 2,
   "rotations": ["NONE", "CLOCKWISE_90", "CLOCKWISE_180", "COUNTERCLOCKWISE_90"],
   "terrainFit": {
     "surface": "LAND_SURFACE",
@@ -116,26 +126,41 @@ Jigsaw settlement assembly are future layers, not free-form fields to invent.
 
 Biome ids must exist in the same pack. Spacing and separation are CHUNKS (16
 blocks), not blocks or exact distances. Require 2..4096 spacing and
-1 <= separation < spacing. A candidate may fail its biome or support test.
-Never promise an exact structure count from a spacing value.
+1 <= separation < spacing. `clearanceBlocks` is 0..16, default 2, and expands each
+building's horizontal reservation beyond its declared size. Reservations include
+all allowed rotations around the pivot, so off-centre origins can reserve more
+space. Overlapping candidates in the same pack compete by a stable seed-derived
+rank; only nonoverlapping reservations survive, independent of chunk load order.
+This is conservative: a winning reservation still excludes neighbours if it later
+fails terrain or biome checks. Other packs and vanilla/third-party structures are
+outside this guarantee. Never promise an exact count from a spacing value.
 
 `LAND_SURFACE` requires dry support; `OCEAN_FLOOR` requires submerged support.
-The structure stays rigid and is raised to its highest support sample. Height
-difference is 0..12 blocks; failures skip the candidate rather than sinking or
-stretching the building. Layer-specific sky islands and anchors are not placement modes yet.
+The structure stays rigid and is raised to its highest footprint sample. All
+authored X/Z columns (including roof and explicitly cleared interiors) are checked,
+not just pillar endpoints; an unsampled hill must not protrude through a room.
+Height difference is 0..12 blocks. Each allowed rotation is tried once in a
+seed-determined order using shared column samples. Failures skip the candidate
+rather than sinking or stretching the building. Layer-specific sky islands and
+anchors are not placement modes yet.
 
 Foundations:
 - `NONE`: no material/depth/supports; requires level floor support.
 - `FILL`: uses authored non-air Y=0 footprint cells, fills short gaps beneath them.
 - `PILLARS`: only supports named `{x,y:0,z}` points, up to 64 distinct points.
 FILL/PILLARS require `material` from the blueprint palette and `maxDepth` 1..16.
-Pillars deliberately support only their declared points; inspect the span between them.
-The foundation is persisted with the structure start, not recomputed as neighbours load.
+Pillars deliberately fill only their declared points, while terrain fitting still
+checks the complete authored footprint. Inspect the span between supports.
+Total foundation fill is capped at 4096 blocks per structure; sites exceeding
+this work budget are skipped. The foundation is persisted with the structure
+start, not recomputed as neighbours load.
 
-Worldsmith's vegetation avoids the structure's three-dimensional reserved box.
-Include the yard/entrance in `size` and mark deliberate air with CLEAR when it
-should be cleared; KEEP still preserves unspecified terrain. `keepClear` documents
-subvolumes inside that reserved box. Other mods' decoration is outside this guarantee.
+Worldsmith's vegetation avoids the authored geometry's three-dimensional bounding
+box, its foundations, and explicit `keepClear` boxes. Put extra yard/entrance
+reservations in `keepClear`, within `size`. Neither `size` nor `clearanceBlocks`
+automatically clears terrain or blocks vegetation in every unused cell. Use CLEAR
+where actual air is wanted; KEEP preserves unspecified terrain. Other mods'
+decoration is outside this guarantee.
 
 ## Design for a result worth visiting
 

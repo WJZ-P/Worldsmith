@@ -79,4 +79,25 @@ class StructureWorkflowTest {
         assertTrue(sessions.recordPack(session.id,"a".repeat(64))!!.finished,"identical saves remain idempotent")
         assertFalse(sessions.recordPack(session.id,"b".repeat(64))!!.finished,"new pack must activate even after a completed prior version")
     }
+
+    @Test fun `MCP preview accepts warnings and can select an upper floor or cutaway`() {
+        val b=example().let { it.copy(build=it.build+listOf(
+            BuildOperation.Clear("door_test",BuildPos(7,2,5),BuildPos(7,3,5)),
+            BuildOperation.Fill("refill_test",BuildPos(7,2,5),BuildPos(7,3,5),"wood"),
+        )) }
+        val result=call("worldsmith_preview_structure",buildJsonObject {
+            put("blueprint",WorldsmithJson.format.encodeToJsonElement(b));put("sliceY",4);put("cutaway",true)
+        })
+        assertFalse(result.isError,result.text)
+        val body=result.structuredContent
+        assertTrue(body.getValue("cutaway").jsonPrimitive.boolean)
+        assertEquals(4,body.getValue("sliceY").jsonPrimitive.int)
+        assertTrue(body.getValue("floorPlan").jsonPrimitive.content.startsWith("Local Y=4"))
+        assertTrue(body.getValue("diagnostics").jsonArray.any { it.jsonObject.getValue("code").jsonPrimitive.content=="CLEAR_REGION_REFILLED" })
+        assertTrue(Files.readString(Path.of(body.getValue("previewPath").jsonPrimitive.content)).contains("ISOMETRIC"))
+        val invalid=call("worldsmith_validate_structure",buildJsonObject {
+            put("blueprint",WorldsmithJson.format.encodeToJsonElement(b));put("sliceY",63)
+        })
+        assertTrue(invalid.isError)
+    }
 }
