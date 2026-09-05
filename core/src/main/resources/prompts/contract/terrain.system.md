@@ -123,7 +123,7 @@ replace `shape` with a `procedural` terrain intent:
     one another.
   - An anchor does more than raise ground. With `climateBias` it also pulls biome
     selection toward the authored identity, so a peak reads as a peak rather
-    than as the plain it grew out of. It can also be referenced by name from two
+    than as the plain it grew out of. It can also be referenced by name from
     other places:
     a band may set `"anchor": "<id>"` to act only within that anchor's reach,
     and a biome's surface rule may set
@@ -131,6 +131,10 @@ replace `shape` with a `procedural` terrain intent:
     it - summit, flank and foot in different materials. Reach for those; a
     landmark that only changes the height reads as the ground pushed upward
     rather than as a place.
+    A structure may also opt into `placement.anchor: {"id":"<id>"}` to put its
+    pivot at that landmark (see the structure contract). This is optional: ordinary
+    buildings should keep biome-restricted random placement without inventing
+    terrain anchors. The link does not flatten the site or override biome/ground checks.
 
 ## Cave controls
 

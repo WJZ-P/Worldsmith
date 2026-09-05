@@ -109,6 +109,10 @@ Jigsaw settlement assembly are future layers, not free-form fields to invent.
 
 ## Placement
 
+**Anchor placement is optional.** Without `anchor`, this is vanilla-style random
+spread restricted by eligible biomes. Do not invent coordinates or terrain anchors
+for ordinary houses, ruins or towers unless the player's prompt asks for landmarks.
+
 ```json
 {
   "biomes": ["sakura_forest", "willow_hills"],
@@ -129,8 +133,9 @@ blocks), not blocks or exact distances. Require 2..4096 spacing and
 1 <= separation < spacing. `clearanceBlocks` is 0..16, default 2, and expands each
 building's horizontal reservation beyond its declared size. Reservations include
 all allowed rotations around the pivot, so off-centre origins can reserve more
-space. Overlapping candidates in the same pack compete by a stable seed-derived
-rank; only nonoverlapping reservations survive, independent of chunk load order.
+space. Within the same pack, an anchored candidate has priority over a random
+candidate. Candidates of the same mode compete by a stable seed-derived rank;
+only nonoverlapping reservations survive, independent of chunk load order.
 This is conservative: a winning reservation still excludes neighbours if it later
 fails terrain or biome checks. Other packs and vanilla/third-party structures are
 outside this guarantee. Never promise an exact count from a spacing value.
@@ -141,8 +146,47 @@ authored X/Z columns (including roof and explicitly cleared interiors) are check
 not just pillar endpoints; an unsampled hill must not protrude through a room.
 Height difference is 0..12 blocks. Each allowed rotation is tried once in a
 seed-determined order using shared column samples. Failures skip the candidate
-rather than sinking or stretching the building. Layer-specific sky islands and
-anchors are not placement modes yet.
+rather than sinking or stretching the building. Selecting a specific floating-island
+layer is not a placement mode yet, including when an anchor is used.
+
+### Optional terrain anchor
+
+For a temple belonging to an already-defined sacred mountain, add this to `placement`:
+
+```json
+"anchor": {"id": "holy_peak", "offsetX": 0, "offsetZ": 0}
+```
+
+`id` references `terrain.shape.anchors[].id`; never repeat the terrain geometry
+or supply an unrelated seed. This requires procedural terrain. The selected anchor
+controls candidate positions:
+
+- `fixed`: one candidate at that anchor's X/Z, plus the optional offsets.
+- `scattered`: one candidate per seeded terrain-anchor instance. This uses exactly
+  the terrain's jitter noise and centre arithmetic, rounded to the nearest block,
+  not a separate random-spread grid. Instances landing in the same chunk share
+  one deterministically chosen candidate because MC stores one start per structure
+  per chunk.
+- `line`: one candidate at `along` in 0..1 along the segment, default 0.5 (midpoint).
+  Add `"along": 0.25` for a point one quarter from start to end. This does not create
+  a row of buildings. Omit `along` for fixed/scattered anchors.
+
+`offsetX` / `offsetZ` are global-axis block offsets, each -4096..4096, independent
+of the building's rotation. The resolved fixed/line pivot must stay within
++/-29999000 blocks. Offsets do not reshape or flatten the terrain.
+
+Omit `spacingChunks` / `separationChunks` in anchor mode: its density comes from
+the terrain anchor, not those random-spread controls. Non-default spacing fields
+are rejected instead of silently ignored. **Biomes remain required and are an AND
+condition**, alongside terrain fit, world height and collision checks. One fixed
+anchor means at most one start, not a guarantee of a building; no valid site means
+no start, with no fallback to an unrelated random position.
+
+`/locate structure` also searches these placements. Fixed/line sites are checked
+directly; scattered sites are searched in a bounded neighbourhood (up to 8 lattice
+cells per axis around the query cell, at most 256 candidate presence checks), ordered
+by distance and compared with any vanilla result. A failed locate is not proof that
+no matching structure exists anywhere in the infinite world.
 
 Foundations:
 - `NONE`: no material/depth/supports; requires level floor support.

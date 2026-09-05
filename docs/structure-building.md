@@ -4,8 +4,8 @@ Worldsmith structures use portable source JSON, not generated Java or a mandator
 catalog of building presets. Minecraft receives compiled NBT templates and
 `worldgen/structure` + `worldgen/structure_set` resources scoped by the pack hash.
 This first implementation supports rigid single-template structures assembled from
-local reusable modules. It does not yet implement Jigsaw settlements, anchor-only
-placements, selected floating-island layers, loot or arbitrary block-entity data.
+local reusable modules. It does not yet implement Jigsaw settlements, selected
+floating-island layers, loot or arbitrary block-entity data.
 
 ## The source of truth
 
@@ -56,9 +56,18 @@ The exporter includes the NBT assets with the datapack copied into the world.
 
 - Biome eligibility references this pack's local biome ids.
 - Spacing and separation are in chunks. They describe random-spread candidate
-  cells, not exact distances or guaranteed building counts.
+  cells, not exact distances or guaranteed building counts. This remains the
+  default: no `anchor` field, no required landmark and no fixed location.
+- Optionally set `placement.anchor: {"id":"holy_peak"}` to reference a terrain
+  anchor. Fixed anchors yield one candidate; scattered anchors follow the same
+  seeded lattice as terrain; line anchors yield one point at `along` (0..1,
+  default midpoint). Optional `offsetX` / `offsetZ` are world-axis block offsets
+  bounded at +/-4096. Every path still checks biome, slope, fluids and support.
+  Anchor mode does not use random spacing, does not flatten the mountain and
+  does not guarantee a successful start or fall back to a random site.
 - Same-pack candidates arbitrate overlapping horizontal reservations using a
-  seed-derived rank. The reservation includes all allowed rotations and
+  seed-derived rank within each mode; authored anchors take priority over random
+  sites. The reservation includes all allowed rotations and
   `clearanceBlocks` (0..16, default 2). Arbitration never loads chunks, recursively
   probes neighbours or depends on which start generated first. A neighbour that
   wins but later fails biome/terrain checks still reserves its site, so exclusion
@@ -83,6 +92,24 @@ The exporter includes the NBT assets with the datapack copied into the world.
   clearing or an automatic extra vegetation exclusion zone. Unmodified third-party
   features are outside this protection.
 
+## Anchor implementation and locate
+
+The source reference stays version-independent in Core. Export resolves it into
+`WorldsmithStructureAnchor` geometry, used by both `template_settings.layout` and
+the optional `worldsmith:anchor` structure placement. Fixed/line targets retain
+their exact block pivot, not the middle of the containing chunk. Scattered targets
+share `WorldsmithAnchorFields.latticeCoordinate` and `JITTER_NOISE` with terrain.
+At extreme jitter, instances in the same chunk are canonicalised identically for
+generation, collision reservations and locate.
+
+Vanilla's locate implementation scans only its two native placement classes.
+`ChunkGeneratorLocateMixin` preserves that search and merges optional anchor results;
+normal structures keep the native path. Fixed sites are directly checked; scattered
+queries cover up to 8 cells around the query cell and check at most 256 nearest
+candidates. This is a bounded search, not an infinite-world absence proof. Actual
+start checks, including exploration-map reference restrictions, occur only during
+locate/map queries. Ordinary worldgen never loads neighbour chunks to find anchors.
+
 ## Developer checks
 
 `./gradlew.bat :core:previewStructure` writes an SVG for the bundled shrine to
@@ -104,6 +131,9 @@ NBT, structure/set codec readback, actual generation-point probing, piece persis
 forward/reverse chunk placement, order-independent collision reservations, full-footprint
 fitting and equivalence to both native heightmaps. Final artistic judgment remains
 an in-game test.
+Anchor tests additionally cover source/MCP/hash roundtrips, native placement codecs,
+negative coordinates, exact pivots, terrain-noise agreement, maximum-jitter chunk
+boundaries, mixed-mode reservations, biome rejection and bounded locate candidates.
 
 Unpublished format remains 1. Packs authored against the old three-document layout
 should be regenerated; no old-layout migration path is retained.
