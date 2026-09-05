@@ -7,6 +7,8 @@ import com.wjz.worldsmith.core.model.TerrainPlan
 import com.wjz.worldsmith.core.model.WorldsmithPack
 import com.wjz.worldsmith.core.model.WorldsmithPackManifest
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
+import com.wjz.worldsmith.core.structure.StructureIndex
+import com.wjz.worldsmith.core.structure.StructurePackIO
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -52,12 +54,14 @@ object WorldsmithPackLoader {
 
     fun load(source: WorldsmithPackSource): WorldsmithPack {
         val manifest = WorldsmithJson.decode<WorldsmithPackManifest>(source.readText(MANIFEST))
-        val contents = listOf(manifest.files.terrain, manifest.files.biomes, manifest.files.features)
-            .associateWith(source::readText)
+        val contents = listOf(manifest.files.terrain, manifest.files.biomes, manifest.files.features, manifest.files.structures)
+            .associateWith(source::readText).toMutableMap()
+        val index = WorldsmithJson.decode<StructureIndex>(contents.getValue(manifest.files.structures))
+        StructurePackIO.paths(index).forEach { contents[it] = source.readText(it) }
         val terrain = WorldsmithJson.decode<TerrainPlan>(contents.getValue(manifest.files.terrain))
         val biomes = WorldsmithJson.decode<BiomePlan>(contents.getValue(manifest.files.biomes))
         val features = WorldsmithJson.decode<FeatureLibrary>(contents.getValue(manifest.files.features))
         val computedId = WorldsmithHashUtil.computeGenerationId(manifest, contents)
-        return WorldsmithPack(manifest, terrain, biomes, features, computedId)
+        return WorldsmithPack(manifest, terrain, biomes, features, computedId, StructurePackIO.load(index, contents))
     }
 }

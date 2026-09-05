@@ -185,7 +185,7 @@ final class WorldsmithHydrologySamplingTest {
 			oldManifest.getFormatVersion(), id, "Hydrology sample", "Compiler fixture", oldManifest.getFiles()
 		);
 		CompiledPack compiledPack = CompiledPack.scoped(new WorldsmithPack(
-			manifest, terrain, source.getBiomes(), source.getFeatures(), id
+			manifest, terrain, source.getBiomes(), source.getFeatures(), id, source.getStructures()
 		));
 		HolderLookup.Provider registries = WorldsmithPackExporter.compilePatch(compiledPack, activeWorldgen).full();
 		return RandomState.create(registries, compiledPack.noiseSettingsKey(), SEED);

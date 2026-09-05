@@ -138,7 +138,7 @@ class WorldsmithPackLoaderTest {
     @Test
     fun `portable pack loads from a regular directory`() {
         val root = "worldsmith/packs/ashlands"
-        listOf("worldsmith.json", "terrain.json", "biomes.json", "features.json").forEach { relative ->
+        listOf("worldsmith.json", "terrain.json", "biomes.json", "features.json", "structures.json").forEach { relative ->
             val target = tempDir.resolve(relative)
             Files.createDirectories(target.parent)
             javaClass.classLoader.getResourceAsStream("$root/$relative").use { source ->

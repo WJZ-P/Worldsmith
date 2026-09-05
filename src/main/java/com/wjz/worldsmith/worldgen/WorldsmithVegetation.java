@@ -523,7 +523,7 @@ public final class WorldsmithVegetation {
 	}
 
 	static List<PlacementModifier> place(FeatureDefinition feature, double density) {
-		return switch (feature.getRecipe()) {
+		List<PlacementModifier> result = switch (feature.getRecipe()) {
 			case GROUND_PATCH, SURFACE_LAYER -> surfacePatchPlacement(feature, density, FeatureFluid.DRY);
 			case AQUATIC_PATCH -> surfacePatchPlacement(feature, density, FeatureFluid.SUBMERGED);
 			case DEAD_TREE, FALLEN_LOG -> singleSurfacePlacement(feature, density);
@@ -533,6 +533,12 @@ public final class WorldsmithVegetation {
 			case CAVE_PATCH -> cavePatchPlacement(feature, density);
 			case HANGING_PATCH -> hangingPatchPlacement(feature, density);
 		};
+		List<PlacementModifier> guarded = new ArrayList<>(result);
+		boolean isTree = feature.getTree() != null;
+		int radius = isTree ? treeHorizontalReach(feature.getTree()) : 16;
+		int height = isTree ? feature.getTree().getTrunk().getHeight().getMax() + treeVerticalPadding(feature.getTree()) : 16;
+		guarded.add(Math.max(1, guarded.size() - 1), new WorldsmithStructureAvoidanceFilter(Math.min(16, radius), Math.min(64, height), isTree ? 0 : 16));
+		return List.copyOf(guarded);
 	}
 
 	private static List<PlacementModifier> surfacePatchPlacement(

@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.core.mcp
 
 import java.util.UUID
+import com.wjz.worldsmith.core.structure.WorldStructureDefinition
 
 /** One ordered step of the guided flow, named by the tool that performs it. */
 data class WorkflowStep(
@@ -15,6 +16,7 @@ data class WorkflowSession(
     val prompt: String,
     val packId: String? = null,
     val finished: Boolean = false,
+    val structures: Map<String, WorldStructureDefinition> = emptyMap(),
 )
 
 /**
@@ -48,18 +50,18 @@ object WorldsmithWorkflow {
     const val OVERVIEW: String =
         "You are designing one Minecraft world from the player's description. Work through `procedure` in " +
             "order and do not stop until $FINISH_TOOL answers complete=true.\n\n" +
-            "Design the terrain, the biomes and the features yourself. The player's prompt is the only standard " +
+            "Design the terrain, the biomes, the features and any structures yourself. The player's prompt is the only standard " +
             "for land/ocean balance, scale, relief, height, caves, rivers, lakes, ocean depth, biome count and " +
             "biome distribution. `howToDesign` gives the order those decisions go in and the joins where two " +
             "documents have to agree; `contracts` holds the field vocabulary, one document each for terrain, " +
-            "biome and feature, and $CONTRACT_TOOL hands any of them back if you need to re-read one; " +
+            "biome, feature and structure, and $CONTRACT_TOOL hands any of them back if you need to re-read one; " +
             "`climatePlacement` describes optional semantic presets plus the exact raw axes. Worldsmith " +
             "validates what you send and " +
             "reports exactly what is wrong, so a rejected pack is a repair job rather than a restart: change " +
             "only what the diagnostics name and send the whole document again.\n\n" +
             "complete=true means exactly this much: the pack is saved in Worldsmith's pack directory, reads " +
-            "back from disk, passes every Worldsmith validator and has been selected for Minecraft's " +
-            "world-creation screen. Claim nothing beyond that to the player - not that a world was already " +
+            "back from disk, passes every Worldsmith validator and activation has been requested for Minecraft's " +
+            "world-creation screen. Minecraft export and reload run separately. Claim nothing beyond that to the player - not that a world was already " +
             "created or played. When you are done, tell them the pack name, how many biomes it has and where it " +
             "was saved."
 
@@ -101,7 +103,9 @@ object WorldsmithWorkflow {
             instruction =
                 "Send the whole pack with this sessionId. Preserve the template's technical terrain envelope, " +
                     "but replace its shape with a procedural intent chosen from the player's prompt; design the " +
-                    "biomes and features to match it. A reply carrying " +
+                    "biomes and features to match it. If the prompt calls for structures, use worldsmith_get_structure_example, " +
+                    "worldsmith_validate_structure and optionally worldsmith_preview_structure, then submit each with worldsmith_put_structure " +
+                    "before writing, or include a complete structures library directly. No structure quota is required. A reply carrying " +
                     "error diagnostics means nothing was saved, so repair those exact problems and call it again.",
         ),
         WorkflowStep(
@@ -148,7 +152,15 @@ class WorkflowSessions @JvmOverloads constructor(
 
     /** Returns null when the id is unknown, which the caller reports rather than throws. */
     @Synchronized
-    fun recordPack(id: String, packId: String): WorkflowSession? = update(id) { it.copy(packId = packId) }
+    fun recordPack(id: String, packId: String): WorkflowSession? = update(id) {
+        it.copy(packId = packId, finished = it.finished && it.packId == packId)
+    }
+
+    @Synchronized
+    fun putStructure(id: String, structure: WorldStructureDefinition): WorkflowSession? = update(id) {
+        require(it.structures.size < 48 || structure.id in it.structures) { "Structure draft limit reached" }
+        it.copy(structures = it.structures + (structure.id to structure), packId = null, finished = false)
+    }
 
     @Synchronized
     fun finish(id: String): WorkflowSession? = update(id) { it.copy(finished = true) }

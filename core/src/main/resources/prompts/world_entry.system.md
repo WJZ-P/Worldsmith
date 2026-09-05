@@ -1,7 +1,7 @@
 # Worldsmith World Design
 
-One Worldsmith pack is three documents submitted together: `terrain` shapes the
-ground, `biomes` labels it and dresses it, `features` scatters things on it.
+One Worldsmith pack is four documents submitted together: `terrain` shapes the
+ground, `biomes` labels it and dresses it, `features` scatters things on it, and `structures` builds bounded architecture.
 Each has its own contract. This page is what none of them can own on their own:
 the order the decisions go in, and the places two documents have to agree.
 
@@ -45,3 +45,7 @@ that echoes the example has answered a prompt nobody wrote.
 Rejection is repair, not restart. Diagnostics name the exact path and code that
 failed; change those and resend the whole document, keeping everything that was
 already accepted.
+
+## Structures
+
+After terrain and biomes, design executable buildings under contract/structure. Use zero when none are requested, not a fixed twenty. Each blueprint owns its materials, geometry and local modules; placement references actual biome ids. Preview and validate individual blueprints before writing the whole pack. The source files are portable JSON; Minecraft templates are compiled artifacts. Do not make network or AI calls during chunk generation.

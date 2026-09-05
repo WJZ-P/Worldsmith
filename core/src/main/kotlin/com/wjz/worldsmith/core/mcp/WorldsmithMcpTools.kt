@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.structure.*
 import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.analysis.BiomeDistributionAnalyzer
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
@@ -78,6 +79,29 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             handler = ::beginWorld,
         ),
         McpTool(
+            name = "worldsmith_put_structure", title = "Submit a structure draft",
+            description = "Validate and replace one complete structure in a generation session. Preserves the other drafts. No Minecraft compilation is run.",
+            inputSchema = objectSchema(mapOf("sessionId" to buildJsonObject { put("type", "string") }, "structure" to documentSchema("WorldStructureDefinition: id, blueprint and placement; read contract/structure.")), listOf("sessionId", "structure")),
+            readOnly = false, handler = ::putStructure,
+        ),
+        McpTool(
+            name = "worldsmith_validate_structure", title = "Validate a structure blueprint",
+            description = "Check and expand one bounded construction blueprint in Core, without Minecraft. Returns geometry counts and exact diagnostics.",
+            inputSchema = objectSchema(mapOf("blueprint" to documentSchema("StructureBlueprint")), listOf("blueprint")),
+            readOnly = true, handler = { inspectStructure(it, false) },
+        ),
+        McpTool(
+            name = "worldsmith_preview_structure", title = "Preview a structure blueprint",
+            description = "Write a three-view SVG schematic for one validated blueprint. This is a geometry preview, not an in-game screenshot; no Minecraft compiler is run.",
+            inputSchema = objectSchema(mapOf("blueprint" to documentSchema("StructureBlueprint")), listOf("blueprint")),
+            readOnly = false, handler = { inspectStructure(it, true) },
+        ),
+        McpTool(
+            name = "worldsmith_get_structure_example", title = "Get an executable structure example",
+            description = "Return a complete buildable shrine example. Copy its field grammar, not its style; structure count and style come only from the player prompt.",
+            inputSchema = emptySchema(), readOnly = true, handler = { structureExample() },
+        ),
+        McpTool(
             name = "worldsmith_status",
             title = "Worldsmith status",
             description = "Read the local Worldsmith bridge, schema and managed pack-directory status.",
@@ -133,8 +157,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             name = WorldsmithWorkflow.CONTRACT_TOOL,
             title = "Get a Worldsmith document contract",
             description =
-                "Return one pack contract in full: 'terrain', 'biome' or 'feature'. " +
-                    WorldsmithWorkflow.BEGIN_TOOL + " already hands out all three, so reach for this only to " +
+                "Return one pack contract in full: 'terrain', 'biome', 'feature' or 'structure'. " +
+                    WorldsmithWorkflow.BEGIN_TOOL + " already hands out all four, so reach for this only to " +
                     "re-read one while repairing a document.",
             inputSchema = objectSchema(
                 properties = mapOf(
@@ -246,6 +270,50 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             append("next: ${WorldsmithWorkflow.TEMPLATE_TOOL}")
         }
         return McpToolResult.success(structured, text)
+    }
+
+    private fun structureExample(): McpToolResult {
+        val text = requireNotNull(javaClass.classLoader.getResourceAsStream("worldsmith/structures/forest_shrine.json"))
+            .bufferedReader(Charsets.UTF_8).use { it.readText() }
+        val blueprint = WorldsmithJson.decode<StructureBlueprint>(text)
+        return McpToolResult.success(buildJsonObject { put("blueprint", encode(blueprint)); put("contract", "structure") })
+    }
+
+    private fun putStructure(arguments: JsonObject): McpToolResult {
+        val sessionId = requiredString(arguments, "sessionId")
+        if (sessions.find(sessionId) == null) return McpToolResult.error("Unknown sessionId; begin a world first")
+        val structure = decode<WorldStructureDefinition>(requiredObject(arguments, "structure"))
+        if (!structure.id.matches(Regex("[a-z0-9_][a-z0-9_-]{0,63}"))) return McpToolResult.error("Invalid structure id")
+        val diagnostics = StructureValidator.validateBlueprint(structure.blueprint)
+        if (diagnostics.any { it.severity == DiagnosticSeverity.ERROR }) return McpToolResult.error("Structure geometry needs repair", buildJsonObject { put("diagnostics", diagnosticsJson(diagnostics)) })
+        val updated = requireNotNull(sessions.putStructure(sessionId, structure))
+        return McpToolResult.success(buildJsonObject {
+            put("sessionId", sessionId); put("id", structure.id); put("draftCount", updated.structures.size)
+            put("geometryValid", true); put("placementValidated", false)
+            put("nextTool", WorldsmithWorkflow.WRITE_TOOL)
+        }, "Structure draft saved; biome references and placement are checked when the whole pack is written.")
+    }
+
+    private fun inspectStructure(arguments: JsonObject, preview: Boolean): McpToolResult {
+        val blueprint = decode<StructureBlueprint>(requiredObject(arguments, "blueprint"))
+        val diagnostics = StructureValidator.validateBlueprint(blueprint)
+        if (diagnostics.isNotEmpty()) return McpToolResult.error("Structure geometry needs repair", buildJsonObject { put("valid", false); put("diagnostics", diagnosticsJson(diagnostics)) })
+        val geometry = StructureGeometryCompiler.compile(blueprint)
+        val result = buildJsonObject {
+            put("valid", true); put("id", blueprint.id); put("cells", geometry.voxels.size)
+            put("solidCells", geometry.voxels.count { it.material.block != "minecraft:air" })
+            put("explicitAirCells", geometry.voxels.count { it.material.block == "minecraft:air" })
+            put("expandedWork", geometry.expandedWork); put("minecraftCompiled", false)
+            put("floorPlan", StructurePreview.floorPlan(geometry))
+            if (preview) {
+                val directory = packDirectory.resolveSibling("structure-previews")
+                Files.createDirectories(directory)
+                val path = directory.resolve(blueprint.id + ".svg")
+                Files.writeString(path, StructurePreview.svg(geometry), StandardCharsets.UTF_8)
+                put("previewPath", path.toString()); put("previewType", "orthographic-schematic")
+            }
+        }
+        return McpToolResult.success(result)
     }
 
     private fun procedureJson(): JsonArray = buildJsonArray {
@@ -569,6 +637,12 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val terrain = decode<TerrainPlan>(terrainDocument)
         val biomes = decode<BiomePlan>(requiredObject(arguments, "biomes"))
         val features = decode<FeatureLibrary>(requiredObject(arguments, "features"))
+        val structures = arguments["structures"]?.let { decode<StructureLibrary>(it) }
+            ?: StructureLibrary(structures = sessions.find(sessionId)?.structures?.values?.toList().orEmpty())
+        val structureDiagnostics = StructureValidator.validate(structures, biomes)
+        if (structureDiagnostics.any { it.severity == DiagnosticSeverity.ERROR }) return McpToolResult.error(
+            "Structure documents need repair", buildJsonObject { put("valid", false); put("diagnostics", diagnosticsJson(structureDiagnostics)) },
+        )
         val files = WorldsmithPackFiles(TERRAIN_FILE, BIOMES_FILE, FEATURES_FILE)
         val draftManifest = WorldsmithPackManifest(
             formatVersion = PACK_FORMAT_VERSION,
@@ -581,9 +655,9 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             TERRAIN_FILE to WorldsmithJson.encode(terrain),
             BIOMES_FILE to WorldsmithJson.encode(biomes),
             FEATURES_FILE to WorldsmithJson.encode(features),
-        )
+        ) + StructurePackIO.files(structures)
         val manifest = WorldsmithHashUtil.finalizeManifest(draftManifest, contents)
-        val pack = WorldsmithPack(manifest, terrain, biomes, features, manifest.id)
+        val pack = WorldsmithPack(manifest, terrain, biomes, features, manifest.id, structures)
         val diagnostics = WorldsmithPackValidator.validate(pack).toMutableList()
         if (guidedSession && terrain.shape !is TerrainShape.Procedural) {
             diagnostics += Diagnostic(
@@ -689,8 +763,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         }
         sessions.finish(sessionId)
         val report = "Worldsmith pack '${pack.manifest.displayName}' is saved and valid: " +
-            "${pack.biomes.biomes.size} biomes and ${pack.features.features.size} features, stored at $directory. " +
-            "It has been selected for Minecraft's world-creation screen. Nothing further is required from you."
+            "${pack.biomes.biomes.size} biomes, ${pack.features.features.size} features and ${pack.structures.structures.size} structures, stored at $directory. " +
+            "Activation has been requested for Minecraft's world-creation screen; export and reload happen there."
         val structured = buildJsonObject {
             put("sessionId", sessionId)
             put("complete", true)
@@ -701,6 +775,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             put("path", directory.toString())
             put("biomeCount", pack.biomes.biomes.size)
             put("featureCount", pack.features.features.size)
+            put("structureCount", pack.structures.structures.size)
+            put("minecraftCompiled", false)
             putJsonObject("climatePlacement") {
                 put("semanticSlots", pack.biomes.biomes.count { it.slot != null })
                 put("rawClimateBoxes", pack.biomes.biomes.count { it.climate != null })
@@ -756,13 +832,11 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 verifyExistingTarget(target, manifest.id)
             }
         } finally {
-            // The move removes pending on success. On failure it contains only
-            // the four fixed files written above, so cleanup never walks an
-            // arbitrary caller-controlled tree.
-            listOf(MANIFEST_FILE, TERRAIN_FILE, BIOMES_FILE, FEATURES_FILE).forEach { name ->
-                Files.deleteIfExists(pending.resolve(name))
+            // Only our compiler-generated files live in pending. A successful
+            // atomic move removes the directory; a failed write is cleaned up.
+            if (Files.exists(pending)) {
+                Files.walk(pending).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach(Files::deleteIfExists) }
             }
-            Files.deleteIfExists(pending)
         }
         return target
     }
@@ -778,6 +852,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     }
 
     private fun writeUtf8(path: Path, content: String) {
+        Files.createDirectories(path.parent)
         Files.writeString(path, content, StandardCharsets.UTF_8)
     }
 
@@ -786,6 +861,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         put("terrain", encode(pack.terrain))
         put("biomes", encode(pack.biomes))
         put("features", encode(pack.features))
+        put("structures", encode(pack.structures))
         put("computedId", pack.computedId)
     }
 
@@ -863,6 +939,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             ),
             "biomes" to documentSchema("A BiomePlan object matching the template."),
             "features" to documentSchema("A FeatureLibrary object matching the template."),
+            "structures" to documentSchema("StructureLibrary with complete inline definitions. Omit to use this session's submitted structure drafts; an empty structures list deliberately selects no structures."),
         ),
         required = listOf("displayName", "terrain", "biomes", "features"),
     )

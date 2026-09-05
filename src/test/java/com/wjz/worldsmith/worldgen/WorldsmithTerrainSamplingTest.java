@@ -1002,7 +1002,7 @@ final class WorldsmithTerrainSamplingTest {
 			source.getBiomes().getSchemaVersion(), source.getBiomes().getBiomes(), spatial
 		);
 		CompiledPack compiledPack = CompiledPack.scoped(new WorldsmithPack(
-			manifest, terrain, biomes, source.getFeatures(), id
+			manifest, terrain, biomes, source.getFeatures(), id, source.getStructures()
 		));
 		HolderLookup.Provider registries = WorldsmithPackExporter.compilePatch(compiledPack, activeWorldgen()).full();
 		return RandomState.create(registries, compiledPack.noiseSettingsKey(), SEED);

@@ -11,6 +11,9 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.HexFormat
+import com.wjz.worldsmith.core.serialization.WorldsmithJson
+import com.wjz.worldsmith.core.structure.StructureIndex
+import com.wjz.worldsmith.core.structure.StructurePackIO
 
 /** Computes the immutable id of the files that affect world generation. */
 object WorldsmithHashUtil {
@@ -26,10 +29,17 @@ object WorldsmithHashUtil {
             "terrain" to manifest.files.terrain,
             "biomes" to manifest.files.biomes,
             "features" to manifest.files.features,
+            "structures" to manifest.files.structures,
         ).forEach { (role, path) ->
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             val parsed = Json.parseToJsonElement(raw)
             updateField(digest, "$role:$path", canonicalJson(normalize(role, parsed)))
+        }
+
+        val index = WorldsmithJson.decode<StructureIndex>(requireNotNull(contents[manifest.files.structures]))
+        StructurePackIO.paths(index).forEach { path ->
+            val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
+            updateField(digest, "blueprint:$path", canonicalJson(Json.parseToJsonElement(raw)))
         }
 
         return HexFormat.of().formatHex(digest.digest())

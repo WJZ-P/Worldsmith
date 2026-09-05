@@ -16,6 +16,8 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.presets.WorldPreset;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
 
 /**
  * One Worldsmith pack with its biomes already resolved against Minecraft types.
@@ -127,6 +129,10 @@ public final class CompiledPack {
 	public ResourceKey<WorldPreset> worldPresetKey() {
 		return ResourceKey.create(Registries.WORLD_PRESET, resourceId("wasteland"));
 	}
+
+	public Identifier structureTemplateId(String id) { return resourceId("buildings/" + id); }
+	public ResourceKey<Structure> structureKey(String id) { return ResourceKey.create(Registries.STRUCTURE, resourceId("buildings/" + id)); }
+	public ResourceKey<StructureSet> structureSetKey(String id) { return ResourceKey.create(Registries.STRUCTURE_SET, resourceId("buildings/" + id)); }
 
 	private Identifier resourceId(String resourcePath) {
 		return Worldsmith.id(this.resourcePrefix + resourcePath);

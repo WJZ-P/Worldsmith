@@ -93,7 +93,7 @@ class WorldGenerationPipelineTest {
 
     private object FakeStructureCatalogAgent : StructureCatalogAgent {
         override suspend fun plan(input: StructureCatalogAgentInput): List<StructureBrief> =
-            (0 until input.request.requestedStructureCount).map { index ->
+            (0 until (input.request.requestedStructureCount ?: 2)).map { index ->
                 StructureBrief(
                     id = "structure-$index",
                     name = "Structure $index",

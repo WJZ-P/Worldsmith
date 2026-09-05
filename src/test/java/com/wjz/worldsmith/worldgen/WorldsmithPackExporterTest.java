@@ -233,7 +233,7 @@ final class WorldsmithPackExporterTest {
 			terrain,
 			source.getBiomes(),
 			source.getFeatures(),
-			id
+			id, source.getStructures()
 		));
 
 		HolderLookup.Provider activeWorldgen =

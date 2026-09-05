@@ -71,6 +71,8 @@ public final class WorldsmithPackExporter {
 		Registries.CONFIGURED_FEATURE,
 		Registries.PLACED_FEATURE,
 		Registries.BIOME,
+		Registries.STRUCTURE,
+		Registries.STRUCTURE_SET,
 		Registries.NOISE_SETTINGS,
 		Registries.WORLD_PRESET
 	);
@@ -90,6 +92,8 @@ public final class WorldsmithPackExporter {
 		builder.add(Registries.CONFIGURED_FEATURE, context -> WorldsmithVegetation.bootstrapConfigured(pack, context));
 		builder.add(Registries.PLACED_FEATURE, context -> WorldsmithVegetation.bootstrapPlaced(pack, context));
 		builder.add(Registries.BIOME, context -> BiomeCompiler.bootstrap(pack, context));
+		builder.add(Registries.STRUCTURE, context -> WorldsmithStructures.bootstrap(pack, context));
+		builder.add(Registries.STRUCTURE_SET, context -> WorldsmithStructures.bootstrapSets(pack, context));
 		builder.add(Registries.NOISE_SETTINGS, context -> WorldsmithNoiseSettings.bootstrap(pack, context));
 		builder.add(Registries.WORLD_PRESET, context -> WorldsmithWorldPresets.bootstrap(pack, context));
 	}
@@ -154,6 +158,7 @@ public final class WorldsmithPackExporter {
 			written += writeRegistry(root, ops, provider, capture(registry));
 		}
 		written += writeTags(root, pack);
+		written += WorldsmithStructureTemplates.write(pack, root);
 		return written;
 	}
 

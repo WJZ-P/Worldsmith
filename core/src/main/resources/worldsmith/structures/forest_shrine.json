@@ -1,0 +1,384 @@
+{
+  "schemaVersion": 1,
+  "id": "forest_shrine",
+  "size": {
+    "x": 15,
+    "y": 13,
+    "z": 19
+  },
+  "origin": {
+    "x": 7,
+    "y": 0,
+    "z": 9
+  },
+  "palette": {
+    "foundation": {
+      "block": "minecraft:stone_bricks"
+    },
+    "wood": {
+      "block": "minecraft:oak_planks"
+    },
+    "post": {
+      "block": "minecraft:stripped_spruce_log"
+    },
+    "roof": {
+      "block": "minecraft:dark_oak_planks"
+    },
+    "roof_stair": {
+      "block": "minecraft:dark_oak_stairs"
+    },
+    "trim": {
+      "block": "minecraft:dark_oak_slab",
+      "properties": {
+        "type": "bottom"
+      }
+    },
+    "window": {
+      "block": "minecraft:glass_pane"
+    },
+    "lamp": {
+      "block": "minecraft:lantern"
+    },
+    "red": {
+      "block": "minecraft:red_terracotta"
+    },
+    "fence": {
+      "block": "minecraft:spruce_fence"
+    }
+  },
+  "build": [
+    {
+      "op": "FILL",
+      "id": "plinth",
+      "from": {
+        "x": 1,
+        "y": 0,
+        "z": 1
+      },
+      "to": {
+        "x": 13,
+        "y": 0,
+        "z": 17
+      },
+      "material": "foundation"
+    },
+    {
+      "op": "FILL",
+      "id": "deck",
+      "from": {
+        "x": 2,
+        "y": 1,
+        "z": 2
+      },
+      "to": {
+        "x": 12,
+        "y": 1,
+        "z": 16
+      },
+      "material": "wood"
+    },
+    {
+      "op": "SHELL",
+      "id": "hall",
+      "from": {
+        "x": 3,
+        "y": 2,
+        "z": 5
+      },
+      "to": {
+        "x": 11,
+        "y": 7,
+        "z": 15
+      },
+      "material": "wood"
+    },
+    {
+      "op": "CLEAR",
+      "id": "entrance",
+      "from": {
+        "x": 6,
+        "y": 2,
+        "z": 5
+      },
+      "to": {
+        "x": 8,
+        "y": 4,
+        "z": 5
+      }
+    },
+    {
+      "op": "CLEAR",
+      "id": "front_steps_clear",
+      "from": {
+        "x": 6,
+        "y": 1,
+        "z": 1
+      },
+      "to": {
+        "x": 8,
+        "y": 1,
+        "z": 1
+      }
+    },
+    {
+      "op": "FILL",
+      "id": "left_window",
+      "from": {
+        "x": 3,
+        "y": 3,
+        "z": 8
+      },
+      "to": {
+        "x": 3,
+        "y": 4,
+        "z": 11
+      },
+      "material": "window"
+    },
+    {
+      "op": "FILL",
+      "id": "right_window",
+      "from": {
+        "x": 11,
+        "y": 3,
+        "z": 8
+      },
+      "to": {
+        "x": 11,
+        "y": 4,
+        "z": 11
+      },
+      "material": "window"
+    },
+    {
+      "op": "REPEAT",
+      "id": "front_columns",
+      "count": 2,
+      "step": {
+        "x": 8,
+        "y": 0,
+        "z": 0
+      },
+      "build": [
+        {
+          "op": "INSTANCE",
+          "id": "post",
+          "module": "pillar",
+          "at": {
+            "x": 3,
+            "y": 2,
+            "z": 3
+          }
+        }
+      ]
+    },
+    {
+      "op": "REPEAT",
+      "id": "back_columns",
+      "count": 3,
+      "step": {
+        "x": 4,
+        "y": 0,
+        "z": 0
+      },
+      "build": [
+        {
+          "op": "INSTANCE",
+          "id": "post",
+          "module": "pillar",
+          "at": {
+            "x": 3,
+            "y": 2,
+            "z": 15
+          }
+        }
+      ]
+    },
+    {
+      "op": "FILL",
+      "id": "front_beam",
+      "from": {
+        "x": 2,
+        "y": 6,
+        "z": 3
+      },
+      "to": {
+        "x": 12,
+        "y": 6,
+        "z": 3
+      },
+      "material": "red"
+    },
+    {
+      "op": "FILL",
+      "id": "back_beam",
+      "from": {
+        "x": 2,
+        "y": 6,
+        "z": 15
+      },
+      "to": {
+        "x": 12,
+        "y": 6,
+        "z": 15
+      },
+      "material": "red"
+    },
+    {
+      "op": "FILL",
+      "id": "front_gable_1",
+      "from": {
+        "x": 3,
+        "y": 7,
+        "z": 5
+      },
+      "to": {
+        "x": 11,
+        "y": 8,
+        "z": 5
+      },
+      "material": "wood"
+    },
+    {
+      "op": "FILL",
+      "id": "front_gable_2",
+      "from": {
+        "x": 5,
+        "y": 9,
+        "z": 5
+      },
+      "to": {
+        "x": 9,
+        "y": 10,
+        "z": 5
+      },
+      "material": "wood"
+    },
+    {
+      "op": "FILL",
+      "id": "rear_gable_1",
+      "from": {
+        "x": 3,
+        "y": 7,
+        "z": 15
+      },
+      "to": {
+        "x": 11,
+        "y": 8,
+        "z": 15
+      },
+      "material": "wood"
+    },
+    {
+      "op": "FILL",
+      "id": "rear_gable_2",
+      "from": {
+        "x": 5,
+        "y": 9,
+        "z": 15
+      },
+      "to": {
+        "x": 9,
+        "y": 10,
+        "z": 15
+      },
+      "material": "wood"
+    },
+    {
+      "op": "FILL",
+      "id": "altar",
+      "from": {
+        "x": 6,
+        "y": 2,
+        "z": 12
+      },
+      "to": {
+        "x": 8,
+        "y": 2,
+        "z": 13
+      },
+      "material": "foundation"
+    },
+    {
+      "op": "SET",
+      "id": "lamp_left",
+      "at": {
+        "x": 4,
+        "y": 2,
+        "z": 6
+      },
+      "material": "lamp"
+    },
+    {
+      "op": "SET",
+      "id": "lamp_right",
+      "at": {
+        "x": 10,
+        "y": 2,
+        "z": 6
+      },
+      "material": "lamp"
+    },
+    {
+      "op": "SET",
+      "id": "altar_light",
+      "at": {
+        "x": 7,
+        "y": 3,
+        "z": 13
+      },
+      "material": "lamp"
+    },
+    {
+      "op": "ROOF",
+      "id": "main_roof",
+      "from": {
+        "x": 0,
+        "y": 7,
+        "z": 1
+      },
+      "to": {
+        "x": 14,
+        "y": 12,
+        "z": 17
+      },
+      "material": "roof",
+      "stairMaterial": "roof_stair",
+      "style": "GABLE",
+      "ridgeAxis": "Z"
+    }
+  ],
+  "modules": {
+    "pillar": [
+      {
+        "op": "FILL",
+        "id": "vertical",
+        "from": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "to": {
+          "x": 0,
+          "y": 3,
+          "z": 0
+        },
+        "material": "post"
+      }
+    ]
+  },
+  "keepClear": [
+    {
+      "from": {
+        "x": 5,
+        "y": 1,
+        "z": 1
+      },
+      "to": {
+        "x": 9,
+        "y": 4,
+        "z": 4
+      }
+    }
+  ]
+}

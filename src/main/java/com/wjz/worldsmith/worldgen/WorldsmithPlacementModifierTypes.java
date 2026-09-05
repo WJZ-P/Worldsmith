@@ -8,6 +8,7 @@ import net.minecraft.world.level.levelgen.placement.PlacementModifierType;
 /** Static-registry types used by data-pack-serializable feature placement. */
 public final class WorldsmithPlacementModifierTypes {
 	private static PlacementModifierType<WorldsmithHeightRangeFilter> heightRangeFilter;
+	private static PlacementModifierType<WorldsmithStructureAvoidanceFilter> structureAvoidance;
 
 	private WorldsmithPlacementModifierTypes() {
 	}
@@ -21,10 +22,12 @@ public final class WorldsmithPlacementModifierTypes {
 			Worldsmith.id("height_range_filter"),
 			() -> WorldsmithHeightRangeFilter.CODEC
 		);
+		structureAvoidance = Registry.register(BuiltInRegistries.PLACEMENT_MODIFIER_TYPE, Worldsmith.id("structure_avoidance"), () -> WorldsmithStructureAvoidanceFilter.CODEC);
 	}
 
 	static PlacementModifierType<WorldsmithHeightRangeFilter> heightRangeFilter() {
 		initialize();
 		return heightRangeFilter;
 	}
+	static PlacementModifierType<WorldsmithStructureAvoidanceFilter> structureAvoidance() { initialize(); return structureAvoidance; }
 }

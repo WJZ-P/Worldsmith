@@ -16,6 +16,12 @@
       "type": "minecraft:biome"
     },
     {
+      "type": "worldsmith:structure_avoidance",
+      "below": 16,
+      "height": 16,
+      "radius": 16
+    },
+    {
       "type": "minecraft:block_predicate_filter",
       "predicate": {
         "type": "minecraft:all_of",

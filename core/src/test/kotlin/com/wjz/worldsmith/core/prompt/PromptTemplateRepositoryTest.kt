@@ -16,6 +16,7 @@ class PromptTemplateRepositoryTest {
             it.terrainPlan,
             it.biomePlan,
             it.featurePlan,
+            it.structurePlan,
         )
     }
 
@@ -35,7 +36,7 @@ class PromptTemplateRepositoryTest {
         val contracts = PromptSet.DEFAULT.contracts
 
         assertEquals(
-            listOf(PromptSet.CONTRACT_TERRAIN, PromptSet.CONTRACT_BIOME, PromptSet.CONTRACT_FEATURE),
+            listOf(PromptSet.CONTRACT_TERRAIN, PromptSet.CONTRACT_BIOME, PromptSet.CONTRACT_FEATURE, PromptSet.CONTRACT_STRUCTURE),
             contracts.keys.toList(),
             "the order is the order the entry document tells an agent to decide them in",
         )

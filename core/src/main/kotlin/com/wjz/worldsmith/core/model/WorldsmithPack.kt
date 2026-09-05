@@ -1,12 +1,14 @@
 package com.wjz.worldsmith.core.model
 
 import kotlinx.serialization.Serializable
+import com.wjz.worldsmith.core.structure.StructureLibrary
 
 @Serializable
 data class WorldsmithPackFiles(
     val terrain: String,
     val biomes: String,
     val features: String,
+    val structures: String = "structures.json",
 )
 
 @Serializable
@@ -24,4 +26,5 @@ data class WorldsmithPack(
     val biomes: BiomePlan,
     val features: FeatureLibrary,
     val computedId: String,
+    val structures: StructureLibrary = StructureLibrary(),
 )

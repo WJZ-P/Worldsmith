@@ -6,25 +6,28 @@ import com.wjz.worldsmith.core.model.WorldBlueprint
 import com.wjz.worldsmith.core.model.WorldGenerationRequest
 
 object WorldBlueprintValidator {
-    private const val MAX_STRUCTURE_COUNT = 64
+    private const val MAX_STRUCTURE_COUNT = com.wjz.worldsmith.core.structure.StructureValidator.MAX_STRUCTURES
 
     fun validateRequest(request: WorldGenerationRequest): List<Diagnostic> = buildList {
         if (request.playerPrompt.isBlank()) {
             add(error("playerPrompt", "EMPTY_PROMPT", "Player prompt must not be blank"))
         }
-        if (request.requestedStructureCount !in 1..MAX_STRUCTURE_COUNT) {
+        if (request.requestedStructureCount != null && request.requestedStructureCount !in 0..MAX_STRUCTURE_COUNT) {
             add(
                 error(
                     "requestedStructureCount",
                     "STRUCTURE_COUNT_OUT_OF_RANGE",
-                    "Requested structure count must be between 1 and $MAX_STRUCTURE_COUNT",
+                    "Requested structure count must be between 0 and $MAX_STRUCTURE_COUNT, or omitted",
                 ),
             )
         }
     }
 
     fun validateBriefs(request: WorldGenerationRequest, briefs: List<StructureBrief>): List<Diagnostic> = buildList {
-        if (briefs.size != request.requestedStructureCount) {
+        if (briefs.size > MAX_STRUCTURE_COUNT) {
+            add(error("structureBriefs", "TOO_MANY_STRUCTURES", "At most $MAX_STRUCTURE_COUNT structures per pack"))
+        }
+        if (request.requestedStructureCount != null && briefs.size != request.requestedStructureCount) {
             add(
                 error(
                     "structureBriefs",

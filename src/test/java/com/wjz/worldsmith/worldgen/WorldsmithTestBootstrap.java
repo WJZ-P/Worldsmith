@@ -29,6 +29,8 @@ final class WorldsmithTestBootstrap {
 		MappedRegistry<?> densityFunctions = (MappedRegistry<?>)BuiltInRegistries.DENSITY_FUNCTION_TYPE;
 		MappedRegistry<?> trunkPlacers = (MappedRegistry<?>)BuiltInRegistries.TRUNK_PLACER_TYPE;
 		MappedRegistry<?> foliagePlacers = (MappedRegistry<?>)BuiltInRegistries.FOLIAGE_PLACER_TYPE;
+		MappedRegistry<?> structureTypes = (MappedRegistry<?>)BuiltInRegistries.STRUCTURE_TYPE;
+		MappedRegistry<?> structurePieces = (MappedRegistry<?>)BuiltInRegistries.STRUCTURE_PIECE;
 		MappedRegistry<?> placementModifiers = (MappedRegistry<?>)BuiltInRegistries.PLACEMENT_MODIFIER_TYPE;
 		try {
 			Field frozen = MappedRegistry.class.getDeclaredField("frozen");
@@ -38,6 +40,8 @@ final class WorldsmithTestBootstrap {
 			frozen.setBoolean(trunkPlacers, false);
 			frozen.setBoolean(foliagePlacers, false);
 			frozen.setBoolean(placementModifiers, false);
+			frozen.setBoolean(structureTypes, false);
+			frozen.setBoolean(structurePieces, false);
 			WorldsmithWorldgen.initialize();
 			Method bindValue = Holder.Reference.class.getDeclaredMethod("bindValue", Object.class);
 			bindValue.setAccessible(true);
@@ -57,6 +61,10 @@ final class WorldsmithTestBootstrap {
 				WorldsmithTreePlacerTypes.foliage(), bindValue);
 			bind(placementModifiers, Registries.PLACEMENT_MODIFIER_TYPE, "height_range_filter",
 				WorldsmithPlacementModifierTypes.heightRangeFilter(), bindValue);
+			bind(placementModifiers, Registries.PLACEMENT_MODIFIER_TYPE, "structure_avoidance",
+				WorldsmithPlacementModifierTypes.structureAvoidance(), bindValue);
+			bind(structureTypes, Registries.STRUCTURE_TYPE, "template", WorldsmithStructureTypes.template(), bindValue);
+			bind(structurePieces, Registries.STRUCTURE_PIECE, "template_piece", WorldsmithStructureTypes.piece(), bindValue);
 			// Fabric performs the ordinary final freeze after mod registration.
 			// The plain test registry was already frozen once, so restore the flag
 			// directly instead of rebuilding its already-bound tag set.
@@ -65,6 +73,8 @@ final class WorldsmithTestBootstrap {
 			frozen.setBoolean(trunkPlacers, true);
 			frozen.setBoolean(foliagePlacers, true);
 			frozen.setBoolean(placementModifiers, true);
+			frozen.setBoolean(structureTypes, true);
+			frozen.setBoolean(structurePieces, true);
 		} catch (ReflectiveOperationException failure) {
 			throw new IllegalStateException("Could not open the test registries", failure);
 		}

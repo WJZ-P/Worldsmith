@@ -89,7 +89,7 @@ final class BiomeCompilerTest {
 			source.getBiomes().getSpatial()
 		);
 		CompiledPack pack = CompiledPack.scoped(new WorldsmithPack(
-			manifest, source.getTerrain(), plan, source.getFeatures(), id
+			manifest, source.getTerrain(), plan, source.getFeatures(), id, source.getStructures()
 		));
 		HolderLookup.Provider active = WorldsmithPackExporter.compilePatch(
 			WorldsmithPacks.builtinCompiled(), vanilla

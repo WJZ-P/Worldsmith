@@ -5,6 +5,7 @@ import com.wjz.worldsmith.core.model.RiverFill
 import com.wjz.worldsmith.core.model.SurfaceHydrology
 import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.WorldsmithPack
+import com.wjz.worldsmith.core.structure.StructureValidator
 
 object WorldsmithPackValidator {
     private const val FORMAT_VERSION = 1
@@ -27,6 +28,7 @@ object WorldsmithPackValidator {
             "terrain" to manifest.files.terrain,
             "biomes" to manifest.files.biomes,
             "features" to manifest.files.features,
+            "structures" to manifest.files.structures,
         ).forEach { (name, path) ->
             if (path.startsWith('/') || path.split('/').any { it == ".." }) {
                 add(error("manifest.files.$name", "UNSAFE_PACK_PATH", "Pack content paths must stay inside the pack"))
@@ -36,6 +38,7 @@ object WorldsmithPackValidator {
         addAll(TerrainPlanValidator.validate(pack.terrain).map { it.prefixed("terrain") })
         addAll(FeatureLibraryValidator.validate(pack.features).map { it.prefixed("features") })
         addAll(BiomePlanValidator.validate(pack.biomes, pack.features).map { it.prefixed("biomes") })
+        addAll(StructureValidator.validate(pack.structures, pack.biomes).map { it.prefixed("structures") })
         addAll(validateBiomeTerrainLinks(pack))
         addAll(validateSurfaceTerrainLinks(pack))
         addAll(validateAnchorReferences(pack))

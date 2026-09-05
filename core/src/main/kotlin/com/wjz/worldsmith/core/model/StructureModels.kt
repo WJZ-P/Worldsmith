@@ -2,6 +2,9 @@ package com.wjz.worldsmith.core.model
 
 import kotlinx.serialization.Serializable
 
+// Descriptive planning context only. Executable portable construction lives in
+// core.structure.StructureBlueprint and is governed by contract/structure.
+
 @Serializable
 enum class StructureCategory {
     SHELTER,

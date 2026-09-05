@@ -11,6 +11,7 @@ public final class WorldsmithDataGenerator implements DataGeneratorEntrypoint {
 	public void onInitializeDataGenerator(FabricDataGenerator fabricDataGenerator) {
 		FabricDataGenerator.Pack pack = fabricDataGenerator.createPack();
 		pack.addProvider(WorldsmithRegistryProvider::new);
+		pack.addProvider(WorldsmithStructureTemplateProvider::new);
 		pack.addProvider(WorldsmithBiomeTagProvider::new);
 		pack.addProvider(WorldsmithWorldPresetTagProvider::new);
 		pack.addProvider(WorldsmithLangProvider::new);

@@ -13,12 +13,15 @@ import com.wjz.worldsmith.core.validation.Diagnostic
 import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 import com.wjz.worldsmith.core.validation.FeatureLibraryValidator
 import kotlinx.serialization.Serializable
+import com.wjz.worldsmith.core.structure.StructureLibrary
+import com.wjz.worldsmith.core.structure.StructureValidator
 
-/** The two documents a model is asked to write in one go. */
+/** Biome, feature and structure documents authored in one in-process response. */
 @Serializable
 data class GeneratedPack(
     val biomes: BiomePlan,
     val features: FeatureLibrary,
+    val structures: StructureLibrary = StructureLibrary(),
 )
 
 sealed interface PackGenerationResult {
@@ -55,12 +58,13 @@ class PackGenerationAgent(
         request: WorldGenerationRequest,
         promptSet: PromptSet = PromptSet.DEFAULT,
     ): PackGenerationResult {
-        // This combined in-process transport asks for two documents in one response.
+        // This combined in-process transport asks for three documents in one response.
         // Keep that transport wrapper out of either document contract: MCP
         // clients submit BiomePlan and FeatureLibrary independently.
         val systemPrompt = listOf(
             templates.load(promptSet.biomePlan).systemPrompt,
             templates.load(promptSet.featurePlan).systemPrompt,
+            templates.load(promptSet.structurePlan).systemPrompt,
             templates.load(PACK_OUTPUT_PROMPT).systemPrompt,
         ).joinToString("\n\n")
         var userPrompt = request.playerPrompt
@@ -93,7 +97,7 @@ class PackGenerationAgent(
     }
 
     private fun validate(pack: GeneratedPack): List<Diagnostic> =
-        FeatureLibraryValidator.validate(pack.features) + BiomePlanValidator.validate(pack.biomes, pack.features)
+        FeatureLibraryValidator.validate(pack.features) + BiomePlanValidator.validate(pack.biomes, pack.features) + StructureValidator.validate(pack.structures, pack.biomes)
 
     private fun parse(reply: String): GeneratedPack? =
         runCatching { WorldsmithJson.decode<GeneratedPack>(stripFence(reply)) }.getOrNull()

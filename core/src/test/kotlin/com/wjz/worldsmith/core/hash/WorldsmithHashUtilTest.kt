@@ -21,11 +21,13 @@ class WorldsmithHashUtilTest {
             "terrain.json" to "{\"height\":384,\"seaLevel\":63}",
             "biomes.json" to "{\"biomes\":[{\"id\":\"a\",\"weight\":1}]}",
             "features.json" to "{\"features\":[{\"id\":\"x\",\"density\":0.5}]}",
+            "structures.json" to "{\"schemaVersion\":1,\"structures\":[]}",
         )
         val formatted = mapOf(
             "terrain.json" to "{ \"seaLevel\": 63, \"height\": 384 }",
             "biomes.json" to "{\n  \"biomes\": [{\"weight\": 1, \"id\": \"a\"}]\n}",
             "features.json" to "{\"features\": [{\"density\": 0.5, \"id\": \"x\"}]}",
+            "structures.json" to "{\"schemaVersion\":1,\"structures\":[]}",
         )
 
         assertEquals(
@@ -58,5 +60,6 @@ class WorldsmithHashUtilTest {
         "terrain.json" to terrain,
         "biomes.json" to "{\"biomes\":[]}",
         "features.json" to "{\"features\":[]}",
+        "structures.json" to "{\"schemaVersion\":1,\"structures\":[]}",
     )
 }

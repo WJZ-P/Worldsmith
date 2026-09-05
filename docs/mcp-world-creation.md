@@ -36,10 +36,11 @@ The guided MCP contract requires this sequence:
 
 1. `worldsmith_begin_world`
 2. `worldsmith_get_pack_template`
-3. `worldsmith_write_pack` (repair and repeat if validation reports errors)
-4. `worldsmith_finish_world`
+3. Optionally validate/preview and submit structures with `worldsmith_put_structure`
+4. `worldsmith_write_pack` (repair and repeat if validation reports errors)
+5. `worldsmith_finish_world`
 
-The first tool returns both a biome contract and a terrain contract. The terrain
+The first tool returns terrain, biome, feature and structure contracts. The terrain
 contract tells the client to derive land/ocean balance, continent size,
 coastline roughness, flat/highland/peak shares, vertical scale, cave density,
 river routing, lake basins, ocean depth, additive/carving density bands and
@@ -47,7 +48,7 @@ landmark anchors from the player's prompt. The biome contract covers climate
 placement, environment, surface grammar and features. The template supplies the
 technical envelope; it is not a fixed terrain design.
 
-`complete=true` means the pack was read back, validated and selected for the
+`complete=true` means the pack was read back, validated and activation has been requested for the
 Minecraft world-creation screen. The final pack remains in:
 
 ```text
@@ -69,3 +70,5 @@ The generated registry ids are scoped by the pack's full content hash. This
 keeps a generated biome named `abyss` distinct from the built-in
 `worldsmith:abyss` and prevents lower-priority tag membership from leaking into
 the generated world.
+
+See [Structure building](structure-building.md) for the executable geometry language, per-structure MCP drafts, preview tool, placement and source layout.

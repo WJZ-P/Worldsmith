@@ -55,7 +55,7 @@ final class WorldsmithFeatureOrderTest {
 			oldManifest.getFormatVersion(), id, "Feature order fixture", "Compiler regression", oldManifest.getFiles()
 		);
 		CompiledPack pack = CompiledPack.scoped(new WorldsmithPack(
-			manifest, source.getTerrain(), biomes, source.getFeatures(), id
+			manifest, source.getTerrain(), biomes, source.getFeatures(), id, source.getStructures()
 		));
 		RegistrySetBuilder.PatchedRegistries compiled = WorldsmithPackExporter.compilePatch(pack, activeWorldgen);
 		HolderLookup.RegistryLookup<Biome> registry = compiled.full().lookupOrThrow(Registries.BIOME);

@@ -44,6 +44,16 @@ tasks.register('hashPack', JavaExec) {
 	args((findProperty('packDir') ?: file('src/main/resources/worldsmith/packs/ashlands').absolutePath))
 }
 
+tasks.register('previewStructure', JavaExec) {
+	group = 'worldsmith'
+	description = 'Compile a structure blueprint into an SVG schematic without Minecraft.'
+	dependsOn classes
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.wjz.worldsmith.core.structure.StructurePreviewCli'
+	args((findProperty('blueprintFile') ?: file('src/main/resources/worldsmith/structures/forest_shrine.json').absolutePath),
+		(findProperty('previewFile') ?: rootProject.file('build/structure-previews/forest_shrine.svg').absolutePath))
+}
+
 java {
 	withSourcesJar()
 	sourceCompatibility = JavaVersion.VERSION_21

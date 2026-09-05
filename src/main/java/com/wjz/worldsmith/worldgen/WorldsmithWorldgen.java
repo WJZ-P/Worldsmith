@@ -12,5 +12,6 @@ public final class WorldsmithWorldgen {
 		WorldsmithDensityFunctionTypes.initialize();
 		WorldsmithTreePlacerTypes.initialize();
 		WorldsmithPlacementModifierTypes.initialize();
+		WorldsmithStructureTypes.initialize();
 	}
 }

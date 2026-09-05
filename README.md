@@ -37,6 +37,17 @@ validated built-in JSON shape under
 
 See [the local MCP-to-Create-World workflow](docs/mcp-world-creation.md).
 
+## Structures
+
+AI-authored structures use a bounded JSON building grammar (fills, shells,
+lines, roofs, repeats and local modules) rather than Java source. They compile
+into Minecraft templates with biome placement, rigid terrain fitting and
+bounded foundations. Structure sources participate in the pack hash.
+
+See [structure building and MCP previews](docs/structure-building.md).
+The executable AI contract is
+[`contract/structure`](core/src/main/resources/prompts/contract/structure.system.md).
+
 ## Build
 
 ```powershell

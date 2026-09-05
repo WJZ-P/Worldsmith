@@ -61,6 +61,10 @@ public final class WorldsmithRegistryProvider extends FabricDynamicRegistryProvi
 
 		entries.add(registries.lookupOrThrow(Registries.NOISE_SETTINGS), pack.noiseSettingsKey());
 		entries.add(registries.lookupOrThrow(Registries.WORLD_PRESET), pack.worldPresetKey());
+		for (var structure : pack.pack().getStructures().getStructures()) {
+			entries.add(registries.lookupOrThrow(Registries.STRUCTURE), pack.structureKey(structure.getId()));
+			entries.add(registries.lookupOrThrow(Registries.STRUCTURE_SET), pack.structureSetKey(structure.getId()));
+		}
 	}
 
 	@Override
