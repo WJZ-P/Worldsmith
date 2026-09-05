@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 1,
+  "id": "arcane_observatory",
+  "size": {
+    "x": 23,
+    "y": 22,
+    "z": 23
+  },
+  "origin": {
+    "x": 11,
+    "y": 0,
+    "z": 11
+  },
+  "palette": {
+    "base": {
+      "block": "minecraft:deepslate_tiles"
+    },
+    "wall": {
+      "block": "minecraft:calcite"
+    },
+    "dome": {
+      "block": "minecraft:purple_stained_glass"
+    },
+    "rim": {
+      "block": "minecraft:cut_copper"
+    },
+    "gem": {
+      "block": "minecraft:amethyst_block"
+    },
+    "light": {
+      "block": "minecraft:sea_lantern"
+    },
+    "door": {
+      "block": "minecraft:dark_oak_door"
+    },
+    "banner": {
+      "block": "minecraft:purple_banner"
+    }
+  },
+  "build": [
+    {
+      "op": "CYLINDER",
+      "id": "foundation",
+      "from": {
+        "x": 1,
+        "y": 0,
+        "z": 1
+      },
+      "to": {
+        "x": 21,
+        "y": 1,
+        "z": 21
+      },
+      "material": "base"
+    },
+    {
+      "op": "ELLIPSOID",
+      "id": "dome",
+      "from": {
+        "x": 2,
+        "y": 2,
+        "z": 2
+      },
+      "to": {
+        "x": 20,
+        "y": 18,
+        "z": 20
+      },
+      "material": "dome",
+      "thickness": 1
+    },
+    {
+      "op": "CLEAR",
+      "id": "lower_hemisphere",
+      "from": {
+        "x": 0,
+        "y": 2,
+        "z": 0
+      },
+      "to": {
+        "x": 22,
+        "y": 9,
+        "z": 22
+      }
+    },
+    {
+      "op": "CYLINDER",
+      "id": "drum",
+      "from": {
+        "x": 2,
+        "y": 2,
+        "z": 2
+      },
+      "to": {
+        "x": 20,
+        "y": 9,
+        "z": 20
+      },
+      "material": "wall",
+      "thickness": 1
+    },
+    {
+      "op": "CLEAR",
+      "id": "interior",
+      "from": {
+        "x": 5,
+        "y": 3,
+        "z": 5
+      },
+      "to": {
+        "x": 17,
+        "y": 11,
+        "z": 17
+      }
+    },
+    {
+      "op": "ARCH",
+      "id": "portal",
+      "from": {
+        "x": 8,
+        "y": 3,
+        "z": 2
+      },
+      "to": {
+        "x": 14,
+        "y": 9,
+        "z": 3
+      },
+      "material": "rim",
+      "springY": 5,
+      "thickness": 1,
+      "spanAxis": "X"
+    },
+    {
+      "op": "DOOR",
+      "id": "door",
+      "at": {
+        "x": 11,
+        "y": 3,
+        "z": 2
+      },
+      "facing": "NORTH",
+      "material": "door"
+    },
+    {
+      "op": "CURVE",
+      "id": "celestial_arc",
+      "points": [
+        {
+          "x": 2,
+          "y": 12,
+          "z": 11
+        },
+        {
+          "x": 3,
+          "y": 20,
+          "z": 11
+        },
+        {
+          "x": 19,
+          "y": 20,
+          "z": 11
+        },
+        {
+          "x": 20,
+          "y": 12,
+          "z": 11
+        }
+      ],
+      "radius": 1.0,
+      "material": "rim"
+    },
+    {
+      "op": "CYLINDER",
+      "id": "altar",
+      "from": {
+        "x": 9,
+        "y": 3,
+        "z": 9
+      },
+      "to": {
+        "x": 13,
+        "y": 4,
+        "z": 13
+      },
+      "material": "gem"
+    },
+    {
+      "op": "SET",
+      "id": "focus",
+      "at": {
+        "x": 11,
+        "y": 5,
+        "z": 11
+      },
+      "material": "light"
+    },
+    {
+      "op": "SET",
+      "id": "banner",
+      "at": {
+        "x": 6,
+        "y": 3,
+        "z": 8
+      },
+      "material": "banner"
+    }
+  ],
+  "access": {
+    "entrances": [
+      {
+        "x": 11,
+        "y": 2,
+        "z": 1
+      }
+    ],
+    "destinations": [
+      {
+        "x": 11,
+        "y": 3,
+        "z": 7
+      }
+    ]
+  },
+  "interactions": [
+    {
+      "kind": "banner",
+      "at": {
+        "x": 6,
+        "y": 3,
+        "z": 8
+      },
+      "patterns": [
+        {
+          "pattern": "minecraft:border",
+          "color": "yellow"
+        },
+        {
+          "pattern": "minecraft:circle",
+          "color": "white"
+        }
+      ]
+    }
+  ]
+}

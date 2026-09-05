@@ -1,0 +1,669 @@
+{
+  "schemaVersion": 1,
+  "id": "wayfarer_lodge",
+  "size": {
+    "x": 17,
+    "y": 14,
+    "z": 21
+  },
+  "origin": {
+    "x": 8,
+    "y": 0,
+    "z": 10
+  },
+  "palette": {
+    "foundation": {
+      "block": "minecraft:stone_bricks"
+    },
+    "mossy": {
+      "block": "minecraft:mossy_stone_bricks"
+    },
+    "wood": {
+      "block": "minecraft:spruce_planks"
+    },
+    "wall": {
+      "block": "minecraft:oak_planks"
+    },
+    "light_wall": {
+      "block": "minecraft:birch_planks"
+    },
+    "post": {
+      "block": "minecraft:stripped_spruce_log"
+    },
+    "roof": {
+      "block": "minecraft:dark_oak_planks"
+    },
+    "roof_stairs": {
+      "block": "minecraft:dark_oak_stairs"
+    },
+    "door": {
+      "block": "minecraft:spruce_door"
+    },
+    "glass": {
+      "block": "minecraft:glass_pane"
+    },
+    "lamp": {
+      "block": "minecraft:lantern"
+    },
+    "brick": {
+      "block": "minecraft:bricks"
+    },
+    "barrel": {
+      "block": "minecraft:barrel"
+    },
+    "sign": {
+      "block": "minecraft:spruce_wall_sign",
+      "properties": {
+        "facing": "north"
+      }
+    },
+    "aged_wood": {
+      "block": "minecraft:stripped_oak_log",
+      "properties": {
+        "axis": "y"
+      }
+    }
+  },
+  "build": [
+    {
+      "op": "CLEAR",
+      "id": "yard_air",
+      "from": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "to": {
+        "x": 15,
+        "y": 12,
+        "z": 19
+      }
+    },
+    {
+      "op": "FILL",
+      "id": "plinth",
+      "from": {
+        "x": 1,
+        "y": 0,
+        "z": 1
+      },
+      "to": {
+        "x": 15,
+        "y": 0,
+        "z": 19
+      },
+      "material": "foundation"
+    },
+    {
+      "op": "FILL",
+      "id": "deck",
+      "from": {
+        "x": 2,
+        "y": 1,
+        "z": 2
+      },
+      "to": {
+        "x": 14,
+        "y": 1,
+        "z": 18
+      },
+      "material": "wood"
+    },
+    {
+      "op": "SHELL",
+      "id": "hall",
+      "from": {
+        "x": 3,
+        "y": 2,
+        "z": 5
+      },
+      "to": {
+        "x": 13,
+        "y": 7,
+        "z": 17
+      },
+      "material": "wall"
+    },
+    {
+      "op": "CLEAR",
+      "id": "attic",
+      "from": {
+        "x": 4,
+        "y": 7,
+        "z": 6
+      },
+      "to": {
+        "x": 12,
+        "y": 10,
+        "z": 16
+      }
+    },
+    {
+      "op": "FILL",
+      "id": "gallery",
+      "from": {
+        "x": 4,
+        "y": 6,
+        "z": 13
+      },
+      "to": {
+        "x": 12,
+        "y": 6,
+        "z": 16
+      },
+      "material": "wood"
+    },
+    {
+      "op": "STAIRCASE",
+      "id": "gallery_stairs",
+      "at": {
+        "x": 5,
+        "y": 2,
+        "z": 9
+      },
+      "facing": "SOUTH",
+      "steps": 4,
+      "width": 2,
+      "material": "roof_stairs",
+      "fillMaterial": "wood",
+      "headroom": 3
+    },
+    {
+      "op": "DOOR",
+      "id": "entry",
+      "at": {
+        "x": 8,
+        "y": 3,
+        "z": 5
+      },
+      "material": "door",
+      "facing": "NORTH"
+    },
+    {
+      "op": "FILL",
+      "id": "left_window",
+      "from": {
+        "x": 3,
+        "y": 3,
+        "z": 8
+      },
+      "to": {
+        "x": 3,
+        "y": 4,
+        "z": 12
+      },
+      "material": "glass"
+    },
+    {
+      "op": "FILL",
+      "id": "right_window",
+      "from": {
+        "x": 13,
+        "y": 3,
+        "z": 8
+      },
+      "to": {
+        "x": 13,
+        "y": 4,
+        "z": 12
+      },
+      "material": "glass"
+    },
+    {
+      "op": "REPEAT",
+      "id": "porch_posts",
+      "count": 2,
+      "step": {
+        "x": 10,
+        "y": 0,
+        "z": 0
+      },
+      "build": [
+        {
+          "op": "INSTANCE",
+          "id": "post",
+          "module": "post",
+          "at": {
+            "x": 3,
+            "y": 2,
+            "z": 3
+          }
+        }
+      ]
+    },
+    {
+      "op": "FILL",
+      "id": "front_beam",
+      "from": {
+        "x": 2,
+        "y": 7,
+        "z": 3
+      },
+      "to": {
+        "x": 14,
+        "y": 7,
+        "z": 3
+      },
+      "material": "post"
+    },
+    {
+      "op": "FILL",
+      "id": "front_gable_8",
+      "from": {
+        "x": 3,
+        "y": 8,
+        "z": 5
+      },
+      "to": {
+        "x": 13,
+        "y": 8,
+        "z": 5
+      },
+      "material": "wall"
+    },
+    {
+      "op": "FILL",
+      "id": "front_gable_9",
+      "from": {
+        "x": 5,
+        "y": 9,
+        "z": 5
+      },
+      "to": {
+        "x": 11,
+        "y": 9,
+        "z": 5
+      },
+      "material": "wall"
+    },
+    {
+      "op": "FILL",
+      "id": "front_gable_10",
+      "from": {
+        "x": 6,
+        "y": 10,
+        "z": 5
+      },
+      "to": {
+        "x": 12,
+        "y": 10,
+        "z": 5
+      },
+      "material": "wall"
+    },
+    {
+      "op": "FILL",
+      "id": "front_gable_11",
+      "from": {
+        "x": 7,
+        "y": 11,
+        "z": 5
+      },
+      "to": {
+        "x": 9,
+        "y": 11,
+        "z": 5
+      },
+      "material": "wall"
+    },
+    {
+      "op": "FILL",
+      "id": "front_gable_12",
+      "from": {
+        "x": 8,
+        "y": 12,
+        "z": 5
+      },
+      "to": {
+        "x": 8,
+        "y": 12,
+        "z": 5
+      },
+      "material": "wall"
+    },
+    {
+      "op": "FILL",
+      "id": "rear_gable_8",
+      "from": {
+        "x": 3,
+        "y": 8,
+        "z": 17
+      },
+      "to": {
+        "x": 13,
+        "y": 8,
+        "z": 17
+      },
+      "material": "wall"
+    },
+    {
+      "op": "FILL",
+      "id": "rear_gable_9",
+      "from": {
+        "x": 5,
+        "y": 9,
+        "z": 17
+      },
+      "to": {
+        "x": 11,
+        "y": 9,
+        "z": 17
+      },
+      "material": "wall"
+    },
+    {
+      "op": "FILL",
+      "id": "rear_gable_10",
+      "from": {
+        "x": 6,
+        "y": 10,
+        "z": 17
+      },
+      "to": {
+        "x": 12,
+        "y": 10,
+        "z": 17
+      },
+      "material": "wall"
+    },
+    {
+      "op": "FILL",
+      "id": "rear_gable_11",
+      "from": {
+        "x": 7,
+        "y": 11,
+        "z": 17
+      },
+      "to": {
+        "x": 9,
+        "y": 11,
+        "z": 17
+      },
+      "material": "wall"
+    },
+    {
+      "op": "FILL",
+      "id": "rear_gable_12",
+      "from": {
+        "x": 8,
+        "y": 12,
+        "z": 17
+      },
+      "to": {
+        "x": 8,
+        "y": 12,
+        "z": 17
+      },
+      "material": "wall"
+    },
+    {
+      "op": "ROOF",
+      "id": "curved_eaves",
+      "from": {
+        "x": 0,
+        "y": 8,
+        "z": 3
+      },
+      "to": {
+        "x": 16,
+        "y": 13,
+        "z": 19
+      },
+      "material": "roof",
+      "stairMaterial": "roof_stairs",
+      "style": "GABLE",
+      "ridgeAxis": "Z",
+      "profile": [
+        {
+          "at": 0.0,
+          "height": 0.2
+        },
+        {
+          "at": 0.25,
+          "height": 0.0
+        },
+        {
+          "at": 1.0,
+          "height": 1.0
+        }
+      ]
+    },
+    {
+      "op": "CHOOSE",
+      "id": "roof_detail",
+      "at": {
+        "x": 11,
+        "y": 9,
+        "z": 14
+      },
+      "choices": [
+        {
+          "module": "chimney",
+          "weight": 2
+        },
+        {
+          "module": "finial",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "op": "SET",
+      "id": "porch_lamp",
+      "at": {
+        "x": 4,
+        "y": 2,
+        "z": 4
+      },
+      "material": "lamp"
+    },
+    {
+      "op": "SET",
+      "id": "loft_lamp",
+      "at": {
+        "x": 8,
+        "y": 7,
+        "z": 15
+      },
+      "material": "lamp"
+    },
+    {
+      "op": "SET",
+      "id": "supplies",
+      "at": {
+        "x": 11,
+        "y": 3,
+        "z": 14
+      },
+      "material": "barrel"
+    },
+    {
+      "op": "SET",
+      "id": "nameplate",
+      "at": {
+        "x": 7,
+        "y": 4,
+        "z": 4
+      },
+      "material": "sign"
+    }
+  ],
+  "modules": {
+    "post": [
+      {
+        "op": "FILL",
+        "id": "beam",
+        "from": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "to": {
+          "x": 0,
+          "y": 4,
+          "z": 0
+        },
+        "material": "post"
+      }
+    ],
+    "chimney": [
+      {
+        "op": "FILL",
+        "id": "stack",
+        "from": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "to": {
+          "x": 1,
+          "y": 3,
+          "z": 1
+        },
+        "material": "brick"
+      }
+    ],
+    "finial": [
+      {
+        "op": "FILL",
+        "id": "finial",
+        "from": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "to": {
+          "x": 0,
+          "y": 4,
+          "z": 0
+        },
+        "material": "post"
+      }
+    ]
+  },
+  "keepClear": [
+    {
+      "from": {
+        "x": 5,
+        "y": 1,
+        "z": 1
+      },
+      "to": {
+        "x": 11,
+        "y": 5,
+        "z": 4
+      }
+    }
+  ],
+  "access": {
+    "entrances": [
+      {
+        "x": 8,
+        "y": 2,
+        "z": 3
+      }
+    ],
+    "destinations": [
+      {
+        "x": 8,
+        "y": 3,
+        "z": 10
+      },
+      {
+        "x": 8,
+        "y": 7,
+        "z": 14
+      }
+    ],
+    "requiredClear": [
+      {
+        "from": {
+          "x": 8,
+          "y": 3,
+          "z": 5
+        },
+        "to": {
+          "x": 8,
+          "y": 4,
+          "z": 5
+        }
+      }
+    ]
+  },
+  "variation": {
+    "count": 4,
+    "seed": 71,
+    "materials": {
+      "wall": [
+        {
+          "material": "wall",
+          "weight": 2
+        },
+        {
+          "material": "light_wall",
+          "weight": 1
+        }
+      ]
+    },
+    "decay": [
+      {
+        "materials": [
+          "wall"
+        ],
+        "probability": 0.1,
+        "replacement": "aged_wood",
+        "exposedOnly": true
+      }
+    ]
+  },
+  "interactions": [
+    {
+      "kind": "container",
+      "at": {
+        "x": 11,
+        "y": 3,
+        "z": 14
+      },
+      "loot": {
+        "minRolls": 2,
+        "maxRolls": 4,
+        "entries": [
+          {
+            "item": "minecraft:bread",
+            "weight": 5,
+            "minCount": 1,
+            "maxCount": 4
+          },
+          {
+            "item": "minecraft:torch",
+            "weight": 4,
+            "minCount": 4,
+            "maxCount": 12
+          },
+          {
+            "item": "minecraft:emerald",
+            "weight": 1,
+            "minCount": 1,
+            "maxCount": 2
+          }
+        ]
+      }
+    },
+    {
+      "kind": "sign",
+      "at": {
+        "x": 7,
+        "y": 4,
+        "z": 4
+      },
+      "front": [
+        "林间旅舍",
+        "Wayfarer Lodge",
+        "楼上也有房间",
+        "Welcome"
+      ],
+      "color": "black",
+      "glowing": true
+    }
+  ]
+}

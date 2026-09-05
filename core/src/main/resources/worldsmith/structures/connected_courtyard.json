@@ -1,0 +1,675 @@
+{
+  "id": "connected_courtyard",
+  "blueprint": {
+    "schemaVersion": 1,
+    "id": "courtyard",
+    "size": {
+      "x": 17,
+      "y": 8,
+      "z": 17
+    },
+    "origin": {
+      "x": 8,
+      "y": 0,
+      "z": 8
+    },
+    "palette": {
+      "foundation": {
+        "block": "minecraft:stone_bricks"
+      },
+      "path": {
+        "block": "minecraft:polished_andesite"
+      },
+      "moss": {
+        "block": "minecraft:moss_block"
+      },
+      "water": {
+        "block": "minecraft:water"
+      },
+      "trim": {
+        "block": "minecraft:dark_oak_planks"
+      }
+    },
+    "build": [
+      {
+        "op": "CLEAR",
+        "id": "air",
+        "from": {
+          "x": 0,
+          "y": 1,
+          "z": 0
+        },
+        "to": {
+          "x": 16,
+          "y": 7,
+          "z": 16
+        }
+      },
+      {
+        "op": "FILL",
+        "id": "foundation",
+        "from": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "to": {
+          "x": 16,
+          "y": 0,
+          "z": 16
+        },
+        "material": "foundation"
+      },
+      {
+        "op": "FILL",
+        "id": "path_x",
+        "from": {
+          "x": 0,
+          "y": 0,
+          "z": 7
+        },
+        "to": {
+          "x": 16,
+          "y": 0,
+          "z": 9
+        },
+        "material": "path"
+      },
+      {
+        "op": "FILL",
+        "id": "path_z",
+        "from": {
+          "x": 7,
+          "y": 0,
+          "z": 0
+        },
+        "to": {
+          "x": 9,
+          "y": 0,
+          "z": 16
+        },
+        "material": "path"
+      },
+      {
+        "op": "FILL",
+        "id": "garden",
+        "from": {
+          "x": 3,
+          "y": 0,
+          "z": 3
+        },
+        "to": {
+          "x": 6,
+          "y": 0,
+          "z": 6
+        },
+        "material": "moss"
+      },
+      {
+        "op": "FILL",
+        "id": "garden_other",
+        "from": {
+          "x": 10,
+          "y": 0,
+          "z": 10
+        },
+        "to": {
+          "x": 13,
+          "y": 0,
+          "z": 13
+        },
+        "material": "moss"
+      },
+      {
+        "op": "CYLINDER",
+        "id": "fountain",
+        "from": {
+          "x": 6,
+          "y": 1,
+          "z": 6
+        },
+        "to": {
+          "x": 10,
+          "y": 2,
+          "z": 10
+        },
+        "material": "foundation"
+      },
+      {
+        "op": "FILL",
+        "id": "water",
+        "from": {
+          "x": 7,
+          "y": 2,
+          "z": 7
+        },
+        "to": {
+          "x": 9,
+          "y": 2,
+          "z": 9
+        },
+        "material": "water"
+      },
+      {
+        "op": "ARCH",
+        "id": "gate_north",
+        "from": {
+          "x": 5,
+          "y": 1,
+          "z": 0
+        },
+        "to": {
+          "x": 11,
+          "y": 6,
+          "z": 0
+        },
+        "material": "trim",
+        "springY": 3,
+        "spanAxis": "X"
+      },
+      {
+        "op": "ARCH",
+        "id": "gate_south",
+        "from": {
+          "x": 5,
+          "y": 1,
+          "z": 16
+        },
+        "to": {
+          "x": 11,
+          "y": 6,
+          "z": 16
+        },
+        "material": "trim",
+        "springY": 3,
+        "spanAxis": "X"
+      },
+      {
+        "op": "ARCH",
+        "id": "gate_west",
+        "from": {
+          "x": 0,
+          "y": 1,
+          "z": 5
+        },
+        "to": {
+          "x": 0,
+          "y": 6,
+          "z": 11
+        },
+        "material": "trim",
+        "springY": 3,
+        "spanAxis": "Z"
+      },
+      {
+        "op": "ARCH",
+        "id": "gate_east",
+        "from": {
+          "x": 16,
+          "y": 1,
+          "z": 5
+        },
+        "to": {
+          "x": 16,
+          "y": 6,
+          "z": 11
+        },
+        "material": "trim",
+        "springY": 3,
+        "spanAxis": "Z"
+      }
+    ],
+    "ports": [
+      {
+        "id": "north",
+        "at": {
+          "x": 8,
+          "y": 1,
+          "z": 0
+        },
+        "facing": "NORTH",
+        "type": "courtyard",
+        "pool": "houses",
+        "required": true
+      },
+      {
+        "id": "south",
+        "at": {
+          "x": 8,
+          "y": 1,
+          "z": 16
+        },
+        "facing": "SOUTH",
+        "type": "courtyard",
+        "pool": "houses",
+        "required": true
+      },
+      {
+        "id": "west",
+        "at": {
+          "x": 0,
+          "y": 1,
+          "z": 8
+        },
+        "facing": "WEST",
+        "type": "courtyard",
+        "pool": "houses",
+        "required": true
+      },
+      {
+        "id": "east",
+        "at": {
+          "x": 16,
+          "y": 1,
+          "z": 8
+        },
+        "facing": "EAST",
+        "type": "courtyard",
+        "pool": "houses",
+        "required": true
+      }
+    ],
+    "access": {
+      "entrances": [
+        {
+          "x": 8,
+          "y": 1,
+          "z": 0
+        },
+        {
+          "x": 8,
+          "y": 1,
+          "z": 16
+        },
+        {
+          "x": 0,
+          "y": 1,
+          "z": 8
+        },
+        {
+          "x": 16,
+          "y": 1,
+          "z": 8
+        }
+      ],
+      "destinations": [
+        {
+          "x": 8,
+          "y": 1,
+          "z": 4
+        }
+      ]
+    }
+  },
+  "placement": {
+    "biomes": [
+      "example_meadow"
+    ],
+    "spacingChunks": 32,
+    "separationChunks": 12,
+    "terrainFit": {
+      "surface": "LAND_SURFACE",
+      "maxHeightDifference": 6,
+      "searchRadius": 8,
+      "foundation": {
+        "mode": "FILL",
+        "material": "foundation",
+        "maxDepth": 6
+      }
+    }
+  },
+  "assembly": {
+    "pieces": {
+      "timber_house": {
+        "schemaVersion": 1,
+        "id": "timber_house",
+        "size": {
+          "x": 9,
+          "y": 11,
+          "z": 13
+        },
+        "origin": {
+          "x": 4,
+          "y": 0,
+          "z": 6
+        },
+        "palette": {
+          "floor": {
+            "block": "minecraft:stone_bricks"
+          },
+          "wall": {
+            "block": "minecraft:oak_planks"
+          },
+          "roof": {
+            "block": "minecraft:spruce_planks"
+          },
+          "stairs": {
+            "block": "minecraft:spruce_stairs"
+          },
+          "door": {
+            "block": "minecraft:oak_door"
+          },
+          "glass": {
+            "block": "minecraft:glass_pane"
+          }
+        },
+        "build": [
+          {
+            "op": "CLEAR",
+            "id": "air",
+            "from": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "to": {
+              "x": 8,
+              "y": 10,
+              "z": 12
+            }
+          },
+          {
+            "op": "FILL",
+            "id": "floor",
+            "from": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "to": {
+              "x": 8,
+              "y": 0,
+              "z": 12
+            },
+            "material": "floor"
+          },
+          {
+            "op": "SHELL",
+            "id": "house",
+            "from": {
+              "x": 1,
+              "y": 0,
+              "z": 3
+            },
+            "to": {
+              "x": 7,
+              "y": 5,
+              "z": 11
+            },
+            "material": "wall"
+          },
+          {
+            "op": "DOOR",
+            "id": "entry",
+            "at": {
+              "x": 4,
+              "y": 1,
+              "z": 3
+            },
+            "material": "door",
+            "facing": "NORTH"
+          },
+          {
+            "op": "FILL",
+            "id": "window_left",
+            "from": {
+              "x": 1,
+              "y": 2,
+              "z": 5
+            },
+            "to": {
+              "x": 1,
+              "y": 3,
+              "z": 8
+            },
+            "material": "glass"
+          },
+          {
+            "op": "FILL",
+            "id": "window_right",
+            "from": {
+              "x": 7,
+              "y": 2,
+              "z": 5
+            },
+            "to": {
+              "x": 7,
+              "y": 3,
+              "z": 8
+            },
+            "material": "glass"
+          },
+          {
+            "op": "ROOF",
+            "id": "roof",
+            "from": {
+              "x": 0,
+              "y": 6,
+              "z": 2
+            },
+            "to": {
+              "x": 8,
+              "y": 10,
+              "z": 12
+            },
+            "material": "roof",
+            "stairMaterial": "stairs",
+            "style": "GABLE",
+            "ridgeAxis": "Z"
+          }
+        ],
+        "ports": [
+          {
+            "id": "entry",
+            "at": {
+              "x": 4,
+              "y": 1,
+              "z": 0
+            },
+            "facing": "NORTH",
+            "type": "courtyard"
+          }
+        ],
+        "access": {
+          "entrances": [
+            {
+              "x": 4,
+              "y": 1,
+              "z": 0
+            }
+          ],
+          "destinations": [
+            {
+              "x": 4,
+              "y": 1,
+              "z": 7
+            }
+          ]
+        }
+      },
+      "plaster_house": {
+        "schemaVersion": 1,
+        "id": "plaster_house",
+        "size": {
+          "x": 9,
+          "y": 11,
+          "z": 13
+        },
+        "origin": {
+          "x": 4,
+          "y": 0,
+          "z": 6
+        },
+        "palette": {
+          "floor": {
+            "block": "minecraft:stone_bricks"
+          },
+          "wall": {
+            "block": "minecraft:white_terracotta"
+          },
+          "roof": {
+            "block": "minecraft:spruce_planks"
+          },
+          "stairs": {
+            "block": "minecraft:spruce_stairs"
+          },
+          "door": {
+            "block": "minecraft:oak_door"
+          },
+          "glass": {
+            "block": "minecraft:glass_pane"
+          }
+        },
+        "build": [
+          {
+            "op": "CLEAR",
+            "id": "air",
+            "from": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "to": {
+              "x": 8,
+              "y": 10,
+              "z": 12
+            }
+          },
+          {
+            "op": "FILL",
+            "id": "floor",
+            "from": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "to": {
+              "x": 8,
+              "y": 0,
+              "z": 12
+            },
+            "material": "floor"
+          },
+          {
+            "op": "SHELL",
+            "id": "house",
+            "from": {
+              "x": 1,
+              "y": 0,
+              "z": 3
+            },
+            "to": {
+              "x": 7,
+              "y": 5,
+              "z": 11
+            },
+            "material": "wall"
+          },
+          {
+            "op": "DOOR",
+            "id": "entry",
+            "at": {
+              "x": 4,
+              "y": 1,
+              "z": 3
+            },
+            "material": "door",
+            "facing": "NORTH"
+          },
+          {
+            "op": "FILL",
+            "id": "window_left",
+            "from": {
+              "x": 1,
+              "y": 2,
+              "z": 5
+            },
+            "to": {
+              "x": 1,
+              "y": 3,
+              "z": 8
+            },
+            "material": "glass"
+          },
+          {
+            "op": "FILL",
+            "id": "window_right",
+            "from": {
+              "x": 7,
+              "y": 2,
+              "z": 5
+            },
+            "to": {
+              "x": 7,
+              "y": 3,
+              "z": 8
+            },
+            "material": "glass"
+          },
+          {
+            "op": "ROOF",
+            "id": "roof",
+            "from": {
+              "x": 0,
+              "y": 6,
+              "z": 2
+            },
+            "to": {
+              "x": 8,
+              "y": 10,
+              "z": 12
+            },
+            "material": "roof",
+            "stairMaterial": "stairs",
+            "style": "GABLE",
+            "ridgeAxis": "Z"
+          }
+        ],
+        "ports": [
+          {
+            "id": "entry",
+            "at": {
+              "x": 4,
+              "y": 1,
+              "z": 0
+            },
+            "facing": "NORTH",
+            "type": "courtyard"
+          }
+        ],
+        "access": {
+          "entrances": [
+            {
+              "x": 4,
+              "y": 1,
+              "z": 0
+            }
+          ],
+          "destinations": [
+            {
+              "x": 4,
+              "y": 1,
+              "z": 7
+            }
+          ]
+        }
+      }
+    },
+    "pools": {
+      "houses": [
+        {
+          "piece": "timber_house",
+          "weight": 2
+        },
+        {
+          "piece": "plaster_house",
+          "weight": 1
+        }
+      ]
+    },
+    "variants": 4,
+    "maxPieces": 5,
+    "maxDepth": 1,
+    "maxRadius": 32
+  }
+}
