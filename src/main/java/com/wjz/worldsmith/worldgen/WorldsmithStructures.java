@@ -7,12 +7,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
-import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BootstrapContext;
-import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -44,6 +42,10 @@ public final class WorldsmithStructures {
                 ? foundation.getSupports().stream().map(p->new BlockPos(p.getX(),0,p.getZ())).toList()
                 : geometry.getVoxels().stream().filter(v->v.getPosition().getY()==0 && !WorldsmithStructureTemplates.resolve(v.getMaterial()).isAir())
                     .map(v->new BlockPos(v.getPosition().getX(),0,v.getPosition().getZ())).distinct().toList();
+            // Probe every authored column, not just the selected pillars. A
+            // hill between pillars must not grow through the room/roof.
+            var footprint=geometry.getVoxels().stream()
+                .map(v->new BlockPos(v.getPosition().getX(),0,v.getPosition().getZ())).distinct().toList();
             if(supports.isEmpty())throw new IllegalArgumentException("Structure '"+structure.getId()+"' needs solid floor cells at local Y=0");
             List<BoundingBox> reserved=new ArrayList<>();
             reserved.add(BoundingBox.encapsulatingPositions(geometry.getVoxels().stream()
@@ -53,14 +55,18 @@ public final class WorldsmithStructures {
             if(foundation.getMode()!=FoundationMode.NONE && (foundationState.isAir() || !foundationState.getFluidState().isEmpty() || !foundationState.isCollisionShapeFullBlock(EmptyBlockGetter.INSTANCE,BlockPos.ZERO))) {
                 throw new IllegalArgumentException("Structure '"+structure.getId()+"' foundation material must be a dry full supporting block");
             }
+            var size=new BlockPos(definition.getSize().getX(),definition.getSize().getY(),definition.getSize().getZ());
+            var origin=new BlockPos(definition.getOrigin().getX(),0,definition.getOrigin().getZ());
+            var rotations=rule.getRotations().stream().map(r->Rotation.valueOf(r.name())).toList();
+            var layout=new WorldsmithStructureLayout.Member(pack.structureKey(structure.getId()).identifier(),pack.id(),
+                rule.getSpacingChunks(),rule.getSeparationChunks(),salt(pack.id()+":"+structure.getId()),
+                WorldsmithStructureLayout.envelope(size,origin,rotations,rule.getClearanceBlocks()));
             var config=new WorldsmithTemplateStructure.Settings(
                 pack.structureTemplateId(definition.getId()),
-                new BlockPos(definition.getSize().getX(),definition.getSize().getY(),definition.getSize().getZ()),
-                new BlockPos(definition.getOrigin().getX(),0,definition.getOrigin().getZ()),
-                rule.getRotations().stream().map(r->Rotation.valueOf(r.name())).toList(),
+                size,origin,rotations,
                 fit.getSurface().name(),fit.getMaxHeightDifference(),foundation.getMode().name(),
                 foundationState,
-                foundation.getMaxDepth(),supports,reserved
+                foundation.getMaxDepth(),supports,reserved,footprint,layout
             );
             var allowed=HolderSet.direct(rule.getBiomes().stream().map(id->biomes.getOrThrow(pack.biomeKey(id))).toList());
             context.register(pack.structureKey(structure.getId()),new WorldsmithTemplateStructure(new Structure.StructureSettings(allowed),config));

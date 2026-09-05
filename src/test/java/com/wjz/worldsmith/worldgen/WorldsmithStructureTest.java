@@ -125,7 +125,7 @@ final class WorldsmithStructureTest {
     @Test void piecesClipWritesToEachChunkAndRemainStableInReverseOrder() throws Exception {
         var geometry=StructureGeometryCompiler.compile(example());
         Identifier id=Identifier.fromNamespaceAndPath("worldsmith","test/shrine");
-        var config=new WorldsmithTemplateStructure.Settings(id,new BlockPos(15,13,19),new BlockPos(7,0,9),List.of(Rotation.NONE),"LAND_SURFACE",4,"FILL",Blocks.STONE_BRICKS.defaultBlockState(),6,List.of(BlockPos.ZERO),List.of(new BoundingBox(0,0,0,14,12,18)));
+        var config=new WorldsmithTemplateStructure.Settings(id,new BlockPos(15,13,19),new BlockPos(7,0,9),List.of(Rotation.NONE),"LAND_SURFACE",4,"FILL",Blocks.STONE_BRICKS.defaultBlockState(),6,List.of(BlockPos.ZERO),List.of(new BoundingBox(0,0,0,14,12,18)),List.of(BlockPos.ZERO),testLayout(id,new BlockPos(15,13,19),new BlockPos(7,0,9)));
         try(var storage=LevelStorageSource.createDefault(temp).createAccess("piece-test")) {
             var manager=new StructureTemplateManager(ResourceManager.Empty.INSTANCE,storage,DataFixers.getDataFixer(),BuiltInRegistries.BLOCK);
             manager.getOrCreate(id).load(BuiltInRegistries.BLOCK,WorldsmithStructureTemplates.encode(geometry));
@@ -143,7 +143,7 @@ final class WorldsmithStructureTest {
     }
 
     @Test void terrainFitIsBoundedAndRejectsWaterCliffsAndMissingSupports() {
-        var config=new WorldsmithTemplateStructure.Settings(Identifier.fromNamespaceAndPath("worldsmith","test/probe"),new BlockPos(5,8,5),new BlockPos(2,0,2),List.of(Rotation.NONE),"LAND_SURFACE",4,"FILL",Blocks.STONE.defaultBlockState(),3,List.of(new BlockPos(0,0,0),new BlockPos(4,0,4)),List.of(new BoundingBox(0,0,0,4,7,4)));
+        var config=new WorldsmithTemplateStructure.Settings(Identifier.fromNamespaceAndPath("worldsmith","test/probe"),new BlockPos(5,8,5),new BlockPos(2,0,2),List.of(Rotation.NONE),"LAND_SURFACE",4,"FILL",Blocks.STONE.defaultBlockState(),3,List.of(new BlockPos(0,0,0),new BlockPos(4,0,4)),List.of(new BoundingBox(0,0,0,4,7,4)),List.of(new BlockPos(0,0,0),new BlockPos(4,0,4)),testLayout(Identifier.fromNamespaceAndPath("worldsmith","test/probe"),new BlockPos(5,8,5),new BlockPos(2,0,2)));
         var slope=WorldsmithTerrainProbe.probe(config,BlockPos.ZERO,Rotation.NONE,-64,319,(x,z)->new WorldsmithTerrainProbe.Column(x<0?65:67,x<0?65:67));
         assertTrue(slope.accepted());
         assertEquals(67,slope.plan().position().getY());
@@ -166,6 +166,11 @@ final class WorldsmithStructureTest {
         assertEquals(Direction.Axis.Z,state.getValue(RotatedPillarBlock.AXIS));
     }
 
+    private static WorldsmithStructureLayout.Member testLayout(Identifier id,BlockPos size,BlockPos origin) {
+        return new WorldsmithStructureLayout.Member(id,"test",24,8,43,
+            WorldsmithStructureLayout.envelope(size,origin,List.of(Rotation.NONE),2));
+    }
+
     private static void place(WorldsmithTemplatePiece piece,FlatWorld world,ChunkPos chunk) {
         world.clip=new BoundingBox(chunk.getMinBlockX(),-64,chunk.getMinBlockZ(),chunk.getMaxBlockX(),319,chunk.getMaxBlockZ());
         piece.postProcess(world.level,null,null,RandomSource.create(2L),world.clip,chunk,BlockPos.ZERO);
@@ -175,7 +180,7 @@ final class WorldsmithStructureTest {
         WorldsmithPack source=WorldsmithPacks.builtin();
         TerrainPlan base=source.getTerrain();
         TerrainPlan terrain=new TerrainPlan(base.getSchemaVersion(),54L,-64,384,1,2,63,base.getDefaultBlock(),base.getDefaultFluid(),WorldsmithTerrainSamplingTest.shape(.97,2,.1,1,0,0,.1,0),true,true,false,base.getSpawnTargets());
-        var placement=new com.wjz.worldsmith.core.structure.StructurePlacement(source.getBiomes().getBiomes().stream().map(BiomeDefinition::getId).toList(),24,8,List.of(BuildRotation.NONE,BuildRotation.CLOCKWISE_90),new StructureTerrainFit(StructureSurface.LAND_SURFACE,4,new StructureFoundation(FoundationMode.FILL,"foundation",6,List.of())));
+        var placement=new com.wjz.worldsmith.core.structure.StructurePlacement(source.getBiomes().getBiomes().stream().map(BiomeDefinition::getId).toList(),24,8,List.of(BuildRotation.NONE,BuildRotation.CLOCKWISE_90),new StructureTerrainFit(StructureSurface.LAND_SURFACE,4,new StructureFoundation(FoundationMode.FILL,"foundation",6,List.of())),2);
         var library=new StructureLibrary(1,List.of(new WorldStructureDefinition("shrine",example(),placement)));
         String id="d".repeat(64);
         var m=source.getManifest();

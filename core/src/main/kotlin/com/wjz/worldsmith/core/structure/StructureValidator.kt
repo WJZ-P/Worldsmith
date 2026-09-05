@@ -10,8 +10,7 @@ object StructureValidator {
 
     @JvmStatic
     fun validateBlueprint(blueprint: StructureBlueprint): List<Diagnostic> = try {
-        StructureGeometryCompiler.compile(blueprint)
-        emptyList()
+        StructureGeometryCompiler.compile(blueprint).diagnostics
     } catch (failure: StructureBuildException) {
         listOf(failure.diagnostic)
     }
@@ -34,10 +33,12 @@ object StructureValidator {
             val geometry = try { StructureGeometryCompiler.compile(blueprint) } catch (failure: StructureBuildException) {
                 add(failure.diagnostic.copy(path="$path.blueprint.${failure.diagnostic.path}")); null
             }
-            if(geometry!=null && geometry.voxels.none { it.position.y==0 && it.material.block!="minecraft:air" }) {
+            if (geometry != null) addAll(geometry.diagnostics.map { it.copy(path = "$path.blueprint.${it.path}") })
+            if(geometry!=null && geometry.voxels.none { it.position.y==0 && !it.material.isAir() }) {
                 add(error("$path.blueprint.build","MISSING_STRUCTURE_FLOOR","A placed structure needs solid authored floor cells at local Y=0"))
             }
             val p=structure.placement
+            if (p.clearanceBlocks !in 0..16) add(error("$path.placement.clearanceBlocks", "STRUCTURE_CLEARANCE_OUT_OF_RANGE", "Structure clearance must be 0..16 blocks"))
             if(p.biomes.isEmpty())add(error("$path.placement.biomes","EMPTY_STRUCTURE_BIOMES","Declare at least one eligible biome id"))
             p.biomes.forEach { if(it !in biomeIds)add(error("$path.placement.biomes","UNKNOWN_STRUCTURE_BIOME","Unknown biome '$it'")) }
             if(p.biomes.distinct().size!=p.biomes.size)add(error("$path.placement.biomes","DUPLICATE_STRUCTURE_BIOME","Biome ids must be distinct"))
@@ -57,7 +58,7 @@ object StructureValidator {
                 if(foundation.supports.size>64 || foundation.supports.distinct().size!=foundation.supports.size)add(error("$fp.supports","INVALID_FOUNDATION_SUPPORTS","Use at most 64 distinct support points"))
                 foundation.supports.forEach { pos ->
                     if(pos.y!=0 || pos.x !in 0 until blueprint.size.x || pos.z !in 0 until blueprint.size.z)add(error("$fp.supports","FOUNDATION_SUPPORT_OUT_OF_BOUNDS","Support must be at Y=0 inside blueprint size"))
-                    if(geometry!=null && geometry.voxels.none { it.position==pos && it.material.block!="minecraft:air" })add(error("$fp.supports","FOUNDATION_SUPPORT_HAS_NO_FLOOR","Each pillar must meet an authored solid floor cell at Y=0"))
+                    if(geometry!=null && geometry.voxels.none { it.position==pos && !it.material.isAir() })add(error("$fp.supports","FOUNDATION_SUPPORT_HAS_NO_FLOOR","Each pillar must meet an authored solid floor cell at Y=0"))
                 }
             }
         }

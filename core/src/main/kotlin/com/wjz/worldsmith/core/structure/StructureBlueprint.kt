@@ -14,7 +14,9 @@ data class BuildBox(val from: BuildPos, val to: BuildPos)
 
 /** Exact, version-neutral block-state description. The MC adapter checks the live registry. */
 @Serializable
-data class BuildMaterial(val block: String, val properties: Map<String, String> = emptyMap())
+data class BuildMaterial(val block: String, val properties: Map<String, String> = emptyMap()) {
+    fun isAir(): Boolean = block == "minecraft:air" || block == "minecraft:cave_air" || block == "minecraft:void_air"
+}
 
 @Serializable
 enum class BuildRotation { NONE, CLOCKWISE_90, CLOCKWISE_180, COUNTERCLOCKWISE_90 }
@@ -113,6 +115,8 @@ data class StructurePlacement(
     val separationChunks: Int = 8,
     val rotations: List<BuildRotation> = BuildRotation.entries,
     val terrainFit: StructureTerrainFit = StructureTerrainFit(),
+    /** Padding reserved around every allowed rotation during deterministic site arbitration. */
+    val clearanceBlocks: Int = 2,
 )
 
 @Serializable
@@ -138,4 +142,5 @@ data class CompiledStructure(
     val voxels: List<StructureVoxel>,
     val keepClear: List<BuildBox>,
     val expandedWork: Int,
+    val diagnostics: List<com.wjz.worldsmith.core.validation.Diagnostic> = emptyList(),
 )
