@@ -100,4 +100,25 @@ class StructureWorkflowTest {
         })
         assertTrue(invalid.isError)
     }
+
+    @Test fun `optional structure anchors survive the MCP draft write and portable pack path`() {
+        val session=begin()
+        val structure=definition().let { it.copy(placement=it.placement.copy(anchor=StructureAnchorTarget("holy_peak"))) }
+        val draft=call("worldsmith_put_structure",buildJsonObject {put("sessionId",session);put("structure",WorldsmithJson.format.encodeToJsonElement(structure))})
+        assertFalse(draft.isError,draft.text)
+        val template=call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
+        val terrain=WorldsmithJson.format.decodeFromJsonElement<com.wjz.worldsmith.core.model.TerrainPlan>(template.getValue("terrain"))
+        val shape=(terrain.shape as com.wjz.worldsmith.core.model.TerrainShape.Procedural).copy(anchors=listOf(
+            com.wjz.worldsmith.core.model.Anchor("holy_peak",com.wjz.worldsmith.core.model.AnchorPlacement.Fixed(-31,17),200,30.0)))
+        val saved=call(WorldsmithWorkflow.WRITE_TOOL,buildJsonObject {
+            put("sessionId",session);put("displayName","Anchored shrine")
+            put("terrain",WorldsmithJson.format.encodeToJsonElement(terrain.copy(shape=shape)))
+            listOf("biomes","features").forEach {put(it,template.getValue(it))}
+        })
+        assertFalse(saved.isError,saved.text)
+        val pack=WorldsmithPackLoader.loadDirectory(Path.of(saved.structuredContent.getValue("path").jsonPrimitive.content))
+        assertEquals("holy_peak",pack.structures.structures.single().placement.anchor!!.id)
+        assertEquals(pack.computedId,pack.manifest.id)
+        assertFalse(call(WorldsmithWorkflow.FINISH_TOOL,buildJsonObject {put("sessionId",session)}).structuredContent.getValue("minecraftCompiled").jsonPrimitive.boolean)
+    }
 }

@@ -7,6 +7,7 @@ import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 object StructureValidator {
     const val MAX_STRUCTURES = 48
     private val ID = Regex("^[a-z0-9_][a-z0-9_-]{0,63}$")
+    private val ANCHOR_ID = Regex("^[a-z0-9_]+$")
 
     @JvmStatic
     fun validateBlueprint(blueprint: StructureBlueprint): List<Diagnostic> = try {
@@ -38,6 +39,12 @@ object StructureValidator {
                 add(error("$path.blueprint.build","MISSING_STRUCTURE_FLOOR","A placed structure needs solid authored floor cells at local Y=0"))
             }
             val p=structure.placement
+            p.anchor?.let { target ->
+                if (!ANCHOR_ID.matches(target.id)) add(error("$path.placement.anchor.id", "INVALID_ANCHOR_ID", "Use an existing terrain anchor id"))
+                if (target.offsetX !in -4096..4096 || target.offsetZ !in -4096..4096) add(error("$path.placement.anchor", "STRUCTURE_ANCHOR_OFFSET_OUT_OF_RANGE", "Anchor offsets must stay within -4096..4096 blocks"))
+                if (target.along !in 0.0..1.0) add(error("$path.placement.anchor.along", "STRUCTURE_ANCHOR_ALONG_OUT_OF_RANGE", "Line position must be between 0 and 1"))
+                if (p.spacingChunks != 24 || p.separationChunks != 8) add(error("$path.placement", "UNUSED_STRUCTURE_SPACING", "Anchor placement does not consume random-spread spacing; omit spacingChunks and separationChunks"))
+            }
             if (p.clearanceBlocks !in 0..16) add(error("$path.placement.clearanceBlocks", "STRUCTURE_CLEARANCE_OUT_OF_RANGE", "Structure clearance must be 0..16 blocks"))
             if(p.biomes.isEmpty())add(error("$path.placement.biomes","EMPTY_STRUCTURE_BIOMES","Declare at least one eligible biome id"))
             p.biomes.forEach { if(it !in biomeIds)add(error("$path.placement.biomes","UNKNOWN_STRUCTURE_BIOME","Unknown biome '$it'")) }

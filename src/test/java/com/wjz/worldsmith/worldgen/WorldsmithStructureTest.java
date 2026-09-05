@@ -168,7 +168,7 @@ final class WorldsmithStructureTest {
 
     private static WorldsmithStructureLayout.Member testLayout(Identifier id,BlockPos size,BlockPos origin) {
         return new WorldsmithStructureLayout.Member(id,"test",24,8,43,
-            WorldsmithStructureLayout.envelope(size,origin,List.of(Rotation.NONE),2));
+            WorldsmithStructureLayout.envelope(size,origin,List.of(Rotation.NONE),2),Optional.empty());
     }
 
     private static void place(WorldsmithTemplatePiece piece,FlatWorld world,ChunkPos chunk) {
@@ -180,7 +180,7 @@ final class WorldsmithStructureTest {
         WorldsmithPack source=WorldsmithPacks.builtin();
         TerrainPlan base=source.getTerrain();
         TerrainPlan terrain=new TerrainPlan(base.getSchemaVersion(),54L,-64,384,1,2,63,base.getDefaultBlock(),base.getDefaultFluid(),WorldsmithTerrainSamplingTest.shape(.97,2,.1,1,0,0,.1,0),true,true,false,base.getSpawnTargets());
-        var placement=new com.wjz.worldsmith.core.structure.StructurePlacement(source.getBiomes().getBiomes().stream().map(BiomeDefinition::getId).toList(),24,8,List.of(BuildRotation.NONE,BuildRotation.CLOCKWISE_90),new StructureTerrainFit(StructureSurface.LAND_SURFACE,4,new StructureFoundation(FoundationMode.FILL,"foundation",6,List.of())),2);
+        var placement=new com.wjz.worldsmith.core.structure.StructurePlacement(source.getBiomes().getBiomes().stream().map(BiomeDefinition::getId).toList(),24,8,List.of(BuildRotation.NONE,BuildRotation.CLOCKWISE_90),new StructureTerrainFit(StructureSurface.LAND_SURFACE,4,new StructureFoundation(FoundationMode.FILL,"foundation",6,List.of())),2,null);
         var library=new StructureLibrary(1,List.of(new WorldStructureDefinition("shrine",example(),placement)));
         String id="d".repeat(64);
         var m=source.getManifest();

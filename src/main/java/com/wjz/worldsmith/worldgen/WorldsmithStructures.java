@@ -2,6 +2,7 @@ package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.core.structure.FoundationMode;
 import com.wjz.worldsmith.core.structure.StructureGeometryCompiler;
+import com.wjz.worldsmith.core.structure.WorldStructureDefinition;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -18,8 +19,6 @@ import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import java.util.ArrayList;
 import net.minecraft.world.level.EmptyBlockGetter;
-import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement;
-import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadType;
 
 public final class WorldsmithStructures {
     private WorldsmithStructures() {}
@@ -58,9 +57,7 @@ public final class WorldsmithStructures {
             var size=new BlockPos(definition.getSize().getX(),definition.getSize().getY(),definition.getSize().getZ());
             var origin=new BlockPos(definition.getOrigin().getX(),0,definition.getOrigin().getZ());
             var rotations=rule.getRotations().stream().map(r->Rotation.valueOf(r.name())).toList();
-            var layout=new WorldsmithStructureLayout.Member(pack.structureKey(structure.getId()).identifier(),pack.id(),
-                rule.getSpacingChunks(),rule.getSeparationChunks(),salt(pack.id()+":"+structure.getId()),
-                WorldsmithStructureLayout.envelope(size,origin,rotations,rule.getClearanceBlocks()));
+            var layout=layout(pack,structure);
             var config=new WorldsmithTemplateStructure.Settings(
                 pack.structureTemplateId(definition.getId()),
                 size,origin,rotations,
@@ -76,11 +73,22 @@ public final class WorldsmithStructures {
     public static void bootstrapSets(CompiledPack pack, BootstrapContext<StructureSet> context) {
         var structures=context.lookup(Registries.STRUCTURE);
         for(var definition:pack.pack().getStructures().getStructures()) {
-            var p=definition.getPlacement();
             context.register(pack.structureSetKey(definition.getId()),new StructureSet(
                 structures.getOrThrow(pack.structureKey(definition.getId())),
-                new RandomSpreadStructurePlacement(p.getSpacingChunks(),p.getSeparationChunks(),RandomSpreadType.LINEAR,salt(pack.id()+":"+definition.getId()))));
+                layout(pack,definition).placement()));
         }
+    }
+
+    static WorldsmithStructureLayout.Member layout(CompiledPack pack, WorldStructureDefinition definition) {
+        var blueprint=definition.getBlueprint();
+        var rule=definition.getPlacement();
+        var size=new BlockPos(blueprint.getSize().getX(),blueprint.getSize().getY(),blueprint.getSize().getZ());
+        var origin=new BlockPos(blueprint.getOrigin().getX(),0,blueprint.getOrigin().getZ());
+        var rotations=rule.getRotations().stream().map(r->Rotation.valueOf(r.name())).toList();
+        return new WorldsmithStructureLayout.Member(pack.structureKey(definition.getId()).identifier(),pack.id(),
+            rule.getSpacingChunks(),rule.getSeparationChunks(),salt(pack.id()+":"+definition.getId()),
+            WorldsmithStructureLayout.envelope(size,origin,rotations,rule.getClearanceBlocks()),
+            WorldsmithStructureAnchor.resolve(pack,rule.getAnchor()));
     }
 
     static int salt(String value) {

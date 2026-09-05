@@ -107,7 +107,17 @@ data class StructureTerrainFit(
     val foundation: StructureFoundation = StructureFoundation(),
 )
 
-/** Spacing/separation are in CHUNKS, not blocks and not guaranteed pairwise distances. */
+/** Optional link to a terrain anchor; never implies a required landmark or a forced successful start. */
+@Serializable
+data class StructureAnchorTarget(
+    val id: String,
+    val offsetX: Int = 0,
+    val offsetZ: Int = 0,
+    /** LINE only: 0 is the start, 1 the end; default is the midpoint. */
+    val along: Double = 0.5,
+)
+
+/** Without anchor, spacing/separation retain vanilla random-spread semantics, in CHUNKS. */
 @Serializable
 data class StructurePlacement(
     val biomes: List<String>,
@@ -117,6 +127,7 @@ data class StructurePlacement(
     val terrainFit: StructureTerrainFit = StructureTerrainFit(),
     /** Padding reserved around every allowed rotation during deterministic site arbitration. */
     val clearanceBlocks: Int = 2,
+    val anchor: StructureAnchorTarget? = null,
 )
 
 @Serializable

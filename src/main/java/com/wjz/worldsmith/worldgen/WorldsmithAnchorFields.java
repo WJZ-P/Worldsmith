@@ -121,21 +121,20 @@ public final class WorldsmithAnchorFields {
 				// indices differ by one, which lands adjacent cells on almost the
 				// same point of a low-frequency noise and translates the whole
 				// lattice instead of jittering each cell of it.
-				double sampleX = neighbourX * (double) spacing;
-				double sampleZ = neighbourZ * (double) spacing;
-				// Two samples of one noise, separated on the unused Y axis, stand
-				// in for two independent offsets.
-				double shiftX = noise.get(sampleX, 0.0, sampleZ);
-				double shiftZ = noise.get(sampleX, 640.0, sampleZ);
-				double reach = jitter * spacing * 0.5;
-				double centreX = (neighbourX + 0.5) * spacing + Mth.clamp(shiftX, -1.0, 1.0) * reach;
-				double centreZ = (neighbourZ + 0.5) * spacing + Mth.clamp(shiftZ, -1.0, 1.0) * reach;
+				double centreX = latticeCoordinate(neighbourX, neighbourZ, spacing, jitter, false, noise);
+				double centreZ = latticeCoordinate(neighbourX, neighbourZ, spacing, jitter, true, noise);
 				double dx = x - centreX;
 				double dz = z - centreZ;
 				nearest = Math.min(nearest, Math.sqrt(dx * dx + dz * dz));
 			}
 		}
 		return nearest;
+	}
+
+	/** Exact shared centre arithmetic for terrain, surface rules and structure placement. */
+	public static double latticeCoordinate(int cellX, int cellZ, int spacing, double jitter, boolean zAxis, NoiseSampler noise) {
+		double shift = noise.get(cellX * (double) spacing, zAxis ? 640.0 : 0.0, cellZ * (double) spacing);
+		return ((zAxis ? cellZ : cellX) + 0.5) * spacing + Mth.clamp(shift, -1.0, 1.0) * (jitter * spacing * 0.5);
 	}
 
 	/** Distance to a single anchor at an authored position. */

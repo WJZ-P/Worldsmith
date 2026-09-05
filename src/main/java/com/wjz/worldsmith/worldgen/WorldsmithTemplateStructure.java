@@ -83,8 +83,13 @@ public final class WorldsmithTemplateStructure extends Structure {
             .map(registry->registry.stream().filter(s->s instanceof WorldsmithTemplateStructure)
                 .map(s->((WorldsmithTemplateStructure)s).templateSettings.layout).toList())
             .orElse(List.of(config.layout));
-        if(!WorldsmithStructureLayout.accepts(config.layout,context.chunkPos(),context.seed(),peers))return Optional.empty();
-        BlockPos anchor = new BlockPos(context.chunkPos().getMiddleBlockX(), 0, context.chunkPos().getMiddleBlockZ());
+        var jitter = config.layout.anchor().orElse(null) instanceof WorldsmithStructureAnchor.Scattered ||
+            peers.stream().anyMatch(p -> p.anchor().orElse(null) instanceof WorldsmithStructureAnchor.Scattered)
+            ? WorldsmithAnchorStructurePlacement.noise(context.randomState()) : null;
+        var site = config.layout.siteInChunk(context.chunkPos(), jitter);
+        if (site.isEmpty()) return Optional.empty();
+        BlockPos anchor = site.get();
+        if(!WorldsmithStructureLayout.accepts(config.layout,anchor,context.seed(),jitter,peers))return Optional.empty();
         var sampler=new WorldsmithTerrainProbe.CachedSampler((x,z)->WorldsmithTerrainProbe.readColumn(
             context.chunkGenerator().getBaseColumn(x,z,context.heightAccessor(),context.randomState()),
             context.heightAccessor().getMinY(),context.heightAccessor().getMaxY()));

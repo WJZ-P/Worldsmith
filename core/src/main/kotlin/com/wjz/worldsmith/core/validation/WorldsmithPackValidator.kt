@@ -2,6 +2,7 @@ package com.wjz.worldsmith.core.validation
 
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import com.wjz.worldsmith.core.model.RiverFill
+import com.wjz.worldsmith.core.model.AnchorPlacement
 import com.wjz.worldsmith.core.model.SurfaceHydrology
 import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.WorldsmithPack
@@ -67,6 +68,35 @@ object WorldsmithPackValidator {
     private fun validateAnchorReferences(pack: WorldsmithPack): List<Diagnostic> = buildList {
         val shape = pack.terrain.shape
         val known = if (shape is TerrainShape.Procedural) shape.anchors.mapTo(mutableSetOf()) { it.id } else emptySet()
+
+        pack.structures.structures.forEachIndexed { index, structure ->
+            val target = structure.placement.anchor ?: return@forEachIndexed
+            val path = "structures.structures[$index].placement.anchor"
+            if (shape !is TerrainShape.Procedural) {
+                add(error(path, "ANCHOR_REQUIRES_PROCEDURAL_TERRAIN", "Structure anchor placement requires procedural terrain"))
+                return@forEachIndexed
+            }
+            val anchor = shape.anchors.find { it.id == target.id }
+            if (anchor == null) {
+                add(error(path, "UNKNOWN_ANCHOR", "Structure references terrain anchor '${target.id}', which does not exist"))
+                return@forEachIndexed
+            }
+            val placement = anchor.placement
+            if (placement !is AnchorPlacement.Line && target.along != 0.5) {
+                add(error("$path.along", "UNUSED_ANCHOR_ALONG", "Only a line anchor consumes along; omit it for fixed or scattered anchors"))
+            }
+            val position = when (placement) {
+                is AnchorPlacement.Fixed -> placement.x.toDouble() to placement.z.toDouble()
+                is AnchorPlacement.Line ->
+                    (placement.startX + (placement.endX.toDouble() - placement.startX) * target.along) to
+                    (placement.startZ + (placement.endZ.toDouble() - placement.startZ) * target.along)
+                is AnchorPlacement.Scattered -> null
+            }
+            if (position != null && (position.first + target.offsetX !in -29_999_000.0..29_999_000.0 ||
+                position.second + target.offsetZ !in -29_999_000.0..29_999_000.0)) {
+                add(error(path, "STRUCTURE_ANCHOR_OUTSIDE_WORLD", "The resolved structure pivot must stay within +/-29999000 blocks"))
+            }
+        }
 
         if (shape is TerrainShape.Procedural) {
             shape.bands.forEachIndexed { index, band ->
