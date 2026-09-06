@@ -168,7 +168,7 @@ final class WorldsmithStructureTest {
 
     private static WorldsmithStructureLayout.Member testLayout(Identifier id,BlockPos size,BlockPos origin) {
         return new WorldsmithStructureLayout.Member(id,"test",24,8,43,
-            WorldsmithStructureLayout.envelope(size,origin,List.of(Rotation.NONE),2),Optional.empty());
+            WorldsmithStructureLayout.envelope(size,origin,List.of(Rotation.NONE),2),Optional.empty(),Optional.empty());
     }
 
     static void place(WorldsmithTemplatePiece piece,FlatWorld world,ChunkPos chunk) {

@@ -37,10 +37,10 @@ final class WorldsmithStructureExpansionTest {
     @TempDir Path temp;
     @BeforeAll static void boot(){WorldsmithTestBootstrap.bootStrap();}
     private static WorldsmithStructurePlan plan() {
-        var part=new WorldsmithStructurePlan.Part(Identifier.fromNamespaceAndPath("worldsmith","test"),BlockPos.ZERO,Rotation.NONE,new BlockPos(3,5,3),List.of(new BoundingBox(0,0,0,2,4,2)));
         List<BlockPos> columns=new ArrayList<>(),supports=new ArrayList<>();
         for(int x=0;x<3;x++)for(int z=0;z<3;z++){columns.add(new BlockPos(x,4,z));supports.add(new BlockPos(x,0,z));}
-        return new WorldsmithStructurePlan(List.of(part),columns,supports,5,new BoundingBox(0,0,0,2,4,2));
+        var part=new WorldsmithStructurePlan.Part(Identifier.fromNamespaceAndPath("worldsmith","test"),BlockPos.ZERO,Rotation.NONE,new BlockPos(3,5,3),List.of(new BoundingBox(0,0,0,2,4,2)),columns,supports,WorldsmithInstanceProcessor.Config.EMPTY);
+        return new WorldsmithStructurePlan(List.of(part),columns,supports,5,new BoundingBox(0,0,0,2,4,2),List.of());
     }
     private static WorldsmithStructureSite site(String surface,int min,int max,int layer,String foundation,int depth,int cut,int budget) {
         return new WorldsmithStructureSite(surface,min,max,layer,0,8,8,foundation,Blocks.STONE_BRICKS.defaultBlockState(),depth,cut,budget);

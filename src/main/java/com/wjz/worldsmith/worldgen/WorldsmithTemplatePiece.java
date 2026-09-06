@@ -72,7 +72,9 @@ public final class WorldsmithTemplatePiece extends TemplateStructurePiece {
         // template in each chunk; clips make forward/reverse chunk order equivalent.
         applyColumns(level,chunkBox,cuts,Blocks.AIR.defaultBlockState());
         applyColumns(level,chunkBox,foundations,foundationState.rotate(getRotation()));
-        this.template.placeInWorld(level,this.templatePosition,referencePos,this.placeSettings.copy().setBoundingBox(chunkBox),
+        var placement=this.placeSettings.copy().setBoundingBox(chunkBox);
+        if(!part.detail().patches().isEmpty())placement.addProcessor(new WorldsmithInstanceProcessor(contentSeed,part.detail()));
+        this.template.placeInWorld(level,this.templatePosition,referencePos,placement,
             RandomSource.create(WorldsmithStructures.mixSeed(contentSeed+chunkPos.pack()*0xD1B54A32D192ED03L)),2);
     }
     private static void applyColumns(WorldGenLevel level,BoundingBox clip,List<BoundingBox> columns,BlockState state) {

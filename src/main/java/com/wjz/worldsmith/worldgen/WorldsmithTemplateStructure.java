@@ -14,17 +14,23 @@ import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureType;
 
-/** Chooses a precompiled rigid multi-piece plan, fits it once, and persists the result. */
+/** Fits a precompiled rigid or terrain-following plan and persists the entire placement. */
 public final class WorldsmithTemplateStructure extends Structure {
-    public record Settings(List<WorldsmithStructurePlan> plans,List<Rotation> rotations,WorldsmithStructureSite site,WorldsmithStructureLayout.Member layout) {
+    public record Settings(List<WorldsmithStructurePlan> plans,List<Rotation> rotations,WorldsmithStructureSite site,WorldsmithStructureLayout.Member layout,Optional<WorldsmithRoadSettings> roads) {
         public static final Codec<Settings> CODEC=RecordCodecBuilder.<Settings>create(i->i.group(
             WorldsmithStructurePlan.CODEC.listOf().fieldOf("plans").forGetter(Settings::plans),
             Rotation.CODEC.listOf().fieldOf("rotations").forGetter(Settings::rotations),
             WorldsmithStructureSite.CODEC.fieldOf("site").forGetter(Settings::site),
-            WorldsmithStructureLayout.Member.CODEC.fieldOf("layout").forGetter(Settings::layout)
+            WorldsmithStructureLayout.Member.CODEC.fieldOf("layout").forGetter(Settings::layout),
+            WorldsmithRoadSettings.CODEC.optionalFieldOf("roads").forGetter(Settings::roads)
         ).apply(i,Settings::new)).validate(s->{
             if(s.plans.isEmpty()||s.plans.size()>8||s.rotations.isEmpty()||s.rotations.size()>4||s.rotations.stream().distinct().count()!=s.rotations.size())return DataResult.error(()->"Invalid plan or rotation count");
             var envelope=s.layout.envelope();int padding=s.site.searchRadius();
+            if(s.roads.isPresent()) {
+                var r=s.roads.get();int extent=r.radius()+padding;
+                if(!List.of("LAND_SURFACE","SKY_SURFACE").contains(s.site.surface())||envelope.minX()>-extent||envelope.minZ()>-extent||envelope.maxX()<extent||envelope.maxZ()<extent)return DataResult.error(()->"Road region must fit the reservation on a supported surface");
+                if(r.terrainFollowing()&&(s.site.foundation().equals("PILLARS")||s.plans.stream().anyMatch(p->p.parts().stream().anyMatch(part->part.offset().getY()!=0||part.supports().isEmpty())||p.links().stream().anyMatch(l->!l.passage()))))return DataResult.error(()->"Terrain-following plans require independently supported, unstacked buildings");
+            }
             for(var plan:s.plans)for(var rotation:s.rotations)for(int x:new int[]{plan.bounds().minX(),plan.bounds().maxX()})for(int z:new int[]{plan.bounds().minZ(),plan.bounds().maxZ()}) {
                 BlockPos p=new BlockPos(x,0,z).rotate(rotation);
                 if(p.getX()-padding<envelope.minX()||p.getX()+padding>envelope.maxX()||p.getZ()-padding<envelope.minZ()||p.getZ()+padding>envelope.maxZ())return DataResult.error(()->"Layout reservation must contain all rotated plans and search offsets");
@@ -51,27 +57,27 @@ public final class WorldsmithTemplateStructure extends Structure {
         var jitter=config.layout.anchor().orElse(null) instanceof WorldsmithStructureAnchor.Scattered || peers.stream().anyMatch(p->p.anchor().orElse(null) instanceof WorldsmithStructureAnchor.Scattered)
             ?WorldsmithAnchorStructurePlacement.noise(context.randomState()):null;
         var nominal=config.layout.siteInChunk(context.chunkPos(),jitter);
-        if(nominal.isEmpty()||!WorldsmithStructureLayout.accepts(config.layout,nominal.get(),context.seed(),jitter,peers))return Optional.empty();
+        if(nominal.isEmpty()||!config.layout.allowed(context.seed(),nominal.get())||!WorldsmithStructureLayout.accepts(config.layout,nominal.get(),context.seed(),jitter,peers))return Optional.empty();
         var height=context.heightAccessor();
-        var sampler=new WorldsmithTerrainProbe.CachedSampler((x,z)->WorldsmithTerrainProbe.readColumn(
-            context.chunkGenerator().getBaseColumn(x,z,height,context.randomState()),height.getMinY(),height.getMaxY(),config.site,plan.height()));
+        var sampler=new WorldsmithTerrainProbe.CachedSampler(WorldsmithColumnSampler.create(
+            context.chunkGenerator(),context.randomState(),height,config.roads.isPresent()?null:config.site,config.roads.isPresent()?2:plan.height()));
         int first=chooser.nextInt(config.rotations.size());
         try {
-            for(var anchor:WorldsmithTerrainProbe.sites(nominal.get(),config.site.searchRadius()))for(int attempt=0;attempt<config.rotations.size();attempt++) {
-                Rotation rotation=config.rotations.get((first+attempt)%config.rotations.size());
-                var fit=WorldsmithTerrainProbe.probe(plan,config.site,anchor,rotation,height.getMinY(),height.getMaxY(),sampler);
-                if(!fit.accepted())continue;
-                var base=fit.plan().position();
-                var locate=base.above(plan.parts().getFirst().offset().getY());
-                if(!context.validBiome().test(context.biomeSource().getNoiseBiome(QuartPos.fromBlock(locate.getX()),QuartPos.fromBlock(locate.getY()),QuartPos.fromBlock(locate.getZ()),context.randomState().sampler())))continue;
-                return Optional.of(new GenerationStub(locate,builder->{
-                    for(int i=0;i<plan.parts().size();i++) {
-                        var part=plan.parts().get(i);var combined=Rotation.values()[(rotation.ordinal()+part.rotation().ordinal())&3];
-                        var position=part.offset().rotate(rotation).offset(base);
-                        builder.addPiece(new WorldsmithTemplatePiece(context.structureTemplateManager(),part,config.site.foundationState(),position,combined,
-                            i==0?fit.plan().foundations():List.of(),i==0?fit.plan().cuts():List.of(),contentSeed ^ (i*0x9E3779B97F4A7C15L)));
-                    }
-                }));
+            for(var anchor:WorldsmithTerrainProbe.sites(nominal.get(),config.site.searchRadius())) {
+                if(config.layout.region().isPresent()&&(!config.layout.region().get().contains(context.seed(),anchor)||!config.layout.region().get().waterMatches(anchor,sampler)))continue;
+                for(int attempt=0;attempt<config.rotations.size();attempt++) {
+                    Rotation rotation=config.rotations.get((first+attempt)%config.rotations.size());
+                    var fit=WorldsmithSettlementPlacement.fit(plan,config.site,config.roads,anchor,rotation,sampler,height.getMinY(),height.getMaxY(),p->context.validBiome().test(context.biomeSource().getNoiseBiome(QuartPos.fromBlock(p.getX()),QuartPos.fromBlock(p.getY()),QuartPos.fromBlock(p.getZ()),context.randomState().sampler())));
+                    if(fit.isEmpty())continue;
+                    var placed=fit.get();var locate=anchor.atY(placed.parts().getFirst().position().getY());
+                    return Optional.of(new GenerationStub(locate,builder->{
+                        for(int i=0;i<placed.parts().size();i++) {
+                            var p=placed.parts().get(i);
+                            builder.addPiece(new WorldsmithTemplatePiece(context.structureTemplateManager(),p.part(),config.site.foundationState(),p.position(),p.rotation(),p.foundations(),p.cuts(),contentSeed ^ (i*0x9E3779B97F4A7C15L)));
+                        }
+                        if(!placed.roads().isEmpty())builder.addPiece(new WorldsmithRoadPiece(placed.roads()));
+                    }));
+                }
             }
         } catch(WorldsmithTerrainProbe.ProbeBudgetExceeded limit) {
             // A pathological site is skipped, not allowed to monopolise a generation worker.

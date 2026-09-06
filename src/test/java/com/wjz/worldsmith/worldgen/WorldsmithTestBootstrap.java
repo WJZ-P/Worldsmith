@@ -31,6 +31,7 @@ final class WorldsmithTestBootstrap {
 		MappedRegistry<?> foliagePlacers = (MappedRegistry<?>)BuiltInRegistries.FOLIAGE_PLACER_TYPE;
 		MappedRegistry<?> structureTypes = (MappedRegistry<?>)BuiltInRegistries.STRUCTURE_TYPE;
 		MappedRegistry<?> structurePieces = (MappedRegistry<?>)BuiltInRegistries.STRUCTURE_PIECE;
+		MappedRegistry<?> processors = (MappedRegistry<?>)BuiltInRegistries.STRUCTURE_PROCESSOR;
 		MappedRegistry<?> structurePlacements = (MappedRegistry<?>)BuiltInRegistries.STRUCTURE_PLACEMENT;
 		MappedRegistry<?> placementModifiers = (MappedRegistry<?>)BuiltInRegistries.PLACEMENT_MODIFIER_TYPE;
 		try {
@@ -44,6 +45,7 @@ final class WorldsmithTestBootstrap {
 			frozen.setBoolean(structureTypes, false);
 			frozen.setBoolean(structurePieces, false);
 			frozen.setBoolean(structurePlacements, false);
+			frozen.setBoolean(processors, false);
 			WorldsmithWorldgen.initialize();
 			Method bindValue = Holder.Reference.class.getDeclaredMethod("bindValue", Object.class);
 			bindValue.setAccessible(true);
@@ -67,6 +69,8 @@ final class WorldsmithTestBootstrap {
 				WorldsmithPlacementModifierTypes.structureAvoidance(), bindValue);
 			bind(structureTypes, Registries.STRUCTURE_TYPE, "template", WorldsmithStructureTypes.template(), bindValue);
 			bind(structurePieces, Registries.STRUCTURE_PIECE, "template_piece", WorldsmithStructureTypes.piece(), bindValue);
+			bind(structurePieces, Registries.STRUCTURE_PIECE, "road_piece", WorldsmithStructureTypes.roadPiece(), bindValue);
+			bind(processors, Registries.STRUCTURE_PROCESSOR, "instance_material", WorldsmithInstanceProcessor.CODEC, bindValue);
 			bind(structurePlacements, Registries.STRUCTURE_PLACEMENT, "anchor", WorldsmithStructureTypes.anchorPlacement(), bindValue);
 			// Fabric performs the ordinary final freeze after mod registration.
 			// The plain test registry was already frozen once, so restore the flag
@@ -79,6 +83,7 @@ final class WorldsmithTestBootstrap {
 			frozen.setBoolean(structureTypes, true);
 			frozen.setBoolean(structurePieces, true);
 			frozen.setBoolean(structurePlacements, true);
+			frozen.setBoolean(processors, true);
 		} catch (ReflectiveOperationException failure) {
 			throw new IllegalStateException("Could not open the test registries", failure);
 		}

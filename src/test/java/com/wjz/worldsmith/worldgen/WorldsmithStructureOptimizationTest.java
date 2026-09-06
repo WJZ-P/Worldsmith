@@ -141,7 +141,7 @@ final class WorldsmithStructureOptimizationTest {
     @Test void differentPackScopesDoNotSuppressEachOthersCandidates() {
         var a=member("a",24,8,37,new BlockPos(5,8,5),BlockPos.ZERO);
         var b=new WorldsmithStructureLayout.Member(Identifier.fromNamespaceAndPath("worldsmith","b"),"other_scope",
-            a.spacing(),a.separation(),a.salt(),a.envelope(),Optional.empty());
+            a.spacing(),a.separation(),a.salt(),a.envelope(),Optional.empty(),Optional.empty());
         var site=a.randomPlacement().getPotentialStructureChunk(72L,0,0);
         assertTrue(WorldsmithStructureLayout.accepts(a,middle(site),72L,null,List.of(a,b)));
         assertTrue(WorldsmithStructureLayout.accepts(b,middle(site),72L,null,List.of(a,b)));
@@ -167,7 +167,7 @@ final class WorldsmithStructureOptimizationTest {
             var id=Identifier.fromNamespaceAndPath("worldsmith",name);
             // One native candidate per 4096-chunk cell, same salt: both compete
             // at (0,0), with no nearby self-candidate. The id breaks the rank tie.
-            var layout=new WorldsmithStructureLayout.Member(id,"same_pack",4096,4095,56,envelope,Optional.empty());
+            var layout=new WorldsmithStructureLayout.Member(id,"same_pack",4096,4095,56,envelope,Optional.empty(),Optional.empty());
             var config=WorldsmithStructureFixtures.settings(template,size,BlockPos.ZERO,List.of(Rotation.NONE),surface,0,"NONE",
                 Blocks.STONE.defaultBlockState(),0,List.of(BlockPos.ZERO),List.of(new BoundingBox(0,0,0,14,12,18)),List.of(BlockPos.ZERO),layout);
             var structure=new WorldsmithTemplateStructure(new Structure.StructureSettings(HolderSet.direct(biome)),config);
@@ -187,7 +187,7 @@ final class WorldsmithStructureOptimizationTest {
 
     private static WorldsmithStructureLayout.Member member(String id,int spacing,int separation,int salt,BlockPos size,BlockPos origin) {
         return new WorldsmithStructureLayout.Member(Identifier.fromNamespaceAndPath("worldsmith",id),"scope",spacing,separation,salt,
-            WorldsmithStructureLayout.envelope(size,origin,List.of(Rotation.values()),2),Optional.empty());
+            WorldsmithStructureLayout.envelope(size,origin,List.of(Rotation.values()),2),Optional.empty(),Optional.empty());
     }
 
     private static WorldsmithTemplateStructure.Settings settings(BlockPos size,String mode,List<BlockPos> footprint,List<BlockPos> supports) {

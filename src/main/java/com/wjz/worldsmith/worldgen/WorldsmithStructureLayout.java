@@ -24,7 +24,7 @@ import net.minecraft.world.level.levelgen.structure.placement.StructurePlacement
  */
 public final class WorldsmithStructureLayout {
     public record Member(Identifier id, String scope, int spacing, int separation, int salt,
-        BoundingBox envelope, Optional<WorldsmithStructureAnchor> anchor) {
+        BoundingBox envelope, Optional<WorldsmithStructureAnchor> anchor,Optional<WorldsmithStructureRegion> region) {
         public static final Codec<Member> CODEC = RecordCodecBuilder.<Member>create(i -> i.group(
             Identifier.CODEC.fieldOf("id").forGetter(Member::id),
             Codec.STRING.fieldOf("scope").forGetter(Member::scope),
@@ -32,7 +32,8 @@ public final class WorldsmithStructureLayout {
             Codec.intRange(1, 4095).fieldOf("separation").forGetter(Member::separation),
             Codec.intRange(0, Integer.MAX_VALUE).fieldOf("salt").forGetter(Member::salt),
             BoundingBox.CODEC.fieldOf("envelope").forGetter(Member::envelope),
-            WorldsmithStructureAnchor.CODEC.optionalFieldOf("anchor").forGetter(Member::anchor)
+            WorldsmithStructureAnchor.CODEC.optionalFieldOf("anchor").forGetter(Member::anchor),
+            WorldsmithStructureRegion.CODEC.optionalFieldOf("region").forGetter(Member::region)
         ).apply(i, Member::new)).validate(m -> {
             if (m.separation >= m.spacing) return DataResult.error(() -> "Spacing must exceed separation");
             if (m.scope.isBlank() || m.scope.length() > 64 || m.envelope.minY() != 0 || m.envelope.maxY() != 0 ||
@@ -61,7 +62,7 @@ public final class WorldsmithStructureLayout {
 
         /** Enumerates only pivots that could collide, using their actual block coordinates. */
         public List<BlockPos> sitesIn(BoundingBox area, long seed, WorldsmithAnchorFields.NoiseSampler noise) {
-            if (anchor.isPresent()) return anchor.get().sitesIn(area, noise);
+            if (anchor.isPresent()) return anchor.get().sitesIn(area, noise).stream().filter(p->allowed(seed,p)).toList();
             int minChunkX = ceilDiv(area.minX() - 8, 16);
             int maxChunkX = Math.floorDiv(area.maxX() - 8, 16);
             int minChunkZ = ceilDiv(area.minZ() - 8, 16);
@@ -71,11 +72,12 @@ public final class WorldsmithStructureLayout {
             for (int x = Math.floorDiv(minChunkX, spacing); x <= Math.floorDiv(maxChunkX, spacing); x++) {
                 for (int z = Math.floorDiv(minChunkZ, spacing); z <= Math.floorDiv(maxChunkZ, spacing); z++) {
                     var pivot = middle(placement.getPotentialStructureChunk(seed, x * spacing, z * spacing));
-                    if (area.isInside(pivot)) result.add(pivot);
+                    if (area.isInside(pivot)&&allowed(seed,pivot)) result.add(pivot);
                 }
             }
             return result;
         }
+        public boolean allowed(long seed,BlockPos p){return region.isEmpty()||region.get().accepts(seed,salt,p);}
     }
 
     private WorldsmithStructureLayout() {}

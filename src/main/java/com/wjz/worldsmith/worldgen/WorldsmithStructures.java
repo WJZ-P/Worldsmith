@@ -8,6 +8,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Optional;
+import net.minecraft.core.Direction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderSet;
 import net.minecraft.core.registries.Registries;
@@ -31,7 +33,7 @@ public final class WorldsmithStructures {
             var site=site(pack,definition);
             var plans=pack.structures().getPlans().get(definition.getId()).stream().map(p->plan(pack,definition,p)).toList();
             var rotations=definition.getPlacement().getRotations().stream().map(r->Rotation.valueOf(r.name())).toList();
-            var settings=new WorldsmithTemplateStructure.Settings(plans,rotations,site,layout(pack,definition));
+            var settings=new WorldsmithTemplateStructure.Settings(plans,rotations,site,layout(pack,definition),roads(definition));
             var allowed=HolderSet.direct(definition.getPlacement().getBiomes().stream().map(id->biomes.getOrThrow(pack.biomeKey(id))).toList());
             // This codec check also protects direct exporter callers that bypassed the MCP validator.
             WorldsmithTemplateStructure.Settings.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE,settings).getOrThrow();
@@ -58,7 +60,26 @@ public final class WorldsmithStructures {
             List<BoundingBox> reserved=new ArrayList<>();
             reserved.add(BoundingBox.encapsulatingPositions(geometry.getVoxels().stream().map(v->pos(v.getPosition())).toList()).orElseThrow());
             geometry.getKeepClear().forEach(b->reserved.add(box(b)));
-            parts.add(new WorldsmithStructurePlan.Part(pack.structureTemplateId(p.getBlueprintId(),p.getVariant()),pos(p.getOffset()),Rotation.valueOf(p.getRotation().name()),pos(geometry.getSize()),List.copyOf(reserved)));
+            var localFootprint=new LinkedHashMap<Long,BlockPos>();var localSupports=new ArrayList<BlockPos>();
+            for(var voxel:geometry.getVoxels()) {
+                var at=pos(voxel.getPosition());localFootprint.merge(WorldsmithStructurePlan.columnKey(at),at,(a,b)->a.getY()>=b.getY()?a:b);
+                if(at.getY()==0&&!voxel.getMaterial().isAir())localSupports.add(at);
+            }
+            var blueprint=pack.structures().getBlueprints().get(p.getBlueprintId());
+            List<WorldsmithInstanceProcessor.Patch> patches=new ArrayList<>();
+            for(var patch:blueprint.getVariation().getInstancePatches()) {
+                List<net.minecraft.world.level.block.state.BlockState> states=new ArrayList<>();
+                for(String key:patch.getMaterials()) {
+                    states.add(WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(key)));
+                    var alternatives=blueprint.getVariation().getMaterials().get(key);
+                    if(alternatives!=null)for(var option:alternatives)states.add(WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(option.getMaterial())));
+                }
+                var byBlock=new LinkedHashMap<net.minecraft.world.level.block.Block,net.minecraft.world.level.block.state.BlockState>();
+                for(var state:states){if(!WorldsmithInstanceProcessor.stable(state))throw new IllegalArgumentException("Instance source must be a stable full cube");byBlock.putIfAbsent(state.getBlock(),state);}
+                patches.add(new WorldsmithInstanceProcessor.Patch(List.copyOf(byBlock.values()),WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(patch.getReplacement())),patch.getProbability(),patch.getScale()));
+            }
+            var detail=new WorldsmithInstanceProcessor.Config(List.copyOf(patches),blueprint.getVariation().getProtectedAreas().stream().map(WorldsmithStructures::box).toList());
+            parts.add(new WorldsmithStructurePlan.Part(pack.structureTemplateId(p.getBlueprintId(),p.getVariant()),pos(p.getOffset()),Rotation.valueOf(p.getRotation().name()),pos(geometry.getSize()),List.copyOf(reserved),List.copyOf(localFootprint.values()),List.copyOf(localSupports),detail));
             for(var voxel:geometry.getVoxels()) {
                 BlockPos at=pos(StructureCatalogCompiler.transform(voxel.getPosition(),p));
                 long key=WorldsmithStructurePlan.columnKey(at);
@@ -75,7 +96,13 @@ public final class WorldsmithStructures {
             }
         }
         var bounds=box(plan.getBounds());
-        var result=new WorldsmithStructurePlan(List.copyOf(parts),List.copyOf(footprint.values()),List.copyOf(supports.values()),bounds.maxY()+1,bounds);
+        List<WorldsmithStructurePlan.Link> links=new ArrayList<>();
+        for(var link:plan.getConnections()) {
+            var a=pack.structures().getBlueprints().get(plan.getParts().get(link.getFromPart()).getBlueprintId()).getPorts().stream().filter(v->v.getId().equals(link.getFromPort())).findFirst().orElseThrow();
+            var b=pack.structures().getBlueprints().get(plan.getParts().get(link.getToPart()).getBlueprintId()).getPorts().stream().filter(v->v.getId().equals(link.getToPort())).findFirst().orElseThrow();
+            links.add(new WorldsmithStructurePlan.Link(link.getFromPart(),pos(a.getAt()),Direction.valueOf(a.getFacing().name()),link.getToPart(),pos(b.getAt()),Direction.valueOf(b.getFacing().name()),a.getPassage()));
+        }
+        var result=new WorldsmithStructurePlan(List.copyOf(parts),List.copyOf(footprint.values()),List.copyOf(supports.values()),bounds.maxY()+1,bounds,List.copyOf(links));
         WorldsmithStructurePlan.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE,result).getOrThrow();
         return result;
     }
@@ -98,8 +125,16 @@ public final class WorldsmithStructures {
                 minX=Math.min(minX,p.getX());minZ=Math.min(minZ,p.getZ());maxX=Math.max(maxX,p.getX());maxZ=Math.max(maxZ,p.getZ());
             }
         }
+        if(definition.getAssembly()!=null&&definition.getAssembly().getRoads()!=null){int r=definition.getAssembly().getMaxRadius();minX=-r;maxX=r;minZ=-r;maxZ=r;}
+        var r=rule.getRegion();
+        var region=r==null?Optional.<WorldsmithStructureRegion>empty():Optional.of(new WorldsmithStructureRegion(salt(pack.id()+":region:"+r.getGroup()),r.getCellSize(),r.getMinInfluence(),r.getMaxInfluence(),r.getChance(),r.getWater().name(),r.getWaterRadius()));
         return new WorldsmithStructureLayout.Member(pack.structureKey(definition.getId()).identifier(),pack.id(),rule.getSpacingChunks(),rule.getSeparationChunks(),salt(pack.id()+":"+definition.getId()),
-            new BoundingBox(minX-padding,0,minZ-padding,maxX+padding,0,maxZ+padding),WorldsmithStructureAnchor.resolve(pack,rule.getAnchor()));
+            new BoundingBox(minX-padding,0,minZ-padding,maxX+padding,0,maxZ+padding),WorldsmithStructureAnchor.resolve(pack,rule.getAnchor()),region);
+    }
+    static Optional<WorldsmithRoadSettings> roads(WorldStructureDefinition d) {
+        var a=d.getAssembly();if(a==null||a.getRoads()==null)return Optional.empty();var r=a.getRoads();var palette=d.getBlueprint().getPalette();
+        var stairs=Optional.ofNullable(r.getStairMaterial()).map(k->{var state=WorldsmithStructureTemplates.resolve(palette.get(k));if(!(state.getBlock() instanceof net.minecraft.world.level.block.StairBlock))throw new IllegalArgumentException("Road stairMaterial must be stairs");return state.setValue(net.minecraft.world.level.block.StairBlock.HALF,net.minecraft.world.level.block.state.properties.Half.BOTTOM).setValue(net.minecraft.world.level.block.StairBlock.SHAPE,net.minecraft.world.level.block.state.properties.StairsShape.STRAIGHT);});
+        return Optional.of(new WorldsmithRoadSettings(WorldsmithStructureTemplates.resolve(palette.get(r.getMaterial())),stairs,Optional.ofNullable(r.getBridgeMaterial()).map(k->WorldsmithStructureTemplates.resolve(palette.get(k))),r.getWidth(),r.getMaxSpan(),r.getMaxCut(),a.getMaxRadius(),a.getTerrainFollowing(),a.getMaxElevationDifference()));
     }
 
     static BlockPos pos(BuildPos p){return new BlockPos(p.getX(),p.getY(),p.getZ());}

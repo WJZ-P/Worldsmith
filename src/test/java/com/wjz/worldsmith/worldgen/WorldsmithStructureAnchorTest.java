@@ -92,11 +92,11 @@ final class WorldsmithStructureAnchorTest {
     @Test void anchorsTakePriorityOverRandomSitesWithoutDependingOnIterationOrder() {
         var id=Identifier.fromNamespaceAndPath("worldsmith","house");
         var envelope=new BoundingBox(-10,0,-10,10,0,10);
-        var random=new WorldsmithStructureLayout.Member(id,"pack",24,8,8,envelope,Optional.empty());
+        var random=new WorldsmithStructureLayout.Member(id,"pack",24,8,8,envelope,Optional.empty(),Optional.empty());
         var site=WorldsmithStructureLayout.middle(random.randomPlacement().getPotentialStructureChunk(SEED,0,0));
         var point=site.offset(1,0,-1);
         var anchor=new WorldsmithStructureLayout.Member(Identifier.fromNamespaceAndPath("worldsmith","temple"),"pack",24,8,92,envelope,
-            Optional.of(new WorldsmithStructureAnchor.Fixed(point.getX(),point.getZ())));
+            Optional.of(new WorldsmithStructureAnchor.Fixed(point.getX(),point.getZ())),Optional.empty());
         for(var members:List.of(List.of(random,anchor),List.of(anchor,random))) {
             assertFalse(WorldsmithStructureLayout.accepts(random,site,SEED,null,members));
             assertTrue(WorldsmithStructureLayout.accepts(anchor,point,SEED,null,members));
