@@ -45,8 +45,8 @@ Optional blueprint fields:
 
 A definition's optional `assembly` owns child blueprints and weighted pools.
 Matching sockets become adjacent cells with opposite facing. Piece bounds do not
-intersect. Required ports must close; terminal/cap modules are useful. Placement
-is a rigid plan, not a whole-world village/road solver or per-building terracing.
+intersect. Required ports must close; terminal/cap modules are useful. Placement is rigid by default. Optional terrain-following settlements fit whole
+building pieces independently and reconnect their entrances with bounded local roads.
 Upper storeys do not generate foundation columns through rooms below them.
 
 Source storage remains a `structures.json` index with separate
@@ -125,3 +125,35 @@ also run vanilla 26.2 item component initializers; fake empty components would h
 real stack limits. Final appearance, movement physics and fluid evolution remain
 in-game acceptance checks. Fresh test worlds are appropriate for this unpublished
 runtime schema change; no migration layer is retained.
+
+## Regional settlements and runtime detail
+
+Optional placement.region gives multiple definitions a shared seeded influence
+field (group/cellSize) with independent centre/outskirts intervals and candidate
+chance. Water affinity is a coarse 8-block-grid surface check. No existing-start
+lookups or traversal-order-dependent town state are used.
+
+Optional assembly.roads leaves gaps between walkable modules and plans local A*
+connections after fitting. terrainFollowing fits detached Y=0 buildings separately;
+solid joints and stacked structures remain rigid. Each building keeps normal
+biome/slope/height gates. Roads currently support land and sky, not a global road
+network or tunnel solver. Failure rejects the start; it never publishes half a town.
+WorldsmithRoadPiece persists palette-compressed writes and indexes them by chunk
+and actual columns for efficient placement and vegetation exclusion.
+Bridge-run length and prior road deck elevations participate in path search,
+not just post-route validation. Empty air intervals between sky islands support
+bounded suspended bridges without fabricated ground or deep support pillars.
+Water-affinity sampling is shared across rotations at each candidate anchor.
+
+Optional variation.instancePatches uses a native StructureProcessor for per-copy
+material patches. Both source and replacement must be stable full cubes, excluding
+fluids, block entities and gravity. Explicit protected volumes are retained. This
+pass changes appearance, not navigation or the bounding box.
+
+The hillside_settlement source example combines all four additions. Existing
+examples remain rigid unless explicitly opted in. Runtime metadata changed within
+the unpublished format; use fresh test worlds after restarting the client.
+
+For this iteration verification is limited to necessary compilation and source
+review. No automated tests, datagen run, graphical verification or import feature
+work is part of the requested scope.

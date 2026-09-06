@@ -104,8 +104,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         ),
         McpTool(
             name = "worldsmith_get_structure_example", title = "Get an executable structure example",
-            description = "Return forest_shrine, wayfarer_lodge (stairs, variants, loot/sign), arcane_observatory (curves/dome/banner), or connected_courtyard (multi-piece assembly). Copy grammar, not mandatory style. Replace example biome ids.",
-            inputSchema = objectSchema(mapOf("id" to buildJsonObject {put("type","string");put("enum",JsonArray(listOf("forest_shrine","wayfarer_lodge","arcane_observatory","connected_courtyard").map(::JsonPrimitive)))}),emptyList()),
+            description = "Return forest_shrine, wayfarer_lodge (stairs, variants, loot/sign), arcane_observatory (curves/dome/banner), connected_courtyard (rigid assembly), or hillside_settlement (regions, terrain-following roads, instance patches). Copy grammar, not mandatory style. Replace example biome ids.",
+            inputSchema = objectSchema(mapOf("id" to buildJsonObject {put("type","string");put("enum",JsonArray(listOf("forest_shrine","wayfarer_lodge","arcane_observatory","connected_courtyard","hillside_settlement").map(::JsonPrimitive)))}),emptyList()),
             readOnly = true, handler = { structureExample(it) },
         ),
         McpTool(
@@ -281,10 +281,10 @@ class WorldsmithMcpTools @JvmOverloads constructor(
 
     private fun structureExample(arguments:JsonObject): McpToolResult {
         val id=arguments["id"]?.jsonPrimitive?.contentOrNull ?: "forest_shrine"
-        if(id !in listOf("forest_shrine","wayfarer_lodge","arcane_observatory","connected_courtyard"))return McpToolResult.error("Unknown structure example")
+        if(id !in listOf("forest_shrine","wayfarer_lodge","arcane_observatory","connected_courtyard","hillside_settlement"))return McpToolResult.error("Unknown structure example")
         val text = requireNotNull(javaClass.classLoader.getResourceAsStream("worldsmith/structures/$id.json"))
             .bufferedReader(Charsets.UTF_8).use { it.readText() }
-        if(id=="connected_courtyard") {
+        if(id=="connected_courtyard" || id=="hillside_settlement") {
             val definition=WorldsmithJson.decode<WorldStructureDefinition>(text)
             return McpToolResult.success(buildJsonObject {put("structure",encode(definition));put("blueprint",encode(definition.blueprint));put("replaceExampleBiomeIds",true);put("contract","structure")})
         }

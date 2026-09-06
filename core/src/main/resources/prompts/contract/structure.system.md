@@ -18,8 +18,8 @@ session's previous saved result.
 Tools:
 - `worldsmith_get_structure_example`, optional `id`: `forest_shrine` (basic),
   `wayfarer_lodge` (loft stairs, curved roof, variants, sign and loot),
-  `arcane_observatory` (dome, arch, curve, banner), `connected_courtyard` (assembly).
-  The courtyard returns `structure` as well as its root `blueprint`; replace its
+  `arcane_observatory` (dome, arch, curve, banner), `connected_courtyard` (rigid assembly), `hillside_settlement` (regional, terrain-following roads and instance patches).
+  The courtyard and hillside examples return `structure` as well as its root `blueprint`; replace its
   example biome ids with ids from your world.
 - `worldsmith_validate_structure`: `blueprint`, optional `variant` and `sliceY`.
   Checks every configured variant and returns a text floor plan of the selected one.
@@ -181,15 +181,15 @@ traversable cells, a floor, and a horizontal facing. Solid attachment sockets us
 `passage:false`, an authored supporting block and any face including UP/DOWN;
 these support stacked towers, branches and roofs without pretending to be doors.
 A child port must match `type` and `passage` and face the opposite direction.
-Connected port cells are adjacent, not overlapping. A pool selects child blueprint
+By default connected port cells are adjacent, not overlapping. With roads, walkable connections leave the configured gap for an outdoor route. A pool selects child blueprint
 ids; the child port consumed by the connection does not spawn another child.
 `required:false` permits a dead end; `required:true` must connect in every plan.
 Include terminal/cap pieces in pools. Budget-aware selection reserves room for
 pending required connections, but there is no exponential backtracking search.
 
 Pieces have independent NBT templates; the full layout can exceed 64 blocks.
-The assembly is rigid, with collision-free declared piece boxes and connected
-sockets, not a whole-world road planner or automatic terrain-following village.
+The default assembly is rigid, with collision-free declared piece boxes and connected
+sockets. The optional settlement policy below fits detached buildings separately.
 Only the lowest assembled datum gets general foundations; upper storeys do not
 fill columns through lower rooms. Solid joints do not imply walkable routes.
 Limits: <=16 child blueprint definitions, <=32 pools, <=16 distinct weighted choices
@@ -305,3 +305,96 @@ lighting and details. Use compound shapes and material roles instead of decorate
 hollow cubes. Check every inhabited floor, every configured variant and assembly
 connections. Exposed weathering is optional; protect critical beams explicitly.
 A complete generated document is a design, not proof of beauty or a game playtest.
+
+## Optional regional organisation
+
+`placement.region` selects shared geographic influence, not a mandatory world layout:
+```json
+"region": {
+  "group":"hamlets", "cellSize":1024,
+  "minInfluence":0.45, "maxInfluence":1.0, "chance":0.85,
+  "water":"ANY", "waterRadius":32
+}
+```
+
+Within one pack, matching group + cellSize share the same seeded, jittered region
+centres. Influence is 0..1. Put central structures around 0.65..1 and peripheral
+farmhouses around 0.1..0.45 if the prompt asks for that pattern. These are suggested
+ranges, not quotas. `cellSize` is 128..8192 BLOCKS; `chance` 0..1 thins candidate
+starts deterministically. The field is statistical, not a saved list of town centres.
+No coordinates or regions are required when this object is absent.
+
+`water` is ANY/NEAR/AWAY. NEAR needs a sampled water surface within `waterRadius`
+8..64 blocks; AWAY excludes sampled water. Sampling is an 8-block grid and may
+miss narrow streams. This applies to surface-level placements, not sky/cave layers.
+Biome, slope, anchors and region remain AND conditions. Region/chance filtering
+happens before terrain work and collision arbitration. Water checks remain a
+conservative later gate, so a reserved site can still fail. Different groups do
+not imply guaranteed separation or an exact number of settlements.
+
+## Optional terrain-following buildings and local roads
+
+The `hillside_settlement` example supplies a full executable source document.
+An assembly can add:
+```json
+"terrainFollowing": true,
+"maxElevationDifference": 16,
+"roads": {
+  "material":"path", "stairMaterial":"road_stairs", "bridgeMaterial":"timber",
+  "gap":8, "width":3, "maxSpan":24, "maxCut":2
+}
+```
+
+Materials reference the ROOT blueprint palette. The deck and bridge must be dry,
+non-gravity, non-interactive full blocks; stairMaterial must be an actual stair.
+Omit bridgeMaterial to avoid unsupported/water crossings. Omit stairMaterial for
+block steps. gap is 4..24, width 1 or 3, maxSpan 0..48 consecutive bridge cells,
+maxCut 0..4. maxElevationDifference is 0..32 across the buildings.
+
+With terrainFollowing=false, roads connect the rigid plan's separated entrances.
+With terrainFollowing=true, every piece is an independent building with an authored
+Y=0 floor; each is fitted against terrain and biome before routes are planned.
+Source pieces must share the floor datum and have walkable ports only. Keep solid
+joints and vertically stacked assemblies rigid. Use NONE or FILL foundations,
+not root-only PILLARS. These first local roads support LAND_SURFACE and SKY_SURFACE.
+
+Routes follow the assembly's declared connection graph, connecting the cells just
+outside the actual entrances. Bounded A* considers height, cuts and water/air gaps,
+avoids building footprints and allows one-block rises/falls. Stairs are oriented
+uphill where a node has a single higher neighbour. Optional short bridges may have
+sparse posts when support is within 12 blocks; sky bridges can remain suspended.
+Pure void crossings require bridgeMaterial and remain bounded by maxSpan.
+Bridge-run length and existing deck elevations constrain the search itself.
+Width is clipped at building edges rather than overwriting door frames. Complex
+junctions with conflicting deck elevations are rejected, not stacked blindly.
+
+This is a LOCAL network inside assembly.maxRadius, not an infinite-world road or
+tunnel system. Each link explores at most 2048 nodes and 128 path cells; the whole
+road piece contains at most 8192 written blocks. Per-building earthwork totals are
+also capped at 8192. A failed required route or sampling budget skips the whole
+start rather than leaving disconnected houses. An alternative route may exist
+outside this bounded search. Roads, bridge supports and clearance are persisted
+as a palette-compressed piece, clipped per chunk, and protected from Worldsmith
+vegetation. Only actual road columns are reserved, not the entire road rectangle.
+
+Core assembly preview shows the building layout and graph, not the final terrain
+heights or routed roads; those are chosen during world generation.
+
+## Optional per-instance material detail
+
+`variation.instancePatches` adds deterministic differences between placed copies,
+without recompiling their geometry:
+```json
+"instancePatches": [
+  {"materials":["wall"],"replacement":"weathered_wall","probability":0.18,"scale":3}
+]
+```
+
+At most 8 rules; each references 1..16 source palette roles (at most 32 resulting
+block types across palette choices) and one replacement. scale 1..16 is a block-cell
+patch size; probability 0..1 is evaluated per patch using the instance seed and
+world coordinates. These cosmetic substitutions can differ even when two starts
+pick the same precompiled blueprint variant. Explicit protectedAreas remain intact.
+Only stable full cubes without block entities, fluids or gravity participate.
+Doors/stairs, carving, clutter, plants and topology changes are not part of this
+runtime pass. Existing precompiled CHOOSE/decay remains available separately.
