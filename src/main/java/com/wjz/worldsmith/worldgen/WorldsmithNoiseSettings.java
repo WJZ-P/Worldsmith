@@ -351,6 +351,9 @@ public final class WorldsmithNoiseSettings {
 			(seaLevel - minY) / 64.0,
 			(seaLevel - maxY) / 64.0
 		);
+		// FindTopSurface scans Y repeatedly at the same X/Z, including during aquifer
+		// construction. The entire horizontal graph must survive those Y changes.
+		horizontalHeightBlocks = DensityFunctions.cache2d(horizontalHeightBlocks);
 		DensityFunction baseTerrain = DensityFunctions.cacheOnce(
 			DensityFunctions.add(
 				verticalGradient,
@@ -444,7 +447,7 @@ public final class WorldsmithNoiseSettings {
 			minY,
 			Math.max(4, terrain.getVerticalNoiseSize() * 4)
 		);
-		DensityFunction authoredPreliminarySurface = DensityFunctions.findTopSurface(
+		DensityFunction authoredPreliminarySurface = shape.getBands().isEmpty() ? basePreliminarySurface : DensityFunctions.findTopSurface(
 			authoredTerrain,
 			DensityFunctions.constant(maxY),
 			minY,
@@ -455,7 +458,7 @@ public final class WorldsmithNoiseSettings {
 		// ordinary ground below it. The lower estimate keeps both surfaces in the
 		// evaluation window, while an authored chasm that removes the original top
 		// can still lower the estimate and expose its floor.
-		DensityFunction preliminarySurface = DensityFunctions.min(
+		DensityFunction preliminarySurface = shape.getBands().isEmpty() ? basePreliminarySurface : DensityFunctions.min(
 			basePreliminarySurface,
 			authoredPreliminarySurface
 		);
