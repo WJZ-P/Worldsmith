@@ -46,3 +46,6 @@ replay_*.log
 
 # Minecraft log output from running worldgen outside the game
 /logs/
+
+# scratch space for MCP world-design sessions
+/.mcp-scratch/
