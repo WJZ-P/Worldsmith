@@ -51,6 +51,17 @@ object StructureCatalogCompiler {
     private fun buildPlans(d:WorldStructureDefinition,sources:Map<String,StructureBlueprint>,templates:Map<String,List<CompiledStructure>>):List<CompiledStructurePlan> {
         val a=d.assembly
         if(a!=null) {
+            need(a.maxElevationDifference in 0..32,"assembly.maxElevationDifference","INVALID_SETTLEMENT_RISE","Maximum building elevation difference is 0..32")
+            need(!a.terrainFollowing || a.roads!=null,"assembly","SETTLEMENT_REQUIRES_ROADS","Independently fitted buildings need roads to reconnect their entrances")
+            a.roads?.let {r->
+                need(r.material in d.blueprint.palette && (r.stairMaterial==null||r.stairMaterial in d.blueprint.palette) && (r.bridgeMaterial==null||r.bridgeMaterial in d.blueprint.palette),"assembly.roads","UNKNOWN_ROAD_MATERIAL","Road materials come from the root blueprint palette")
+                need(r.gap in 4..24 && r.width in listOf(1,3) && r.maxSpan in 0..48 && r.maxCut in 0..4,"assembly.roads","INVALID_ROAD_POLICY","Road gap 4..24, width 1/3, bridge span 0..48 and cut 0..4")
+                need(d.placement.terrainFit.surface in listOf(StructureSurface.LAND_SURFACE,StructureSurface.SKY_SURFACE),"assembly.roads","UNSUPPORTED_ROAD_SURFACE","Road planning currently supports dry land and sky surfaces")
+            }
+            if(a.terrainFollowing) {
+                need(d.placement.terrainFit.foundation.mode!=FoundationMode.PILLARS,"assembly","SETTLEMENT_FOUNDATIONS","Per-building fitting uses NONE or FILL, not root-only pillar coordinates")
+                need((listOf(d.blueprint)+a.pieces.values).all {b->b.ports.all {it.passage}},"assembly","SETTLEMENT_SOLID_JOINT","Solid/vertical assemblies stay rigid; terrain following is for buildings connected by walkable roads")
+            }
             need(a.variants in d.blueprint.variation.count..8 && a.maxPieces in 1..16 && a.maxDepth in 0..8 && a.maxRadius in 16..96,"assembly","INVALID_ASSEMBLY_LIMITS","Use enough variants for the root (at most 8), maxPieces 1..16, depth 0..8 and radius 16..96")
             need(a.pools.size in 1..32,"assembly.pools","INVALID_ASSEMBLY_POOLS","Declare 1..32 pools")
             for((pool,choices) in a.pools)need(pool.matches(Regex("[a-z0-9_][a-z0-9_-]{0,63}")) && choices.size in 1..16 && choices.map {it.piece}.distinct().size==choices.size && choices.all {it.piece in a.pieces && it.weight in 1..10000},"assembly.pools.$pool","INVALID_ASSEMBLY_POOL","Pools need distinct existing pieces and positive bounded weights")
@@ -70,7 +81,8 @@ object StructureCatalogCompiler {
                 val parent=parts[parentIndex]
                 val facing=port.facing.rotate(parent.rotation.ordinal)
                 val at=transform(port.at,parent)
-                val target=BuildPos(at.x+facing.dx,at.y+facing.dy,at.z+facing.dz)
+                val distance=if(port.passage && a.roads!=null)a.roads.gap+1 else 1
+                val target=BuildPos(at.x+facing.dx*distance,at.y+facing.dy*distance,at.z+facing.dz*distance)
                 var attached=false
                 if(port.pool!=null && parts.size<a.maxPieces && depth<a.maxDepth) {
                     val choices=a.pools.getValue(port.pool).sortedBy {choice->
@@ -108,6 +120,8 @@ object StructureCatalogCompiler {
             }
             val minY=parts.minOf {box(it).from.y}
             val normalized=parts.map {it.copy(offset=it.offset.copy(y=it.offset.y-minY))}
+            need(a?.terrainFollowing!=true || normalized.all {it.offset.y==0},"assembly","SETTLEMENT_STACKED_PIECES","Terrain-following building plans must share the source floor datum; use rigid assembly for stacked storeys")
+            need(a?.terrainFollowing!=true || normalized.all {p->p.geometry.voxels.any {it.position.y==0&&!it.material.isAir()}},"assembly","SETTLEMENT_FLOOR_MISSING","Each terrain-following building needs its own authored floor at local Y=0")
             val boxes=normalized.map(::box)
             val bounds=BuildBox(BuildPos(boxes.minOf {it.from.x},0,boxes.minOf {it.from.z}),BuildPos(boxes.maxOf {it.to.x},boxes.maxOf {it.to.y},boxes.maxOf {it.to.z}))
             need(a==null || maxOf(abs(bounds.from.x),abs(bounds.to.x),abs(bounds.from.z),abs(bounds.to.z))<=a.maxRadius,"assembly","ROOT_OUTSIDE_ASSEMBLY_RADIUS","The root also needs to fit the declared assembly radius")

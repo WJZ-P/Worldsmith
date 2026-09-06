@@ -23,7 +23,7 @@ object StructurePackIO {
             val file=save(structure.blueprint)
             val assembly=structure.assembly?.let {a->
                 require(a.pieces.size<=16)
-                StructureAssemblyIndex(a.pieces.mapValues {(id,b)->require(id==b.id);save(b)},a.pools,a.variants,a.maxPieces,a.maxDepth,a.maxRadius)
+                StructureAssemblyIndex(a.pieces.mapValues {(id,b)->require(id==b.id);save(b)},a.pools,a.variants,a.maxPieces,a.maxDepth,a.maxRadius,a.terrainFollowing,a.maxElevationDifference,a.roads)
             }
             StructureIndexEntry(structure.id,file,structure.placement,assembly)
         }
@@ -50,7 +50,7 @@ object StructurePackIO {
         }
         val definitions=index.structures.map { entry ->
             val blueprint=read(entry.blueprint)
-            val assembly=entry.assembly?.let {a->StructureAssembly(a.pieces.mapValues {(id,path)->read(path).also {require(it.id==id)}},a.pools,a.variants,a.maxPieces,a.maxDepth,a.maxRadius)}
+            val assembly=entry.assembly?.let {a->StructureAssembly(a.pieces.mapValues {(id,path)->read(path).also {require(it.id==id)}},a.pools,a.variants,a.maxPieces,a.maxDepth,a.maxRadius,a.terrainFollowing,a.maxElevationDifference,a.roads)}
             WorldStructureDefinition(entry.id,blueprint,entry.placement,assembly)
         }
         return StructureLibrary(index.schemaVersion,definitions)

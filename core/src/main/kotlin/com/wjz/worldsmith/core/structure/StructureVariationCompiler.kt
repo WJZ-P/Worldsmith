@@ -22,6 +22,9 @@ internal object StructureVariationCompiler {
         val v=b.variation
         check(v.count in 1..8,"variation.count","Use 1..8 precompiled variants")
         check(v.materials.size<=128 && v.decay.size<=16 && v.protectedAreas.size<=32,"variation","Variation has too many rules or protected areas")
+        check(v.instancePatches.size<=8,"variation.instancePatches","At most 8 instance material patches")
+        v.instancePatches.forEachIndexed {i,p->check(p.materials.size in 1..16 && p.materials.all {it in b.palette} && p.replacement in b.palette && p.probability in 0.0..1.0 && p.scale in 1..16,"variation.instancePatches[$i]","Use palette references, probability 0..1 and patch scale 1..16; MC requires stable full blocks")}
+        v.instancePatches.forEachIndexed {i,p->check(p.materials.flatMap {key->listOf(b.palette.getValue(key).block)+(v.materials[key]?.mapNotNull {b.palette[it.material]?.block}?:emptyList())}.distinct().size<=32,"variation.instancePatches[$i]","A patch may match at most 32 distinct block types across palette variants")}
         v.materials.forEach { (slot,choices)->check(slot in b.palette && choices.size in 1..16 && choices.all {it.material in b.palette && it.weight in 1..10000},"variation.materials.$slot","Choose existing palette entries with positive bounded weights") }
         for((i,d) in v.decay.withIndex())check(d.materials.isNotEmpty()&&d.materials.size<=128&&d.materials.all {it in b.palette}&&d.probability in 0.0..1.0&&(d.replacement==null||d.replacement in b.palette),"variation.decay[$i]","Decay needs palette references and probability 0..1")
         for(box in v.protectedAreas+v.decay.mapNotNull {it.region})check(box.from.x>=0&&box.from.y>=0&&box.from.z>=0&&box.to.x<b.size.x&&box.to.y<b.size.y&&box.to.z<b.size.z&&box.from.x<=box.to.x&&box.from.y<=box.to.y&&box.from.z<=box.to.z,"variation","Variation boxes must be ordered and inside the blueprint")

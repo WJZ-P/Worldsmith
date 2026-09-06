@@ -166,7 +166,7 @@ data class StructureAnchorTarget(
 
 /** Without anchor, spacing/separation retain vanilla random-spread semantics, in CHUNKS. */
 @Serializable
-data class StructurePlacement(
+data class StructurePlacement @JvmOverloads constructor(
     val biomes: List<String>,
     val spacingChunks: Int = 24,
     val separationChunks: Int = 8,
@@ -175,6 +175,7 @@ data class StructurePlacement(
     /** Padding reserved around every allowed rotation during deterministic site arbitration. */
     val clearanceBlocks: Int = 2,
     val anchor: StructureAnchorTarget? = null,
+    val region:StructureRegion?=null,
 )
 
 @Serializable

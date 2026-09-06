@@ -44,6 +44,11 @@ object StructureValidator {
                 add(error("$path.blueprint.build","MISSING_STRUCTURE_FLOOR","A placed structure needs solid authored floor cells at local Y=0"))
             }
             val p=structure.placement
+            p.region?.let {r->
+                if(!ID.matches(r.group)||r.cellSize !in 128..8192||r.minInfluence !in 0.0..1.0||r.maxInfluence !in r.minInfluence..1.0||r.chance !in 0.0..1.0||r.waterRadius !in 8..64)
+                    add(error("$path.placement.region","INVALID_STRUCTURE_REGION","Use a shared short group id, cellSize 128..8192, ordered influence 0..1, chance 0..1 and waterRadius 8..64"))
+                if(r.water!=StructureWaterPreference.ANY && p.terrainFit.surface !in listOf(StructureSurface.LAND_SURFACE,StructureSurface.OCEAN_FLOOR,StructureSurface.WATER_SURFACE))add(error("$path.placement.region.water","REGION_WATER_SURFACE","Water proximity applies to surface-level placements, not sky/cave layers"))
+            }
             p.anchor?.let { target ->
                 if (!ANCHOR_ID.matches(target.id)) add(error("$path.placement.anchor.id", "INVALID_ANCHOR_ID", "Use an existing terrain anchor id"))
                 if (target.offsetX !in -4096..4096 || target.offsetZ !in -4096..4096) add(error("$path.placement.anchor", "STRUCTURE_ANCHOR_OFFSET_OUT_OF_RANGE", "Anchor offsets must stay within -4096..4096 blocks"))

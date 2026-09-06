@@ -18,6 +18,19 @@ import kotlinx.serialization.SerialName
     val count:Int=1, val seed:Long=0,
     val materials:Map<String,List<WeightedMaterial>> = emptyMap(),
     val decay:List<StructureDecay> = emptyList(), val protectedAreas:List<BuildBox> = emptyList(),
+    val instancePatches:List<StructureInstancePatch> = emptyList(),
+)
+@Serializable data class StructureInstancePatch(val materials:List<String>,val replacement:String,val probability:Double=0.15,val scale:Int=4)
+
+@Serializable enum class StructureWaterPreference { ANY, NEAR, AWAY }
+@Serializable data class StructureRegion(
+    val group:String, val cellSize:Int=1024,
+    val minInfluence:Double=0.0,val maxInfluence:Double=1.0,val chance:Double=1.0,
+    val water:StructureWaterPreference=StructureWaterPreference.ANY,val waterRadius:Int=32,
+)
+@Serializable data class StructureRoads(
+    val material:String,val stairMaterial:String?=null,val bridgeMaterial:String?=null,
+    val gap:Int=8,val width:Int=3,val maxSpan:Int=24,val maxCut:Int=2,
 )
 
 @Serializable enum class PortFacing(val dx:Int,val dy:Int,val dz:Int) {
@@ -35,10 +48,12 @@ import kotlinx.serialization.SerialName
 @Serializable data class StructureAssembly(
     val pieces:Map<String,StructureBlueprint>, val pools:Map<String,List<AssemblyChoice>>,
     val variants:Int=4, val maxPieces:Int=12, val maxDepth:Int=5, val maxRadius:Int=80,
+    val terrainFollowing:Boolean=false,val maxElevationDifference:Int=16,val roads:StructureRoads?=null,
 )
 @Serializable data class StructureAssemblyIndex(
     val pieces:Map<String,String>, val pools:Map<String,List<AssemblyChoice>>,
     val variants:Int=4, val maxPieces:Int=12, val maxDepth:Int=5, val maxRadius:Int=80,
+    val terrainFollowing:Boolean=false,val maxElevationDifference:Int=16,val roads:StructureRoads?=null,
 )
 
 /** Typed content, never arbitrary NBT or executable commands. */
