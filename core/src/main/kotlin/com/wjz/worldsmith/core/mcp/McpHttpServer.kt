@@ -225,6 +225,8 @@ class McpHttpServer(
                         put("text", result.text)
                     },
                 )
+                result.images.forEach { image -> add(buildJsonObject { put("type","image");put("mimeType",image.mimeType);put("data",image.data) }) }
+                result.resources.forEach { resource -> add(buildJsonObject { put("type","resource");putJsonObject("resource") {put("uri",resource.uri);put("mimeType",resource.mimeType);put("blob",resource.blob)} }) }
             }
             put("structuredContent", result.structuredContent)
             if (result.isError) put("isError", true)

@@ -2,6 +2,10 @@ package com.wjz.worldsmith.core.structure
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import com.wjz.worldsmith.core.draw.DrawStructure
+import com.wjz.worldsmith.core.drawhost.DrawingArtifact
+import com.wjz.worldsmith.core.drawhost.DrawingSourceRecord
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -110,11 +114,11 @@ sealed interface BuildOperation {
 data class StructureBlueprint @JvmOverloads constructor(
     val schemaVersion: Int = 1,
     val id: String,
-    val size: BuildPos,
+    val size: BuildPos = BuildPos(1,1,1),
     /** Local horizontal anchor used when placing this template. Y must be zero (foundation datum). */
     val origin: BuildPos = BuildPos(0, 0, 0),
-    val palette: Map<String, BuildMaterial>,
-    val build: List<BuildOperation>,
+    val palette: Map<String, BuildMaterial> = emptyMap(),
+    val build: List<BuildOperation> = emptyList(),
     val modules: Map<String, List<BuildOperation>> = emptyMap(),
     /** Volumes kept clear of Worldsmith vegetation, including entrances and yards. */
     val keepClear: List<BuildBox> = emptyList(),
@@ -122,7 +126,13 @@ data class StructureBlueprint @JvmOverloads constructor(
     val variation: StructureVariation = StructureVariation(),
     val ports: List<StructurePort> = emptyList(),
     val interactions: List<StructureInteraction> = emptyList(),
+    val lighting: StructureLighting? = null,
+    val drawing: StructureDrawingSource? = null,
+    val rooms: List<BuildBox> = emptyList(),
+    val indoorPassages: List<BuildBox> = emptyList(),
 )
+
+@Serializable data class StructureDrawingSource(val variants: List<String>, val allowPreviousRevision: Boolean = false)
 
 @Serializable
 enum class StructureSurface { LAND_SURFACE, OCEAN_FLOOR, WATER_SURFACE, SKY_SURFACE, CAVE_FLOOR, CAVE_CEILING }
@@ -183,18 +193,23 @@ data class WorldStructureDefinition @JvmOverloads constructor(val id: String, va
 
 /** In-memory/MCP document; portable disk storage keeps each blueprint in its own file. */
 @Serializable
-data class StructureLibrary(val schemaVersion: Int = 1, val structures: List<WorldStructureDefinition> = emptyList())
+data class StructureLibrary @JvmOverloads constructor(
+    val schemaVersion: Int = 1, val structures: List<WorldStructureDefinition> = emptyList(), val architecture: StructureArchitecture? = null,
+    val artifacts: Map<String,DrawingArtifact> = emptyMap(), val sources: Map<String,DrawingSourceRecord> = emptyMap(),
+    @Transient val drawingAssets: Map<String,DrawStructure> = emptyMap(),
+)
 
 @Serializable
 data class StructureIndexEntry(val id: String, val blueprint: String, val placement: StructurePlacement, val assembly:StructureAssemblyIndex?=null)
 
 @Serializable
-data class StructureIndex(val schemaVersion: Int = 1, val structures: List<StructureIndexEntry> = emptyList())
+data class StructureIndex @JvmOverloads constructor(val schemaVersion: Int = 1, val structures: List<StructureIndexEntry> = emptyList(), val architecture: StructureArchitecture? = null,
+    val artifacts: Map<String,DrawingArtifact> = emptyMap(), val sources: Map<String,DrawingSourceRecord> = emptyMap())
 
 /** AIR is explicit. Missing coordinates mean KEEP, never implicit air. */
-data class StructureVoxel(val position: BuildPos, val material: BuildMaterial, val quarterTurns: Int = 0, val passable:Boolean=false)
+data class StructureVoxel @JvmOverloads constructor(val position: BuildPos, val material: BuildMaterial, val quarterTurns: Int = 0, val passable:Boolean=false, val mirrorX:Boolean=false)
 
-data class CompiledStructure(
+data class CompiledStructure @JvmOverloads constructor(
     val id: String,
     val size: BuildPos,
     val origin: BuildPos,
@@ -203,4 +218,12 @@ data class CompiledStructure(
     val expandedWork: Int,
     val diagnostics: List<com.wjz.worldsmith.core.validation.Diagnostic> = emptyList(),
     val interactions: List<StructureInteraction> = emptyList(),
+    val lighting: StructureLighting? = null,
+    val ports: List<StructurePort> = emptyList(),
+    val protectedAreas: List<BuildBox> = emptyList(),
+    val sourceMin: BuildPos = BuildPos(0,0,0),
+    val drawingSource: Boolean = false,
+    val storageFragment: Boolean = false,
+    val interactionIds: List<Int> = emptyList(),
+    val anchors: Map<String,BuildPos> = emptyMap(),
 )

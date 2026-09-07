@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.core.structure
 
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
+import com.wjz.worldsmith.core.draw.DrawSnapshotCodec
 
 /** The single disk layout shared by hashing, the loader and MCP persistence. */
 object StructurePackIO {
@@ -27,7 +28,7 @@ object StructurePackIO {
             }
             StructureIndexEntry(structure.id,file,structure.placement,assembly)
         }
-        contents[INDEX_FILE]=WorldsmithJson.encode(StructureIndex(library.schemaVersion,entries))
+        contents[INDEX_FILE]=WorldsmithJson.encode(StructureIndex(library.schemaVersion,entries,library.architecture,library.artifacts,library.sources))
         return contents
     }
 
@@ -41,7 +42,7 @@ object StructurePackIO {
     }
 
     @JvmStatic
-    fun load(index:StructureIndex,contents:Map<String,String>):StructureLibrary {
+    @JvmOverloads fun load(index:StructureIndex,contents:Map<String,String>,binaries:Map<String,ByteArray> = emptyMap()):StructureLibrary {
         paths(index)
         fun read(path:String):StructureBlueprint {
             val b=WorldsmithJson.decode<StructureBlueprint>(requireNotNull(contents[path]))
@@ -53,6 +54,21 @@ object StructurePackIO {
             val assembly=entry.assembly?.let {a->StructureAssembly(a.pieces.mapValues {(id,path)->read(path).also {require(it.id==id)}},a.pools,a.variants,a.maxPieces,a.maxDepth,a.maxRadius,a.terrainFollowing,a.maxElevationDifference,a.roads)}
             WorldStructureDefinition(entry.id,blueprint,entry.placement,assembly)
         }
-        return StructureLibrary(index.schemaVersion,definitions)
+        require(index.artifacts.size<=512 && index.sources.size<=64) { "Drawing/source catalog budget exceeded" }
+        require(index.sources.values.sumOf { s->s.files.values.sumOf { it.toByteArray(Charsets.UTF_8).size.toLong() } }<=8*1024*1024) { "Source provenance budget exceeded" }
+        require(index.schemaVersion==2 || index.artifacts.isEmpty()) { "SDK drawings require structure format 2" }
+        val drawings=index.artifacts.mapValues { (id,meta)->
+            require(id.matches(Regex("[0-9a-f]{64}")) && meta.id==id && meta.sourceHash in index.sources && meta.codecVersion==DrawSnapshotCodec.VERSION) { "Invalid drawing artifact manifest" }
+            val bytes=requireNotNull(binaries[meta.path]) { "Missing drawing '${meta.path}'" }
+            require(DrawSnapshotCodec.hash(bytes)==meta.dataHash) { "Frozen drawing hash mismatch" }
+            DrawSnapshotCodec.decode(bytes)
+        }
+        return StructureLibrary(index.schemaVersion,definitions,index.architecture,index.artifacts,index.sources,drawings)
     }
+
+    @JvmStatic fun binaryFiles(library:StructureLibrary):Map<String,ByteArray> = library.artifacts.map { (id,meta)->
+        require(id.matches(Regex("[0-9a-f]{64}")) && meta.id==id)
+        val bytes=DrawSnapshotCodec.encode(requireNotNull(library.drawingAssets[id]) { "Missing frozen drawing '$id'" })
+        require(DrawSnapshotCodec.hash(bytes)==meta.dataHash) { "Frozen drawing changed since construction" };meta.path to bytes
+    }.toMap()
 }

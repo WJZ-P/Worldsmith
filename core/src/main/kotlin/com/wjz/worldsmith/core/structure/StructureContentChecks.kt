@@ -16,6 +16,7 @@ internal object StructureContentChecks {
             val at="ports[$i]"
             if(!id.matches(p.id)||!id.matches(p.type)||p.pool?.let { !id.matches(it) }==true)error(at,"INVALID_PORT_NAME","Use short lowercase port, type and pool names")
             val boundary=when(p.facing){PortFacing.NORTH->p.at.z==0;PortFacing.SOUTH->p.at.z==b.size.z-1;PortFacing.EAST->p.at.x==b.size.x-1;PortFacing.WEST->p.at.x==0;PortFacing.UP->p.at.y==b.size.y-1;PortFacing.DOWN->p.at.y==0}
+            if(p.chance !in 0.0..1.0 || (p.required || p.pool==null) && p.chance!=1.0)error(at,"INVALID_PORT_CHANCE","chance is 0..1 on optional outgoing pool ports only; required and non-spawning ports use 1")
             if(!inside(p.at)||!boundary)error(at,"PORT_OUTSIDE_BOUNDARY","Port must sit on its declared boundary face")
             else if(!p.passage) {
                 if(cells[p.at]?.let(StructureNavigation::supports)!=true)error(at,"EMPTY_ATTACHMENT_PORT","A solid attachment socket needs an authored supporting block")

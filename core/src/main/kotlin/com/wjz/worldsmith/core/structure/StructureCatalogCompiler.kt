@@ -20,7 +20,7 @@ object StructureCatalogCompiler {
     const val MAX_PLAN_VOXELS=262144
 
     @JvmStatic fun compile(library:StructureLibrary):CompiledStructureCatalog {
-        need(library.schemaVersion==1 && library.structures.size<=48,"structures","STRUCTURE_CATALOG_LIMIT","Use schema 1 and at most 48 definitions")
+        need(library.schemaVersion in 1..2 && library.structures.size<=48,"structures","STRUCTURE_CATALOG_LIMIT","Use schema 1/2 and at most 48 definitions")
         val sources=linkedMapOf<String,StructureBlueprint>();val templates=linkedMapOf<String,List<CompiledStructure>>()
         var voxels=0;var work=0
         fun add(b:StructureBlueprint) {
@@ -28,12 +28,13 @@ object StructureCatalogCompiler {
             need(previous==null || previous==b,"blueprints.${b.id}","CONFLICTING_BLUEPRINT","Blueprint ids must resolve to identical source content")
             if(previous!=null)return
             need(sources.size<=MAX_BLUEPRINTS,"structures","STRUCTURE_CATALOG_LIMIT","At most $MAX_BLUEPRINTS distinct blueprints per pack")
-            val variants=StructureGeometryCompiler.compileVariants(b)
+            val variants=StructureGeometryCompiler.compileVariants(b,library.drawingAssets)
             voxels+=variants.sumOf {it.voxels.size};work+=variants.sumOf {it.expandedWork}
             need(voxels<=MAX_TOTAL_VOXELS && work<=MAX_TOTAL_WORK,"structures","STRUCTURE_CATALOG_BUDGET","Compiled templates exceed the pack-wide voxel/work budget")
             templates[b.id]=variants
         }
         for(definition in library.structures) {
+            need(definition.id.matches(Regex("^[a-z0-9_][a-z0-9_-]{0,63}$")),"id","INVALID_STRUCTURE_ID","Use a short lowercase identifier without path separators")
             add(definition.blueprint)
             definition.assembly?.let {assembly->
                 need(assembly.pieces.size in 1..16,"assembly.pieces","ASSEMBLY_PIECE_LIMIT","Declare 1..16 reusable piece blueprints")
@@ -67,17 +68,21 @@ object StructureCatalogCompiler {
             for((pool,choices) in a.pools)need(pool.matches(Regex("[a-z0-9_][a-z0-9_-]{0,63}")) && choices.size in 1..16 && choices.map {it.piece}.distinct().size==choices.size && choices.all {it.piece in a.pieces && it.weight in 1..10000},"assembly.pools.$pool","INVALID_ASSEMBLY_POOL","Pools need distinct existing pieces and positive bounded weights")
             for(b in listOf(d.blueprint)+a.pieces.values) for(p in b.ports)need(p.pool==null || p.pool in a.pools,"assembly.ports.${b.id}.${p.id}","UNKNOWN_ASSEMBLY_POOL","Port refers to an unknown pool")
         } else need(d.blueprint.ports.none {it.required},"ports","REQUIRED_PORT_WITHOUT_ASSEMBLY","Required ports need an assembly")
-        return (0 until (a?.variants ?: d.blueprint.variation.count)).map {variant->
-            val root=templates.getValue(d.blueprint.id)[variant % d.blueprint.variation.count]
-            val parts=mutableListOf(CompiledStructurePart(d.blueprint.id,variant % d.blueprint.variation.count,BuildPos(-root.origin.x,0,-root.origin.z),BuildRotation.NONE,root))
+        val rootVariants=templates.getValue(d.blueprint.id)
+        need(a==null || a.variants>=rootVariants.size,"assembly.variants","ASSEMBLY_VARIANT_COVERAGE","Assembly must cover every root drawing variant")
+        return (0 until (a?.variants ?: rootVariants.size)).map {variant->
+            val root=rootVariants[variant % rootVariants.size]
+            val parts=mutableListOf(CompiledStructurePart(d.blueprint.id,variant % rootVariants.size,BuildPos(-root.origin.x,0,root.origin.z*-1),BuildRotation.NONE,root))
             val connections=mutableListOf<StructureConnection>()
             val used=mutableSetOf<Pair<Int,String>>()
             val pending=ArrayDeque<Triple<Int,StructurePort,Int>>()
-            d.blueprint.ports.forEach {pending.add(Triple(0,it,0))}
+            root.ports.forEach {pending.add(Triple(0,it,0))}
             var attempts=0
             while(a!=null && pending.isNotEmpty()) {
                 val (parentIndex,port,depth)=pending.removeFirst()
                 if((parentIndex to port.id) in used)continue
+                if(!port.required && port.pool!=null && port.chance<1.0 &&
+                    StructureVariationCompiler.unit(variant.toLong(),"${d.id}:optional:$parentIndex:${port.id}")>=port.chance)continue
                 val parent=parts[parentIndex]
                 val facing=port.facing.rotate(parent.rotation.ordinal)
                 val at=transform(port.at,parent)
@@ -94,10 +99,10 @@ object StructureCatalogCompiler {
                         val geometries=templates.getValue(b.id)
                         val chosen=(StructureVariationCompiler.unit(variant.toLong(),"$parentIndex:${port.id}:${b.id}")*geometries.size).toInt()
                         val geometry=geometries[chosen]
-                        for(childPort in b.ports.filter {it.type==port.type && it.passage==port.passage})for(rotation in BuildRotation.entries) {
+                        for(childPort in geometry.ports.filter {it.type==port.type && it.passage==port.passage})for(rotation in BuildRotation.entries) {
                             need(++attempts<=2048,"assembly","ASSEMBLY_WORK_BUDGET","Assembly exceeded 2048 candidate connections")
                             if(childPort.facing.rotate(rotation.ordinal)!=facing.opposite())continue
-                            val requiredChildren=b.ports.count {it.id!=childPort.id && it.required}
+                            val requiredChildren=geometry.ports.count {it.id!=childPort.id && it.required}
                             val reservedForPending=pending.count {(index,p,_)->p.required && (index to p.id) !in used}
                             if(depth+1>=a.maxDepth && requiredChildren>0 || parts.size+1+requiredChildren+reservedForPending>a.maxPieces)continue
                             val p=StructureGeometryCompiler.rotate(childPort.at,rotation.ordinal)
@@ -111,7 +116,7 @@ object StructureCatalogCompiler {
                             val childIndex=parts.size;parts+=child
                             used+=(parentIndex to port.id);used+=(childIndex to childPort.id)
                             connections+=StructureConnection(parentIndex,port.id,childIndex,childPort.id)
-                            b.ports.filter {it.id!=childPort.id}.forEach {pending.add(Triple(childIndex,it,depth+1))}
+                            geometry.ports.filter {it.id!=childPort.id}.forEach {pending.add(Triple(childIndex,it,depth+1))}
                             attached=true;break@search
                         }
                     }
@@ -123,6 +128,7 @@ object StructureCatalogCompiler {
             need(a?.terrainFollowing!=true || normalized.all {it.offset.y==0},"assembly","SETTLEMENT_STACKED_PIECES","Terrain-following building plans must share the source floor datum; use rigid assembly for stacked storeys")
             need(a?.terrainFollowing!=true || normalized.all {p->p.geometry.voxels.any {it.position.y==0&&!it.material.isAir()}},"assembly","SETTLEMENT_FLOOR_MISSING","Each terrain-following building needs its own authored floor at local Y=0")
             val boxes=normalized.map(::box)
+            need(normalized.sumOf { StructureTiling.tiles(it.geometry).size }<=StructureTiling.MAX_TILES,"assembly","STORAGE_FRAGMENT_BUDGET","Plan exceeds 128 technical fragments; logical member limits remain separate")
             val bounds=BuildBox(BuildPos(boxes.minOf {it.from.x},0,boxes.minOf {it.from.z}),BuildPos(boxes.maxOf {it.to.x},boxes.maxOf {it.to.y},boxes.maxOf {it.to.z}))
             need(a==null || maxOf(abs(bounds.from.x),abs(bounds.to.x),abs(bounds.from.z),abs(bounds.to.z))<=a.maxRadius,"assembly","ROOT_OUTSIDE_ASSEMBLY_RADIUS","The root also needs to fit the declared assembly radius")
             CompiledStructurePlan(normalized,connections,bounds)

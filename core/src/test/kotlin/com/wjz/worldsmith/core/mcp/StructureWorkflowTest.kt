@@ -16,8 +16,9 @@ class StructureWorkflowTest {
     private fun call(name:String,args:JsonObject=JsonObject(emptyMap()))=tools.all().single {it.name==name}.handler(args)
     private fun begin()=call(WorldsmithWorkflow.BEGIN_TOOL,buildJsonObject {put("prompt","A forest of shrines")}).structuredContent.getValue("sessionId").jsonPrimitive.content
     private fun example()=WorldsmithJson.format.decodeFromJsonElement<StructureBlueprint>(call("worldsmith_get_structure_example").structuredContent.getValue("blueprint"))
-    private fun definition()=WorldStructureDefinition("forest_shrine",example(),StructurePlacement(listOf("ashfall_plain"),terrainFit=StructureTerrainFit(foundation=StructureFoundation(FoundationMode.FILL,"foundation",6))))
+    private fun definition()=WorldStructureDefinition("forest_shrine",example().copy(lighting=StructureLighting(StructureLightingMode.EXTERIOR_ONLY)),StructurePlacement(listOf("ashfall_plain"),terrainFit=StructureTerrainFit(foundation=StructureFoundation(FoundationMode.FILL,"foundation",6))))
     private fun write(session:String):McpToolResult {
+        StructureTestWorld.install(tools,session)
         val template=call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
         return call(WorldsmithWorkflow.WRITE_TOOL,buildJsonObject {
             put("sessionId",session);put("displayName","Built structures")
@@ -42,15 +43,15 @@ class StructureWorkflowTest {
         val put=call("worldsmith_put_structure",buildJsonObject {put("sessionId",session);put("structure",WorldsmithJson.format.encodeToJsonElement(definition()))})
         assertFalse(put.isError,put.text)
         val write=write(session)
-        assertFalse(write.isError,write.text)
+        assertFalse(write.isError,write.structuredContent.toString())
         val directory=Path.of(write.structuredContent.getValue("path").jsonPrimitive.content)
         assertTrue(Files.exists(directory.resolve("structures/forest_shrine.json")))
         val loaded=WorldsmithPackLoader.loadDirectory(directory)
-        assertEquals(1,loaded.structures.structures.size)
+        assertEquals(4,loaded.structures.structures.size)
         assertEquals(loaded.computedId,loaded.manifest.id)
         val finish=call(WorldsmithWorkflow.FINISH_TOOL,buildJsonObject {put("sessionId",session)})
-        assertTrue(finish.structuredContent.getValue("complete").jsonPrimitive.boolean)
-        assertEquals(1,finish.structuredContent.getValue("structureCount").jsonPrimitive.int)
+        assertFalse(finish.structuredContent.getValue("complete").jsonPrimitive.boolean)
+        assertEquals("WAITING_NATIVE_CONTEXT",finish.structuredContent.getValue("stage").jsonPrimitive.content)
         assertFalse(finish.structuredContent.getValue("minecraftCompiled").jsonPrimitive.boolean)
     }
 
@@ -106,6 +107,7 @@ class StructureWorkflowTest {
         val structure=definition().let { it.copy(placement=it.placement.copy(anchor=StructureAnchorTarget("holy_peak"))) }
         val draft=call("worldsmith_put_structure",buildJsonObject {put("sessionId",session);put("structure",WorldsmithJson.format.encodeToJsonElement(structure))})
         assertFalse(draft.isError,draft.text)
+        StructureTestWorld.install(tools,session)
         val template=call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
         val terrain=WorldsmithJson.format.decodeFromJsonElement<com.wjz.worldsmith.core.model.TerrainPlan>(template.getValue("terrain"))
         val shape=(terrain.shape as com.wjz.worldsmith.core.model.TerrainShape.Procedural).copy(anchors=listOf(
@@ -115,9 +117,9 @@ class StructureWorkflowTest {
             put("terrain",WorldsmithJson.format.encodeToJsonElement(terrain.copy(shape=shape)))
             listOf("biomes","features").forEach {put(it,template.getValue(it))}
         })
-        assertFalse(saved.isError,saved.text)
+        assertFalse(saved.isError,saved.structuredContent.toString())
         val pack=WorldsmithPackLoader.loadDirectory(Path.of(saved.structuredContent.getValue("path").jsonPrimitive.content))
-        assertEquals("holy_peak",pack.structures.structures.single().placement.anchor!!.id)
+        assertEquals("holy_peak",pack.structures.structures.single {it.id=="forest_shrine"}.placement.anchor!!.id)
         assertEquals(pack.computedId,pack.manifest.id)
         assertFalse(call(WorldsmithWorkflow.FINISH_TOOL,buildJsonObject {put("sessionId",session)}).structuredContent.getValue("minecraftCompiled").jsonPrimitive.boolean)
     }

@@ -33,7 +33,7 @@ class WorldsmithWorkflowTest {
     @TempDir
     lateinit var packDirectory: Path
 
-    private val tools: WorldsmithMcpTools by lazy { WorldsmithMcpTools(packDirectory) }
+    private val tools: WorldsmithMcpTools by lazy { WorldsmithMcpTools(packDirectory.resolve("packs"), publicationHost=PublicationHost { _,_->PublicationStatus("PUBLISHED") }) }
 
     private fun call(name: String, arguments: JsonObject = JsonObject(emptyMap())): McpToolResult =
         tools.all().single { it.name == name }.handler(arguments)
@@ -41,8 +41,9 @@ class WorldsmithWorkflowTest {
     private fun begin(prompt: String = "a wind-scoured wasteland"): JsonObject =
         call(WorldsmithWorkflow.BEGIN_TOOL, buildJsonObject { put("prompt", prompt) }).structuredContent
 
-    /** Writes the template back unchanged, which is the shortest run that can succeed. */
+    /** Adds the required world architecture before writing the terrain template. */
     private fun writeTemplateAs(sessionId: String?): JsonObject {
+        if(sessionId!=null && sessionId!="not-a-session")StructureTestWorld.install(tools,sessionId)
         val template = call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
         val arguments = buildJsonObject {
             if (sessionId != null) put("sessionId", sessionId)
@@ -218,7 +219,7 @@ class WorldsmithWorkflowTest {
     }
 
     @Test
-    fun `finishing before anything was written asks for the write step`() {
+    fun `finishing before planning asks for the architecture step`() {
         val sessionId = begin().text("sessionId")
 
         val result = finish(sessionId)
@@ -226,7 +227,7 @@ class WorldsmithWorkflowTest {
         // Not an error: the run is simply unfinished, and the agent is told what it owes.
         assertFalse(result.isError)
         assertFalse(result.structuredContent.bool("complete"))
-        assertEquals(WorldsmithWorkflow.WRITE_TOOL, result.structuredContent.text("nextTool"))
+        assertEquals(WorldsmithWorkflow.ARCHITECTURE_TOOL, result.structuredContent.text("nextTool"))
     }
 
     @Test
@@ -250,6 +251,7 @@ class WorldsmithWorkflowTest {
     fun `a guided prompt run must replace passthrough terrain with procedural intent`() {
         val sessionId = begin().text("sessionId")
         val template = call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
+        StructureTestWorld.install(tools,sessionId)
         val terrain = WorldsmithJson.format.decodeFromJsonElement<TerrainPlan>(template.getValue("terrain"))
             .copy(shape = TerrainShape.Vanilla(VanillaNoisePreset.OVERWORLD))
         val result = call(
@@ -298,40 +300,30 @@ class WorldsmithWorkflowTest {
     }
 
     @Test
-    fun `finishing queues the validated pack for Minecraft exactly once`() {
-        val activated = mutableListOf<String>()
-        val tools = WorldsmithMcpTools(packDirectory, packFinished = activated::add)
-        fun invoke(name: String, arguments: JsonObject = JsonObject(emptyMap())) =
-            tools.all().single { it.name == name }.handler(arguments)
-        val session = invoke(
-            WorldsmithWorkflow.BEGIN_TOOL,
-            buildJsonObject { put("prompt", "a quiet salt world") },
-        ).structuredContent.text("sessionId")
-        val template = invoke(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
-        val written = invoke(
-            WorldsmithWorkflow.WRITE_TOOL,
-            buildJsonObject {
-                put("sessionId", session)
-                put("displayName", "Activated World")
-                put("terrain", template.getValue("terrain"))
-                put("biomes", template.getValue("biomes"))
-                put("features", template.getValue("features"))
-            },
-        ).structuredContent
-
-        assertTrue(invoke(WorldsmithWorkflow.FINISH_TOOL, buildJsonObject { put("sessionId", session) })
-            .structuredContent.bool("complete"))
-        assertTrue(invoke(WorldsmithWorkflow.FINISH_TOOL, buildJsonObject { put("sessionId", session) })
-            .structuredContent.bool("complete"))
-        assertEquals(listOf(written.text("id")), activated)
+    fun `finish rechecks native readiness instead of accepting a core-only callback`() {
+        val activated=mutableListOf<String>()
+        val tools=WorldsmithMcpTools(packDirectory.resolve("native"),packFinished=activated::add)
+        val session=StructureTestWorld.call(tools,WorldsmithWorkflow.BEGIN_TOOL,buildJsonObject {put("prompt","stone courts")}).structuredContent.text("sessionId")
+        StructureTestWorld.install(tools,session)
+        val template=StructureTestWorld.call(tools,WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
+        val written=StructureTestWorld.call(tools,WorldsmithWorkflow.WRITE_TOOL,buildJsonObject {
+            put("sessionId",session);put("displayName","Native required")
+            listOf("terrain","biomes","features").forEach {put(it,template.getValue(it))}
+        })
+        assertFalse(written.isError,written.text)
+        repeat(2) {
+            val result=StructureTestWorld.call(tools,WorldsmithWorkflow.FINISH_TOOL,buildJsonObject {put("sessionId",session)})
+            assertFalse(result.structuredContent.bool("complete"))
+            assertEquals("WAITING_NATIVE_CONTEXT",result.structuredContent.text("stage"))
+        }
+        assertTrue(activated.isEmpty(),"legacy callbacks must not manufacture native success")
     }
 
     @Test
     fun `a pack written outside a run still saves and says the session was not recorded`() {
         val orphan = writeTemplateAs("not-a-session")
 
-        assertTrue(orphan.bool("valid"))
-        assertFalse(orphan.bool("sessionRecorded"))
+        assertFalse(orphan.bool("complete"))
         assertEquals(WorldsmithWorkflow.BEGIN_TOOL, orphan.text("nextTool"))
 
         val bare = writeTemplateAs(null)
@@ -340,7 +332,7 @@ class WorldsmithWorkflowTest {
     }
 
     @Test
-    fun `a finished run is discarded before an unfinished one`() {
+    fun `capacity preserves completed history and all unfinished drafts`() {
         var next = 0
         val sessions = WorkflowSessions(maxSessions = 2, idFactory = { "s" + next++ })
 
@@ -349,8 +341,9 @@ class WorldsmithWorkflowTest {
         sessions.finish(first.id)
         sessions.begin("third")
 
-        assertEquals(2, sessions.size())
-        assertNull(sessions.find(first.id), "the finished run should have been evicted first")
+        assertEquals(3, sessions.size())
+        assertNotNull(sessions.find(first.id), "completed history is preserved")
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException::class.java) { sessions.begin("fourth") }
         assertNotNull(sessions.find(second.id), "an unfinished run should outlive a finished one")
     }
 }

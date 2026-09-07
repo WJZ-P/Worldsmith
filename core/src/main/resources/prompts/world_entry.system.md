@@ -2,7 +2,9 @@
 
 One Worldsmith pack is four documents submitted together: `terrain` shapes the
 ground, `biomes` labels it and dresses it, `features` scatters things on it, and `structures` builds bounded architecture.
-Each has its own contract. This page is what none of them can own on their own:
+Each has its own contract. A fifth contract, `architecture`, coordinates building
+groups, independent structures, a theme-defining landmark and readable interiors.
+This page is what none of them can own on their own:
 the order the decisions go in, and the places two documents have to agree.
 
 ## Order
@@ -48,4 +50,17 @@ already accepted.
 
 ## Structures
 
-After terrain and biomes, design executable buildings under contract/structure. Use zero when none are requested, not a fixed twenty. Each blueprint owns its materials, geometry and local modules; placement references actual biome ids. Preview and validate individual blueprints before writing the whole pack. The source files are portable JSON; Minecraft templates are compiled artifacts. Do not make network or AI calls during chunk generation.
+After terrain and biomes, proactively design world-specific architecture under
+contract/architecture: at least two distinct groups, one independent structure,
+and one monumental LANDMARK group that most strongly expresses the world theme.
+Infer plausible functions and secondary places instead of waiting for the player
+to list every building. Do not copy a fixed cross-player catalog or style.
+
+Submit the architecture plan, then use contract/draw: build Java through the MCP
+worker, inspect returned model images, revise, and attach frozen drawing ids to
+contract/structure metadata. Required and optional roles must match actual assembly variants;
+every occupied indoor space needs authored readable night lighting. Blueprints own
+geometry/material choices; placement references real biome ids. Validate the complete
+architecture before publication. Format 2 freezes SDK geometry plus JSON metadata and source provenance; old format 1
+JSON remains readable. Native export/readback and reload precede completion. No network or AI calls occur during chunk generation. A validated
+landmark plan is not proof of a placed instance.

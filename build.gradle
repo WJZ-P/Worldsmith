@@ -65,6 +65,8 @@ dependencies {
 }
 
 processResources {
+	dependsOn ':draw-worker:runtimeBundle'
+	from(project(':draw-worker').layout.buildDirectory.dir('runtime')) { into 'worldsmith/runtime' }
 	def expansions = [
 		"version": project.version,
 		"fabric_kotlin_version": project.fabric_kotlin_version,
@@ -84,6 +86,9 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
 	useJUnitPlatform()
+	dependsOn ':draw-worker:runtimeBundle'
+	systemProperty 'worldsmith.workerRuntime', file('draw-worker/build/runtime').absolutePath
+	if (project.hasProperty('structureSmokeOutput')) systemProperty 'worldsmith.smokeOutput', file(project.property('structureSmokeOutput')).absolutePath
 }
 
 java {

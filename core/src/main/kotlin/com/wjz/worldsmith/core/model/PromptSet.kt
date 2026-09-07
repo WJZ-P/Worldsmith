@@ -37,6 +37,8 @@ data class PromptSet(
             CONTRACT_BIOME to biomePlan,
             CONTRACT_FEATURE to featurePlan,
             CONTRACT_STRUCTURE to structurePlan,
+            CONTRACT_ARCHITECTURE to PromptTemplateRef("contract/architecture"),
+            CONTRACT_DRAW to PromptTemplateRef("contract/draw"),
         )
 
     companion object {
@@ -44,6 +46,8 @@ data class PromptSet(
         const val CONTRACT_BIOME: String = "biome"
         const val CONTRACT_FEATURE: String = "feature"
         const val CONTRACT_STRUCTURE: String = "structure"
+        const val CONTRACT_ARCHITECTURE: String = "architecture"
+        const val CONTRACT_DRAW: String = "draw"
 
         val DEFAULT = PromptSet(
             worldBible = PromptTemplateRef("world_bible"),

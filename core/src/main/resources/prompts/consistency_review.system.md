@@ -6,4 +6,10 @@ Check thematic consistency, duplicated structure roles, palette conflicts,
 invalid references, footprint violations, and missing structure definitions.
 Preserve stable IDs and make the smallest changes needed for a coherent result.
 
+For guided MCP publication, also review contract/architecture: distinct groups and
+independent structures coexist, a monumental theme-defining LANDMARK is present,
+actual member counts agree with required/optional roles, and occupied interiors
+are explicitly lit. Ask worldsmith_validate_architecture for machine diagnostics;
+do not infer successful placement or real rendered brightness from source validation.
+
 Return the complete reviewed `WorldBlueprint` JSON and no surrounding prose.

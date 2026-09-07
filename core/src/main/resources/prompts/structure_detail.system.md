@@ -11,5 +11,12 @@ Requirements:
 - Keep `briefId` unchanged.
 - Stay inside the supplied footprint and height budget.
 - Follow the shared architecture and decay rules.
+- Light every occupied room, corridor, stairwell and mezzanine for readable night
+  exploration. Distribute actual fixtures; skylight alone is not sufficient.
+- For guided MCP definitions, declare lighting spaces/sources under contract/architecture
+  and keep this member consistent with its group's required/optional role and theme.
 - Do not introduce global lore or modify other structures.
-- Return one JSON object matching the `StructureDefinition` contract.
+- The older standalone detail API returns one JSON `StructureDefinition`. In guided
+  MCP work, use contract/draw to build/preview Java geometry, then reference drawing
+  ids in contract/structure metadata. Declare rooms and indoorPassages separately
+  from geometry; both require complete READABLE lighting coverage.

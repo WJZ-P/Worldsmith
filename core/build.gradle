@@ -33,6 +33,10 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
 	useJUnitPlatform()
+	dependsOn ':draw-worker:runtimeBundle'
+	systemProperty 'worldsmith.workerRuntime', rootProject.file('draw-worker/build/runtime').absolutePath
+	systemProperty 'worldsmith.projectRoot', rootProject.projectDir.absolutePath
+	if (project.hasProperty('java26Home')) systemProperty 'worldsmith.java26Home', project.property('java26Home')
 }
 
 tasks.register('hashPack', JavaExec) {
@@ -57,8 +61,22 @@ tasks.register('previewStructure', JavaExec) {
 		(findProperty('variant') ?: '0'), (findProperty('assembly') ?: 'false'))
 }
 
+tasks.register('drawGallery', JavaExec) {
+	group = 'worldsmith'
+	description = 'Run the pure-Java drawing SDK example without Minecraft or Python.'
+	dependsOn classes
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.wjz.worldsmith.core.draw.examples.DrawGallery'
+}
+
 java {
 	withSourcesJar()
 	sourceCompatibility = JavaVersion.VERSION_21
 	targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.register('drawSdkJar', Jar) {
+	archiveClassifier = 'draw-sdk'
+	dependsOn compileJava
+	from(sourceSets.main.output.classesDirs) { include 'com/wjz/worldsmith/core/draw/**' }
 }

@@ -20,12 +20,17 @@ data class McpToolResult(
     val text: String,
     val structuredContent: JsonObject,
     val isError: Boolean = false,
+    val images: List<McpImage> = emptyList(),
+    val resources: List<McpBinaryResource> = emptyList(),
 ) {
     companion object {
-        fun success(structuredContent: JsonObject, text: String = structuredContent.toString()) =
-            McpToolResult(text, structuredContent)
+        fun success(structuredContent: JsonObject, text: String = structuredContent.toString(), images: List<McpImage> = emptyList(),resources:List<McpBinaryResource> = emptyList()) =
+            McpToolResult(text, structuredContent, images=images,resources=resources)
 
         fun error(message: String, structuredContent: JsonObject = buildJsonObject { put("error", message) }) =
             McpToolResult(message, structuredContent, isError = true)
     }
 }
+
+data class McpImage(val data: String, val mimeType: String = "image/png")
+data class McpBinaryResource(val uri:String,val blob:String,val mimeType:String="application/octet-stream")

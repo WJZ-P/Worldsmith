@@ -2,6 +2,12 @@ package com.wjz.worldsmith.core.mcp
 
 import java.util.UUID
 import com.wjz.worldsmith.core.structure.WorldStructureDefinition
+import com.wjz.worldsmith.core.structure.StructureArchitecture
+import kotlinx.serialization.Serializable
+import java.nio.file.Files
+import java.nio.file.Path
+import com.wjz.worldsmith.core.serialization.WorldsmithJson
+import com.wjz.worldsmith.core.drawhost.DrawingHost
 
 /** One ordered step of the guided flow, named by the tool that performs it. */
 data class WorkflowStep(
@@ -11,12 +17,14 @@ data class WorkflowStep(
 )
 
 /** What one guided run has achieved so far. */
-data class WorkflowSession(
+@Serializable data class WorkflowSession(
     val id: String,
     val prompt: String,
     val packId: String? = null,
     val finished: Boolean = false,
     val structures: Map<String, WorldStructureDefinition> = emptyMap(),
+    val architecture: StructureArchitecture? = null,
+    val revision: Long = 0,
 )
 
 /**
@@ -38,6 +46,9 @@ object WorldsmithWorkflow {
     const val STYLE_GET_TOOL: String = "worldsmith_get_style"
     const val CONTRACT_TOOL: String = "worldsmith_get_contract"
     const val ANALYZE_TOOL: String = "worldsmith_analyze_biome_distribution"
+    const val ARCHITECTURE_TOOL: String = "worldsmith_plan_architecture"
+    const val ARCHITECTURE_VALIDATE_TOOL: String = "worldsmith_validate_architecture"
+    const val STRUCTURE_TOOL: String = "worldsmith_put_structure"
     const val WRITE_TOOL: String = "worldsmith_write_pack"
     const val FINISH_TOOL: String = "worldsmith_finish_world"
 
@@ -50,20 +61,27 @@ object WorldsmithWorkflow {
     const val OVERVIEW: String =
         "You are designing one Minecraft world from the player's description. Work through `procedure` in " +
             "order and do not stop until $FINISH_TOOL answers complete=true.\n\n" +
-            "Design the terrain, the biomes, the features and any structures yourself. The player's prompt is the only standard " +
+            "Design terrain, biomes, features and world-specific architecture yourself. New guided worlds require at least two distinct building groups, " +
+            "one independent structure, and at least one monumental theme-defining group. Read contract/architecture, plan required/optional members, " +
+            "and light occupied interiors explicitly. Do not reuse a default style across players. The player's prompt is the standard " +
             "for land/ocean balance, scale, relief, height, caves, rivers, lakes, ocean depth, biome count and " +
             "biome distribution. `howToDesign` gives the order those decisions go in and the joins where two " +
             "documents have to agree; `contracts` holds the field vocabulary, one document each for terrain, " +
-            "biome, feature and structure, and $CONTRACT_TOOL hands any of them back if you need to re-read one; " +
+            "biome, feature, structure, draw and architecture planning, and $CONTRACT_TOOL hands any of them back if you need to re-read one; " +
             "`climatePlacement` describes optional semantic presets plus the exact raw axes. Worldsmith " +
             "validates what you send and " +
             "reports exactly what is wrong, so a rejected pack is a repair job rather than a restart: change " +
             "only what the diagnostics name and send the whole document again.\n\n" +
-            "complete=true means exactly this much: the pack is saved in Worldsmith's pack directory, reads " +
-            "back from disk, passes every Worldsmith validator and activation has been requested for Minecraft's " +
-            "world-creation screen. Minecraft export and reload run separately. Claim nothing beyond that to the player - not that a world was already " +
-            "created or played. When you are done, tell them the pack name, how many biomes it has and where it " +
-            "was saved."
+            "Use the Java Draw SDK as the primary geometry route: submit source through MCP, wait for the MC-side worker, " +
+            "inspect returned model images, revise, then reference frozen drawing ids from structure metadata. The AI needs only MCP; " +
+            "the player needs no Python, JDK or external compiler. One in-game confirmation is required per authoring session after restart. " +
+            "SDK geometry, architecture composition and world deployment remain separate modules.\n\n" +
+            "complete=true means the content-addressed pack reads back and passes Core checks, native structure export/readback, " +
+            "Minecraft's full data-pack reload and preset activation in the current Create World context. WAITING_NATIVE_CONTEXT " +
+            "requires the player to open Create World; report that action and pause rather than polling indefinitely. " +
+            "A model preview is not a gameplay screenshot. A published plan is not a created/played world and landmarkInstancesVerified stays false. " +
+            "Report the pack name, biome count and saved location only after the final native receipt."
+
 
     val PROCEDURE: List<WorkflowStep> = listOf(
         WorkflowStep(
@@ -99,51 +117,84 @@ object WorldsmithWorkflow {
         ),
         WorkflowStep(
             order = 5,
+            tool = ARCHITECTURE_TOOL,
+            instruction = "Read contract/architecture. Derive multiple groups from this world's theme, each with a centerpiece, required and optional roles, distinct purpose/layout and discovery intent. Include a monumental LANDMARK group and independent structures. Submit the plan before authoring executable members.",
+        ),
+        WorkflowStep(
+            order = 6,
+            tool = "worldsmith_build_drawing",
+            instruction = "Read contract/draw. Submit a complete Java 21 DrawProgram plus optional helper files, a stable build name, a new requestId and 1..8 seeds. Build each logical building independently. Required session approval happens inside Minecraft, never through an MCP approval tool.",
+        ),
+        WorkflowStep(
+            order = 7,
+            tool = "worldsmith_get_drawing_job",
+            instruction = "Query the returned jobId. WAITING_APPROVAL needs a player action. Poll queued/active jobs at a reasonable interval; on errors inspect file/line/column diagnostics and retry with a new requestId. Failure never authorizes silently substituting an older drawing.",
+        ),
+        WorkflowStep(
+            order = 8,
+            tool = "worldsmith_preview_drawing",
+            instruction = "Inspect isometric, front/back or slice model PNG content from each successful frozen drawing. Fix silhouette, openings, floors and distribution of lights by rebuilding. Preview uses simplified cube shapes/materials/light, not the Minecraft renderer.",
+        ),
+        WorkflowStep(
+            order = 9,
+            tool = STRUCTURE_TOOL,
+            instruction = "Reference drawing.variants in the planned group definitions and standalone structures. Keep metadata in original drawing coordinates; use old JSON build operations only for compatibility. Declare lighting for every root and child blueprint: READABLE occupied spaces with actual light fixtures, or EXTERIOR_ONLY for open designs. Submit complete definitions one at a time. Required ports must produce the member counts promised by the plan.",
+        ),
+        WorkflowStep(
+            order = 10,
+            tool = ARCHITECTURE_VALIDATE_TOOL,
+            instruction = "Check the whole architecture plan against the executable drafts. Repair missing members, landmark scale, unclassified structures and dark rooms. This checks all compiled variants; it is not a gameplay or aesthetic proof.",
+        ),
+        WorkflowStep(
+            order = 11,
             tool = WRITE_TOOL,
             instruction =
                 "Send the whole pack with this sessionId. Preserve the template's technical terrain envelope, " +
                     "but replace its shape with a procedural intent chosen from the player's prompt; design the " +
-                    "biomes and features to match it. If the prompt calls for structures, use worldsmith_get_structure_example, " +
-                    "worldsmith_validate_structure and optionally worldsmith_preview_structure, then submit each with worldsmith_put_structure " +
-                    "before writing, or include a complete structures library directly. No structure quota is required. A reply carrying " +
+                    "biomes and features to match it. Include the planned architecture and all definitions, or omit structures to use the session drafts. " +
+                    "Architecture policy is checked again before any files are saved. A reply carrying " +
                     "error diagnostics means nothing was saved, so repair those exact problems and call it again.",
         ),
         WorkflowStep(
-            order = 6,
+            order = 12,
             tool = FINISH_TOOL,
             instruction =
                 "Call it with this sessionId. It re-reads the pack from disk and re-validates it. Stop when it " +
-                    "answers complete=true; while it answers false, do what `nextTool` says and call it again.",
+                    "answers complete=true. Native pending phases need a later check; WAITING_NATIVE_CONTEXT needs the player to open Create World. Native failures require repair, not an automatic retry loop.",
         ),
     )
 }
 
-/**
- * Remembers guided runs so [WorldsmithWorkflow.FINISH_TOOL] can answer honestly.
- *
- * Without this the finish tool could only ever return true, which would make it
- * a decoration rather than a completion signal. Sessions live in memory and die
- * with the bridge, which is the truthful lifetime: the bridge only exists while
- * the game does, and a pack half-written before a restart is not resumable.
- *
- * The map is bounded so a bridge left running for a long session cannot grow
- * without limit; finished runs are discarded before unfinished ones.
- */
+/** Atomically persisted guided drafts. Completed and unfinished records are retained;
+ * capacity exhaustion is reported instead of silently evicting authoring work.
+ * Drawing job recovery is separate and never restores source-execution approval. */
 class WorkflowSessions @JvmOverloads constructor(
     private val maxSessions: Int = DEFAULT_MAX_SESSIONS,
     private val idFactory: () -> String = { UUID.randomUUID().toString().replace("-", "") },
+    private val directory: Path? = null,
 ) {
     init {
         require(maxSessions >= 1) { "maxSessions must be at least 1" }
     }
 
     private val sessions = LinkedHashMap<String, WorkflowSession>()
+    init {
+        directory?.let { root ->
+            Files.createDirectories(root)
+            Files.list(root).use { files -> files.filter { it.fileName.toString().matches(Regex("[a-f0-9]{32}\\.json")) }.sorted().forEach { path ->
+                require(sessions.size<128) { "Session store exceeds 128 records" }
+                val s=WorldsmithJson.decode<WorkflowSession>(Files.readString(path))
+                require(path.fileName.toString()==s.id+".json"); sessions[s.id]=s
+            } }
+        }
+    }
 
     @Synchronized
     fun begin(prompt: String): WorkflowSession {
-        evictDownTo(maxSessions - 1)
+        require(sessions.values.count { !it.finished } < maxSessions && sessions.size<128) { "Active session capacity reached; resume existing drafts rather than discarding them" }
         val session = WorkflowSession(idFactory(), prompt)
         sessions[session.id] = session
+        save(session)
         return session
     }
 
@@ -159,28 +210,42 @@ class WorkflowSessions @JvmOverloads constructor(
     @Synchronized
     fun putStructure(id: String, structure: WorldStructureDefinition): WorkflowSession? = update(id) {
         require(it.structures.size < 48 || structure.id in it.structures) { "Structure draft limit reached" }
-        it.copy(structures = it.structures + (structure.id to structure), packId = null, finished = false)
+        if(it.structures[structure.id]==structure)it else it.copy(structures = it.structures + (structure.id to structure), packId = null, finished = false, revision=it.revision+1)
+    }
+
+    @Synchronized
+    fun planArchitecture(id: String, plan: StructureArchitecture): WorkflowSession? = update(id) {
+        if(it.architecture==plan)it else it.copy(architecture = plan, packId = null, finished = false, revision=it.revision+1)
     }
 
     @Synchronized
     fun finish(id: String): WorkflowSession? = update(id) { it.copy(finished = true) }
 
+    /** A slow validation/export may not commit over a concurrent edit or restored revision. */
+    @Synchronized fun recordPackAtRevision(id:String,packId:String,revision:Long):WorkflowSession? {
+        if(sessions[id]?.revision!=revision)return null
+        return recordPack(id,packId)
+    }
+    @Synchronized fun finishAtRevision(id:String,packId:String,revision:Long):WorkflowSession? {
+        val current=sessions[id] ?: return null
+        if(current.revision!=revision || current.packId!=packId)return null
+        return finish(id)
+    }
+
     @Synchronized
     fun size(): Int = sessions.size
+    @Synchronized fun all(): List<WorkflowSession> = sessions.values.toList()
+    @Synchronized fun invalidate(id:String):WorkflowSession? = update(id) { it.copy(packId=null,finished=false,revision=it.revision+1) }
 
     private fun update(id: String, change: (WorkflowSession) -> WorkflowSession): WorkflowSession? {
         val current = sessions[id] ?: return null
         val updated = change(current)
         sessions[id] = updated
+        save(updated)
         return updated
     }
 
-    private fun evictDownTo(target: Int) {
-        while (sessions.size > target) {
-            val victim = sessions.entries.firstOrNull { it.value.finished }?.key ?: sessions.keys.first()
-            sessions.remove(victim)
-        }
-    }
+    private fun save(session:WorkflowSession) { directory?.let { DrawingHost.atomic(it.resolve(session.id+".json"),WorldsmithJson.encode(session).toByteArray(Charsets.UTF_8)) } }
 
     companion object {
         const val DEFAULT_MAX_SESSIONS: Int = 8

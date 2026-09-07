@@ -19,8 +19,8 @@ import com.wjz.worldsmith.core.structure.StructurePackIO
 object WorldsmithHashUtil {
     private const val HASH_DOMAIN = "worldsmith-generation-pack-v1"
 
-    @JvmStatic
-    fun computeGenerationId(manifest: WorldsmithPackManifest, contents: Map<String, String>): String {
+    @JvmStatic @JvmOverloads
+    fun computeGenerationId(manifest: WorldsmithPackManifest, contents: Map<String, String>,binaries:Map<String,ByteArray> = emptyMap()): String {
         val digest = MessageDigest.getInstance("SHA-256")
         updateField(digest, "domain", HASH_DOMAIN)
         updateField(digest, "formatVersion", manifest.formatVersion.toString())
@@ -41,13 +41,19 @@ object WorldsmithHashUtil {
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             updateField(digest, "blueprint:$path", canonicalJson(Json.parseToJsonElement(raw)))
         }
+        index.artifacts.toSortedMap().forEach { (id,meta)->
+            require(id.matches(Regex("[a-f0-9]{64}")) && meta.id==id && manifest.formatVersion==2)
+            val bytes=requireNotNull(binaries[meta.path]) { "Missing frozen drawing ${meta.path}" }
+            require(com.wjz.worldsmith.core.draw.DrawSnapshotCodec.hash(bytes)==meta.dataHash)
+            updateField(digest,"drawing:${meta.path}",meta.dataHash)
+        }
 
         return HexFormat.of().formatHex(digest.digest())
     }
 
-    @JvmStatic
-    fun finalizeManifest(manifest: WorldsmithPackManifest, contents: Map<String, String>): WorldsmithPackManifest =
-        manifest.copy(id = computeGenerationId(manifest, contents))
+    @JvmStatic @JvmOverloads
+    fun finalizeManifest(manifest: WorldsmithPackManifest, contents: Map<String, String>,binaries:Map<String,ByteArray> = emptyMap()): WorldsmithPackManifest =
+        manifest.copy(id = computeGenerationId(manifest, contents,binaries))
 
     @JvmStatic
     fun matches(manifest: WorldsmithPackManifest, computedId: String): Boolean =

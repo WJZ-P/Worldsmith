@@ -39,10 +39,12 @@ import kotlinx.serialization.SerialName
     fun opposite()=when(this){UP->DOWN;DOWN->UP;else->rotate(2)}
 }
 /** Optional walkable passage, or a solid attachment socket for towers, branches and roofs. */
-@Serializable data class StructurePort(
+@Serializable data class StructurePort @JvmOverloads constructor(
     val id:String, val at:BuildPos, val facing:PortFacing, val type:String,
     val pool:String?=null, val required:Boolean=false,
     val passage:Boolean=true,
+    /** Optional outgoing attachment probability, evaluated once per precompiled plan. */
+    val chance:Double=1.0,
 )
 @Serializable data class AssemblyChoice(val piece:String, val weight:Int=1)
 @Serializable data class StructureAssembly(

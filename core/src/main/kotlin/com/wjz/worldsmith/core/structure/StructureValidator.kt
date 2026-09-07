@@ -16,17 +16,18 @@ object StructureValidator {
         listOf(failure.diagnostic)
     }
 
-    @JvmStatic fun validateDefinition(definition:WorldStructureDefinition):List<Diagnostic> = try {
-        val compiled=StructureCatalogCompiler.compile(StructureLibrary(structures=listOf(definition)))
+    @JvmStatic @JvmOverloads fun validateDefinition(definition:WorldStructureDefinition,drawings:Map<String,com.wjz.worldsmith.core.draw.DrawStructure> = emptyMap()):List<Diagnostic> = try {
+        val compiled=StructureCatalogCompiler.compile(StructureLibrary(structures=listOf(definition),drawingAssets=drawings))
         compiled.templates.flatMap {(id,variants)->variants.flatMapIndexed {i,g->g.diagnostics.map {it.copy(path="blueprints.$id.variants[$i].${it.path}")}}}
     } catch(failure:StructureBuildException) {listOf(failure.diagnostic)}
 
     @JvmStatic
     fun validate(library: StructureLibrary, biomes: BiomePlan): List<Diagnostic> = buildList {
-        if(library.schemaVersion!=1)add(error("schemaVersion","UNSUPPORTED_SCHEMA","Structure library schema must be 1"))
+        if(library.schemaVersion !in 1..2)add(error("schemaVersion","UNSUPPORTED_SCHEMA","Structure library schema must be 1 or 2"))
         if(library.structures.size>MAX_STRUCTURES){add(error("structures","TOO_MANY_STRUCTURES","At most $MAX_STRUCTURES structure definitions per pack"));return@buildList}
         val catalog=try {StructureCatalogCompiler.compile(library)}catch(failure:StructureBuildException){add(failure.diagnostic);null}
         if(catalog!=null)addAll(catalog.templates.flatMap {(id,variants)->variants.flatMapIndexed {i,g->g.diagnostics.map {it.copy(path="blueprints.$id.variants[$i].${it.path}")}}})
+        if(catalog!=null)addAll(StructureArchitectureValidator.validate(library,catalog))
         val biomeIds=biomes.biomes.map { it.id }.toSet()
         val seen=mutableSetOf<String>()
         val blueprints=mutableMapOf<String,StructureBlueprint>()
@@ -83,8 +84,11 @@ object StructureValidator {
                 if(foundation.mode!=FoundationMode.PILLARS && foundation.supports.isNotEmpty())add(error("$fp.supports","UNUSED_FOUNDATION_SUPPORTS","Only PILLARS consumes support points"))
                 if(foundation.supports.size>64 || foundation.supports.distinct().size!=foundation.supports.size)add(error("$fp.supports","INVALID_FOUNDATION_SUPPORTS","Use at most 64 distinct support points"))
                 foundation.supports.forEach { pos ->
-                    if(pos.y!=0 || pos.x !in 0 until blueprint.size.x || pos.z !in 0 until blueprint.size.z)add(error("$fp.supports","FOUNDATION_SUPPORT_OUT_OF_BOUNDS","Support must be at Y=0 inside blueprint size"))
-                    if(variants!=null && variants.any {g->g.voxels.none { it.position==pos && !it.material.isAir() }})add(error("$fp.supports","FOUNDATION_SUPPORT_HAS_NO_FLOOR","Each pillar must meet an authored solid floor cell in every variant"))
+                    if(variants!=null && variants.any {g->
+                        val p=BuildPos(pos.x-g.sourceMin.x,pos.y-g.sourceMin.y,pos.z-g.sourceMin.z)
+                        p.y!=0 || p.x !in 0 until g.size.x || p.z !in 0 until g.size.z
+                    })add(error("$fp.supports","FOUNDATION_SUPPORT_OUT_OF_BOUNDS","Support must be on the normalized bottom datum inside every variant"))
+                    if(variants!=null && variants.any {g->val p=BuildPos(pos.x-g.sourceMin.x,pos.y-g.sourceMin.y,pos.z-g.sourceMin.z);g.voxels.none { it.position==p && !it.material.isAir() }})add(error("$fp.supports","FOUNDATION_SUPPORT_HAS_NO_FLOOR","Each pillar must meet an authored solid floor cell in every variant"))
                 }
             }
         }

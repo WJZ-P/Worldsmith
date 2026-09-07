@@ -1,0 +1,1098 @@
+{
+  "schemaVersion": 1,
+  "structures": [
+    {
+      "id": "grand_group",
+      "blueprint": {
+        "schemaVersion": 1,
+        "id": "hero_hub",
+        "size": {
+          "x": 39,
+          "y": 35,
+          "z": 39
+        },
+        "origin": {
+          "x": 19,
+          "y": 0,
+          "z": 19
+        },
+        "palette": {
+          "stone": {
+            "block": "minecraft:stone_bricks"
+          },
+          "wood": {
+            "block": "minecraft:dark_oak_planks"
+          },
+          "lamp": {
+            "block": "minecraft:lantern",
+            "properties": {
+              "hanging": "true"
+            }
+          },
+          "door": {
+            "block": "minecraft:oak_door"
+          }
+        },
+        "build": [
+          {
+            "op": "CLEAR",
+            "id": "space",
+            "from": {
+              "x": 0,
+              "y": 4,
+              "z": 0
+            },
+            "to": {
+              "x": 38,
+              "y": 34,
+              "z": 38
+            }
+          },
+          {
+            "op": "FILL",
+            "id": "platform",
+            "from": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "to": {
+              "x": 38,
+              "y": 3,
+              "z": 38
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_2_2",
+            "from": {
+              "x": 2,
+              "y": 4,
+              "z": 2
+            },
+            "to": {
+              "x": 4,
+              "y": 32,
+              "z": 4
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_2_34",
+            "from": {
+              "x": 2,
+              "y": 4,
+              "z": 34
+            },
+            "to": {
+              "x": 4,
+              "y": 32,
+              "z": 36
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_34_2",
+            "from": {
+              "x": 34,
+              "y": 4,
+              "z": 2
+            },
+            "to": {
+              "x": 36,
+              "y": 32,
+              "z": 4
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_34_34",
+            "from": {
+              "x": 34,
+              "y": 4,
+              "z": 34
+            },
+            "to": {
+              "x": 36,
+              "y": 32,
+              "z": 36
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "roof",
+            "from": {
+              "x": 0,
+              "y": 33,
+              "z": 0
+            },
+            "to": {
+              "x": 38,
+              "y": 33,
+              "z": 38
+            },
+            "material": "wood"
+          }
+        ],
+        "lighting": {
+          "mode": "EXTERIOR_ONLY"
+        },
+        "ports": [
+          {
+            "id": "north",
+            "at": {
+              "x": 19,
+              "y": 4,
+              "z": 0
+            },
+            "facing": "NORTH",
+            "type": "walk",
+            "required": true,
+            "chance": 1.0,
+            "pool": "wings"
+          },
+          {
+            "id": "east",
+            "at": {
+              "x": 38,
+              "y": 4,
+              "z": 19
+            },
+            "facing": "EAST",
+            "type": "walk",
+            "required": true,
+            "chance": 1.0,
+            "pool": "wings"
+          }
+        ]
+      },
+      "placement": {
+        "biomes": [
+          "frostash_flats"
+        ],
+        "spacingChunks": 24,
+        "separationChunks": 8,
+        "terrainFit": {
+          "surface": "LAND_SURFACE",
+          "maxHeightDifference": 4,
+          "foundation": {
+            "mode": "FILL",
+            "material": "stone",
+            "maxDepth": 6
+          }
+        }
+      },
+      "assembly": {
+        "pieces": {
+          "hero_wing": {
+            "schemaVersion": 1,
+            "id": "hero_wing",
+            "size": {
+              "x": 15,
+              "y": 12,
+              "z": 15
+            },
+            "origin": {
+              "x": 7,
+              "y": 0,
+              "z": 7
+            },
+            "palette": {
+              "stone": {
+                "block": "minecraft:stone_bricks"
+              },
+              "wood": {
+                "block": "minecraft:dark_oak_planks"
+              },
+              "lamp": {
+                "block": "minecraft:lantern",
+                "properties": {
+                  "hanging": "true"
+                }
+              },
+              "door": {
+                "block": "minecraft:oak_door"
+              }
+            },
+            "build": [
+              {
+                "op": "CLEAR",
+                "id": "space",
+                "from": {
+                  "x": 0,
+                  "y": 4,
+                  "z": 0
+                },
+                "to": {
+                  "x": 14,
+                  "y": 11,
+                  "z": 14
+                }
+              },
+              {
+                "op": "FILL",
+                "id": "platform",
+                "from": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "to": {
+                  "x": 14,
+                  "y": 3,
+                  "z": 14
+                },
+                "material": "stone"
+              },
+              {
+                "op": "FILL",
+                "id": "post_2_2",
+                "from": {
+                  "x": 2,
+                  "y": 4,
+                  "z": 2
+                },
+                "to": {
+                  "x": 4,
+                  "y": 9,
+                  "z": 4
+                },
+                "material": "stone"
+              },
+              {
+                "op": "FILL",
+                "id": "post_2_10",
+                "from": {
+                  "x": 2,
+                  "y": 4,
+                  "z": 10
+                },
+                "to": {
+                  "x": 4,
+                  "y": 9,
+                  "z": 12
+                },
+                "material": "stone"
+              },
+              {
+                "op": "FILL",
+                "id": "post_10_2",
+                "from": {
+                  "x": 10,
+                  "y": 4,
+                  "z": 2
+                },
+                "to": {
+                  "x": 12,
+                  "y": 9,
+                  "z": 4
+                },
+                "material": "stone"
+              },
+              {
+                "op": "FILL",
+                "id": "post_10_10",
+                "from": {
+                  "x": 10,
+                  "y": 4,
+                  "z": 10
+                },
+                "to": {
+                  "x": 12,
+                  "y": 9,
+                  "z": 12
+                },
+                "material": "stone"
+              },
+              {
+                "op": "FILL",
+                "id": "roof",
+                "from": {
+                  "x": 0,
+                  "y": 10,
+                  "z": 0
+                },
+                "to": {
+                  "x": 14,
+                  "y": 10,
+                  "z": 14
+                },
+                "material": "wood"
+              }
+            ],
+            "lighting": {
+              "mode": "EXTERIOR_ONLY"
+            },
+            "ports": [
+              {
+                "id": "entry",
+                "at": {
+                  "x": 7,
+                  "y": 4,
+                  "z": 0
+                },
+                "facing": "NORTH",
+                "type": "walk",
+                "required": false,
+                "chance": 1.0
+              }
+            ]
+          }
+        },
+        "pools": {
+          "wings": [
+            {
+              "piece": "hero_wing",
+              "weight": 1
+            }
+          ]
+        },
+        "variants": 2,
+        "maxPieces": 3,
+        "maxDepth": 1,
+        "maxRadius": 80
+      }
+    },
+    {
+      "id": "outpost_group",
+      "blueprint": {
+        "schemaVersion": 1,
+        "id": "outpost_hub",
+        "size": {
+          "x": 13,
+          "y": 9,
+          "z": 13
+        },
+        "origin": {
+          "x": 6,
+          "y": 0,
+          "z": 6
+        },
+        "palette": {
+          "stone": {
+            "block": "minecraft:stone_bricks"
+          },
+          "wood": {
+            "block": "minecraft:dark_oak_planks"
+          },
+          "lamp": {
+            "block": "minecraft:lantern",
+            "properties": {
+              "hanging": "true"
+            }
+          },
+          "door": {
+            "block": "minecraft:oak_door"
+          }
+        },
+        "build": [
+          {
+            "op": "CLEAR",
+            "id": "space",
+            "from": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "to": {
+              "x": 12,
+              "y": 8,
+              "z": 12
+            }
+          },
+          {
+            "op": "FILL",
+            "id": "platform",
+            "from": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "to": {
+              "x": 12,
+              "y": 0,
+              "z": 12
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_2_2",
+            "from": {
+              "x": 2,
+              "y": 1,
+              "z": 2
+            },
+            "to": {
+              "x": 4,
+              "y": 6,
+              "z": 4
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_2_8",
+            "from": {
+              "x": 2,
+              "y": 1,
+              "z": 8
+            },
+            "to": {
+              "x": 4,
+              "y": 6,
+              "z": 10
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_8_2",
+            "from": {
+              "x": 8,
+              "y": 1,
+              "z": 2
+            },
+            "to": {
+              "x": 10,
+              "y": 6,
+              "z": 4
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_8_8",
+            "from": {
+              "x": 8,
+              "y": 1,
+              "z": 8
+            },
+            "to": {
+              "x": 10,
+              "y": 6,
+              "z": 10
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "roof",
+            "from": {
+              "x": 0,
+              "y": 7,
+              "z": 0
+            },
+            "to": {
+              "x": 12,
+              "y": 7,
+              "z": 12
+            },
+            "material": "wood"
+          }
+        ],
+        "lighting": {
+          "mode": "EXTERIOR_ONLY"
+        },
+        "ports": [
+          {
+            "id": "north",
+            "at": {
+              "x": 6,
+              "y": 1,
+              "z": 0
+            },
+            "facing": "NORTH",
+            "type": "walk",
+            "required": true,
+            "chance": 1.0,
+            "pool": "rooms"
+          },
+          {
+            "id": "east",
+            "at": {
+              "x": 12,
+              "y": 1,
+              "z": 6
+            },
+            "facing": "EAST",
+            "type": "walk",
+            "required": false,
+            "chance": 0.5,
+            "pool": "shops"
+          }
+        ]
+      },
+      "placement": {
+        "biomes": [
+          "frostash_flats"
+        ],
+        "spacingChunks": 24,
+        "separationChunks": 8,
+        "terrainFit": {
+          "surface": "LAND_SURFACE",
+          "maxHeightDifference": 4,
+          "foundation": {
+            "mode": "FILL",
+            "material": "stone",
+            "maxDepth": 6
+          }
+        }
+      },
+      "assembly": {
+        "pieces": {
+          "lit_room": {
+            "schemaVersion": 1,
+            "id": "lit_room",
+            "size": {
+              "x": 11,
+              "y": 7,
+              "z": 11
+            },
+            "origin": {
+              "x": 5,
+              "y": 0,
+              "z": 5
+            },
+            "palette": {
+              "stone": {
+                "block": "minecraft:stone_bricks"
+              },
+              "wood": {
+                "block": "minecraft:dark_oak_planks"
+              },
+              "lamp": {
+                "block": "minecraft:lantern",
+                "properties": {
+                  "hanging": "true"
+                }
+              },
+              "door": {
+                "block": "minecraft:oak_door"
+              }
+            },
+            "build": [
+              {
+                "op": "SHELL",
+                "id": "room",
+                "from": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "to": {
+                  "x": 10,
+                  "y": 5,
+                  "z": 10
+                },
+                "material": "stone"
+              },
+              {
+                "op": "DOOR",
+                "id": "door",
+                "at": {
+                  "x": 5,
+                  "y": 1,
+                  "z": 0
+                },
+                "material": "door",
+                "facing": "NORTH"
+              },
+              {
+                "op": "SET",
+                "id": "light_3_3",
+                "at": {
+                  "x": 3,
+                  "y": 4,
+                  "z": 3
+                },
+                "material": "lamp"
+              },
+              {
+                "op": "SET",
+                "id": "light_7_3",
+                "at": {
+                  "x": 7,
+                  "y": 4,
+                  "z": 3
+                },
+                "material": "lamp"
+              },
+              {
+                "op": "SET",
+                "id": "light_3_7",
+                "at": {
+                  "x": 3,
+                  "y": 4,
+                  "z": 7
+                },
+                "material": "lamp"
+              },
+              {
+                "op": "SET",
+                "id": "light_7_7",
+                "at": {
+                  "x": 7,
+                  "y": 4,
+                  "z": 7
+                },
+                "material": "lamp"
+              }
+            ],
+            "lighting": {
+              "mode": "READABLE",
+              "minimum": 8,
+              "spaces": [
+                {
+                  "from": {
+                    "x": 1,
+                    "y": 1,
+                    "z": 1
+                  },
+                  "to": {
+                    "x": 9,
+                    "y": 3,
+                    "z": 9
+                  }
+                }
+              ],
+              "sources": [
+                {
+                  "at": {
+                    "x": 3,
+                    "y": 4,
+                    "z": 3
+                  },
+                  "level": 15
+                },
+                {
+                  "at": {
+                    "x": 7,
+                    "y": 4,
+                    "z": 3
+                  },
+                  "level": 15
+                },
+                {
+                  "at": {
+                    "x": 3,
+                    "y": 4,
+                    "z": 7
+                  },
+                  "level": 15
+                },
+                {
+                  "at": {
+                    "x": 7,
+                    "y": 4,
+                    "z": 7
+                  },
+                  "level": 15
+                }
+              ]
+            },
+            "ports": [
+              {
+                "id": "entry",
+                "at": {
+                  "x": 5,
+                  "y": 1,
+                  "z": 0
+                },
+                "facing": "NORTH",
+                "type": "walk",
+                "required": false,
+                "chance": 1.0
+              }
+            ]
+          },
+          "workshop": {
+            "schemaVersion": 1,
+            "id": "workshop",
+            "size": {
+              "x": 7,
+              "y": 7,
+              "z": 7
+            },
+            "origin": {
+              "x": 3,
+              "y": 0,
+              "z": 3
+            },
+            "palette": {
+              "stone": {
+                "block": "minecraft:stone_bricks"
+              },
+              "wood": {
+                "block": "minecraft:dark_oak_planks"
+              },
+              "lamp": {
+                "block": "minecraft:lantern",
+                "properties": {
+                  "hanging": "true"
+                }
+              },
+              "door": {
+                "block": "minecraft:oak_door"
+              }
+            },
+            "build": [
+              {
+                "op": "CLEAR",
+                "id": "space",
+                "from": {
+                  "x": 0,
+                  "y": 1,
+                  "z": 0
+                },
+                "to": {
+                  "x": 6,
+                  "y": 6,
+                  "z": 6
+                }
+              },
+              {
+                "op": "FILL",
+                "id": "platform",
+                "from": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "to": {
+                  "x": 6,
+                  "y": 0,
+                  "z": 6
+                },
+                "material": "stone"
+              },
+              {
+                "op": "FILL",
+                "id": "post_2_2",
+                "from": {
+                  "x": 2,
+                  "y": 1,
+                  "z": 2
+                },
+                "to": {
+                  "x": 4,
+                  "y": 4,
+                  "z": 4
+                },
+                "material": "stone"
+              },
+              {
+                "op": "FILL",
+                "id": "roof",
+                "from": {
+                  "x": 0,
+                  "y": 5,
+                  "z": 0
+                },
+                "to": {
+                  "x": 6,
+                  "y": 5,
+                  "z": 6
+                },
+                "material": "wood"
+              }
+            ],
+            "lighting": {
+              "mode": "EXTERIOR_ONLY"
+            },
+            "ports": [
+              {
+                "id": "entry",
+                "at": {
+                  "x": 3,
+                  "y": 1,
+                  "z": 0
+                },
+                "facing": "NORTH",
+                "type": "walk",
+                "required": false,
+                "chance": 1.0
+              }
+            ]
+          }
+        },
+        "pools": {
+          "rooms": [
+            {
+              "piece": "lit_room",
+              "weight": 1
+            }
+          ],
+          "shops": [
+            {
+              "piece": "workshop",
+              "weight": 1
+            }
+          ]
+        },
+        "variants": 8,
+        "maxPieces": 3,
+        "maxDepth": 1,
+        "maxRadius": 48
+      }
+    },
+    {
+      "id": "wayside",
+      "blueprint": {
+        "schemaVersion": 1,
+        "id": "wayside_pavilion",
+        "size": {
+          "x": 9,
+          "y": 8,
+          "z": 9
+        },
+        "origin": {
+          "x": 4,
+          "y": 0,
+          "z": 4
+        },
+        "palette": {
+          "stone": {
+            "block": "minecraft:stone_bricks"
+          },
+          "wood": {
+            "block": "minecraft:dark_oak_planks"
+          },
+          "lamp": {
+            "block": "minecraft:lantern",
+            "properties": {
+              "hanging": "true"
+            }
+          },
+          "door": {
+            "block": "minecraft:oak_door"
+          }
+        },
+        "build": [
+          {
+            "op": "CLEAR",
+            "id": "space",
+            "from": {
+              "x": 0,
+              "y": 1,
+              "z": 0
+            },
+            "to": {
+              "x": 8,
+              "y": 7,
+              "z": 8
+            }
+          },
+          {
+            "op": "FILL",
+            "id": "platform",
+            "from": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "to": {
+              "x": 8,
+              "y": 0,
+              "z": 8
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_2_2",
+            "from": {
+              "x": 2,
+              "y": 1,
+              "z": 2
+            },
+            "to": {
+              "x": 4,
+              "y": 5,
+              "z": 4
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_2_4",
+            "from": {
+              "x": 2,
+              "y": 1,
+              "z": 4
+            },
+            "to": {
+              "x": 4,
+              "y": 5,
+              "z": 6
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_4_2",
+            "from": {
+              "x": 4,
+              "y": 1,
+              "z": 2
+            },
+            "to": {
+              "x": 6,
+              "y": 5,
+              "z": 4
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "post_4_4",
+            "from": {
+              "x": 4,
+              "y": 1,
+              "z": 4
+            },
+            "to": {
+              "x": 6,
+              "y": 5,
+              "z": 6
+            },
+            "material": "stone"
+          },
+          {
+            "op": "FILL",
+            "id": "roof",
+            "from": {
+              "x": 0,
+              "y": 6,
+              "z": 0
+            },
+            "to": {
+              "x": 8,
+              "y": 6,
+              "z": 8
+            },
+            "material": "wood"
+          }
+        ],
+        "lighting": {
+          "mode": "EXTERIOR_ONLY"
+        },
+        "ports": [
+          {
+            "id": "entry",
+            "at": {
+              "x": 4,
+              "y": 1,
+              "z": 0
+            },
+            "facing": "NORTH",
+            "type": "walk",
+            "required": false,
+            "chance": 1.0
+          }
+        ]
+      },
+      "placement": {
+        "biomes": [
+          "frostash_flats"
+        ],
+        "spacingChunks": 24,
+        "separationChunks": 8,
+        "terrainFit": {
+          "surface": "LAND_SURFACE",
+          "maxHeightDifference": 4,
+          "foundation": {
+            "mode": "FILL",
+            "material": "stone",
+            "maxDepth": 6
+          }
+        }
+      }
+    }
+  ],
+  "architecture": {
+    "policyVersion": 1,
+    "worldTheme": "A world of stone colonnades, sheltered rooms and timber-roofed courts",
+    "groups": [
+      {
+        "structure": "grand_group",
+        "title": "grand_group",
+        "role": "LANDMARK",
+        "centerpiece": "hero_hub",
+        "themeFit": "Stone colonnades and timber roofs of this particular setting",
+        "layoutIntent": "Focal courtyard with supporting buildings",
+        "distinction": "Monumental civic complex",
+        "discovery": "Repeatable compatible land-biome candidates",
+        "required": [
+          {
+            "role": "centre",
+            "blueprints": [
+              "hero_hub"
+            ],
+            "minCount": 1,
+            "maxCount": 1
+          },
+          {
+            "role": "wings",
+            "blueprints": [
+              "hero_wing"
+            ],
+            "minCount": 2,
+            "maxCount": 2
+          }
+        ],
+        "optional": []
+      },
+      {
+        "structure": "outpost_group",
+        "title": "outpost_group",
+        "role": "REGULAR",
+        "centerpiece": "outpost_hub",
+        "themeFit": "Stone colonnades and timber roofs of this particular setting",
+        "layoutIntent": "Asymmetric practical outpost",
+        "distinction": "Small working settlement",
+        "discovery": "Repeatable compatible land-biome candidates",
+        "required": [
+          {
+            "role": "hub",
+            "blueprints": [
+              "outpost_hub"
+            ],
+            "minCount": 1,
+            "maxCount": 1
+          },
+          {
+            "role": "room",
+            "blueprints": [
+              "lit_room"
+            ],
+            "minCount": 1,
+            "maxCount": 1
+          }
+        ],
+        "optional": [
+          {
+            "role": "workshop",
+            "blueprints": [
+              "workshop"
+            ],
+            "minCount": 0,
+            "maxCount": 1
+          }
+        ]
+      }
+    ],
+    "standalone": [
+      {
+        "structure": "wayside",
+        "purpose": "Independent wayside pavilion",
+        "themeFit": "A small expression of the same materials"
+      }
+    ]
+  }
+}

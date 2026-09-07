@@ -15,6 +15,7 @@ import java.nio.file.Path
 
 fun interface WorldsmithPackSource {
     fun readText(relativePath: String): String
+    fun readBytes(relativePath: String): ByteArray = error("Binary resources are not supported by this pack source")
 }
 
 class DirectoryWorldsmithPackSource(root: Path) : WorldsmithPackSource {
@@ -24,6 +25,12 @@ class DirectoryWorldsmithPackSource(root: Path) : WorldsmithPackSource {
         val target = root.resolve(relativePath).normalize()
         require(target.startsWith(root)) { "Pack path escapes its root: $relativePath" }
         return Files.readString(target, StandardCharsets.UTF_8)
+    }
+    override fun readBytes(relativePath:String):ByteArray {
+        val target=root.resolve(relativePath).normalize()
+        require(target.startsWith(root) && target.toRealPath().startsWith(root.toRealPath()) && !Files.isSymbolicLink(target))
+        require(Files.size(target)<=com.wjz.worldsmith.core.draw.DrawSnapshotCodec.MAX_BYTES) { "Drawing file too large" }
+        return Files.readAllBytes(target)
     }
 }
 
@@ -40,6 +47,13 @@ class ClasspathWorldsmithPackSource(
         val resource = "$root/$relativePath"
         return classLoader.getResourceAsStream(resource)?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }
             ?: error("Pack resource '$resource' was not found")
+    }
+    override fun readBytes(relativePath:String):ByteArray {
+        require(relativePath.matches(Regex("drawings/[a-f0-9]{64}\\.wsdraw")))
+        return requireNotNull(classLoader.getResourceAsStream("$root/$relativePath")).use {
+            val bytes=it.readNBytes(com.wjz.worldsmith.core.draw.DrawSnapshotCodec.MAX_BYTES+1)
+            require(bytes.size<=com.wjz.worldsmith.core.draw.DrawSnapshotCodec.MAX_BYTES);bytes
+        }
     }
 }
 
@@ -61,7 +75,9 @@ object WorldsmithPackLoader {
         val terrain = WorldsmithJson.decode<TerrainPlan>(contents.getValue(manifest.files.terrain))
         val biomes = WorldsmithJson.decode<BiomePlan>(contents.getValue(manifest.files.biomes))
         val features = WorldsmithJson.decode<FeatureLibrary>(contents.getValue(manifest.files.features))
-        val computedId = WorldsmithHashUtil.computeGenerationId(manifest, contents)
-        return WorldsmithPack(manifest, terrain, biomes, features, computedId, StructurePackIO.load(index, contents))
+        require(index.artifacts.size<=512 && index.artifacts.all { (id,v)->id.matches(Regex("[a-f0-9]{64}")) && v.id==id })
+        val binaries=index.artifacts.values.associate { it.path to source.readBytes(it.path) }
+        val computedId = WorldsmithHashUtil.computeGenerationId(manifest, contents,binaries)
+        return WorldsmithPack(manifest, terrain, biomes, features, computedId, StructurePackIO.load(index, contents,binaries))
     }
 }

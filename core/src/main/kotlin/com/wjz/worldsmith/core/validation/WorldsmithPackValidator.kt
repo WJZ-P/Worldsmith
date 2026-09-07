@@ -14,7 +14,7 @@ object WorldsmithPackValidator {
 
     fun validate(pack: WorldsmithPack): List<Diagnostic> = buildList {
         val manifest = pack.manifest
-        if (manifest.formatVersion != FORMAT_VERSION) {
+        if (manifest.formatVersion !in 1..2) {
             add(error("manifest.formatVersion", "UNSUPPORTED_PACK_FORMAT", "Unsupported pack format ${manifest.formatVersion}"))
         }
         if (!ID.matches(manifest.id)) {
