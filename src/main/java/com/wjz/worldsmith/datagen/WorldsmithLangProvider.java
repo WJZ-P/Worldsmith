@@ -32,7 +32,9 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 	}
 
 	/** Strings for the optional Cloth Config screen. */
-	private static void addSettingsScreen(TranslationBuilder builder) {
+    private static void addSettingsScreen(TranslationBuilder builder) {
+        builder.add("worldsmith.draw.approval.title", "Allow AI Java authoring for this world?");
+        builder.add("worldsmith.draw.approval.body", "Session %s will run AI-authored Java in a separate process under your account. Time and memory are limited, but this is not a filesystem/network sandbox. Approve only a trusted AI client. Approval ends when the client restarts.");
 		builder.add("worldsmith.config.title", "Worldsmith");
 		builder.add("worldsmith.config.category.model", "Model");
 		builder.add("worldsmith.config.category.credentials", "Credentials");
@@ -80,6 +82,11 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		builder.add("worldsmith.config.mcp.port", "Port");
 		builder.add("worldsmith.config.mcp.port.tooltip",
 			"The port to prefer. If it is busy the bridge takes the next free one, so the address below is what actually bound. The bridge restarts when you save.");
+		builder.add("worldsmith.config.mcp.autoApprove", "Run AI code without asking");
+		builder.add("worldsmith.config.mcp.autoApprove.tooltip",
+			"On by default: a connected assistant may compile and run its own Java for this world without a confirmation. "
+				+ "The worker limits time and memory, but it is not a filesystem or network sandbox and the code runs under your account. "
+				+ "Turn this off to be asked once per authoring session.");
 		builder.add("worldsmith.config.mcp.endpoint", "Address: %s");
 		builder.add("worldsmith.config.mcp.discovery",
 			"Running bridges announce themselves in %s, so an agent can read the address from there "

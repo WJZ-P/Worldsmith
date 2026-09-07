@@ -32,6 +32,8 @@
   "worldsmith.config.mcp.discovery": "Running bridges announce themselves in %s, so an agent can read the address from there instead of being told it. The file disappears when the bridge stops.",
   "worldsmith.config.mcp.enabled": "Enable bridge",
   "worldsmith.config.mcp.enabled.tooltip": "Off by default. Turning this on opens a local port for as long as the game is running.",
+  "worldsmith.config.mcp.autoApprove": "Run AI code without asking",
+  "worldsmith.config.mcp.autoApprove.tooltip": "On by default: a connected assistant may compile and run its own Java for this world without a confirmation. The worker limits time and memory, but it is not a filesystem or network sandbox and the code runs under your account. Turn this off to be asked once per authoring session.",
   "worldsmith.config.mcp.endpoint": "Address: %s",
   "worldsmith.config.mcp.port": "Port",
   "worldsmith.config.mcp.port.tooltip": "The port to prefer. If it is busy the bridge takes the next free one, so the address below is what actually bound. The bridge restarts when you save.",
@@ -47,5 +49,7 @@
   "worldsmith.config.region.tooltip": "AWS Bedrock only. Ignored by every other provider.",
   "worldsmith.config.timeout_seconds": "Request timeout",
   "worldsmith.config.timeout_seconds.tooltip": "Seconds to wait for one reply before giving up.",
-  "worldsmith.config.title": "Worldsmith"
+  "worldsmith.config.title": "Worldsmith",
+  "worldsmith.draw.approval.title": "Allow AI Java authoring for this world?",
+  "worldsmith.draw.approval.body": "Session %s will run AI-authored Java in a separate process under your account. Time and memory are limited, but this is not a filesystem/network sandbox. Approve only a trusted AI client. Approval ends when the client restarts."
 }

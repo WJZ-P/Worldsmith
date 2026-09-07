@@ -164,6 +164,13 @@ public final class WorldsmithConfigScreen {
 			.build());
 
 		category.addEntry(entries
+			.startBooleanToggle(Component.translatable("worldsmith.config.mcp.autoApprove"), draft.mcpAutoApprove)
+			.setDefaultValue(new McpSettings().getAutoApproveSourceExecution())
+			.setTooltip(Component.translatable("worldsmith.config.mcp.autoApprove.tooltip"))
+			.setSaveConsumer(value -> draft.mcpAutoApprove = value)
+			.build());
+
+		category.addEntry(entries
 			.startTextDescription(Component.translatable("worldsmith.config.mcp.endpoint", endpointLabel(draft)))
 			.build());
 
@@ -205,6 +212,7 @@ public final class WorldsmithConfigScreen {
 		private int timeoutSeconds;
 		private boolean mcpEnabled;
 		private int mcpPort;
+		private boolean mcpAutoApprove;
 
 		private static Draft of(WorldsmithSettings settings) {
 			LlmSettings llm = settings.getLlm();
@@ -220,6 +228,7 @@ public final class WorldsmithConfigScreen {
 			draft.timeoutSeconds = llm.getTimeoutSeconds();
 			draft.mcpEnabled = mcp.getEnabled();
 			draft.mcpPort = mcp.getPort();
+			draft.mcpAutoApprove = mcp.getAutoApproveSourceExecution();
 			return draft;
 		}
 
@@ -230,7 +239,7 @@ public final class WorldsmithConfigScreen {
 		}
 
 		private McpSettings toMcpSettings() {
-			return new McpSettings(mcpEnabled, mcpPort);
+			return new McpSettings(mcpEnabled, mcpPort, mcpAutoApprove);
 		}
 	}
 }
