@@ -39,12 +39,21 @@ See [the local MCP-to-Create-World workflow](docs/mcp-world-creation.md).
 
 ## Structures
 
-AI-authored structures use a bounded JSON building grammar (fills, shells,
-lines, roofs, repeats and local modules) rather than Java source. They compile
+For free-form Java authoring, see [the drawing SDK](docs/draw-sdk.md): a Core
+voxel canvas with brushes, masks, curves, implicit geometry and native structure
+NBT export. It remains separate from architecture composition and placement.
+The [Structure Agent](docs/structure-agent.md) connects Java submission, hidden
+worker compilation, model-image preview, composition and native publication through MCP.
+
+Java drawings freeze into format 2 data and are referenced by structure metadata.
+The bounded JSON building grammar (fills, shells, lines, roofs, repeats and local
+modules) remains a format 1 compatibility entry. Both routes compile
 into Minecraft templates with biome placement, rigid terrain fitting and
 bounded foundations. Structure sources participate in the pack hash.
 
 See [structure building and MCP previews](docs/structure-building.md).
+New guided worlds also follow [the architecture-agent policy](docs/architecture-agent.md):
+world-specific groups, independent structures, a monumental landmark and readable interiors.
 The executable AI contract is
 [`contract/structure`](core/src/main/resources/prompts/contract/structure.system.md).
 

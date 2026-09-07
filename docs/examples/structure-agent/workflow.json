@@ -1,0 +1,694 @@
+{
+  "description": "Each tool/arguments pair is one MCP call. Replace whole-string $VARIABLE values from prior structuredContent using capture JSON pointers. waitUntil repeats only while a job is active; WAITING_APPROVAL needs player confirmation. The test example borrows terrain only for verification, not as a universal world design.",
+  "steps": [
+    {
+      "tool": "worldsmith_begin_world",
+      "arguments": {
+        "prompt": "Example-only stone colonnade world: a monumental civic group, a smaller outpost and independent wayside pavilions."
+      },
+      "capture": {
+        "SESSION": "/sessionId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_pack_template",
+      "arguments": {},
+      "capture": {
+        "TERRAIN": "/terrain",
+        "BIOMES": "/biomes",
+        "FEATURES": "/features"
+      }
+    },
+    {
+      "tool": "worldsmith_list_styles",
+      "arguments": {}
+    },
+    {
+      "tool": "worldsmith_get_style",
+      "arguments": {
+        "id": "general"
+      }
+    },
+    {
+      "tool": "worldsmith_get_contract",
+      "arguments": {
+        "id": "architecture"
+      }
+    },
+    {
+      "tool": "worldsmith_get_contract",
+      "arguments": {
+        "id": "draw"
+      }
+    },
+    {
+      "tool": "worldsmith_get_contract",
+      "arguments": {
+        "id": "structure"
+      }
+    },
+    {
+      "tool": "worldsmith_analyze_biome_distribution",
+      "arguments": {
+        "terrain": "$TERRAIN",
+        "biomes": "$BIOMES"
+      }
+    },
+    {
+      "tool": "worldsmith_plan_architecture",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "architecture": {
+          "policyVersion": 1,
+          "worldTheme": "Stone colonnades and timber-roofed open courts",
+          "groups": [
+            {
+              "structure": "civic_group",
+              "title": "Monumental civic court",
+              "role": "LANDMARK",
+              "centerpiece": "grand_hall",
+              "themeFit": "The strongest expression of this world's stone colonnades",
+              "layoutIntent": "Raised central court with two connected halls",
+              "distinction": "Monumental height, long approach and focal roof",
+              "discovery": "Repeated eligible dry land candidates, not a guaranteed instance",
+              "required": [
+                {
+                  "role": "centre",
+                  "blueprints": [
+                    "grand_hall"
+                  ],
+                  "minCount": 1,
+                  "maxCount": 1
+                },
+                {
+                  "role": "supporting halls",
+                  "blueprints": [
+                    "wing"
+                  ],
+                  "minCount": 2,
+                  "maxCount": 2
+                }
+              ]
+            },
+            {
+              "structure": "outpost_group",
+              "title": "Working outpost",
+              "role": "REGULAR",
+              "centerpiece": "outpost_court",
+              "themeFit": "Small utilitarian expression of the same material language",
+              "layoutIntent": "One service hall and an optional workshop",
+              "distinction": "Asymmetric smaller-scale working settlement",
+              "discovery": "Dry surface sites in the example biome",
+              "required": [
+                {
+                  "role": "centre",
+                  "blueprints": [
+                    "outpost_court"
+                  ],
+                  "minCount": 1,
+                  "maxCount": 1
+                },
+                {
+                  "role": "service hall",
+                  "blueprints": [
+                    "wing"
+                  ],
+                  "minCount": 1,
+                  "maxCount": 1
+                }
+              ],
+              "optional": [
+                {
+                  "role": "workshop",
+                  "blueprints": [
+                    "workshop"
+                  ],
+                  "minCount": 0,
+                  "maxCount": 1
+                }
+              ]
+            }
+          ],
+          "standalone": [
+            {
+              "structure": "wayside",
+              "purpose": "Independent wayside shelter",
+              "themeFit": "A small open colonnade in the same world"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "grand",
+        "requestId": "grand-r1",
+        "entryClass": "CourtyardProgram",
+        "sources": {
+          "CourtyardProgram.java": "import com.wjz.worldsmith.core.draw.*;\n\n/** Field-shape demonstration only: every world should author its own design. */\npublic final class CourtyardProgram implements DrawProgram {\n    public DrawStructure generate(DrawContext context) {\n        String kind = context.parameters().getOrDefault(\"kind\", \"grand\");\n        int n = switch (kind) { case \"grand\" -> 19; case \"court\" -> 8; case \"wing\" -> 7; default -> 4; };\n        int h = switch (kind) { case \"grand\" -> 35; case \"court\" -> 10; case \"wing\" -> 12; default -> 8; };\n        var canvas = context.canvas(Box.of(-n, 0, -n, n, h - 1, n));\n        canvas.pen(\"stone_bricks\").fill(Box.of(-n, 0, -n, n, 3, n));\n        canvas.pen(\"air\").fill(Box.of(-n, 4, -n, n, h - 1, n));\n        for (int x : new int[] {-n + 2, n - 4})\n            for (int z : new int[] {-n + 2, n - 4})\n                canvas.pen(\"stone_bricks\").fill(Box.of(x, 4, z, x + 2, h - 3, z + 2));\n        canvas.pen(\"dark_oak_planks\").fill(Box.of(-n, h - 2, -n, n, h - 2, n));\n        canvas.anchor(\"north_entry\", new Vec3i(0, 4, -n));\n        return canvas.snapshot();\n    }\n}\n"
+        },
+        "seeds": [
+          20260906
+        ],
+        "parameters": {
+          "kind": "grand"
+        }
+      },
+      "capture": {
+        "JOB_GRAND": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_GRAND"
+      },
+      "capture": {
+        "DRAW_GRAND": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preview_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_GRAND",
+        "view": "isometric"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "court",
+        "requestId": "court-r1",
+        "entryClass": "CourtyardProgram",
+        "sources": {
+          "CourtyardProgram.java": "import com.wjz.worldsmith.core.draw.*;\n\n/** Field-shape demonstration only: every world should author its own design. */\npublic final class CourtyardProgram implements DrawProgram {\n    public DrawStructure generate(DrawContext context) {\n        String kind = context.parameters().getOrDefault(\"kind\", \"grand\");\n        int n = switch (kind) { case \"grand\" -> 19; case \"court\" -> 8; case \"wing\" -> 7; default -> 4; };\n        int h = switch (kind) { case \"grand\" -> 35; case \"court\" -> 10; case \"wing\" -> 12; default -> 8; };\n        var canvas = context.canvas(Box.of(-n, 0, -n, n, h - 1, n));\n        canvas.pen(\"stone_bricks\").fill(Box.of(-n, 0, -n, n, 3, n));\n        canvas.pen(\"air\").fill(Box.of(-n, 4, -n, n, h - 1, n));\n        for (int x : new int[] {-n + 2, n - 4})\n            for (int z : new int[] {-n + 2, n - 4})\n                canvas.pen(\"stone_bricks\").fill(Box.of(x, 4, z, x + 2, h - 3, z + 2));\n        canvas.pen(\"dark_oak_planks\").fill(Box.of(-n, h - 2, -n, n, h - 2, n));\n        canvas.anchor(\"north_entry\", new Vec3i(0, 4, -n));\n        return canvas.snapshot();\n    }\n}\n"
+        },
+        "seeds": [
+          20260906
+        ],
+        "parameters": {
+          "kind": "court"
+        }
+      },
+      "capture": {
+        "JOB_COURT": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_COURT"
+      },
+      "capture": {
+        "DRAW_COURT": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preview_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_COURT",
+        "view": "isometric"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "wing",
+        "requestId": "wing-r1",
+        "entryClass": "CourtyardProgram",
+        "sources": {
+          "CourtyardProgram.java": "import com.wjz.worldsmith.core.draw.*;\n\n/** Field-shape demonstration only: every world should author its own design. */\npublic final class CourtyardProgram implements DrawProgram {\n    public DrawStructure generate(DrawContext context) {\n        String kind = context.parameters().getOrDefault(\"kind\", \"grand\");\n        int n = switch (kind) { case \"grand\" -> 19; case \"court\" -> 8; case \"wing\" -> 7; default -> 4; };\n        int h = switch (kind) { case \"grand\" -> 35; case \"court\" -> 10; case \"wing\" -> 12; default -> 8; };\n        var canvas = context.canvas(Box.of(-n, 0, -n, n, h - 1, n));\n        canvas.pen(\"stone_bricks\").fill(Box.of(-n, 0, -n, n, 3, n));\n        canvas.pen(\"air\").fill(Box.of(-n, 4, -n, n, h - 1, n));\n        for (int x : new int[] {-n + 2, n - 4})\n            for (int z : new int[] {-n + 2, n - 4})\n                canvas.pen(\"stone_bricks\").fill(Box.of(x, 4, z, x + 2, h - 3, z + 2));\n        canvas.pen(\"dark_oak_planks\").fill(Box.of(-n, h - 2, -n, n, h - 2, n));\n        canvas.anchor(\"north_entry\", new Vec3i(0, 4, -n));\n        return canvas.snapshot();\n    }\n}\n"
+        },
+        "seeds": [
+          20260906
+        ],
+        "parameters": {
+          "kind": "wing"
+        }
+      },
+      "capture": {
+        "JOB_WING": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_WING"
+      },
+      "capture": {
+        "DRAW_WING": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preview_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_WING",
+        "view": "isometric"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "marker",
+        "requestId": "marker-r1",
+        "entryClass": "CourtyardProgram",
+        "sources": {
+          "CourtyardProgram.java": "import com.wjz.worldsmith.core.draw.*;\n\n/** Field-shape demonstration only: every world should author its own design. */\npublic final class CourtyardProgram implements DrawProgram {\n    public DrawStructure generate(DrawContext context) {\n        String kind = context.parameters().getOrDefault(\"kind\", \"grand\");\n        int n = switch (kind) { case \"grand\" -> 19; case \"court\" -> 8; case \"wing\" -> 7; default -> 4; };\n        int h = switch (kind) { case \"grand\" -> 35; case \"court\" -> 10; case \"wing\" -> 12; default -> 8; };\n        var canvas = context.canvas(Box.of(-n, 0, -n, n, h - 1, n));\n        canvas.pen(\"stone_bricks\").fill(Box.of(-n, 0, -n, n, 3, n));\n        canvas.pen(\"air\").fill(Box.of(-n, 4, -n, n, h - 1, n));\n        for (int x : new int[] {-n + 2, n - 4})\n            for (int z : new int[] {-n + 2, n - 4})\n                canvas.pen(\"stone_bricks\").fill(Box.of(x, 4, z, x + 2, h - 3, z + 2));\n        canvas.pen(\"dark_oak_planks\").fill(Box.of(-n, h - 2, -n, n, h - 2, n));\n        canvas.anchor(\"north_entry\", new Vec3i(0, 4, -n));\n        return canvas.snapshot();\n    }\n}\n"
+        },
+        "seeds": [
+          20260906
+        ],
+        "parameters": {
+          "kind": "marker"
+        }
+      },
+      "capture": {
+        "JOB_MARKER": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_MARKER"
+      },
+      "capture": {
+        "DRAW_MARKER": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preview_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_MARKER",
+        "view": "isometric"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "marker",
+        "requestId": "marker-r2",
+        "entryClass": "CourtyardProgram",
+        "sources": {
+          "CourtyardProgram.java": "import com.wjz.worldsmith.core.draw.*;\n\n/** Field-shape demonstration only: every world should author its own design. */\npublic final class CourtyardProgram implements DrawProgram {\n    public DrawStructure generate(DrawContext context) {\n        String kind = context.parameters().getOrDefault(\"kind\", \"grand\");\n        int n = switch (kind) { case \"grand\" -> 19; case \"court\" -> 8; case \"wing\" -> 7; default -> 4; };\n        int h = switch (kind) { case \"grand\" -> 35; case \"court\" -> 10; case \"wing\" -> 12; default -> 8; };\n        var canvas = context.canvas(Box.of(-n, 0, -n, n, h - 1, n));\n        canvas.pen(\"stone_bricks\").fill(Box.of(-n, 0, -n, n, 3, n));\n        canvas.pen(\"air\").fill(Box.of(-n, 4, -n, n, h - 1, n));\n        for (int x : new int[] {-n + 2, n - 4})\n            for (int z : new int[] {-n + 2, n - 4})\n                canvas.pen(\"stone_bricks\").fill(Box.of(x, 4, z, x + 2, h - 3, z + 2));\n        canvas.pen(\"spruce_planks\").fill(Box.of(-n, h - 2, -n, n, h - 2, n));\n        canvas.anchor(\"north_entry\", new Vec3i(0, 4, -n));\n        return canvas.snapshot();\n    }\n}\n"
+        },
+        "seeds": [
+          20260906
+        ],
+        "parameters": {
+          "kind": "marker"
+        }
+      },
+      "capture": {
+        "JOB_MARKER": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_MARKER"
+      },
+      "capture": {
+        "DRAW_MARKER": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preview_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_MARKER",
+        "view": "back"
+      }
+    },
+    {
+      "tool": "worldsmith_put_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "structure": {
+          "id": "civic_group",
+          "blueprint": {
+            "id": "grand_hall",
+            "drawing": {
+              "variants": [
+                "$DRAW_GRAND"
+              ]
+            },
+            "origin": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "lighting": {
+              "mode": "EXTERIOR_ONLY"
+            },
+            "ports": [
+              {
+                "id": "north",
+                "at": {
+                  "x": 0,
+                  "y": 4,
+                  "z": -19
+                },
+                "facing": "NORTH",
+                "type": "walk",
+                "required": true,
+                "chance": 1,
+                "pool": "halls"
+              },
+              {
+                "id": "east",
+                "at": {
+                  "x": 19,
+                  "y": 4,
+                  "z": 0
+                },
+                "facing": "EAST",
+                "type": "walk",
+                "required": true,
+                "chance": 1,
+                "pool": "halls"
+              }
+            ]
+          },
+          "placement": {
+            "biomes": [
+              "frostash_flats"
+            ],
+            "spacingChunks": 24,
+            "separationChunks": 8,
+            "rotations": [
+              "NONE",
+              "CLOCKWISE_90",
+              "CLOCKWISE_180",
+              "COUNTERCLOCKWISE_90"
+            ],
+            "terrainFit": {
+              "surface": "LAND_SURFACE",
+              "maxHeightDifference": 3
+            }
+          },
+          "assembly": {
+            "pieces": {
+              "wing": {
+                "id": "wing",
+                "drawing": {
+                  "variants": [
+                    "$DRAW_WING"
+                  ]
+                },
+                "origin": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "lighting": {
+                  "mode": "EXTERIOR_ONLY"
+                },
+                "ports": [
+                  {
+                    "id": "entry",
+                    "at": {
+                      "x": 0,
+                      "y": 4,
+                      "z": -7
+                    },
+                    "facing": "NORTH",
+                    "type": "walk",
+                    "required": false,
+                    "chance": 1
+                  }
+                ]
+              }
+            },
+            "pools": {
+              "halls": [
+                {
+                  "piece": "wing",
+                  "weight": 1
+                }
+              ]
+            },
+            "variants": 2,
+            "maxPieces": 3,
+            "maxDepth": 1,
+            "maxRadius": 80
+          }
+        }
+      }
+    },
+    {
+      "tool": "worldsmith_put_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "structure": {
+          "id": "outpost_group",
+          "blueprint": {
+            "id": "outpost_court",
+            "drawing": {
+              "variants": [
+                "$DRAW_COURT"
+              ]
+            },
+            "origin": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "lighting": {
+              "mode": "EXTERIOR_ONLY"
+            },
+            "ports": [
+              {
+                "id": "east",
+                "at": {
+                  "x": 8,
+                  "y": 4,
+                  "z": 0
+                },
+                "facing": "EAST",
+                "type": "walk",
+                "required": true,
+                "chance": 1,
+                "pool": "halls"
+              },
+              {
+                "id": "north",
+                "at": {
+                  "x": 0,
+                  "y": 4,
+                  "z": -8
+                },
+                "facing": "NORTH",
+                "type": "walk",
+                "required": false,
+                "chance": 0.55,
+                "pool": "shops"
+              }
+            ]
+          },
+          "placement": {
+            "biomes": [
+              "frostash_flats"
+            ],
+            "spacingChunks": 24,
+            "separationChunks": 8,
+            "rotations": [
+              "NONE",
+              "CLOCKWISE_90",
+              "CLOCKWISE_180",
+              "COUNTERCLOCKWISE_90"
+            ],
+            "terrainFit": {
+              "surface": "LAND_SURFACE",
+              "maxHeightDifference": 3
+            }
+          },
+          "assembly": {
+            "pieces": {
+              "wing": {
+                "id": "wing",
+                "drawing": {
+                  "variants": [
+                    "$DRAW_WING"
+                  ]
+                },
+                "origin": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "lighting": {
+                  "mode": "EXTERIOR_ONLY"
+                },
+                "ports": [
+                  {
+                    "id": "entry",
+                    "at": {
+                      "x": 0,
+                      "y": 4,
+                      "z": -7
+                    },
+                    "facing": "NORTH",
+                    "type": "walk",
+                    "required": false,
+                    "chance": 1
+                  }
+                ]
+              },
+              "workshop": {
+                "id": "workshop",
+                "drawing": {
+                  "variants": [
+                    "$DRAW_WING"
+                  ]
+                },
+                "origin": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 0
+                },
+                "lighting": {
+                  "mode": "EXTERIOR_ONLY"
+                },
+                "ports": [
+                  {
+                    "id": "entry",
+                    "at": {
+                      "x": 0,
+                      "y": 4,
+                      "z": -7
+                    },
+                    "facing": "NORTH",
+                    "type": "walk",
+                    "required": false,
+                    "chance": 1
+                  }
+                ]
+              }
+            },
+            "pools": {
+              "halls": [
+                {
+                  "piece": "wing",
+                  "weight": 1
+                }
+              ],
+              "shops": [
+                {
+                  "piece": "workshop",
+                  "weight": 1
+                }
+              ]
+            },
+            "variants": 4,
+            "maxPieces": 3,
+            "maxDepth": 1,
+            "maxRadius": 80
+          }
+        }
+      }
+    },
+    {
+      "tool": "worldsmith_put_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "structure": {
+          "id": "wayside",
+          "blueprint": {
+            "id": "marker",
+            "drawing": {
+              "variants": [
+                "$DRAW_MARKER"
+              ]
+            },
+            "origin": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "lighting": {
+              "mode": "EXTERIOR_ONLY"
+            },
+            "ports": []
+          },
+          "placement": {
+            "biomes": [
+              "frostash_flats"
+            ],
+            "spacingChunks": 24,
+            "separationChunks": 8,
+            "rotations": [
+              "NONE",
+              "CLOCKWISE_90",
+              "CLOCKWISE_180",
+              "COUNTERCLOCKWISE_90"
+            ],
+            "terrainFit": {
+              "surface": "LAND_SURFACE",
+              "maxHeightDifference": 3
+            }
+          }
+        }
+      }
+    },
+    {
+      "tool": "worldsmith_validate_architecture",
+      "arguments": {
+        "sessionId": "$SESSION"
+      }
+    },
+    {
+      "tool": "worldsmith_write_pack",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "displayName": "SDK Example World",
+        "terrain": "$TERRAIN",
+        "biomes": "$BIOMES",
+        "features": "$FEATURES"
+      },
+      "capture": {
+        "PACK": "/id"
+      }
+    },
+    {
+      "tool": "worldsmith_finish_world",
+      "arguments": {
+        "sessionId": "$SESSION"
+      }
+    }
+  ]
+}

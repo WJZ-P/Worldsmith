@@ -1,21 +1,26 @@
 # Structure authoring and world generation
 
-Worldsmith's source format remains 1. AI authors portable JSON, not Java or NBT.
+New authoring uses Java through the MC-side worker and frozen drawing references
+in JSON metadata (format 2). Legacy format 1 JSON remains readable.
+See [Structure Agent](structure-agent.md) for the complete MCP pipeline.
 The executable contract is `core/src/main/resources/prompts/contract/structure.system.md`.
+New guided MCP worlds additionally use `contract/architecture`; see
+[architecture-agent policy](architecture-agent.md) for planning, member counts and lighting.
 The terrain contract links to it. All features are opt-in: random biome-restricted
 placement, no assembly, one variant and no interactions remain valid defaults.
 
 ## Pipeline
 
-1. Core expands bounded primitive operations and local modules.
+1. The approved worker generates frozen SDK data; Core also expands legacy primitives/modules.
 2. It resolves finite seeded palette/module variants and protected weathering.
 3. Optional voxel circulation and port checks run without Minecraft.
 4. Optional socket assembly produces bounded rigid multi-piece plans.
 5. A catalog owns unique source blueprints, compiled variants and layout plans.
 6. The MC adapter resolves live blocks/states, generates small native plan metadata,
-   and exports one NBT per blueprint variant plus typed block entities/loot tables.
+   and exports NBT storage tiles (SDK <=32³) plus typed block entities/loot tables.
+   Storage fragments retain logical-building transforms and do not consume member slots.
 7. Native worldgen picks a plan, arbitrates reservations, probes bounded terrain,
-   chooses a rigid pose, and persists individual pieces and cut/fill columns.
+   chooses rigid or per-building terrain fit, and persists pieces and cut/fill columns.
 8. Each chunk writes only its clipped piece portions with private placement settings
    and deterministic content seeds. No AI call or recursive construction occurs here.
 
