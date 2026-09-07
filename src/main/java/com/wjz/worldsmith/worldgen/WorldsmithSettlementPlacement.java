@@ -16,7 +16,7 @@ public final class WorldsmithSettlementPlacement {
         if(roads.isPresent()&&roads.get().terrainFollowing()) {
             int lowest=Integer.MAX_VALUE,highest=Integer.MIN_VALUE;long work=0;
             for(var part:plan.parts()) {
-                var local=new WorldsmithStructurePlan.Part(part.template(),BlockPos.ZERO,Rotation.NONE,part.size(),part.reserved(),part.footprint(),part.supports(),part.detail());
+                var local=new WorldsmithStructurePlan.Part(part.template(),BlockPos.ZERO,Rotation.NONE,part.size(),part.reserved(),part.footprint(),part.supports(),part.detail(),part.tiles());
                 var single=new WorldsmithStructurePlan(List.of(local),part.footprint(),part.supports(),part.size().getY(),local.bounds(),List.of());
                 var combined=Rotation.values()[(rotation.ordinal()+part.rotation().ordinal())&3];
                 var corner=part.offset().rotate(rotation).offset(anchor.atY(0));

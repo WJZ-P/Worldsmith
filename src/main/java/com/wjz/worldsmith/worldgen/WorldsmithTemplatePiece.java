@@ -10,6 +10,7 @@ import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
@@ -28,12 +29,12 @@ public final class WorldsmithTemplatePiece extends TemplateStructurePiece {
 
     public WorldsmithTemplatePiece(StructureTemplateManager manager,WorldsmithStructurePlan.Part part,BlockState foundationState,
         BlockPos position,Rotation rotation,List<BoundingBox> foundations,List<BoundingBox> cuts,long contentSeed) {
-        super(WorldsmithStructureTypes.piece(),0,manager,part.template(),part.template().toString(),placement(rotation),position);
+        super(WorldsmithStructureTypes.piece(),0,manager,part.template(),part.template().toString(),placement(rotation,part.preserveShape()),position);
         this.part=part;this.foundationState=foundationState;this.foundations=List.copyOf(foundations);this.cuts=List.copyOf(cuts);this.contentSeed=contentSeed;
         this.reserved=reserved(part,position,rotation);validateAndExpand();
     }
     public WorldsmithTemplatePiece(StructurePieceSerializationContext context,CompoundTag tag) {
-        super(WorldsmithStructureTypes.piece(),tag,context.structureTemplateManager(),id->placement(Rotation.valueOf(tag.getStringOr("Rotation","NONE"))));
+        super(WorldsmithStructureTypes.piece(),tag,context.structureTemplateManager(),id->placement(Rotation.valueOf(tag.getStringOr("Rotation","NONE")),tag.getCompoundOrEmpty("Part").getBooleanOr("preserve_shape",false)));
         this.part=WorldsmithStructurePlan.Part.CODEC.parse(NbtOps.INSTANCE,tag.getCompoundOrEmpty("Part")).getOrThrow();
         this.foundationState=BlockState.CODEC.parse(NbtOps.INSTANCE,tag.getCompoundOrEmpty("FoundationState")).getOrThrow();
         this.foundations=BoundingBox.CODEC.listOf().parse(NbtOps.INSTANCE,tag.getListOrEmpty("Foundations")).getOrThrow();
@@ -51,7 +52,7 @@ public final class WorldsmithTemplatePiece extends TemplateStructurePiece {
             this.boundingBox.encapsulate(box);
         }
     }
-    private static StructurePlaceSettings placement(Rotation rotation){return new StructurePlaceSettings().setRotation(rotation).setIgnoreEntities(true);}
+    private static StructurePlaceSettings placement(Rotation rotation,boolean preserveShape){return new StructurePlaceSettings().setRotation(rotation).setIgnoreEntities(true).setKnownShape(preserveShape);}
     private static List<BoundingBox> reserved(WorldsmithStructurePlan.Part part,BlockPos position,Rotation rotation) {
         return part.reserved().stream().map(b->BoundingBox.fromCorners(new BlockPos(b.minX(),b.minY(),b.minZ()).rotate(rotation).offset(position),new BlockPos(b.maxX(),b.maxY(),b.maxZ()).rotate(rotation).offset(position))).toList();
     }
@@ -75,7 +76,11 @@ public final class WorldsmithTemplatePiece extends TemplateStructurePiece {
         var placement=this.placeSettings.copy().setBoundingBox(chunkBox);
         if(!part.detail().patches().isEmpty())placement.addProcessor(new WorldsmithInstanceProcessor(contentSeed,part.detail()));
         this.template.placeInWorld(level,this.templatePosition,referencePos,placement,
-            RandomSource.create(WorldsmithStructures.mixSeed(contentSeed+chunkPos.pack()*0xD1B54A32D192ED03L)),2);
+            RandomSource.create(WorldsmithStructures.mixSeed(contentSeed+chunkPos.pack()*0xD1B54A32D192ED03L)),
+            // The whole SDK building was already state/pair-validated. Applying
+            // neighbor physics per fragment can erase the first half before the
+            // adjoining tile/chunk is emitted. Old pieces retain their old behavior.
+            part.preserveShape()?Block.UPDATE_CLIENTS|Block.UPDATE_KNOWN_SHAPE:Block.UPDATE_CLIENTS);
     }
     private static void applyColumns(WorldGenLevel level,BoundingBox clip,List<BoundingBox> columns,BlockState state) {
         for(var box:columns)if(box.intersects(clip))for(int y=Math.max(box.minY(),clip.minY());y<=Math.min(box.maxY(),clip.maxY());y++) {

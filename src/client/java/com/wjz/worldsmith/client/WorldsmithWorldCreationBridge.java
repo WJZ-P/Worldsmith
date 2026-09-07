@@ -3,6 +3,12 @@ package com.wjz.worldsmith.client;
 import com.mojang.datafixers.util.Pair;
 import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
+import com.wjz.worldsmith.core.mcp.PublicationStatus;
+import net.minecraft.SharedConstants;
+import net.minecraft.core.HolderLookup;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader;
 import com.wjz.worldsmith.core.validation.DiagnosticSeverity;
 import com.wjz.worldsmith.core.validation.WorldsmithPackValidator;
@@ -61,6 +67,9 @@ public final class WorldsmithWorldCreationBridge {
 	private static final Map<String, String> DISPLAY_NAMES = new ConcurrentHashMap<>();
 	private static final Map<String, String> BIOME_NAMES = new ConcurrentHashMap<>();
 	private static volatile String activePackId;
+    private static final Map<String,PublicationStatus> PUBLICATIONS=new ConcurrentHashMap<>();
+    private static final java.util.concurrent.ExecutorService EXPORTS=Executors.newSingleThreadExecutor(r->{var t=new Thread(r,"worldsmith-native-export");t.setDaemon(true);return t;});
+    private static final String COMPILER_VERSION=com.wjz.worldsmith.core.drawhost.DrawingVersions.NATIVE_COMPILER;
 
 	private WorldsmithWorldCreationBridge() {
 	}
@@ -69,7 +78,38 @@ public final class WorldsmithWorldCreationBridge {
 	public static void initialize() {
 		activePackId = readActivePack();
 		WorldsmithMcpService.setPackFinishedListener(WorldsmithWorldCreationBridge::activatePack);
+		WorldsmithMcpService.setPublicationHost(WorldsmithWorldCreationBridge::requestPublication);
 	}
+
+    public static PublicationStatus requestPublication(WorldsmithPack pack,Path directory) {
+        String id=pack.getManifest().getId();
+        if(!id.equals(activePackId))activatePack(id);
+        var waiting=new PublicationStatus("WAITING_NATIVE_CONTEXT","Open the Create World screen for native validation and activation",List.of());
+        var result=new CompletableFuture<PublicationStatus>();
+        // Read UI-owned state on the render thread, not from an MCP handler. A receipt
+        // from an older Create World screen must never complete a different context.
+        Runnable check=()->{
+            try {
+                if(Minecraft.getInstance().gui.screen() instanceof CreateWorldScreen screen) {
+                    var state=SCREENS.computeIfAbsent(screen,ignored->new ScreenState());
+                    installStateListener(screen,state);applyPack(screen,state,id);
+                    result.complete(PUBLICATIONS.getOrDefault(id,waiting));
+                } else result.complete(waiting);
+            } catch(Exception e){failed(id,e);result.complete(PUBLICATIONS.get(id));}
+        };
+        var minecraft=Minecraft.getInstance();
+        if(minecraft.isSameThread())check.run();else minecraft.execute(check);
+        try {return result.get(2,java.util.concurrent.TimeUnit.SECONDS);}
+        catch(java.util.concurrent.TimeoutException e){return waiting;}
+        catch(InterruptedException e){Thread.currentThread().interrupt();return waiting;}
+        catch(java.util.concurrent.ExecutionException e){failed(id,e);return PUBLICATIONS.get(id);}
+    }
+    private static void failed(String id,Throwable failure) {
+        Throwable cause=failure;while(cause.getCause()!=null)cause=cause.getCause();
+        String message=cause.getMessage()==null?cause.getClass().getSimpleName():cause.getMessage();
+        PUBLICATIONS.put(id,new PublicationStatus("FAILED",message,List.of(new com.wjz.worldsmith.core.validation.Diagnostic("native","NATIVE_PUBLICATION_FAILED",DiagnosticSeverity.ERROR,message))));
+        Worldsmith.LOGGER.error("Native publication failed for {}",id,failure);
+    }
 
 	/** Called by Fabric after a Create World screen has initialized. */
 	public static void onScreenOpened(CreateWorldScreen screen) {
@@ -161,55 +201,50 @@ public final class WorldsmithWorldCreationBridge {
 		});
 	}
 
-	private static void applyPack(CreateWorldScreen screen, ScreenState state, String packId) {
-		if (packId.equals(state.appliedPackId) || packId.equals(state.applyingPackId)) {
-			return;
-		}
-
-		try {
-			WorldsmithPack pack = loadManagedPack(packId);
-			CompiledPack compiled = CompiledPack.scoped(pack);
-			CreateWorldScreenAccessor access = (CreateWorldScreenAccessor) screen;
-			WorldCreationUiState uiState = access.worldsmith$getUiState();
-			Path tempDataPackDirectory = access.worldsmith$getOrCreateTempDataPackDir();
-			if (tempDataPackDirectory == null) {
-				throw new IllegalStateException("Minecraft did not create its temporary data-pack directory");
-			}
-
-			// The registry ids keep the full hash. The temporary repository folder
-			// only needs to be distinct within one Create World screen, and keeping
-			// it short avoids Windows path-length trouble once nested worldgen ids
-			// are appended below it.
-			String folderName = GENERATED_FOLDER_PREFIX + packId.substring(0, 16);
-			exportAtomically(compiled, uiState, tempDataPackDirectory, folderName);
-			PackRepository repository = repository(access, uiState.getSettings().dataConfiguration());
-			String repositoryId = "file/" + folderName;
-			if (!repository.getAvailableIds().contains(repositoryId)) {
-				throw new IllegalStateException("Minecraft did not discover exported pack " + repositoryId);
-			}
-
-			ArrayList<String> selected = new ArrayList<>(repository.getSelectedIds());
-			selected.removeIf(id -> id.startsWith(REPOSITORY_PREFIX));
-			selected.add(repositoryId);
-			repository.setSelected(selected);
-
-			state.applyingPackId = packId;
-			state.repositoryId = repositoryId;
-			state.presetKey = compiled.worldPresetKey();
-			state.seed = pack.getTerrain().getSeed();
-			access.worldsmith$tryApplyNewDataPacks(
-				repository,
-				false,
-				configuration -> abort(screen, state, configuration)
-			);
-			// When the same immutable pack is already loaded Minecraft may take a
-			// fast path that does not replace the context, so also try immediately.
-			trySelectPreset(screen, state, uiState);
-		} catch (Exception failure) {
-			state.applyingPackId = null;
-			Worldsmith.LOGGER.error("Could not activate Worldsmith pack {} in Create World", packId, failure);
-		}
-	}
+    private static void applyPack(CreateWorldScreen screen,ScreenState state,String packId) {
+        var access=(CreateWorldScreenAccessor)screen;
+        var uiState=access.worldsmith$getUiState();
+        if(packId.equals(state.appliedPackId) && state.validatedContext==uiState.getSettings().worldgenLoadContext()) {
+            // Re-select explicitly if the player changed the preset on the same screen.
+            var preset=state.validatedContext.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(state.appliedPresetKey);
+            uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));
+            if(state.appliedSeed!=null)uiState.setSeed(Long.toString(state.appliedSeed));
+            PUBLICATIONS.put(packId,new PublicationStatus("PUBLISHED","Native export, reload and preset activation succeeded",List.of()));return;
+        }
+        if(packId.equals(state.applyingPackId))return;
+        if(packId.equals(state.lastAttemptPackId) && state.lastAttemptContext==uiState.getSettings().worldgenLoadContext()
+            && PUBLICATIONS.getOrDefault(packId,new PublicationStatus("", "",List.of())).getStage().equals("FAILED"))return;
+        state.applyingPackId=packId;long serial=++state.serial;
+        try {
+            var context=uiState.getSettings().worldgenLoadContext();
+            state.lastAttemptContext=context;state.lastAttemptPackId=packId;
+            var directory=access.worldsmith$getOrCreateTempDataPackDir();
+            if(directory==null)throw new IllegalStateException("Minecraft did not create a temporary pack repository");
+            String folder=GENERATED_FOLDER_PREFIX+packId.substring(0,16)+"-"+Integer.toHexString(System.identityHashCode(context));
+            PUBLICATIONS.put(packId,new PublicationStatus("NATIVE_CHECK","Validating against the actual Create World registry context",List.of()));
+            CompletableFuture.supplyAsync(()->{
+                try {
+                    var pack=loadManagedPack(packId);var compiled=CompiledPack.scoped(pack);
+                    exportAtomically(compiled,context,directory,folder);return compiled;
+                } catch(Exception e){throw new java.util.concurrent.CompletionException(e);}
+            },EXPORTS).whenComplete((compiled,failure)->Minecraft.getInstance().execute(()->{
+                if(state.serial!=serial || !packId.equals(state.applyingPackId))return;
+                if(failure!=null){state.applyingPackId=null;failed(packId,failure);return;}
+                if(Minecraft.getInstance().gui.screen()!=screen || uiState.getSettings().worldgenLoadContext()!=context || !packId.equals(activePackId)) {
+                    state.applyingPackId=null;PUBLICATIONS.put(packId,new PublicationStatus("WAITING_NATIVE_CONTEXT","Creation context changed; return to Create World to retry",List.of()));return;
+                }
+                try {
+                    var repository=repository(access,uiState.getSettings().dataConfiguration());String repositoryId="file/"+folder;
+                    if(!repository.getAvailableIds().contains(repositoryId))throw new IllegalStateException("Minecraft did not discover the exported pack");
+                    var selected=new ArrayList<>(repository.getSelectedIds());selected.removeIf(id->id.startsWith(REPOSITORY_PREFIX));selected.add(repositoryId);repository.setSelected(selected);
+                    state.repositoryId=repositoryId;state.presetKey=compiled.worldPresetKey();state.seed=compiled.terrain().getSeed();
+                    PUBLICATIONS.put(packId,new PublicationStatus("RELOADING","Minecraft is reloading the validated pack",List.of()));
+                    access.worldsmith$tryApplyNewDataPacks(repository,false,configuration->abort(screen,state,configuration));
+                    trySelectPreset(screen,state,uiState);
+                } catch(Exception e){state.applyingPackId=null;failed(packId,e);}
+            }));
+        } catch(Exception e){state.applyingPackId=null;failed(packId,e);}
+    }
 
 	private static void installStateListener(CreateWorldScreen screen, ScreenState state) {
 		if (state.listenerInstalled) {
@@ -243,15 +278,20 @@ public final class WorldsmithWorldCreationBridge {
 		}
 
 		Long seed = state.seed;
+        // Clear applying first to avoid listener recursion, but commit the success
+        // cache only AFTER both UI mutations finish successfully.
 		state.applyingPackId = null;
-		state.appliedPackId = packId;
 		state.repositoryId = null;
 		state.presetKey = null;
 		state.seed = null;
-		uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));
-		if (seed != null) {
-			uiState.setSeed(Long.toString(seed));
-		}
+        try {
+            if(!packId.equals(activePackId))return;
+            uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));
+            if (seed != null)uiState.setSeed(Long.toString(seed));
+        } catch(Exception e){state.appliedPackId=null;state.validatedContext=null;failed(packId,e);return;}
+        state.appliedPackId = packId;state.appliedPresetKey=presetKey;state.appliedSeed=seed;
+        state.validatedContext = uiState.getSettings().worldgenLoadContext();
+		PUBLICATIONS.put(packId,new PublicationStatus("PUBLISHED","Native structure readback, registry reload and activation succeeded",List.of()));
 		Worldsmith.LOGGER.info("Worldsmith pack {} is available and selected in More World Options", packId);
 	}
 
@@ -265,6 +305,7 @@ public final class WorldsmithWorldCreationBridge {
 		state.repositoryId = null;
 		state.presetKey = null;
 		state.seed = null;
+		if(packId!=null)failed(packId,new IllegalStateException("Minecraft rejected the data-pack reload"));
 		Worldsmith.LOGGER.warn("Minecraft rejected Worldsmith pack {} while reloading Create World", packId);
 		Minecraft.getInstance().execute(() -> Minecraft.getInstance().gui.setScreen(screen));
 	}
@@ -287,7 +328,7 @@ public final class WorldsmithWorldCreationBridge {
 
 	private static void exportAtomically(
 		CompiledPack pack,
-		WorldCreationUiState uiState,
+		HolderLookup.Provider context,
 		Path repositoryRoot,
 		String folderName
 	) throws IOException {
@@ -296,19 +337,20 @@ public final class WorldsmithWorldCreationBridge {
 		if (!target.startsWith(root)) {
 			throw new IllegalArgumentException("Generated pack path escaped Minecraft's temporary directory");
 		}
-		if (Files.isDirectory(target) && Files.isRegularFile(target.resolve("pack.mcmeta"))) {
-			return;
-		}
+		String stamp=pack.id()+":"+SharedConstants.getCurrentVersion().dataVersion().version()+":"+COMPILER_VERSION+":"+System.identityHashCode(context);
+        if(Files.isRegularFile(target.resolve("worldsmith-native.stamp")) && Files.readString(target.resolve("worldsmith-native.stamp")).equals(stamp))return;
+        if(Files.exists(target))throw new IOException("Stale native export cache; reopen Create World to obtain a fresh repository");
 
 		Path pending = Files.createTempDirectory(root, ".worldsmith-pending-");
 		try {
-			WorldsmithPackExporter.export(pack, uiState.getSettings().worldgenLoadContext(), pending);
+			WorldsmithPackExporter.export(pack, context, pending);
+			Files.writeString(pending.resolve("worldsmith-native.stamp"),stamp);
 			try {
 				Files.move(pending, target, StandardCopyOption.ATOMIC_MOVE);
 			} catch (AtomicMoveNotSupportedException ignored) {
 				Files.move(pending, target);
 			} catch (FileAlreadyExistsException ignored) {
-				if (!Files.isRegularFile(target.resolve("pack.mcmeta"))) {
+				if (!Files.isRegularFile(target.resolve("worldsmith-native.stamp")) || !Files.readString(target.resolve("worldsmith-native.stamp")).equals(stamp)) {
 					throw ignored;
 				}
 			}
@@ -396,5 +438,11 @@ public final class WorldsmithWorldCreationBridge {
 		private String repositoryId;
 		private ResourceKey<WorldPreset> presetKey;
 		private Long seed;
+		private long serial;
+		private HolderLookup.Provider validatedContext;
+        private HolderLookup.Provider lastAttemptContext;
+        private String lastAttemptPackId;
+        private ResourceKey<WorldPreset> appliedPresetKey;
+        private Long appliedSeed;
 	}
 }

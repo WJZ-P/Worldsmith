@@ -5,6 +5,7 @@ import com.wjz.worldsmith.core.structure.CompiledStructure;
 import com.wjz.worldsmith.core.structure.StructureGeometryCompiler;
 import com.wjz.worldsmith.core.structure.StructureVoxel;
 import com.wjz.worldsmith.core.structure.StructureInteraction;
+import com.wjz.worldsmith.core.structure.StructureTiling;
 import com.google.gson.GsonBuilder;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.HolderLookup;
@@ -29,6 +30,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
@@ -64,6 +66,7 @@ public final class WorldsmithStructureTemplates {
     }
 
     public static CompoundTag encode(CompiledStructure geometry,HolderLookup.Provider registries,CompiledPack pack) {
+        if(!geometry.getStorageFragment())validateGeometry(geometry);
         CompoundTag root = new CompoundTag();
         root.putInt("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());
         root.put("size", ints(geometry.getSize().getX(), geometry.getSize().getY(), geometry.getSize().getZ()));
@@ -76,6 +79,7 @@ public final class WorldsmithStructureTemplates {
         for(int i=0;i<geometry.getInteractions().size();i++)interactions.put(geometry.getInteractions().get(i).getAt(),i);
         for (StructureVoxel voxel : geometry.getVoxels()) {
             BlockState state = states.computeIfAbsent(voxel.getMaterial(), WorldsmithStructureTemplates::resolve)
+                .mirror(voxel.getMirrorX()?Mirror.FRONT_BACK:Mirror.NONE)
                 .rotate(Rotation.values()[voxel.getQuarterTurns()]);
             int index = ids.computeIfAbsent(state, key -> { int next = ids.size(); palette.add(NbtUtils.writeBlockState(key)); return next; });
             CompoundTag block = new CompoundTag();
@@ -86,7 +90,7 @@ public final class WorldsmithStructureTemplates {
                 if(registries==null)throw new IllegalArgumentException("Block entity content requires registry-aware export");
                 var pos=voxel.getPosition();var payload=geometry.getInteractions().get(interaction);
                 block.put("nbt",WorldsmithStructureInteractions.encode(payload,state,new net.minecraft.core.BlockPos(pos.getX(),pos.getY(),pos.getZ()),registries,
-                    pack==null?null:pack.structureLootId(geometry.getId(),interaction)));
+                    pack==null?null:pack.structureLootId(geometry.getId(),geometry.getInteractionIds().isEmpty()?interaction:geometry.getInteractionIds().get(interaction))));
             }
             blocks.add(block);
         }
@@ -98,23 +102,43 @@ public final class WorldsmithStructureTemplates {
         return template.save(new CompoundTag());
     }
 
+    public static void validateGeometry(CompiledStructure geometry) {
+        var nativeCells=new java.util.HashMap<net.minecraft.core.BlockPos,BlockState>();
+        var resolved=new java.util.HashMap<BuildMaterial,BlockState>();
+        for(var voxel:geometry.getVoxels()) {
+            var state=resolved.computeIfAbsent(voxel.getMaterial(),WorldsmithStructureTemplates::resolve).mirror(voxel.getMirrorX()?Mirror.FRONT_BACK:Mirror.NONE).rotate(Rotation.values()[voxel.getQuarterTurns()]);
+            var p=voxel.getPosition();nativeCells.put(new net.minecraft.core.BlockPos(p.getX(),p.getY(),p.getZ()),state);
+        }
+        WorldsmithNativeGeometryChecks.validate(nativeCells);
+        if(geometry.getLighting()==null)return;
+        var sources=geometry.getLighting().getSources();
+        var cells=new java.util.HashMap<com.wjz.worldsmith.core.structure.BuildPos,StructureVoxel>();
+        for(var voxel:geometry.getVoxels())cells.put(voxel.getPosition(),voxel);
+        for(var source:sources) {
+            var voxel=cells.get(source.getAt());
+            if(voxel==null)throw new IllegalArgumentException("Missing declared light source at "+source.getAt());
+            var state=resolve(voxel.getMaterial()).rotate(Rotation.values()[voxel.getQuarterTurns()]);
+            if(state.getLightEmission()<source.getLevel())throw new IllegalArgumentException(
+                "Light source in "+geometry.getId()+" at "+source.getAt()+" declares "+source.getLevel()+" but "+state+" emits "+state.getLightEmission());
+        }
+    }
+
+    public static Identifier tileId(Identifier base,int index) { return base.withPath(base.getPath()+"/tile_"+index); }
+
     public static int write(CompiledPack pack, HolderLookup.Provider registries, Path root, CachedOutput cache) throws IOException {
         int count = 0;
         for(var entry:pack.structures().getTemplates().entrySet())for(int variant=0;variant<entry.getValue().size();variant++) {
-            var geometry=entry.getValue().get(variant);
-            Identifier id=pack.structureTemplateId(entry.getKey(),variant);
-            Path target = root.resolve("data").resolve(id.getNamespace()).resolve("structure").resolve(id.getPath() + ".nbt");
-            Files.createDirectories(target.getParent());
-            var tag=encode(geometry,registries,pack);
-            if(cache==null) {
-                NbtIo.writeCompressed(tag, target);
-            } else {
-                ByteArrayOutputStream buffer=new ByteArrayOutputStream();
-                NbtIo.writeCompressed(tag,buffer);
-                byte[] bytes=buffer.toByteArray();
-                cache.writeIfNeeded(target,bytes,Hashing.sha1().hashBytes(bytes));
+            var geometry=entry.getValue().get(variant);validateGeometry(geometry);
+            var fragments=StructureTiling.tiles(geometry);var base=pack.structureTemplateId(entry.getKey(),variant);
+            for(int fragment=0;fragment<fragments.size();fragment++) {
+                var piece=fragments.get(fragment).getGeometry();
+                Identifier id=geometry.getDrawingSource()?tileId(base,fragment):base;
+                Path target=root.resolve("data").resolve(id.getNamespace()).resolve("structure").resolve(id.getPath()+".nbt");
+                Files.createDirectories(target.getParent());var tag=encode(piece,registries,pack);
+                if(cache==null)NbtIo.writeCompressed(tag,target);
+                else { var buffer=new ByteArrayOutputStream();NbtIo.writeCompressed(tag,buffer);byte[] bytes=buffer.toByteArray();cache.writeIfNeeded(target,bytes,Hashing.sha1().hashBytes(bytes)); }
+                count++;
             }
-            count++;
         }
         for(var blueprint:pack.structures().getBlueprints().values())for(int i=0;i<blueprint.getInteractions().size();i++) {
             if(!(blueprint.getInteractions().get(i) instanceof StructureInteraction.Container container)||container.getLoot()==null)continue;

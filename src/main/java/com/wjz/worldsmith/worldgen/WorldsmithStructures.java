@@ -26,6 +26,12 @@ public final class WorldsmithStructures {
 
     public static void bootstrap(CompiledPack pack, BootstrapContext<Structure> context) {
         var biomes=context.lookup(Registries.BIOME);
+        for(var artifact:pack.pack().getStructures().getArtifacts().values()) {
+            int current=net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version();
+            if(artifact.getTargetDataVersion()!=current || !artifact.getNativeCompilerVersion().equals(com.wjz.worldsmith.core.drawhost.DrawingVersions.NATIVE_COMPILER))
+                throw new IllegalArgumentException("Frozen drawing "+artifact.getId()+" targets data version "+artifact.getTargetDataVersion()+" / "+artifact.getNativeCompilerVersion()+
+                    "; this native exporter is "+current+" / "+com.wjz.worldsmith.core.drawhost.DrawingVersions.NATIVE_COMPILER+". Rebuild explicitly for this target; loading a pack never executes its source.");
+        }
         // Check every palette entry and generated state, even in a low-weight variant.
         pack.structures().getBlueprints().values().forEach(b->b.getPalette().values().forEach(WorldsmithStructureTemplates::resolve));
         pack.structures().getTemplates().values().forEach(variants->variants.forEach(g->g.getVoxels().stream().map(StructureVoxel::getMaterial).distinct().forEach(WorldsmithStructureTemplates::resolve)));
@@ -78,8 +84,20 @@ public final class WorldsmithStructures {
                 for(var state:states){if(!WorldsmithInstanceProcessor.stable(state))throw new IllegalArgumentException("Instance source must be a stable full cube");byBlock.putIfAbsent(state.getBlock(),state);}
                 patches.add(new WorldsmithInstanceProcessor.Patch(List.copyOf(byBlock.values()),WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(patch.getReplacement())),patch.getProbability(),patch.getScale()));
             }
-            var detail=new WorldsmithInstanceProcessor.Config(List.copyOf(patches),blueprint.getVariation().getProtectedAreas().stream().map(WorldsmithStructures::box).toList());
-            parts.add(new WorldsmithStructurePlan.Part(pack.structureTemplateId(p.getBlueprintId(),p.getVariant()),pos(p.getOffset()),Rotation.valueOf(p.getRotation().name()),pos(geometry.getSize()),List.copyOf(reserved),List.copyOf(localFootprint.values()),List.copyOf(localSupports),detail));
+            if(geometry.getLighting()!=null)for(var light:geometry.getLighting().getSources()) {
+                var voxel=geometry.getVoxels().stream().filter(v->v.getPosition().equals(light.getAt())).findFirst().orElseThrow();
+                var block=WorldsmithStructureTemplates.resolve(voxel.getMaterial()).getBlock();
+                if(patches.stream().anyMatch(patch->patch.sources().stream().anyMatch(state->state.getBlock()==block)&&patch.replacement().getLightEmission()<light.getLevel()))
+                    throw new IllegalArgumentException("Instance patches must preserve declared lighting at "+light.getAt());
+            }
+            var detail=new WorldsmithInstanceProcessor.Config(List.copyOf(patches),geometry.getProtectedAreas().stream().map(WorldsmithStructures::box).toList());
+            var baseId=pack.structureTemplateId(p.getBlueprintId(),p.getVariant());
+            List<WorldsmithStructurePlan.Tile> tiles=new ArrayList<>();
+            if(geometry.getDrawingSource()) {
+                var fragments=StructureTiling.tiles(geometry);
+                for(int i=0;i<fragments.size();i++) {var t=fragments.get(i);tiles.add(new WorldsmithStructurePlan.Tile(WorldsmithStructureTemplates.tileId(baseId,i),pos(t.getOffset()),pos(t.getGeometry().getSize())));}
+            }
+            parts.add(new WorldsmithStructurePlan.Part(tiles.isEmpty()?baseId:tiles.getFirst().template(),pos(p.getOffset()),Rotation.valueOf(p.getRotation().name()),pos(geometry.getSize()),List.copyOf(reserved),List.copyOf(localFootprint.values()),List.copyOf(localSupports),detail,List.copyOf(tiles)));
             for(var voxel:geometry.getVoxels()) {
                 BlockPos at=pos(StructureCatalogCompiler.transform(voxel.getPosition(),p));
                 long key=WorldsmithStructurePlan.columnKey(at);
@@ -92,14 +110,16 @@ public final class WorldsmithStructures {
         if(definition.getPlacement().getTerrainFit().getFoundation().getMode()==FoundationMode.PILLARS) {
             supports.clear();var root=plan.getParts().getFirst();
             for(var p:definition.getPlacement().getTerrainFit().getFoundation().getSupports()) {
-                var at=pos(StructureCatalogCompiler.transform(p,root));supports.put(WorldsmithStructurePlan.columnKey(at),at);
+                var min=root.getGeometry().getSourceMin();
+                var normalized=new BuildPos(p.getX()-min.getX(),p.getY()-min.getY(),p.getZ()-min.getZ());
+                var at=pos(StructureCatalogCompiler.transform(normalized,root));supports.put(WorldsmithStructurePlan.columnKey(at),at);
             }
         }
         var bounds=box(plan.getBounds());
         List<WorldsmithStructurePlan.Link> links=new ArrayList<>();
         for(var link:plan.getConnections()) {
-            var a=pack.structures().getBlueprints().get(plan.getParts().get(link.getFromPart()).getBlueprintId()).getPorts().stream().filter(v->v.getId().equals(link.getFromPort())).findFirst().orElseThrow();
-            var b=pack.structures().getBlueprints().get(plan.getParts().get(link.getToPart()).getBlueprintId()).getPorts().stream().filter(v->v.getId().equals(link.getToPort())).findFirst().orElseThrow();
+            var a=plan.getParts().get(link.getFromPart()).getGeometry().getPorts().stream().filter(v->v.getId().equals(link.getFromPort())).findFirst().orElseThrow();
+            var b=plan.getParts().get(link.getToPart()).getGeometry().getPorts().stream().filter(v->v.getId().equals(link.getToPort())).findFirst().orElseThrow();
             links.add(new WorldsmithStructurePlan.Link(link.getFromPart(),pos(a.getAt()),Direction.valueOf(a.getFacing().name()),link.getToPart(),pos(b.getAt()),Direction.valueOf(b.getFacing().name()),a.getPassage()));
         }
         var result=new WorldsmithStructurePlan(List.copyOf(parts),List.copyOf(footprint.values()),List.copyOf(supports.values()),bounds.maxY()+1,bounds,List.copyOf(links));

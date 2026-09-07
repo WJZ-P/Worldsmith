@@ -50,7 +50,7 @@ public final class WorldsmithTemplateStructure extends Structure {
         long contentSeed=WorldsmithStructures.mixSeed(context.seed()+context.chunkPos().pack()*0x9E3779B97F4A7C15L+((long)config.layout.salt()<<32));
         var chooser=RandomSource.create(contentSeed);
         var plan=config.plans.get(chooser.nextInt(config.plans.size()));
-        if(plan.parts().stream().anyMatch(p->context.structureTemplateManager().get(p.template()).isEmpty()))return Optional.empty();
+        if(plan.parts().stream().anyMatch(p->p.tiles().isEmpty()?context.structureTemplateManager().get(p.template()).isEmpty():p.tiles().stream().anyMatch(t->context.structureTemplateManager().get(t.template()).isEmpty())))return Optional.empty();
         var peers=context.registryAccess().lookup(Registries.STRUCTURE)
             .map(registry->registry.stream().filter(s->s instanceof WorldsmithTemplateStructure).map(s->((WorldsmithTemplateStructure)s).templateSettings.layout).toList())
             .orElse(List.of(config.layout));
@@ -73,7 +73,7 @@ public final class WorldsmithTemplateStructure extends Structure {
                     return Optional.of(new GenerationStub(locate,builder->{
                         for(int i=0;i<placed.parts().size();i++) {
                             var p=placed.parts().get(i);
-                            builder.addPiece(new WorldsmithTemplatePiece(context.structureTemplateManager(),p.part(),config.site.foundationState(),p.position(),p.rotation(),p.foundations(),p.cuts(),contentSeed ^ (i*0x9E3779B97F4A7C15L)));
+                            WorldsmithBuildingPieces.create(context.structureTemplateManager(),p,config.site.foundationState(),contentSeed ^ (i*0x9E3779B97F4A7C15L)).forEach(builder::addPiece);
                         }
                         if(!placed.roads().isEmpty())builder.addPiece(new WorldsmithRoadPiece(placed.roads()));
                     }));

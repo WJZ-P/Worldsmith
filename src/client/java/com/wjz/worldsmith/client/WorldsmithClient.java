@@ -13,7 +13,8 @@ public final class WorldsmithClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		Worldsmith.LOGGER.info("Worldsmith client initialized");
 
-		WorldsmithWorldCreationBridge.initialize();
+        WorldsmithWorldCreationBridge.initialize();
+        WorldsmithMcpService.setSourceApprovalListener(WorldsmithSourceApproval::request);
 		ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
 			if (screen instanceof CreateWorldScreen createWorldScreen) {
 				WorldsmithWorldCreationBridge.onScreenOpened(createWorldScreen);

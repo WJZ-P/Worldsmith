@@ -23,6 +23,7 @@ public record WorldsmithStructurePlan(List<Part> parts, List<BlockPos> footprint
     ).apply(i,WorldsmithStructurePlan::new)).validate(p->{
         if(p.parts.isEmpty()||p.parts.size()>16||p.footprint.isEmpty()||p.footprint.size()>8192||p.supports.isEmpty()||p.supports.size()>8192)
             return DataResult.error(()->"Structure plan exceeds piece/column limits or has no support");
+        if(p.parts.stream().mapToInt(part->Math.max(1,part.tiles().size())).sum()>128)return DataResult.error(()->"Plan exceeds 128 storage fragments");
         var columns=new HashSet<Long>();
         for(var point:p.footprint)if(!valid(point,p.height)||!p.bounds.isInside(point)||!columns.add(columnKey(point)))return DataResult.error(()->"Invalid or duplicate footprint column");
         var supportColumns=new HashSet<Long>();
@@ -47,8 +48,19 @@ public record WorldsmithStructurePlan(List<Part> parts, List<BlockPos> footprint
             Codec.intRange(0,15).fieldOf("to").forGetter(Link::to),BlockPos.CODEC.fieldOf("exit_to").forGetter(Link::exitTo),Direction.CODEC.fieldOf("facing_to").forGetter(Link::facingTo),Codec.BOOL.fieldOf("passage").forGetter(Link::passage)
         ).apply(i,Link::new));
     }
+    public record Tile(Identifier template,BlockPos offset,BlockPos size) {
+        public static final Codec<Tile> CODEC=RecordCodecBuilder.<Tile>create(i->i.group(
+            Identifier.CODEC.fieldOf("template").forGetter(Tile::template),BlockPos.CODEC.fieldOf("offset").forGetter(Tile::offset),BlockPos.CODEC.fieldOf("size").forGetter(Tile::size)
+        ).apply(i,Tile::new)).validate(t->t.size.getX()>0&&t.size.getX()<=32&&t.size.getY()>0&&t.size.getY()<=32&&t.size.getZ()>0&&t.size.getZ()<=32&&t.offset.getX()>=0&&t.offset.getY()>=0&&t.offset.getZ()>=0?DataResult.success(t):DataResult.error(()->"Invalid storage tile"));
+    }
     public record Part(Identifier template, BlockPos offset, Rotation rotation, BlockPos size, List<BoundingBox> reserved,
-        List<BlockPos> footprint,List<BlockPos> supports,WorldsmithInstanceProcessor.Config detail) {
+        List<BlockPos> footprint,List<BlockPos> supports,WorldsmithInstanceProcessor.Config detail,List<Tile> tiles,boolean preserveShape) {
+        public Part(Identifier template,BlockPos offset,Rotation rotation,BlockPos size,List<BoundingBox> reserved,List<BlockPos> footprint,List<BlockPos> supports,WorldsmithInstanceProcessor.Config detail) {
+            this(template,offset,rotation,size,reserved,footprint,supports,detail,List.of(),false);
+        }
+        public Part(Identifier template,BlockPos offset,Rotation rotation,BlockPos size,List<BoundingBox> reserved,List<BlockPos> footprint,List<BlockPos> supports,WorldsmithInstanceProcessor.Config detail,List<Tile> tiles) {
+            this(template,offset,rotation,size,reserved,footprint,supports,detail,tiles,!tiles.isEmpty());
+        }
         public static final Codec<Part> CODEC=RecordCodecBuilder.<Part>create(i->i.group(
             Identifier.CODEC.fieldOf("template").forGetter(Part::template),
             BlockPos.CODEC.fieldOf("offset").forGetter(Part::offset),
@@ -56,11 +68,19 @@ public record WorldsmithStructurePlan(List<Part> parts, List<BlockPos> footprint
             BlockPos.CODEC.fieldOf("size").forGetter(Part::size),
             BoundingBox.CODEC.listOf().fieldOf("reserved").forGetter(Part::reserved),
             BlockPos.CODEC.listOf().fieldOf("footprint").forGetter(Part::footprint),BlockPos.CODEC.listOf().fieldOf("supports").forGetter(Part::supports),
-            WorldsmithInstanceProcessor.Config.CODEC.fieldOf("detail").forGetter(Part::detail)
+            WorldsmithInstanceProcessor.Config.CODEC.fieldOf("detail").forGetter(Part::detail),
+            Tile.CODEC.listOf().optionalFieldOf("tiles",List.of()).forGetter(Part::tiles),
+            Codec.BOOL.optionalFieldOf("preserve_shape",false).forGetter(Part::preserveShape)
         ).apply(i,Part::new)).validate(p->{
-            if(p.size.getX()<1||p.size.getX()>64||p.size.getY()<1||p.size.getY()>64||p.size.getZ()<1||p.size.getZ()>64||!valid(p.offset,128))return DataResult.error(()->"Invalid bounded template piece");
+            int horizontal=p.tiles.isEmpty()?64:193,vertical=p.tiles.isEmpty()?64:128;
+            if(p.size.getX()<1||p.size.getX()>horizontal||p.size.getY()<1||p.size.getY()>vertical||p.size.getZ()<1||p.size.getZ()>horizontal||!valid(p.offset,128))return DataResult.error(()->"Invalid bounded logical building");
+            if(p.tiles.size()>128||p.tiles.stream().anyMatch(t->!local(t.offset,p.size)||!local(t.offset.offset(t.size).offset(-1,-1,-1),p.size)))return DataResult.error(()->"Storage tile outside logical building");
+            for(int a=0;a<p.tiles.size();a++)for(int b=a+1;b<p.tiles.size();b++) {
+                var x=p.tiles.get(a);var y=p.tiles.get(b);
+                if(BoundingBox.fromCorners(x.offset,x.offset.offset(x.size).offset(-1,-1,-1)).intersects(BoundingBox.fromCorners(y.offset,y.offset.offset(y.size).offset(-1,-1,-1))))return DataResult.error(()->"Storage tiles overlap");
+            }
             if(p.reserved.isEmpty()||p.reserved.size()>33||p.reserved.stream().anyMatch(b->b.minX()<0||b.minY()<0||b.minZ()<0||b.maxX()>=p.size.getX()||b.maxY()>=p.size.getY()||b.maxZ()>=p.size.getZ()))return DataResult.error(()->"Invalid piece reservations");
-            if(p.footprint.isEmpty()||p.footprint.size()>4096||p.supports.size()>4096||p.footprint.stream().anyMatch(v->!local(v,p.size))||p.supports.stream().anyMatch(v->!local(v,p.size)||v.getY()!=0))return DataResult.error(()->"Invalid per-piece terrain samples");
+            if(p.footprint.isEmpty()||p.footprint.size()>8192||p.supports.size()>8192||p.footprint.stream().anyMatch(v->!local(v,p.size))||p.supports.stream().anyMatch(v->!local(v,p.size)||v.getY()!=0))return DataResult.error(()->"Invalid per-building terrain samples");
             var columns=new HashSet<Long>();for(var v:p.footprint)if(!columns.add(columnKey(v)))return DataResult.error(()->"Duplicate piece footprint column");
             var supported=new HashSet<Long>();for(var v:p.supports)if(!columns.contains(columnKey(v))||!supported.add(columnKey(v)))return DataResult.error(()->"Unprobed or duplicate piece support");
             return DataResult.success(p);

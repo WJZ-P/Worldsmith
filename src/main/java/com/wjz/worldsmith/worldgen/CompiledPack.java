@@ -38,7 +38,11 @@ public final class CompiledPack {
 	private final Map<String, CompiledBiome> byId;
 	private final CompiledStructureCatalog structures;
 
-	private CompiledPack(WorldsmithPack pack, String resourcePrefix) {
+    private CompiledPack(WorldsmithPack pack, String resourcePrefix) {
+        for(var artifact:pack.getStructures().getArtifacts().values()) {
+            if(artifact.getTargetDataVersion()!=net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version())
+                throw new IllegalArgumentException("Drawing target data version differs from this Minecraft version; rebuild/export explicitly rather than executing archived source");
+        }
 		this.pack = pack;
 		this.resourcePrefix = resourcePrefix;
 		this.structures = StructureCatalogCompiler.compile(pack.getStructures());
