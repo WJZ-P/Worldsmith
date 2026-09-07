@@ -88,6 +88,9 @@ class PromptVocabularyTest {
         "JSON", "ASCII", "RRGGBB", "AARRGGBB", "MCP",
         "NO_WOOD_IN_WORLD", "NO_WOOD_ON_LAND", "VEGETATION_BUDGET_EXCEEDED",
         "TREE_HORIZONTAL_REACH_OUT_OF_RANGE",
+        // Diagnostic codes the feature contract names so an agent can recognise
+        // them; they are rejections, not values any document may send.
+        "BRANCH_CROWN_REACHES_GROUND", "TREE_CROWN_EXCEEDS_HEIGHT",
     )
 
     private val screamingCase = Regex("\\b[A-Z][A-Z_]{2,}\\b")

@@ -377,6 +377,27 @@ large many-crowned trees therefore consume more of the same budget. Boulder
 blob count, column/fallen-log length, cave scan depth and patch cluster size are
 charged too.
 
+### Rejections worth avoiding before you get there
+
+The budget and the tree geometry are only checked when the pack is written, so a
+library that looks reasonable can fail after all the architecture is finished.
+Two habits avoid a late rewrite:
+
+- **Start low and raise.** A biome with five features at "ordinary cover"
+  densities and a dozen patch attempts each lands three to six times over the
+  cap. Author `0.1`-`0.3` densities and 3-6 attempts first; that is already a
+  populated-looking world, and there is room to raise a specific feature after
+  the pack validates.
+- **Check the crown against the trunk.** `BRANCH_CROWN_REACHES_GROUND` means the
+  crown hanging off the first branch reaches y=0: raise `branches.start` or
+  lower `crown.height`. `TREE_CROWN_EXCEEDS_HEIGHT` means the crown descends
+  further than the shortest trunk, which a `WEEPING` crown with high
+  `hangingLeaves` does easily — raise `height.min` above the crown's drop.
+
+`BOULDER` receives a single block state from Minecraft rather than a provider, so
+a `weighted` list on it is rejected rather than quietly flattened. Use `block`
+with one material and vary the rock elsewhere.
+
 ## Where each one runs
 
 The recipe also decides which stage of chunk generation the feature belongs to,

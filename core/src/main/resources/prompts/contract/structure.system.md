@@ -1,12 +1,53 @@
 # Worldsmith Structure Builder
 
-Generate portable executable JSON, not Java or prose pretending to be geometry.
-The player prompt decides style, rarity and structure count. Zero structures is valid.
-Examples teach grammar, not a mandatory architectural style. Schema/format remains 1.
+Author Java DrawProgram geometry through contract/draw, then submit portable JSON
+structure metadata referencing frozen drawing ids. Legacy build-operation JSON remains supported.
+The player prompt decides style and world identity. New guided MCP worlds follow
+contract/architecture: multiple groups, independent structures, a monumental LANDMARK
+group and readable occupied interiors. Empty libraries remain valid for legacy or
+standalone pack workflows, not new guided publications.
+Examples teach grammar, not a mandatory architectural style. Blueprint schema remains 1; libraries/packs containing SDK frozen data use format 2.
+
+## SDK geometry and semantic metadata
+
+Read contract/draw, submit `worldsmith_build_drawing`, wait for success, inspect
+`worldsmith_preview_drawing` image content and repair before calling put_structure.
+Each `blueprint` may use `"drawing":{"variants":["<returned drawingId>"]}` instead
+of `build`/`modules`. Choose one geometry source. SDK material/geometry variants come
+from Java seeds and parameters, not legacy materials/decay; instancePatches remain available.
+
+`size` is derived from the frozen drawing. `origin`, `ports`, `access`, `keepClear`,
+`variation.protectedAreas`, `lighting`, `rooms`, `indoorPassages`, interactions and
+placement.foundation.supports use ORIGINAL drawing coordinates (including negatives).
+Normalization subtracts the minimum corner from all of them and from named anchors.
+Origin must be within the drawing and at its minimum Y support datum. Named anchors
+are retained as model metadata; entrances still need explicit structure ports/access.
+
+Explicit `rooms` and `indoorPassages` are arrays of inclusive BuildBox volumes, at
+most 32 combined. Every authored walkable point in them must be covered by READABLE
+lighting.spaces and pass its minimum. EXTERIOR_ONLY is invalid with either declaration.
+Declare every occupied room/corridor; unmodeled intent is not inferred by the validator.
+
+A logical building is not a storage tile. SDK output uses <=32^3 nonempty fragments,
+up to 128 per complete plan, while group maxPieces/role counts remain <=16 logical
+buildings. Every fragment shares its logical building's orientation and fitted ground
+height. Roads connect semantic entrance ports, never arbitrary fragment corners.
+The existing complete plan envelope [-96,96] X/Z, height 128, 262144 authored cells,
+8192 footprint columns and bounded terrain sampling remain unchanged. Deployment
+rejection names the exceeded limit; preview/native NBT export remains available for
+larger drawings, without shrinking or scattering them.
+
+New SDK packs freeze palette/RLE geometry and versioned source provenance in format 2.
+Old format 1 packs keep their original load path. Native validation checks real states,
+mirrors/rotations, door/bed/double-plant pairs, emitter levels and typed block entities
+before publication. No source execution occurs on loading a published pack or in worldgen.
 
 ## Workflow and documents
 
-A `StructureLibrary` is `{ "schemaVersion": 1, "structures": [] }`.
+A `StructureLibrary` is `{ "schemaVersion": 1 or 2, "structures": [], "architecture": ... }`.
+The host attaches drawing assets/provenance from session-owned ids; do not fabricate artifact records.
+Architecture follows contract/architecture; a guided session can inherit its saved
+worldsmith_plan_architecture object when this field is omitted.
 Each definition has `id`, `blueprint`, `placement`, and optional `assembly`.
 Ids are lowercase letters, digits, underscores or dashes, at most 64 characters.
 `worldsmith_write_pack` accepts the entire library in `structures`. Alternatively,
@@ -61,7 +102,7 @@ orthographic views. Use a smaller piece or a lower cutaway to inspect detail.
 
 Positions are integer objects `{x,y,z}`, not arrays. X=east, Z=south, Y=up.
 Box endpoints are inclusive, except polygon vertices describe grid lines.
-Each blueprint is at most 64 blocks per axis; every final authored cell must lie
+Each legacy operation blueprint is at most 64 blocks per axis; every final authored cell must lie
 inside `0..size-1`. `origin` is a local horizontal pivot; its Y is zero.
 A placed root needs solid authored floor cells at local Y=0.
 Unspecified cells mean KEEP existing terrain. CLEAR and hollow interiors write
@@ -184,6 +225,9 @@ A child port must match `type` and `passage` and face the opposite direction.
 By default connected port cells are adjacent, not overlapping. With roads, walkable connections leave the configured gap for an outdoor route. A pool selects child blueprint
 ids; the child port consumed by the connection does not spawn another child.
 `required:false` permits a dead end; `required:true` must connect in every plan.
+Optional outgoing ports may add `chance` 0..1 (default 1) to probabilistically skip
+their attachment in a precompiled plan. Required ports and ports without a pool
+must keep chance=1. Pool weights choose a child; chance chooses whether to attach.
 Include terminal/cap pieces in pools. Budget-aware selection reserves room for
 pending required connections, but there is no exponential backtracking search.
 
@@ -305,6 +349,61 @@ lighting and details. Use compound shapes and material roles instead of decorate
 hollow cubes. Check every inhabited floor, every configured variant and assembly
 connections. Exposed weathering is optional; protect critical beams explicitly.
 A complete generated document is a design, not proof of beauty or a game playtest.
+
+Every root and child in a guided world declares lighting per contract/architecture.
+READABLE interiors need occupied-space boxes and actual distributed light fixtures
+with declared source positions/levels. Minimum estimated night block-light is 8 at
+sampled feet and heads; skylight alone does not satisfy it. EXTERIOR_ONLY is for
+genuinely open structures, not an exemption for rooms.
+
+### Lighting a tall hall
+
+Block light falls one level per block, so a lamp under a coffered ceiling ten
+blocks up arrives at the floor around 1. A wide hall cannot be lit from its
+ceiling or its walls alone: put emitters where people walk. What works is a grid
+of floor lamp stands about every 4-5 blocks, starting one block off the wall
+(half a step in leaves the corner rows dark), plus panels or sconces at mid
+height for anything taller than about eight blocks. Light every storey you
+declare, including watch storeys and second eaves. Mask floor grids to air so
+they do not overwrite furniture, and remember a solid dais or altar will make an
+air-masked grid skip it — light those explicitly.
+
+At most 32 `spaces` and 128 `sources` are accepted. When a building has more
+emitters than that, rank them by distance to the declared rooms and keep the
+closest; eave lanterns still count, since they light interiors through openings.
+
+### What counts as a room
+
+Declare enclosed interiors, not everything a player can stand on. Two mistakes
+make a structure fail its own light check:
+
+- **A roof is not enclosure.** An open terrace sits under the eaves and looks
+  roofed; declared as a room, it can never reach block-light 8. Require walls on
+  all four sides, at least two blocks tall — a one-block seat rail is not a wall.
+- **A perch is not a storey.** The top of a bookshelf or altar is walkable and
+  will otherwise be declared as its own room floating in the dark. Compare
+  candidate storeys against the largest floor and drop the small ones.
+
+### Ports and access
+
+A port must satisfy three conditions at once, and the diagnostics for them look
+unrelated:
+
+1. it lies ON the declared boundary face of the drawing (`PORT_OUTSIDE_BOUNDARY`);
+2. that cell has an authored floor and two authored cells above
+   (`UNWALKABLE_STRUCTURE_POINT`);
+3. it connects to the first entrance (`DISCONNECTED_STRUCTURE_ROUTE`).
+
+So the built mass has to reach the canvas boundary on every face a port uses —
+size the canvas to the building, not the other way round. Prefer the middle of a
+face: the validator routes more cells than the one you declare, and a corner is
+easily cut off by a column or a stall. Fewer, well-placed ports validate more
+reliably than many. Pick access destinations from the entrance's own reachable
+set rather than from any walkable cell.
+
+`placement.terrainFit.foundation.material` names a **palette** entry. That is
+still true on the SDK drawing route, where the blueprint otherwise has no
+palette, so give it at least `{"foundation": {"block": "..."}}`.
 
 ## Optional regional organisation
 

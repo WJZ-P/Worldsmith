@@ -1,0 +1,234 @@
+# Worldsmith Java drawing SDK
+
+Use `com.wjz.worldsmith.core.draw` to author arbitrary voxel geometry in Java.
+There is no mandatory architectural style, asset catalog, roof enum or socket grammar.
+Write your own Java functions, loops, equations and composition. The SDK is a canvas,
+not an agent runner: this reference tool does not execute source code.
+
+## Runtime boundary
+
+- The drawing package is Java 21, using only JDK classes. No Python, NumPy,
+  Minecraft classes or third-party runtime is needed to construct a drawing.
+- In the Minecraft mod, `WorldsmithDrawExporter.write(drawing, path)` resolves
+  real block states, applies native rotation/mirroring and writes gzip structure NBT.
+  This requires the bootstrapped Minecraft classpath, not a running world.
+- Core alone does not guess target-version block properties or NBT data versions.
+- The Mod bundles ECJ 3.46.0 and the Java-only SDK in a separate `draw-worker`.
+  Submit source with `worldsmith_build_drawing`; the current MC Java runtime launches
+  hidden child processes for compilation and drawing. Generated classes never load
+  into the game JVM. No installed JDK/javac/Python is required by the player.
+- Source uses Java 21 grammar, preview features disabled and `-proc:none`. Entry:
+  `public final class Hall implements DrawProgram { public DrawStructure generate(DrawContext context) { ... } }`.
+  Context contains `seed()`, string `parameters()` and drawing `limits()` only.
+- One in-game confirmation per session is required before executing source, and must
+  be renewed after a bridge/client restart. MCP has no approval endpoint. This is
+  resource/fault isolation, NOT a complete filesystem or network security sandbox.
+- Submit 1..16 relative `.java` files, <=1 MiB total, 1..8 seeds, <=64 string parameters.
+  Default queue concurrency 1; heap 1 GiB; compile timeout 30s; total drawing timeout
+  120s across all seeds. Logs <=64 KiB (MCP excerpt <=8 KiB), binary result <=64 MiB.
+  Failures/cancellation interrupt only that job; successful older drafts remain.
+- Use `worldsmith_get_drawing_job(sessionId,jobId)` for stages and diagnostics. Reuse
+  an identical `requestId` for transport retries; use a NEW id for a repair/retry.
+  Results include revision, content hash, bounds, authored cells and drawing ids.
+- `worldsmith_preview_drawing(sessionId,drawingId,view,sliceY)` returns actual PNG
+  MCP image content; view is isometric/front/back/slice. Slice Y uses original drawing
+  coordinates. This is a simplified voxel model, not a game screenshot or light-engine proof.
+- `worldsmith_put_structure` references `blueprint.drawing.variants: [drawingId,...]`.
+  Omit `build` and `modules`. Origin, ports, supports, rooms, indoorPassages, lighting,
+  access, protection and interactions stay in structure metadata, not DrawProgram.
+  All metadata uses ORIGINAL drawing coordinates; normalization transforms it with
+  the geometry and named anchors. The origin Y must equal the canvas minimum Y.
+- Native deployment keeps existing bounds: per logical drawing <=193x128x193,
+  whole plan inside [-96,96] X/Z and height <=128, <=262144 authored cells including
+  AIR, <=8192 footprint columns. The shared world sampling/write budgets are unchanged.
+  Each logical SDK building becomes nonempty <=32x32x32 storage fragments. The
+  logical-member limit is 16, with an independent maximum of 128 fragments per plan.
+  Tiles share the building's fitted transform/datum; roads join authored entrances.
+  Oversize output still supports model preview and `worldsmith_export_drawing`
+  (native NBT returned as an MCP embedded resource), but deployment reports limits.
+- Format 2 packs contain palette/RLE/gzip frozen drawings, source provenance and
+  compiler/SDK/target-data-version metadata; hashes cover these plus structure policy.
+  Loaders and chunk generation consume data ONLY. Neither published source nor
+  resumed unfinished source is executed automatically. Format 1 remains readable.
+- `worldsmith_list_sessions` and `worldsmith_resume_session` recover saved plans,
+  source/job references and drafts; incomplete jobs become INTERRUPTED. Capacity and
+  corrupt-record diagnostics are explicit, with files retained. Old drawing revisions
+  require explicit `drawing.allowPreviousRevision=true`; never silently publish them.
+
+## Coordinate and state semantics
+
+`Vec3i(x,y,z)` = integer block centre. `Vec3d` = continuous modelling position.
+X=east, Y=up, Z=south. `Box` endpoints are inclusive. Negative canvas coordinates work.
+
+Missing voxel = KEEP the destination world. `BlockStateRef.AIR` = explicitly clear.
+`shell` only draws faces; it does not silently clear its interior. `clear` authors AIR,
+while `forget` removes authored data and returns the selected region to KEEP.
+All shapes clip to the canvas and the painter's optional clip window.
+
+`BlockStateRef.of("stone_brick_stairs").with("facing","north").with("half","bottom")`
+stores a symbolic state. Core checks syntax; native export checks actual registry values.
+Empty chests/signs can be drawn as blocks, but this SDK release does not author entity or
+block-entity content. Existing typed-interaction tools remain separate.
+
+## Mistakes that cost whole rebuilds
+
+**Every space a player stands in must be authored AIR.** KEEP is not an opening:
+it is "whatever the destination world already has", so the structure validator
+rejects it as unwalkable and the deployed build can have terrain in it. Drawing
+the solid parts and leaving the rest unauthored is the single most common error.
+Author AIR for all of these, not just the obvious room interior:
+
+- terrace and plinth decks, and the tread of every flight of steps
+- doorways and gate passages — skipping the wall there leaves KEEP, not a door
+- the volume under an open pavilion, arch, bridge deck or market awning
+- upper storeys: a walled box with no cleared interior is an unlit solid void
+
+Clear before you place rails, columns and furniture, so those overwrite the AIR
+rather than the AIR erasing them.
+
+**Native export validates block states that Core accepts.** Run
+`worldsmith_export_drawing` on each finished drawing before building metadata
+around it; it is the cheapest way to catch these:
+
+- wall side properties are `none` / `low` / `tall`, never `true` / `false`
+- a bed's `part=head` must sit on the `facing` side of its `part=foot` block
+- doors, beds and double plants are checked as pairs, emitters for lit state
+- not every modern block id resolves here; `minecraft:chain` does not
+
+**Record the canvas minimum corner.** Structure metadata uses original drawing
+coordinates while exported NBT is normalised from zero. Deriving the origin from
+the exported size only works if the canvas is symmetric about x=0 and z=0 — an
+asymmetric `Box` shifts every declared coordinate by one and the error is silent.
+Either keep canvases symmetric or carry the origin alongside the drawing id.
+
+## Basic Java example
+
+```java
+var canvas = DrawCanvas.sized(96, 48, 80);
+var stone = canvas.pen("stone_bricks");
+stone.fill(Box.of(4, 0, 4, 91, 2, 75));
+stone.shell(Box.of(12, 3, 12, 83, 24, 67), 2);
+stone.clear(Box.of(14, 3, 14, 81, 22, 65));
+stone.clear(Box.of(45, 3, 12, 50, 10, 14));
+stone.bezier(List.of(new Vec3d(44, 10, 12), new Vec3d(47, 20, 12),
+                    new Vec3d(51, 10, 12)), 0.8);
+canvas.pen("deepslate_tiles").heightField(Box.of(10, 23, 10, 85, 39, 69),
+    (x,z) -> 25 + 10 * Math.pow(1 - Math.abs(x - 47.5) / 37.5, 1.5), 1);
+canvas.anchor("front_entry", new Vec3i(47, 3, 12));
+DrawStructure drawing = canvas.snapshot();
+// On the bootstrapped MC classpath:
+WorldsmithDrawExporter.write(drawing, Path.of("build/draw/author_build.nbt"));
+```
+
+## Canvas and painter
+
+- `new DrawCanvas(Box bounds[, DrawLimits limits])`, `DrawCanvas.sized(w,h,d)`.
+- `canvas.pen(String blockId)` or `canvas.pen(Brush)` returns an immutable painter view.
+- `painter.brush(brush)`, `.masked(mask)`, `.clipped(localBox)` create new views.
+- `.translate(x,y,z)`, `.rotateY(quarterTurns)`, `.mirrorX()`, `.mirrorZ()` compose
+  local-to-parent transforms. `pen.translate(30,0,20).rotateY(1)` rotates local geometry
+  before placing it at (30,0,20). State orientation is deferred to native export.
+- `set(x,y,z)`, `points(List<Vec3i>)`, `fill(Box)`, `shell(Box,thickness)`, `clear(Box)`, `forget(Box)`.
+- One operation is transactional: if a callback or budget check throws, its voxel writes
+  are discarded. Earlier successful operations remain. Work reservations are still charged.
+  Do not make nested edits or snapshots from a brush/mask. The canvas is thread-confined.
+
+## Fine geometry
+
+- `line(Vec3d from,to,double radius)`, `polyline(List<Vec3d>,radius)` produce a
+  six-connected raster centreline plus a capsule stroke. Radius 0 gives a one-block line.
+- `bezier(List<Vec3d> controls,radius)` accepts 3 (quadratic) or 4 (cubic) controls.
+- `arc(centre,radius,startRadians,endRadians,strokeRadius)` lies in the X/Z plane.
+- `sphere(centre,radius)`, `ellipsoid(centre,radii)`.
+- `cylinder(from,to,radius)` is flat-capped, along any 3D axis.
+- `frustum(from,to,bottomRadius,topRadius)` makes tapered columns/cones.
+- `torus(centre,majorRadius,tubeRadius)` has its symmetry axis along Y.
+- `extrude(List<Vec2d> polygon,int minY,int maxY)` fills a concave polygon prism.
+  Its X/Z boundary centres are included; outlines use the even/odd rule.
+- `heightField(Box window,DoubleBinaryOperator height,int thickness)` evaluates y=f(x,z),
+  rounding down. Thickness 0 fills from the window floor; positive values make a surface coat.
+- `volume(Box,Predicate<Vec3i>)` is a completely custom voxel membership function.
+- `field(Box,Field)` draws where an arbitrary scalar field is <=0. NaN is rejected.
+
+`Fields` supplies sphere, box, ellipsoid, capsule, cylinder, frustum and torus fields.
+Fields compose with `union`, `intersect`, `subtract`, `offset`, `shell`, `translate`,
+`rotateX/Y/Z(radians)` and uniform `scale`. Example:
+
+```java
+Field vaultedWall = Fields.sphere(new Vec3d(30,15,30), 12)
+    .subtract(Fields.sphere(new Vec3d(30,15,30), 10));
+canvas.pen("quartz_block").field(Box.of(17,15,17,43,29,43), vaultedWall);
+```
+
+For distance fields, offset/shell use block-distance units. Ellipsoid and frustum helpers
+are level sets, not exact distances: shell thickness on those is not uniformly measured
+in blocks. Continuous field rotations change geometry only, not block facing; use exact
+painter transforms for block-oriented components. All rasterizations are voxel approximations.
+
+## Brushes and masks
+
+`Brush` is `(localPosition, previousDrawBlock) -> BlockStateRef`; null output skips.
+Previous block null means KEEP. Callbacks see the canvas before the whole operation.
+Material returned by a brush is oriented in the painter's local frame.
+
+- `Brush.solid(state/id)`, `Brush.air()`.
+- `Brushes.weighted(seed,patchScale,List<Brushes.Weighted>)` chooses coherent material patches.
+- `Brushes.probability(brush,p,seed,scale)` leaves unselected cells unchanged.
+- `Brushes.checker(a,b,scale)` makes an X/Z checkerboard; `layers(firstY,height,states)` cycles Y layers.
+- All built-in random brushes key off local coordinates and an explicit seed, not call order.
+- `Mask.all()`, `keepOnly()`, `airOnly()`, `solidOnly()`, `matching(blockId)`, `within(Box)`.
+  Compose with `.and`, `.or`, `.not`, or write a Java lambda. `solidOnly` means authored
+  non-air, not a native collision-shape or load-bearing guarantee.
+
+## Copying, grouping, export
+
+`canvas.snapshot()` freezes a drawing. `drawing.crop(Box)` extracts part of it.
+`pen.paste(drawing, Vec3i at)` puts its minimum corner at `at` and includes explicit AIR.
+`pen.paste(drawing, GridTransform transform, boolean includeAir)` transforms source
+coordinates as-is. Paste ignores the pen's material brush but respects its mask and clip.
+Anchor names are not automatically pasted; explicitly transform/rename them as needed.
+
+`drawing.tiles(w,h,d)` returns nonempty storage tiles. Each has an offset relative to
+the original minimum corner; native export normalizes each tile to its own minimum.
+This is storage splitting, not a joint system or per-tile terrain fitting policy.
+Named anchors remain model metadata; vanilla structure NBT has no matching anchor semantics.
+
+The SDK has no 64-block architectural axis limit. Default budgets: 2,000,000 authored
+cells including AIR, 32,000,000 raster work units, 200,000 path samples. Callers may
+explicitly choose `DrawLimits`. A tiny brush inside a huge custom scan still incurs
+scan cost. These are SDK resource budgets, not permission to exceed native worldgen bounds.
+
+Native `.nbt` is a building template, not a whole world/save or a distribution rule.
+Use the target MC version's data pack `data/<namespace>/structure/<name>.nbt` layout
+or a structure-loading workflow. Use the explicit drawing-id metadata route above to deploy; the SDK itself never registers world content.
+
+Reference implementation: `com.wjz.worldsmith.core.draw.examples.DrawGallery`.
+It is a demonstrator only; every player/world may author entirely different geometry.
+
+## Complete MCP entry point
+
+Submit the following as sources["CourtyardProgram.java"], entryClass="CourtyardProgram".
+parameters.kind can demonstrate different footprints; author new designs for real prompts.
+The example is an open pavilion, hence no enclosed-room exception is being used.
+
+```java
+import com.wjz.worldsmith.core.draw.*;
+
+/** Field-shape demonstration only: every world should author its own design. */
+public final class CourtyardProgram implements DrawProgram {
+    public DrawStructure generate(DrawContext context) {
+        String kind = context.parameters().getOrDefault("kind", "grand");
+        int n = switch (kind) { case "grand" -> 19; case "court" -> 8; case "wing" -> 7; default -> 4; };
+        int h = switch (kind) { case "grand" -> 35; case "court" -> 10; case "wing" -> 12; default -> 8; };
+        var canvas = context.canvas(Box.of(-n, 0, -n, n, h - 1, n));
+        canvas.pen("stone_bricks").fill(Box.of(-n, 0, -n, n, 3, n));
+        canvas.pen("air").fill(Box.of(-n, 4, -n, n, h - 1, n));
+        for (int x : new int[] {-n + 2, n - 4})
+            for (int z : new int[] {-n + 2, n - 4})
+                canvas.pen("stone_bricks").fill(Box.of(x, 4, z, x + 2, h - 3, z + 2));
+        canvas.pen("dark_oak_planks").fill(Box.of(-n, h - 2, -n, n, h - 2, n));
+        canvas.anchor("north_entry", new Vec3i(0, 4, -n));
+        return canvas.snapshot();
+    }
+}
+```
