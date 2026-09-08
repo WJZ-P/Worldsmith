@@ -50,3 +50,10 @@ Java SDK 通过独立 worker 接入 MCP：只传源码与参数，返回冻结 d
 技术分片最多 32³、每方案最多 128；不占用 16 个逻辑建筑名额，也不独立贴地。
 finish_world 仅在原生 NBT 回读、完整数据包重载与当前创建世界上下文激活成功后完成。
 缺少上下文返回 WAITING_NATIVE_CONTEXT。详见 [完整流程](structure-agent.md)。
+
+
+新版创作入口与示例：[Structure Authoring Workbench](structure-authoring-workbench.md)。
+
+内容质量优先的指引与看图循环：[建筑设计与视觉迭代](structure-design-quality.md)。
+`begin_world` 的 full/summary 均返回 `designGuide`；`architecture` 契约新增
+`creative-brief`、`form-function-and-family`、`visual-quality-loop`，可按章节读取。

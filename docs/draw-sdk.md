@@ -66,5 +66,8 @@ WorldsmithDrawExporter.write(drawing, Path.of("build/draw/my_build.nbt"));
 - 当前输出方块及状态，不包含实体、箱内物品、牌子文字等 block-entity 内容。
 - 世界部署显式引用冻结 drawingId；旧 JSON 是兼容几何入口。建筑语义、编排、选址仍在 SDK 外部。
 - 玩家和 AI 端无需安装 Python/JDK/javac；MC 当前 Java 运行时启动隐藏 worker，编译器随 Mod 附带。
-- 首次源码执行需要 MC 内的会话确认，重启后重新确认；这是故障/资源隔离，不是完整文件或网络沙箱。
+- 关闭自动执行时，首次源码执行需要 MC 内的会话确认，重启后重新确认；这是故障/资源隔离，不是完整文件或网络沙箱。
 - 新包使用格式 2，保存冻结数据与源码来源。加载发布包只读取数据，格式 1 仍兼容。
+
+
+新版创作入口与示例：[Structure Authoring Workbench](structure-authoring-workbench.md)。

@@ -53,7 +53,7 @@ public final class Hall implements DrawProgram {
 - 默认单并发，子进程堆 1 GiB；编译 30 秒、全部种子的绘图合计 120 秒。
 - SDK 默认预算：200 万 authored cells（包含 AIR）、3200 万绘图工作量、20 万路径采样。
 - 单结果至多 64 MiB；日志最多 64 KiB，MCP 返回最多 8 KiB 日志摘录。
-- 每个世界创作会话首次执行源码，在 MC 内确认一次。重启桥接/客户端后重新确认；MCP 没有批准接口。
+- 源码执行遵循宿主设置，默认自动执行；关闭自动执行后按会话在 MC 内确认，重启后重新确认。MCP 没有批准接口。
 - 工作进程隔离故障和资源，并清理环境、限制类路径；**不是完整的文件系统或网络安全沙箱**。只批准可信创作会话。
 
 构建立即返回 `jobId`，用 `worldsmith_get_drawing_job` 查询：
@@ -68,9 +68,13 @@ public final class Hall implements DrawProgram {
 ## 模型预览与导出
 
 `worldsmith_preview_drawing(sessionId,drawingId,view,sliceY)` 返回 MCP `image/png` 内容，
-支持 `isometric / front / back / slice`。`sliceY` 使用原绘图坐标；负坐标有效。
+支持 `isometric / isometric_back / front / back / left / right / top / slice`，`views` 一次最多四张。
+`renderMode:clay` 检查体量（灰模顶视按高度明暗），`material` 查看近似材质色。
+`cutaway:true` 隐藏 sliceY 以上的体素，保留选择的视角；slice 仅展示单层。
+`sliceY` 使用原绘图坐标；负坐标有效。用 `frame` 固定取景，用 `region` 检查局部。
 从同一份冻结快照绘制，不是仅返回 MC 机器上的本地路径。PNG 简化方块形状、颜色和光照，
 不是游戏截图或实际光照证明。高面数模型可使用正/背视图或切层；渲染有独立面数预算。
+完整质量流程见 [建筑设计与视觉迭代](structure-design-quality.md)，不要只看一张有利角度的轴测图。
 
 `worldsmith_export_drawing` 通过原生方块状态检查后返回 gzip NBT 的 MCP 内嵌二进制资源。
 超过世界部署范围的绘图仍可以独立预览/导出；部署不会自动缩放、截断或散放片段。
@@ -140,3 +144,6 @@ JSON 中每个 `tool` / `arguments` 是一次实际 MCP 调用。将整值 `$VAR
 
 该调用序列由 `DocumentedDrawingExampleTest` 实际回放，源码通过附带 ECJ 构建。
 原生结构、保存重载和固定种子一致性另由定向集成与隔离服务器验收。
+
+
+新版创作入口与示例：[Structure Authoring Workbench](structure-authoring-workbench.md)。

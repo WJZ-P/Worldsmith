@@ -38,7 +38,7 @@ The guided MCP contract requires this sequence:
 2. `worldsmith_get_pack_template`
 3. Read the world style and analyze biome distribution
 4. Read `worldsmith_get_contract` id `architecture`, then `worldsmith_plan_architecture`
-5. Build individual Java DrawPrograms with `worldsmith_build_drawing`, query `worldsmith_get_drawing_job`, inspect `worldsmith_preview_drawing` image content and revise. The player confirms source execution inside MC once per session.
+5. Prefer geometry-linked StructureProgram source targets (DrawProgram remains compatible). Build with `worldsmith_build_drawing`, query `worldsmith_get_drawing_job`, inspect actual `worldsmith_preview_drawing` images and revise before expanding a family. Study clay massing, elevations, occupied-floor cutaways and the assembled layout. Source confirmation follows the configured host policy.
 6. Reference frozen drawing ids and submit metadata with `worldsmith_put_structure`
 7. `worldsmith_validate_architecture` checks real variants, required/optional members,
    landmark scale and occupied-space lighting
@@ -88,3 +88,6 @@ in-game confirmation after restart. The AI needs MCP only; the player needs no s
 JDK, javac or Python. The hidden worker is not an OS filesystem/network sandbox.
 
 [Complete Java and MCP example](structure-agent.md).
+
+
+新版创作入口与示例：[Structure Authoring Workbench](structure-authoring-workbench.md)。
