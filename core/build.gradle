@@ -12,6 +12,7 @@ repositories {
 }
 
 dependencies {
+	api project(':authoring-sdk')
 	implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${project.coroutines_version}"
 	implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:${project.serialization_version}"
 
@@ -75,8 +76,16 @@ java {
 	targetCompatibility = JavaVersion.VERSION_21
 }
 
+// Compile the Java-only draw API independently of Kotlin. authoring-sdk depends
+// on this API and Core consumes authoring-sdk, so using compileJava creates a cycle.
+tasks.register('compileDrawApi', JavaCompile) {
+	source fileTree('src/main/java') { include 'com/wjz/worldsmith/core/draw/**' }
+	classpath = files()
+	destinationDirectory = layout.buildDirectory.dir('classes/draw-api')
+	options.release = 21
+}
 tasks.register('drawSdkJar', Jar) {
 	archiveClassifier = 'draw-sdk'
-	dependsOn compileJava
-	from(sourceSets.main.output.classesDirs) { include 'com/wjz/worldsmith/core/draw/**' }
+	dependsOn compileDrawApi
+	from(layout.buildDirectory.dir('classes/draw-api'))
 }

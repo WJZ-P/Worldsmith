@@ -20,8 +20,8 @@ not an agent runner: this reference tool does not execute source code.
 - Source uses Java 21 grammar, preview features disabled and `-proc:none`. Entry:
   `public final class Hall implements DrawProgram { public DrawStructure generate(DrawContext context) { ... } }`.
   Context contains `seed()`, string `parameters()` and drawing `limits()` only.
-- One in-game confirmation per session is required before executing source, and must
-  be renewed after a bridge/client restart. MCP has no approval endpoint. This is
+- Source confirmation follows the host setting: automatic execution is on by default;
+  when switched off, approval is per session and renewed after restart. MCP has no approval endpoint. This is
   resource/fault isolation, NOT a complete filesystem or network security sandbox.
 - Submit 1..16 relative `.java` files, <=1 MiB total, 1..8 seeds, <=64 string parameters.
   Default queue concurrency 1; heap 1 GiB; compile timeout 30s; total drawing timeout
@@ -31,7 +31,8 @@ not an agent runner: this reference tool does not execute source code.
   an identical `requestId` for transport retries; use a NEW id for a repair/retry.
   Results include revision, content hash, bounds, authored cells and drawing ids.
 - `worldsmith_preview_drawing(sessionId,drawingId,view,sliceY)` returns actual PNG
-  MCP image content; view is isometric/front/back/slice. Slice Y uses original drawing
+  MCP image content; views include isometric/isometric_back/front/back/left/right/top/slice.
+  Use renderMode=clay for form studies or material for approximate colours. Slice Y uses original drawing
   coordinates. This is a simplified voxel model, not a game screenshot or light-engine proof.
 - `worldsmith_put_structure` references `blueprint.drawing.variants: [drawingId,...]`.
   Omit `build` and `modules`. Origin, ports, supports, rooms, indoorPassages, lighting,
@@ -86,9 +87,10 @@ Author AIR for all of these, not just the obvious room interior:
 Clear before you place rails, columns and furniture, so those overwrite the AIR
 rather than the AIR erasing them.
 
-**Native export validates block states that Core accepts.** Run
-`worldsmith_export_drawing` on each finished drawing before building metadata
-around it; it is the cheapest way to catch these:
+**Inspect real block vocabulary before committing fine detail.** Use
+`worldsmith_query_block_states` for ids/properties and `worldsmith_preflight_structure`
+on the frozen drawing for native checks. Export NBT when an export is needed, not
+as a substitute for the cheaper registry query. Typical pitfalls include:
 
 - wall side properties are `none` / `low` / `tall`, never `true` / `false`
 - a bed's `part=head` must sit on the `facing` side of its `part=foot` block
@@ -232,3 +234,90 @@ public final class CourtyardProgram implements DrawProgram {
     }
 }
 ```
+
+
+## Authoring workbench
+
+Prefer source projects and StructureProgram for new architectural work. DrawProgram
+and full inline sources remain compatible. Keep geometric primitives in core.draw;
+the optional com.wjz.worldsmith.authoring package manages geometry-linked semantics.
+It has no world, player, biome-selection or group-policy objects.
+
+1. Call worldsmith_put_drawing_source with sessionId, name, expectedRevision (0 for
+   creation), changes:{relative.java:sourceText|null}, and targets:{target:{entryClass,
+   files:[...]}}. Each target lists its complete source dependency set. Projects allow
+   64 files/4 MiB; each target retains 16 files/1 MiB. Returned projectId and revision
+   identify an immutable source version. Null removes a file; dangling target files fail.
+2. Build with sessionId, name, requestId, sourceRef:{projectId,revision,target}, seeds
+   and parameters. Do not also provide inline entryClass/sources. Parameters vary
+   drawings without recompiling unchanged source. Only affected target dependencies
+   invalidate compilation; different build requests still execute code.
+3. Read source later with worldsmith_get_drawing_source(sessionId,projectId,revision,
+   files), or use jobId to recover an older inline-source job. No filesystem access
+   is needed on the AI client. Source reads never execute code.
+4. Query worldsmith_query_block_states before guessing target-version ids/properties.
+   ids may contain block[state=value] strings; invalid states still return the allowed
+   property vocabulary. This is native registry inspection, not whole-pack export.
+
+StructureProgram.generate(AuthoringContext) returns AuthoredStructure. The context
+exposes seed(), parameters(), random(streamName), canvas(bounds), origin(position),
+material(name,state), room(id,interior,floor), indoorPassage(id,interior,floor),
+entrance(id,feet,facing,floor,headroom), lightFixture(id,at,state,level), support(at),
+protect(region), component(id,region), instance(id,authoredComponent,transform),
+container(at,state,items) and snapshot(). Item is AuthoringContext.Item(slot,item,count).
+
+room and indoorPassage author AIR throughout the interior and floor below it. Their
+occupied-space declaration is the floor plane of THAT storey, not furniture tops;
+upper floors need their own room declarations. entrance connects a physical doorway
+to the canvas boundary with an authored floor/AIR corridor and records both positions.
+lightFixture places the block and its light declaration together. These helpers do not
+invent fixture placement, a style or a building layout. Snapshot data and semantics are
+immutable. instance transforms/prefixes geometry, rooms, entrances, supports, fixtures
+and protected regions together. Named components are declared spatial regions used
+for debug filtering, not independent worldgen pieces.
+
+Submit an authored blueprint as {"id":"hall","authored":{"variants":["drawingId"]},
+"portBindings":{"north":{"pool":"halls","required":true}}}. Do not also submit hand-
+written geometry/semantic fields. Port bindings set pool/required/chance only; internal
+coordinates and lighting come from the frozen result. Root placement/assembly remain
+external. PILLARS consumes authored support points. Multiple variants must have the
+same semantic layout; split genuinely different layouts into separate definitions.
+
+worldsmith_preflight_structure takes sessionId plus ONE of structure, blueprint or
+ drawingId. Stages geometry/semantics/native/assembly/deployment report PASSED, FAILED
+or NOT_RUN with bounded spatial diagnostics. Execution SUCCEEDED is separate from
+these checks. Missing assembly context is NOT_RUN, not a failed connection. Preflight
+never certifies full data-pack reload or a placed world instance. Valid frozen geometry
+remains previewable when rooms/ports/lighting need repair. Publishing stays strict.
+
+worldsmith_preview_structure supports region/frame (BuildBox), components/hideComponents,
+views (up to four), renderMode:material|clay, cutaway and overlays:[ports,access,clearance,lighting,errors]. Its sliceY is
+normalized blueprint Y; preview_drawing sliceY is original drawing Y. Returned frame
+can be reused across edits; automatic framing stays stable for the same session/name.
+Views are isometric, isometric_back, front, back, left, right, top and slice. Front is
+north (-Z), back south (+Z), left west (-X), right east (+X); top looks down from +Y.
+Slice displays one layer. Cutaway hides everything ABOVE sliceY and keeps chosen
+views (e.g. top + isometric) so furniture, floors and low walls remain visible.
+Assembly preview accepts these views/modes/frame/region/cutaway options too; its
+sliceY uses original assembled coordinates, not a member's local floor index.
+Overlays are x-ray debugging samples. Lighting is an estimate, not the game light engine.
+Assembly failure can return separate member images; layoutPreviewAvailable=false says
+explicitly that those images are not a successful assembled plan.
+
+For aesthetic iteration follow architecture section visual-quality-loop. Preview
+clay massing before adding ornament, inspect all elevations and occupied floors,
+then the assembled place. Compare actual images after a specific change. A material
+preview approximates colours and renders blocks as cubes; do not tune fine native
+stairs/glass/light effects against those approximations as if they were screenshots.
+
+Use worldsmith_put_architecture_draft(sessionId,expectedRevision,architecture,structures,
+remove) to commit related plan/member changes as one revision. Repairable drafts can be
+saved; write_pack/finish_world still enforce all publication constraints. A repeated
+error across distinct creative revisions raises a repetition hint; read-only polls do not.
+
+worldsmith_authoring_stats reports persisted host phases, request phase timings and
+cache hits. It does not estimate model reasoning time. Compilation cache is bounded at
+256 entries/512 MiB; parsed drawings at 128 MiB, with oversize entries not retained.
+Only rebuildable caches are evicted. worldsmith_archive_session archives terminal jobs
+and the session to release capacity, preserving sources and frozen results. Resume
+restores data, not code execution. Finish/cancel active jobs before archiving.

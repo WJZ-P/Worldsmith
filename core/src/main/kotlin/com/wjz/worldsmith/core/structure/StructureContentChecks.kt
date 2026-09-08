@@ -8,7 +8,7 @@ internal object StructureContentChecks {
     private val id=Regex("^[a-z0-9_][a-z0-9_-]{0,63}$")
     private val colors=setOf("white","orange","magenta","light_blue","yellow","lime","pink","gray","light_gray","cyan","purple","blue","brown","green","red","black")
     fun validate(b:StructureBlueprint,cells:Map<BuildPos,StructureVoxel>):List<Diagnostic> = buildList {
-        fun error(path:String,code:String,message:String){ add(Diagnostic(path,code,DiagnosticSeverity.ERROR,message)) }
+        fun error(path:String,code:String,message:String,at:BuildPos?=null,expected:String?=null,actual:String?=null,hint:String?=null){ add(Diagnostic(path,code,DiagnosticSeverity.ERROR,message,position=at,expected=expected,actual=actual,hint=hint)) }
         fun inside(p:BuildPos)=p.x in 0 until b.size.x && p.y in 0 until b.size.y && p.z in 0 until b.size.z
         fun resource(s:String)=s.length<=160 && namespaced.matches(s)
         if(b.ports.size>32 || b.ports.map { it.id }.distinct().size!=b.ports.size)error("ports","INVALID_STRUCTURE_PORTS","Use at most 32 distinctly named ports")
@@ -17,14 +17,15 @@ internal object StructureContentChecks {
             if(!id.matches(p.id)||!id.matches(p.type)||p.pool?.let { !id.matches(it) }==true)error(at,"INVALID_PORT_NAME","Use short lowercase port, type and pool names")
             val boundary=when(p.facing){PortFacing.NORTH->p.at.z==0;PortFacing.SOUTH->p.at.z==b.size.z-1;PortFacing.EAST->p.at.x==b.size.x-1;PortFacing.WEST->p.at.x==0;PortFacing.UP->p.at.y==b.size.y-1;PortFacing.DOWN->p.at.y==0}
             if(p.chance !in 0.0..1.0 || (p.required || p.pool==null) && p.chance!=1.0)error(at,"INVALID_PORT_CHANCE","chance is 0..1 on optional outgoing pool ports only; required and non-spawning ports use 1")
-            if(!inside(p.at)||!boundary)error(at,"PORT_OUTSIDE_BOUNDARY","Port must sit on its declared boundary face")
+            if(!inside(p.at)||!boundary)error(at,"PORT_OUTSIDE_BOUNDARY","Port must sit on its declared boundary face",p.at,"${p.facing} boundary of ${b.size}",p.at.toString(),"Keep the physical doorway and boundary connector distinct; author floor/AIR between them")
             else if(!p.passage) {
                 if(cells[p.at]?.let(StructureNavigation::supports)!=true)error(at,"EMPTY_ATTACHMENT_PORT","A solid attachment socket needs an authored supporting block")
             } else if(p.facing.dy!=0 || p.at.y !in 1 until b.size.y-1)error(at,"INVALID_PASSAGE_PORT","Walkable ports need a horizontal facing, headroom and a floor; use passage=false for solid UP/DOWN joints")
             else {
                 val foot=cells[p.at];val head=cells[p.at.copy(y=p.at.y+1)];val floor=cells[p.at.copy(y=p.at.y-1)]
                 if(foot?.let { it.material.isAir()||it.passable }!=true || head?.let { it.material.isAir()||it.passable }!=true || floor==null || !StructureNavigation.supports(floor))
-                    error(at,"BLOCKED_STRUCTURE_PORT","Port needs two authored traversable cells and an authored solid floor")
+                    error(at,"BLOCKED_STRUCTURE_PORT","Port needs two authored traversable cells and an authored solid floor",p.at,
+                        "feet and head traversable; supporting floor", "feet=${foot?.material ?: "KEEP"}; head=${head?.material ?: "KEEP"}; floor=${floor?.material ?: "KEEP"}","Author AIR at the blocked feet/head positions and a supporting floor below; KEEP is not air")
             }
         }
         if(b.interactions.size>128 || b.interactions.map { it.at }.distinct().size!=b.interactions.size)error("interactions","INVALID_INTERACTIONS","At most 128 interactions, one per block position")

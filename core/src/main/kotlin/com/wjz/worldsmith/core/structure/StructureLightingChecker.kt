@@ -9,6 +9,12 @@ object StructureLightingChecker {
     private const val MAX_WORK = 1_000_000
     @JvmStatic
     fun inspect(blueprint: StructureBlueprint, voxels: Collection<StructureVoxel>): StructureLightingReport {
+        val report=analyze(blueprint,voxels)
+        report.diagnostics.firstOrNull {it.severity==DiagnosticSeverity.ERROR}?.let {throw StructureBuildException(it)}
+        return report
+    }
+    @JvmStatic fun analyze(blueprint:StructureBlueprint,voxels:Collection<StructureVoxel>):StructureLightingReport = try {compute(blueprint,voxels)}catch(e:StructureBuildException){StructureLightingReport(0,null,listOf(e.diagnostic))}
+    private fun compute(blueprint:StructureBlueprint,voxels:Collection<StructureVoxel>):StructureLightingReport {
         val occupied=blueprint.rooms+blueprint.indoorPassages
         val policy = blueprint.lighting ?: if(occupied.isEmpty())return StructureLightingReport(0, null) else
             throw StructureBuildException(Diagnostic("lighting","ROOMS_REQUIRE_LIGHTING",DiagnosticSeverity.ERROR,"Declared indoor rooms require READABLE lighting"))
@@ -71,7 +77,11 @@ object StructureLightingChecker {
         }
         val sampled = samples.map { p -> p to minOf(levels[p] ?: 0, levels[p.copy(y = p.y + 1)] ?: 0) }
         val dark = sampled.filter { it.second < policy.minimum }
-        need(dark.isEmpty(), "spaces", "ROOM_TOO_DARK", "${dark.size}/${samples.size} walking samples fall below block-light ${policy.minimum}; first=${dark.firstOrNull()?.first}. Add distributed lights or repair blocked light paths; skylight is not counted.")
-        return StructureLightingReport(samples.size, sampled.minOfOrNull { it.second })
+        val bounds=if(dark.isEmpty())null else BuildBox(BuildPos(dark.minOf {it.first.x},dark.minOf {it.first.y},dark.minOf {it.first.z}),BuildPos(dark.maxOf {it.first.x},dark.maxOf {it.first.y},dark.maxOf {it.first.z}))
+        val diagnostics=if(dark.isEmpty())emptyList()else listOf(Diagnostic("lighting.spaces","ROOM_TOO_DARK",DiagnosticSeverity.ERROR,
+            "${dark.size}/${samples.size} walking samples fall below block-light ${policy.minimum}",position=dark.first().first,region=bounds,
+            expected="feet/head block light >= ${policy.minimum}",actual="minimum=${sampled.minOf {it.second}}",hint="Add distributed fixtures near the dark region or repair blocked light paths; skylight is not counted",metrics=mapOf("darkSamples" to dark.size,"walkingSamples" to samples.size)))
+        val stride=maxOf(1,(sampled.size+2047)/2048)
+        return StructureLightingReport(samples.size,sampled.minOfOrNull {it.second},diagnostics,sampled.filterIndexed {i,_->i%stride==0}.map {StructureLightSample(it.first,it.second)},dark.size,bounds)
     }
 }

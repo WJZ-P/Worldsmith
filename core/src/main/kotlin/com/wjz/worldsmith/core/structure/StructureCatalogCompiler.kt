@@ -89,6 +89,11 @@ object StructureCatalogCompiler {
                 val distance=if(port.passage && a.roads!=null)a.roads.gap+1 else 1
                 val target=BuildPos(at.x+facing.dx*distance,at.y+facing.dy*distance,at.z+facing.dz*distance)
                 var attached=false
+                val rejected=linkedMapOf<String,Int>()
+                fun reject(reason:String){rejected[reason]=(rejected[reason] ?: 0)+1}
+                if(port.pool==null)reject("missing_pool")
+                if(parts.size>=a.maxPieces)reject("member_budget")
+                if(depth>=a.maxDepth)reject("depth_budget")
                 if(port.pool!=null && parts.size<a.maxPieces && depth<a.maxDepth) {
                     val choices=a.pools.getValue(port.pool).sortedBy {choice->
                         // Weighted deterministic permutation, without replacement.
@@ -99,20 +104,21 @@ object StructureCatalogCompiler {
                         val geometries=templates.getValue(b.id)
                         val chosen=(StructureVariationCompiler.unit(variant.toLong(),"$parentIndex:${port.id}:${b.id}")*geometries.size).toInt()
                         val geometry=geometries[chosen]
+                        if(geometry.ports.none {it.type==port.type && it.passage==port.passage})reject("port_type")
                         for(childPort in geometry.ports.filter {it.type==port.type && it.passage==port.passage})for(rotation in BuildRotation.entries) {
                             need(++attempts<=2048,"assembly","ASSEMBLY_WORK_BUDGET","Assembly exceeded 2048 candidate connections")
-                            if(childPort.facing.rotate(rotation.ordinal)!=facing.opposite())continue
+                            if(childPort.facing.rotate(rotation.ordinal)!=facing.opposite()){reject("orientation");continue}
                             val requiredChildren=geometry.ports.count {it.id!=childPort.id && it.required}
                             val reservedForPending=pending.count {(index,p,_)->p.required && (index to p.id) !in used}
-                            if(depth+1>=a.maxDepth && requiredChildren>0 || parts.size+1+requiredChildren+reservedForPending>a.maxPieces)continue
+                            if(depth+1>=a.maxDepth && requiredChildren>0 || parts.size+1+requiredChildren+reservedForPending>a.maxPieces){reject("member_or_depth_budget");continue}
                             val p=StructureGeometryCompiler.rotate(childPort.at,rotation.ordinal)
                             val child=CompiledStructurePart(b.id,chosen,BuildPos(target.x-p.x,target.y-p.y,target.z-p.z),rotation,geometry)
                             val bounds=box(child)
-                            if(maxOf(abs(bounds.from.x),abs(bounds.to.x),abs(bounds.from.z),abs(bounds.to.z))>a.maxRadius)continue
-                            if(parts.any {intersects(box(it),bounds)})continue
+                            if(maxOf(abs(bounds.from.x),abs(bounds.to.x),abs(bounds.from.z),abs(bounds.to.z))>a.maxRadius){reject("radius");continue}
+                            if(parts.any {intersects(box(it),bounds)}){reject("overlap");continue}
                             val all=parts.map(::box)+bounds
-                            if(all.maxOf {it.to.y}-all.minOf {it.from.y}+1>128)continue
-                            if(parts.sumOf {it.geometry.voxels.size}+geometry.voxels.size>MAX_PLAN_VOXELS)continue
+                            if(all.maxOf {it.to.y}-all.minOf {it.from.y}+1>128){reject("height");continue}
+                            if(parts.sumOf {it.geometry.voxels.size}+geometry.voxels.size>MAX_PLAN_VOXELS){reject("authored_cells");continue}
                             val childIndex=parts.size;parts+=child
                             used+=(parentIndex to port.id);used+=(childIndex to childPort.id)
                             connections+=StructureConnection(parentIndex,port.id,childIndex,childPort.id)
@@ -121,7 +127,9 @@ object StructureCatalogCompiler {
                         }
                     }
                 }
-                need(!port.required||attached,"assembly.variant[$variant].${parent.blueprintId}.${port.id}","REQUIRED_PORT_UNCONNECTED","Required port did not connect within the piece, depth and radius budgets; add a compatible terminal/cap piece or adjust the graph")
+                if(port.required&&!attached)throw StructureBuildException(Diagnostic("assembly.variant[$variant].${parent.blueprintId}.${port.id}","REQUIRED_PORT_UNCONNECTED",DiagnosticSeverity.ERROR,
+                    "Required entrance has no compatible placement",position=at,expected="one compatible non-overlapping member within radius ${a?.maxRadius}",actual=rejected.toString(),
+                    hint="Inspect candidate rejection counts; repair the indicated orientation, overlap or budget instead of blindly rebuilding every member",metrics=rejected+mapOf("members" to parts.size,"depth" to depth)))
             }
             val minY=parts.minOf {box(it).from.y}
             val normalized=parts.map {it.copy(offset=it.offset.copy(y=it.offset.y-minY))}

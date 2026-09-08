@@ -1,7 +1,8 @@
 # Worldsmith Structure Builder
 
-Author Java DrawProgram geometry through contract/draw, then submit portable JSON
-structure metadata referencing frozen drawing ids. Legacy build-operation JSON remains supported.
+Author Java StructureProgram (geometry-linked semantics) or DrawProgram through
+contract/draw, then submit portable JSON references to frozen results. Legacy
+build-operation JSON remains supported.
 The player prompt decides style and world identity. New guided MCP worlds follow
 contract/architecture: multiple groups, independent structures, a monumental LANDMARK
 group and readable occupied interiors. Empty libraries remain valid for legacy or
@@ -12,6 +13,10 @@ Examples teach grammar, not a mandatory architectural style. Blueprint schema re
 
 Read contract/draw, submit `worldsmith_build_drawing`, wait for success, inspect
 `worldsmith_preview_drawing` image content and repair before calling put_structure.
+For new architectural work, prefer blueprint.authored.variants from StructureProgram;
+see contract/draw section authoring-workbench for the mutually exclusive authored
+fields. The explicit metadata rules below describe the DrawProgram/manual route;
+do not duplicate authored rooms, entrances or lighting by hand.
 Each `blueprint` may use `"drawing":{"variants":["<returned drawingId>"]}` instead
 of `build`/`modules`. Choose one geometry source. SDK material/geometry variants come
 from Java seeds and parameters, not legacy materials/decay; instancePatches remain available.
@@ -64,16 +69,20 @@ Tools:
   example biome ids with ids from your world.
 - `worldsmith_validate_structure`: `blueprint`, optional `variant` and `sliceY`.
   Checks every configured variant and returns a text floor plan of the selected one.
-- `worldsmith_preview_structure`: same inputs, optional `cutaway: true`.
-  Writes top/front/right/isometric SVG views; cutaway removes cells above `sliceY`.
-- `worldsmith_preview_assembly`: complete `structure`, optional plan `variant`.
-  Returns piece offsets, rotations, graph edges, and a whole-layout SVG.
+- `worldsmith_preview_structure`: same inputs; returns actual PNG image content
+  and an SVG schematic. Choose up to four `views` from isometric, isometric_back,
+  front, back, left, right, top, slice; `renderMode` is material or clay. Optional
+  `cutaway:true` removes cells above normalized `sliceY` in the chosen views.
+  A slice view alone shows only that layer, not the interior volume below it.
+- `worldsmith_preview_assembly`: complete `structure`, optional plan `variant`,
+  plus views/renderMode/frame/region/cutaway/sliceY. Returns PNG images, piece offsets,
+  rotations, graph edges, and a whole-layout SVG. Assembly sliceY is original Y.
 
 All of those checks run in Core, without booting Minecraft or resolving the entire
 MC registry. Live block/property, item, block-entity and codec checks happen during
 world-creation export. Never claim a schematic proves an in-game playtest.
-The isometric view has a 16000 exposed-face limit; very detailed shapes retain the
-orthographic views. Use a smaller piece or a lower cutaway to inspect detail.
+The SVG isometric has a 16000 exposed-face limit; PNG has a 250000 face budget.
+Use a cropped region, orthographic view or lower cutaway for expensive detail.
 
 ## Blueprint basics
 
@@ -349,6 +358,10 @@ lighting and details. Use compound shapes and material roles instead of decorate
 hollow cubes. Check every inhabited floor, every configured variant and assembly
 connections. Exposed weathering is optional; protect critical beams explicitly.
 A complete generated document is a design, not proof of beauty or a game playtest.
+Read architecture sections creative-brief and visual-quality-loop. Review a clay
+composition before ornament, material elevations including the sides and rear,
+each occupied-floor cutaway, and the assembled place. Compare a fixed frame after
+a deliberate repair; adding details or passing validation is not itself progress.
 
 Every root and child in a guided world declares lighting per contract/architecture.
 READABLE interiors need occupied-space boxes and actual distributed light fixtures
@@ -358,31 +371,28 @@ genuinely open structures, not an exemption for rooms.
 
 ### Lighting a tall hall
 
-Block light falls one level per block, so a lamp under a coffered ceiling ten
-blocks up arrives at the floor around 1. A wide hall cannot be lit from its
-ceiling or its walls alone: put emitters where people walk. What works is a grid
-of floor lamp stands about every 4-5 blocks, starting one block off the wall
-(half a step in leaves the corner rows dark), plus panels or sconces at mid
-height for anything taller than about eight blocks. Light every storey you
-declare, including watch storeys and second eaves. Mask floor grids to air so
-they do not overwrite furniture, and remember a solid dais or altar will make an
-air-masked grid skip it — light those explicitly.
+Core's conservative estimate decreases one level per face-adjacent step; a level
+15 source ten unobstructed steps away estimates 5, before longer paths around
+solid obstacles. Do not rely on distant high-ceiling lamps to light the walking plane.
+Choose theme-appropriate mid-height sconces, suspended fixtures, column lights or
+inlaid bands and place them with the bay rhythm and actual occupied routes. Use
+preflight samples to repair specific dark areas, accounting for furniture, stairs
+and blocked propagation. Preserve clear paths and focal contrast; a universal
+floor-lamp grid is not a lighting design. Readability and atmosphere should coexist.
 
-At most 32 `spaces` and 128 `sources` are accepted. When a building has more
-emitters than that, rank them by distance to the declared rooms and keep the
-closest; eave lanterns still count, since they light interiors through openings.
+At most 32 spaces and 128 declared sources are accepted. Design the layout within
+those limits and cover each occupied storey. Rework fixture placement or separate
+logical buildings if needed; do not hide an unlit area by dropping its declaration.
 
 ### What counts as a room
 
-Declare enclosed interiors, not everything a player can stand on. Two mistakes
-make a structure fail its own light check:
-
-- **A roof is not enclosure.** An open terrace sits under the eaves and looks
-  roofed; declared as a room, it can never reach block-light 8. Require walls on
-  all four sides, at least two blocks tall — a one-block seat rail is not a wall.
-- **A perch is not a storey.** The top of a bookshelf or altar is walkable and
-  will otherwise be declared as its own room floating in the dark. Compare
-  candidate storeys against the largest floor and drop the small ones.
+Declare spaces from intended use and floor layout, not guessed enclosure or
+relative area. A small occupied loft is still a storey; it needs access and light.
+A bookshelf top is furniture, not automatically a room. Genuinely open exterior
+spaces may use the exterior policy; a roofed occupied hall or partially open room
+does not become exempt by removing one wall. Helpers should describe designed
+floor planes, with separate rooms/passages for genuinely occupied levels. Never
+delete real interior declarations to improve a numeric light result.
 
 ### Ports and access
 

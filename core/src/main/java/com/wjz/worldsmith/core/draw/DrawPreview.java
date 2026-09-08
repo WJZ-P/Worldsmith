@@ -11,14 +11,31 @@ import javax.imageio.ImageIO;
 /** Bounded CPU model preview, not game rendering, physical lighting or collision geometry. */
 public final class DrawPreview {
 	private DrawPreview() {}
+	public static final List<String> VIEWS = List.of("isometric", "isometric_back", "front", "back", "left", "right", "top", "slice");
+	public static final List<String> RENDER_MODES = List.of("material", "clay");
 	private record Face(double[] x,double[] y,double depth,int colour) {}
-	public static byte[] png(DrawStructure drawing,String view,Integer sliceY) throws IOException {
-		if(!Set.of("isometric","front","back","slice").contains(view))throw new IllegalArgumentException("Unknown preview view");
+	public record Marker(Vec3i position,int colour,String label) {}
+    public static byte[] png(DrawStructure drawing,String view,Integer sliceY) throws IOException {
+        return png(drawing,view,sliceY,drawing.bounds(),List.of());
+    }
+    public static byte[] png(DrawStructure drawing,String view,Integer sliceY,Box frame,List<Marker> markers) throws IOException {
+        return png(drawing,view,sliceY,frame,markers,"material");
+    }
+    public static byte[] png(DrawStructure drawing,String view,Integer sliceY,Box frame,List<Marker> markers,String renderMode) throws IOException {
+		if(!VIEWS.contains(view))throw new IllegalArgumentException("Unknown preview view");
+		if(!RENDER_MODES.contains(renderMode))throw new IllegalArgumentException("Unknown preview renderMode");
 		if(view.equals("slice")&&(sliceY==null||sliceY<drawing.bounds().min().y()||sliceY>drawing.bounds().max().y()))throw new IllegalArgumentException("sliceY must be inside drawing bounds");
 		var occupied=new HashMap<Vec3i,DrawBlock>();
 		for(var v:drawing.voxels())if(!v.block().state().isAir()&&(!view.equals("slice")||v.position().y()==sliceY))occupied.put(v.position(),v.block());
-		double yaw=view.equals("back")?Math.PI:view.equals("isometric")?Math.PI/4:0;
-		double elevation=view.equals("slice")?Math.PI/2:view.equals("isometric")?Math.PI/6:0;
+		double yaw=switch(view) {
+            case "back" -> Math.PI;
+            case "left" -> -Math.PI/2;
+            case "right" -> Math.PI/2;
+            case "isometric" -> Math.PI/4;
+            case "isometric_back" -> Math.PI*5/4;
+            default -> 0;
+        };
+		double elevation=(view.equals("slice")||view.equals("top"))?Math.PI/2:view.startsWith("isometric")?Math.PI/6:0;
 		double[] right={Math.cos(yaw),0,Math.sin(yaw)}, down={Math.sin(yaw)*Math.sin(elevation),-Math.cos(elevation),-Math.cos(yaw)*Math.sin(elevation)}, near={Math.sin(yaw)*Math.cos(elevation),Math.sin(elevation),-Math.cos(yaw)*Math.cos(elevation)};
 		var faces=new ArrayList<Face>();
 		for(var entry:occupied.entrySet()) {
@@ -30,7 +47,14 @@ public final class DrawPreview {
 				int u=(axis+1)%3,v=(axis+2)%3; double[] xs=new double[4],ys=new double[4];double depth=0;
 				int[][] corners={{-1,-1},{1,-1},{1,1},{-1,1}};
 				for(int i=0;i<4;i++) {double[] point=centre.clone();point[axis]+=sign*.5;point[u]+=corners[i][0]*.5;point[v]+=corners[i][1]*.5;xs[i]=dot(point,right);ys[i]=dot(point,down);depth+=dot(point,near)/4;}
-				faces.add(new Face(xs,ys,depth,shade(colour(entry.getValue().state().id()),axis==1?1.0:axis==0?.77:.9)));
+				int baseColour=renderMode.equals("clay")?0xC3C7CC:colour(entry.getValue().state().id());
+                // A uniformly coloured top projection loses all height discontinuities.
+                // Use the fixed frame as the datum so revision comparisons keep the same scale.
+                if(renderMode.equals("clay")&&view.equals("top")) {
+                    double height=Math.max(0,Math.min(1,(p.y()-(double)frame.min().y()+.5)/frame.height()));
+                    baseColour=shade(baseColour,.65+.35*height);
+                }
+				faces.add(new Face(xs,ys,depth,shade(baseColour,axis==1?1.0:axis==0?.77:.9)));
 				if(faces.size()>250000)throw new IllegalArgumentException("Isometric face budget exceeded; request front/back or a slice of this same drawing");
 			}
 		}
@@ -39,13 +63,24 @@ public final class DrawPreview {
 		g.setColor(new Color(0x18242D));g.fillRect(0,0,1280,1000);g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
 		if(!faces.isEmpty()) {
 			double minX=Double.POSITIVE_INFINITY,maxX=-minX,minY=minX,maxY=-minX;
-			for(var face:faces)for(int i=0;i<4;i++){minX=Math.min(minX,face.x[i]);maxX=Math.max(maxX,face.x[i]);minY=Math.min(minY,face.y[i]);maxY=Math.max(maxY,face.y[i]);}
+			for(double x:new double[]{frame.min().x()-.5,frame.max().x()+.5})for(double y:new double[]{frame.min().y()-.5,frame.max().y()+.5})for(double z:new double[]{frame.min().z()-.5,frame.max().z()+.5}) {
+                double[] point={x,y,z};double px=dot(point,right),py=dot(point,down);
+                minX=Math.min(minX,px);maxX=Math.max(maxX,px);minY=Math.min(minY,py);maxY=Math.max(maxY,py);
+            }
 			double scale=Math.min(1160/Math.max(1,maxX-minX),850/Math.max(1,maxY-minY));
 			for(var face:faces){var polygon=new Polygon();for(int i=0;i<4;i++)polygon.addPoint((int)Math.round(640+(face.x[i]-(minX+maxX)/2)*scale),(int)Math.round(485+(face.y[i]-(minY+maxY)/2)*scale));g.setColor(new Color(face.colour));g.fillPolygon(polygon);}
+            int labels=0;g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,12));
+            for(var marker:markers.stream().limit(4096).toList()) {
+                var p=marker.position();double[] point={p.x(),p.y(),p.z()};
+                if(view.equals("slice")&&p.y()!=sliceY)continue;
+                int x=(int)Math.round(640+(dot(point,right)-(minX+maxX)/2)*scale),y=(int)Math.round(485+(dot(point,down)-(minY+maxY)/2)*scale);
+                g.setColor(new Color(marker.colour()));g.fillOval(x-3,y-3,6,6);
+                if(!marker.label().isEmpty()&&labels++<24)g.drawString(marker.label(),x+5,y-4);
+            }
 		}
 		g.setColor(new Color(0xD6E3E8));g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,18));
-		g.drawString("Worldsmith | "+view+" | "+drawing.nonAirCells()+" non-air cells",40,950);
-		g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14));g.drawString("Voxel model preview; simplified blocks and shading. Not an in-game screenshot.",40,978);g.dispose();
+		g.drawString("Worldsmith | "+view+" | "+renderMode+" | "+drawing.nonAirCells()+" non-air cells",40,950);
+		g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14));g.drawString("Voxel model preview; simplified blocks and shading. Not an in-game screenshot."+(renderMode.equals("clay")&&view.equals("top")?" Top shade indicates height.":""),40,978);g.dispose();
 		var bytes=new ByteArrayOutputStream();ImageIO.write(image,"png",bytes);return bytes.toByteArray();
 	}
 	private static double dot(double[] a,double[] b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}

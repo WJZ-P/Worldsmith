@@ -37,8 +37,9 @@ final class WorldsmithDrawingIntegrationTest {
     private static final String SESSION="b".repeat(32);
     private static final String SOURCE="""
         import com.wjz.worldsmith.core.draw.*;
-        public class Monument implements DrawProgram {
-          public DrawStructure generate(DrawContext context) {
+        import com.wjz.worldsmith.authoring.*;
+        public class Monument implements StructureProgram {
+          public AuthoredStructure generate(AuthoringContext context) {
             var c=context.canvas(Box.of(-40,0,-16,39,39,15));
             c.pen("stone_bricks").fill(Box.of(-40,0,-16,39,3,15));
             c.pen("air").fill(Box.of(-40,4,-16,39,38,15));
@@ -52,7 +53,12 @@ final class WorldsmithDrawingIntegrationTest {
             c.pen("sunflower[half=lower]").set(4,4,0);
             c.pen("sunflower[half=upper]").set(4,5,0);
             c.anchor("entry",new Vec3i(0,4,-16));
-            return c.snapshot();
+            context.origin(new Vec3i(0,0,0));
+            context.material("path",BlockStateRef.of("stone_bricks"));
+            context.material("stair",BlockStateRef.of("stone_brick_stairs"));
+            context.entrance("north",new Vec3i(0,4,-16),"NORTH",BlockStateRef.of("stone_bricks"),2);
+            context.entrance("east",new Vec3i(39,4,0),"EAST",BlockStateRef.of("stone_bricks"),2);
+            return context.snapshot();
           }
         }
         """;
@@ -90,14 +96,22 @@ final class WorldsmithDrawingIntegrationTest {
            "lighting":{"mode":"EXTERIOR_ONLY"}}
           """);
     }
-    private static CompiledPack pack(DrawStructure drawing,String id) {
+    private static CompiledPack pack(DrawStructure drawing,String id,DrawingHost host) {
         var base=WorldsmithPacks.builtin();var placement=new StructurePlacement(base.getBiomes().getBiomes().stream().map(BiomeDefinition::getId).toList(),24,8,List.of(BuildRotation.NONE),new StructureTerrainFit(),2,null);
         var roads=WorldsmithJson.INSTANCE.getFormat().decodeFromString(StructureRoads.Companion.serializer(),"""
           {"material":"path","stairMaterial":"stair","bridgeMaterial":"path","maxSpan":16,"gap":4,"width":3}
           """);
         var assembly=new StructureAssembly(Map.of("sdk_wing",wing()),Map.of("wings",List.of(new AssemblyChoice("sdk_wing",1))),1,3,1,96,true,16,roads);
-        var group=new WorldStructureDefinition("sdk_group",blueprint("sdk_hall",id,true),placement,assembly);
-        var single=new WorldStructureDefinition("sdk_standalone",blueprint("sdk_single",id,false),placement);
+        var resolver=new AuthoredDraftResolver(host);
+        java.util.function.BiFunction<String,Boolean,StructureBlueprint> authored=(name,connected)->{
+            var json=new com.google.gson.JsonObject();json.addProperty("id",name);
+            json.add("authored",com.google.gson.JsonParser.parseString("{\"variants\":[\""+id+"\"]}"));
+            if(connected)json.add("portBindings",com.google.gson.JsonParser.parseString("{\"north\":{\"pool\":\"wings\",\"required\":true},\"east\":{\"pool\":\"wings\",\"required\":true}}"));
+            var input=(kotlinx.serialization.json.JsonObject)WorldsmithJson.INSTANCE.getFormat().parseToJsonElement(json.toString());
+            return WorldsmithJson.INSTANCE.getFormat().decodeFromJsonElement(StructureBlueprint.Companion.serializer(),resolver.blueprint(SESSION,input,false));
+        };
+        var group=new WorldStructureDefinition("sdk_group",authored.apply("sdk_hall",true),placement,assembly);
+        var single=new WorldStructureDefinition("sdk_standalone",authored.apply("sdk_single",false),placement);
         var library=new StructureLibrary(2,List.of(group,single),null,Map.of(),Map.of(),Map.of(id,drawing));
         var hash="d".repeat(64);
         return CompiledPack.scoped(new WorldsmithPack(new WorldsmithPackManifest(2,hash,"SDK native smoke","Targeted integration fixture",base.getManifest().getFiles()),base.getTerrain(),base.getBiomes(),base.getFeatures(),hash,library));
@@ -106,7 +120,7 @@ final class WorldsmithDrawingIntegrationTest {
     @Test void workerDrawingRemainsThreeLogicalBuildingsAcrossTilesRotationsAndSaveReload() throws Exception {
         var runtime=new DrawingRuntime(Path.of(System.getProperty("worldsmith.workerRuntime")),Path.of(System.getProperty("java.home")),List.of("--limit-modules=java.base,java.compiler,java.logging,java.xml,java.desktop"));
         try(var host=new DrawingHost(temp.resolve("jobs"),runtime,SharedConstants.getCurrentVersion().dataVersion().version())) {
-            var artifact=build(host);var drawing=host.drawing(artifact);var pack=pack(drawing,artifact.getId());
+            var artifact=build(host);var drawing=host.drawing(artifact);var pack=pack(drawing,artifact.getId(),host);
             var catalog=pack.structures();var logical=catalog.getPlans().get("sdk_group").getFirst();
             assertEquals(3,logical.getParts().size());assertEquals(2,logical.getConnections().size());
             var geometry=logical.getParts().getFirst().getGeometry();

@@ -51,4 +51,7 @@ data class StructureLighting(
     val minimum: Int = 8,
 )
 
-data class StructureLightingReport(val sampledFeet: Int, val minimumEstimatedLevel: Int?)
+@Serializable data class StructureLightSample(val position:BuildPos,val level:Int)
+@Serializable data class StructureLightingReport(val sampledFeet: Int, val minimumEstimatedLevel: Int?,
+    val diagnostics:List<com.wjz.worldsmith.core.validation.Diagnostic> = emptyList(),val samples:List<StructureLightSample> = emptyList(),
+    val darkCount:Int=0,val darkBounds:BuildBox?=null)

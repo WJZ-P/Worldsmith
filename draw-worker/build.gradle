@@ -5,6 +5,7 @@ repositories { mavenCentral() }
 configurations { compilerRuntime }
 dependencies {
 	implementation files(rootProject.project(':core').tasks.named('drawSdkJar'))
+	implementation project(':authoring-sdk')
 	implementation 'org.eclipse.jdt:ecj:3.46.0'
 	compilerRuntime 'org.eclipse.jdt:ecj:3.46.0'
 }
@@ -16,5 +17,6 @@ tasks.register('runtimeBundle', Sync) {
 	into layout.buildDirectory.dir('runtime')
 	from(tasks.named('jar')) { rename { 'draw-worker.jar' } }
 	from(project(':core').tasks.named('drawSdkJar')) { rename { 'draw-sdk.jar' } }
+	from(project(':authoring-sdk').tasks.named('jar')) { rename { 'authoring-sdk.jar' } }
 	from(configurations.compilerRuntime) { rename { 'ecj.jar' } }
 }

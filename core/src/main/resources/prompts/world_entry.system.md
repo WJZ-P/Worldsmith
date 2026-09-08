@@ -64,3 +64,21 @@ geometry/material choices; placement references real biome ids. Validate the com
 architecture before publication. Format 2 freezes SDK geometry plus JSON metadata and source provenance; old format 1
 JSON remains readable. Native export/readback and reload precede completion. No network or AI calls occur during chunk generation. A validated
 landmark plan is not proof of a placed instance.
+
+
+## Efficient structure authoring
+
+New MCP clients may call begin_world with detail=summary; contract indexes and section
+retrieval avoid re-reading every document. Full contracts remain available. For buildings,
+prefer source projects plus StructureProgram: representative components -> main mass ->
+roof/facade -> circulation -> occupied lighting -> decoration -> secondary variants.
+Read architecture sections `creative-brief`, `form-function-and-family` and
+`visual-quality-loop`. Carry concrete theme-to-form choices in the existing plan
+fields. Study the main building in clay before decoration, review side/rear
+elevations and each occupied floor, then compose the group in top/opposite views.
+Reuse component craft, not a single building shape for unrelated functions.
+The summary entry retains `designGuide` and a `designReference`; it is not a reason
+to skip the creative brief or inspect only machine-checkable counts.
+Run worldsmith_preflight_structure early and use spatial model overlays to repair errors.
+Do not confuse worker success with authoring checks, or authoring checks with publication.
+Use worldsmith_authoring_stats for host work; never call request gaps model-thinking time.

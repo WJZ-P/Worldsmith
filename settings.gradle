@@ -13,3 +13,4 @@ rootProject.name = 'worldsmith'
 
 include 'core'
 include 'draw-worker'
+include 'authoring-sdk'

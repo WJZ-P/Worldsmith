@@ -20,13 +20,13 @@ object StructureGeometryCompiler {
     private val AIR = BuildMaterial("minecraft:air")
 
     @JvmStatic @JvmOverloads
-    fun compile(blueprint: StructureBlueprint, variant:Int=0, drawings:Map<String,com.wjz.worldsmith.core.draw.DrawStructure> = emptyMap()): CompiledStructure {
+    fun compile(blueprint: StructureBlueprint, variant:Int=0, drawings:Map<String,com.wjz.worldsmith.core.draw.DrawStructure> = emptyMap(),strict:Boolean=true): CompiledStructure {
         blueprint.drawing?.let { source ->
             if(source.variants.size !in 1..8 || variant !in source.variants.indices)throw StructureBuildException(Diagnostic("drawing.variants","INVALID_DRAWING_VARIANT",DiagnosticSeverity.ERROR,"Use 1..8 drawing ids and a valid variant index"))
             val drawing=drawings[source.variants[variant]] ?: throw StructureBuildException(Diagnostic("drawing.variants[$variant]","MISSING_DRAWING_DATA",DiagnosticSeverity.ERROR,"Frozen drawing is not attached to this library"))
-            return StructureDrawCompiler.compile(blueprint,drawing)
+            return StructureDrawCompiler.compile(blueprint,drawing,strict)
         }
-        return Builder(blueprint,variant).compile()
+        return Builder(blueprint,variant,strict).compile()
     }
 
     @JvmStatic @JvmOverloads fun compileVariants(blueprint:StructureBlueprint,drawings:Map<String,com.wjz.worldsmith.core.draw.DrawStructure> = emptyMap()):List<CompiledStructure> {
@@ -34,7 +34,7 @@ object StructureGeometryCompiler {
         return (0 until (blueprint.drawing?.variants?.size ?: blueprint.variation.count)).map {compile(blueprint,it,drawings)}
     }
 
-    private class Builder(val blueprint: StructureBlueprint, val variant:Int) {
+    private class Builder(val blueprint: StructureBlueprint, val variant:Int,val strict:Boolean) {
         val cells = LinkedHashMap<BuildPos, StructureVoxel>()
         val writers = HashMap<BuildPos, String>()
         val writtenOperations = linkedSetOf<String>()
@@ -65,16 +65,16 @@ object StructureGeometryCompiler {
             execute(blueprint.build, Transform(), "build", 0)
             val navigation=StructureNavigation.inspect(blueprint,cells.values)
             val before=navigation.diagnostics+StructureContentChecks.validate(blueprint,cells)
-            before.firstOrNull {it.severity==DiagnosticSeverity.ERROR}?.let {throw StructureBuildException(it)}
+            if(strict)before.firstOrNull {it.severity==DiagnosticSeverity.ERROR}?.let {throw StructureBuildException(it)}
             val protectedLights=blueprint.lighting?.sources?.map {it.at}.orEmpty()
             val weathered=StructureVariationCompiler.decay(blueprint,cells,selectedPalette,seed,navigation.protectedCells+protectedLights)
             cells.clear();cells.putAll(weathered)
             check(cells.values.any { !it.material.isAir() }, "build", "EMPTY_STRUCTURE", "The final template must contain solid authored content")
             check(blueprint.keepClear.size <= 32, "keepClear", "TOO_MANY_CLEAR_VOLUMES", "At most 32 clearance boxes")
             blueprint.keepClear.forEachIndexed { i, box -> box(box.from, box.to, "keepClear[$i]"); point(box.from,"keepClear[$i].from"); point(box.to,"keepClear[$i].to") }
-            StructureLightingChecker.inspect(blueprint,cells.values)
+            if(strict)StructureLightingChecker.inspect(blueprint,cells.values)
             return CompiledStructure(blueprint.id, blueprint.size, blueprint.origin,
-                cells.entries.sortedWith(compareBy({ it.key.y }, { it.key.z }, { it.key.x })).map { it.value }, blueprint.keepClear, work, qualityDiagnostics(),blueprint.interactions,blueprint.lighting,blueprint.ports,blueprint.variation.protectedAreas)
+                cells.entries.sortedWith(compareBy({ it.key.y }, { it.key.z }, { it.key.x })).map { it.value }, blueprint.keepClear, work, qualityDiagnostics()+if(strict)emptyList()else before,blueprint.interactions,blueprint.lighting,blueprint.ports,blueprint.variation.protectedAreas,reachableFeet=navigation.reachableFeet.toList())
         }
 
         fun qualityDiagnostics(): List<Diagnostic> {

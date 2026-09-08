@@ -13,7 +13,7 @@ object StructureNavigation {
         val access=blueprint.access?.let {it.copy(destinations=(it.destinations+ports).distinct())}
             ?: if(ports.size>1)StructureAccess(listOf(ports.first()),ports.drop(1)) else return Report(emptyList(),emptySet(),emptySet())
         val errors=mutableListOf<Diagnostic>();val protected=mutableSetOf<BuildPos>()
-        fun error(path:String,code:String,message:String) { errors+=Diagnostic("access.$path",code,DiagnosticSeverity.ERROR,message) }
+        fun error(path:String,code:String,message:String,at:BuildPos?=null) { errors+=Diagnostic("access.$path",code,DiagnosticSeverity.ERROR,message,position=at,hint="Inspect the access overlay, supporting floor and authored headroom around this point") }
         if(access.headroom !in 2..4 || access.entrances.size !in 1..32 || access.destinations.size !in 1..128 || access.requiredClear.size>32) {
             error("","INVALID_STRUCTURE_ACCESS","Use 1..32 entrances, 1..128 destinations, at most 32 clear boxes and headroom 2..4")
             return Report(errors,protected,emptySet())
@@ -36,7 +36,7 @@ object StructureNavigation {
             if(blocked>0)error("requiredClear[$i]","BLOCKED_REQUIRED_CLEARANCE","$blocked cells are solid or KEEP; author air/doors explicitly")
         }
         (access.entrances.mapIndexed { i,p -> "entrances[$i]" to p }+access.destinations.mapIndexed { i,p -> "destinations[$i]" to p }).forEach { (path,p) ->
-            if(!walkable(p))error(path,"UNWALKABLE_STRUCTURE_POINT","Point $p needs an authored supporting floor and ${access.headroom} traversable cells above it")
+            if(!walkable(p))error(path,"UNWALKABLE_STRUCTURE_POINT","Point $p needs an authored supporting floor and ${access.headroom} traversable cells above it",p)
         }
         val queue=ArrayDeque<BuildPos>();val reached=mutableSetOf<BuildPos>()
         // Every declared destination AND every entrance must connect to the first
@@ -55,7 +55,7 @@ object StructureNavigation {
             }
         }
         (access.entrances+access.destinations).forEachIndexed { i,p ->
-            if(walkable(p) && p !in reached)error("routes[$i]","DISCONNECTED_STRUCTURE_ROUTE","Point $p is disconnected from the first entrance")
+            if(walkable(p) && p !in reached)error("routes[$i]","DISCONNECTED_STRUCTURE_ROUTE","Point $p is disconnected from the first entrance",p)
         }
         // Protect traversable volume AND its floor, so decay preserves routes.
         for(p in reached)for(dy in -1 until access.headroom)protected+=p.copy(y=p.y+dy)

@@ -133,7 +133,7 @@ public final class WorldsmithMcpService {
 
     private static DrawingRuntime drawingRuntime() throws java.io.IOException {
         Path directory=packDirectory().resolveSibling("runtime").resolve("draw-1-ecj-3.46.0");Files.createDirectories(directory);
-        for(String name:java.util.List.of("draw-sdk.jar","draw-worker.jar","ecj.jar")) {
+        for(String name:java.util.List.of("draw-sdk.jar","authoring-sdk.jar","draw-worker.jar","ecj.jar")) {
             byte[] bytes;
             try(var input=WorldsmithMcpService.class.getClassLoader().getResourceAsStream("worldsmith/runtime/"+name)) {
                 if(input==null)throw new java.io.IOException("Missing bundled drawing runtime: "+name);bytes=input.readAllBytes();
@@ -152,7 +152,7 @@ public final class WorldsmithMcpService {
             WorldsmithMcpTools tools = new WorldsmithMcpTools(packDirectory(), runtimeInfo(), packFinished,new ClasspathPromptTemplateRepository(),new ClasspathStyleCatalog(),sessions,drawingHost,publicationHost,drawing->{
                 try {var output=new java.io.ByteArrayOutputStream();net.minecraft.nbt.NbtIo.writeCompressed(com.wjz.worldsmith.worldgen.WorldsmithDrawExporter.encode(drawing),output);return output.toByteArray();}
                 catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
-            });
+            },new com.wjz.worldsmith.worldgen.WorldsmithAuthoringNativeHost());
 			McpHttpServer started = new McpHttpServer(tools.all(), modVersion());
 			URI endpoint = started.start(port);
 			server = started;

@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.worker;
 
 import com.wjz.worldsmith.core.draw.*;
+import com.wjz.worldsmith.authoring.*;
 import org.eclipse.jdt.internal.compiler.tool.EclipseCompiler;
 import javax.tools.*;
 import java.io.*;
@@ -21,7 +22,7 @@ public final class DrawWorkerMain {
 			try (var manager = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
 				List<File> sources;
 				try (var stream = Files.walk(root.resolve("sources"))) { sources=stream.filter(p->p.toString().endsWith(".java")).sorted().map(Path::toFile).toList(); }
-				var options=List.of("-source","21","-target","21","-proc:none","-encoding","UTF-8","-classpath",request.getProperty("sdk"),"-d",root.resolve("classes").toString());
+                var options=List.of("-source","21","-target","21","-proc:none","-encoding","UTF-8","-classpath",request.getProperty("sdk")+File.pathSeparator+request.getProperty("authoring"),"-d",root.resolve("classes").toString());
 				boolean success=compiler.getTask(new PrintWriter(System.err),manager,diagnostics,options,null,manager.getJavaFileObjectsFromFiles(sources)).call();
 				var output=new Properties(); int i=0;
 				for (var d:diagnostics.getDiagnostics()) {
@@ -38,8 +39,13 @@ public final class DrawWorkerMain {
 			String[] seeds=request.getProperty("seeds").split(",");
 			for(int i=0;i<seeds.length;i++) {
 				try(var loader=new URLClassLoader(new java.net.URL[]{root.resolve("classes").toUri().toURL()},DrawProgram.class.getClassLoader())) {
-					var program=loader.loadClass(request.getProperty("entryClass")).asSubclass(DrawProgram.class).getDeclaredConstructor().newInstance();
-					var drawing=Objects.requireNonNull(program.generate(new DrawContext(Long.parseLong(seeds[i]),params,DrawLimits.DEFAULT)),"Program returned null");
+                    var program=loader.loadClass(request.getProperty("entryClass")).getDeclaredConstructor().newInstance();
+                    var context=new DrawContext(Long.parseLong(seeds[i]),params,DrawLimits.DEFAULT);DrawStructure drawing;
+                    if(program instanceof StructureProgram authored) {
+                        var result=Objects.requireNonNull(authored.generate(new AuthoringContext(context)),"Program returned null");drawing=result.drawing();
+                        Files.write(root.resolve("result-"+i+".authoring.json"),result.sidecar());
+                    } else if(program instanceof DrawProgram legacy)drawing=Objects.requireNonNull(legacy.generate(context),"Program returned null");
+                    else throw new IllegalArgumentException("Entry must implement DrawProgram or StructureProgram");
 					Files.write(root.resolve("result-"+i+".wsdraw"),DrawSnapshotCodec.encode(drawing));
 				}
 			}

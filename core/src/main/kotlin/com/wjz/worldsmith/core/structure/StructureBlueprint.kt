@@ -226,4 +226,5 @@ data class CompiledStructure @JvmOverloads constructor(
     val storageFragment: Boolean = false,
     val interactionIds: List<Int> = emptyList(),
     val anchors: Map<String,BuildPos> = emptyMap(),
+    val reachableFeet:List<BuildPos> = emptyList(),
 )

@@ -9,9 +9,12 @@ import org.junit.jupiter.api.io.TempDir
 
 class DocumentedDrawingExampleTest {
     @TempDir lateinit var root:Path
-    @Test fun `published Java and full MCP example execute without a client-side compiler`() {
-        val path=Path.of(System.getProperty("worldsmith.projectRoot"),"docs/examples/structure-agent/workflow.json")
-        val steps=Json.parseToJsonElement(Files.readString(path)).jsonObject.getValue("steps").jsonArray
+    @Test fun `published Java and full MCP example execute without a client-side compiler`() = replay("structure-agent")
+    @Test fun `authored workbench source projects and shared components replay end to end`() = replay("authoring-workbench")
+    private fun replay(example:String) {
+        val path=Path.of(System.getProperty("worldsmith.projectRoot"),"docs/examples/$example/workflow.json")
+        val document=Json.parseToJsonElement(Files.readString(path)).jsonObject
+        val steps=document.getValue("steps").jsonArray
         val variables=mutableMapOf<String,JsonElement>()
         fun substitute(value:JsonElement):JsonElement = when(value) {
             is JsonObject -> JsonObject(value.mapValues {substitute(it.value)})
@@ -39,10 +42,11 @@ class DocumentedDrawingExampleTest {
                     }
                 }
                 imageCount+=result.images.size
+                if(name=="worldsmith_preflight_structure")assertTrue(result.structuredContent.getValue("valid").jsonPrimitive.boolean,"Repair before expanding the next building: ${result.structuredContent}")
                 step["capture"]?.jsonObject?.forEach { (key,p)->variables[key]=pointer(result.structuredContent,p.jsonPrimitive.content) }
                 if(name==WorldsmithWorkflow.FINISH_TOOL)assertTrue(result.structuredContent.getValue("complete").jsonPrimitive.boolean)
             }
-            assertEquals(5,imageCount);assertNotNull(variables["PACK"])
+            assertEquals(document["expectedImages"]?.jsonPrimitive?.int ?: 5,imageCount)
         }
     }
 }

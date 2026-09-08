@@ -1,0 +1,831 @@
+{
+  "description": "Executable MCP sequence. Replace whole $VARIABLE values from prior structuredContent captures. Wait for SUCCEEDED and inspect checks; UI confirmation follows host policy. Only changed target dependencies are rebuilt. Template terrain is a test fixture, not a universal design.",
+  "expectedImages": 6,
+  "steps": [
+    {
+      "tool": "worldsmith_begin_world",
+      "arguments": {
+        "prompt": "Example-only world of luminous stone courts, monumental civic architecture and smaller wayside structures.",
+        "detail": "summary"
+      },
+      "capture": {
+        "SESSION": "/sessionId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_pack_template",
+      "arguments": {},
+      "capture": {
+        "TERRAIN": "/terrain",
+        "BIOMES": "/biomes",
+        "FEATURES": "/features"
+      }
+    },
+    {
+      "tool": "worldsmith_get_contract",
+      "arguments": {
+        "id": "draw",
+        "detail": "index"
+      }
+    },
+    {
+      "tool": "worldsmith_get_contract",
+      "arguments": {
+        "id": "architecture",
+        "detail": "index"
+      }
+    },
+    {
+      "tool": "worldsmith_get_contract",
+      "arguments": {
+        "id": "structure",
+        "detail": "index"
+      }
+    },
+    {
+      "tool": "worldsmith_get_contract",
+      "arguments": {
+        "id": "draw",
+        "section": "authoring-workbench"
+      }
+    },
+    {
+      "tool": "worldsmith_query_block_states",
+      "arguments": {
+        "ids": [
+          "minecraft:glowstone",
+          "minecraft:stone_bricks",
+          "minecraft:dark_oak_planks"
+        ]
+      }
+    },
+    {
+      "tool": "worldsmith_plan_architecture",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "architecture": {
+          "policyVersion": 1,
+          "worldTheme": "Stone colonnades and timber-roofed open courts",
+          "groups": [
+            {
+              "structure": "civic_group",
+              "title": "Monumental civic court",
+              "role": "LANDMARK",
+              "centerpiece": "grand_hall",
+              "themeFit": "The strongest expression of this world's stone colonnades",
+              "layoutIntent": "Raised central court with two connected halls",
+              "distinction": "Monumental height, long approach and focal roof",
+              "discovery": "Repeated eligible dry land candidates, not a guaranteed instance",
+              "required": [
+                {
+                  "role": "centre",
+                  "blueprints": [
+                    "grand_hall"
+                  ],
+                  "minCount": 1,
+                  "maxCount": 1
+                },
+                {
+                  "role": "supporting halls",
+                  "blueprints": [
+                    "wing"
+                  ],
+                  "minCount": 2,
+                  "maxCount": 2
+                }
+              ]
+            },
+            {
+              "structure": "outpost_group",
+              "title": "Working outpost",
+              "role": "REGULAR",
+              "centerpiece": "outpost_court",
+              "themeFit": "Small utilitarian expression of the same material language",
+              "layoutIntent": "One service hall and an optional workshop",
+              "distinction": "Asymmetric smaller-scale working settlement",
+              "discovery": "Dry surface sites in the example biome",
+              "required": [
+                {
+                  "role": "centre",
+                  "blueprints": [
+                    "outpost_court"
+                  ],
+                  "minCount": 1,
+                  "maxCount": 1
+                },
+                {
+                  "role": "service hall",
+                  "blueprints": [
+                    "wing"
+                  ],
+                  "minCount": 1,
+                  "maxCount": 1
+                }
+              ],
+              "optional": [
+                {
+                  "role": "workshop",
+                  "blueprints": [
+                    "workshop"
+                  ],
+                  "minCount": 0,
+                  "maxCount": 1
+                }
+              ]
+            }
+          ],
+          "standalone": [
+            {
+              "structure": "wayside",
+              "purpose": "Independent wayside shelter",
+              "themeFit": "A small open colonnade in the same world"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "tool": "worldsmith_put_drawing_source",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "courts",
+        "expectedRevision": 0,
+        "changes": {
+          "Materials.java": "import com.wjz.worldsmith.core.draw.*;\npublic final class Materials {\n    public static BlockStateRef stone(){return BlockStateRef.of(\"stone_bricks\");}\n    public static String roof(){return \"dark_oak_planks\";}\n}\n",
+          "Pavilion.java": "import com.wjz.worldsmith.core.draw.*;\nimport com.wjz.worldsmith.authoring.*;\n\n/** A composable teaching example, not a production architectural style preset. */\npublic final class Pavilion implements StructureProgram {\n    public AuthoredStructure generate(AuthoringContext a) {\n        String kind=a.parameters().getOrDefault(\"kind\",\"grand\");\n        int n=kind.equals(\"grand\")?19:kind.equals(\"court\")?8:7;\n        int h=kind.equals(\"grand\")?35:kind.equals(\"court\")?10:12;\n        var c=a.canvas(Box.of(-n,0,-n,n,h-1,n));a.origin(new Vec3i(0,0,0));\n        a.material(\"foundation\",Materials.stone());\n        c.pen(Brush.solid(Materials.stone())).fill(Box.of(-n,0,-n,n,3,n));\n        a.room(\"hall\",Box.of(-n+1,4,-n+1,n-1,h-3,n-1),Materials.stone());\n        for(int x:new int[]{-n+2,n-4})for(int z:new int[]{-n+2,n-4})\n            c.pen(Brush.solid(Materials.stone())).fill(Box.of(x,4,z,x+2,h-3,z+2));\n        c.pen(Materials.roof()).fill(Box.of(-n,h-2,-n,n,h-2,n));\n        a.component(\"roof\",Box.of(-n,h-2,-n,n,h-2,n));\n        var points=new java.util.LinkedHashSet<Vec3i>();\n        for(int x=-n+2;x<n;x+=5)for(int z=-n+2;z<n;z+=5)\n            if(c.get(new Vec3i(x,4,z)).orElseThrow().state().isAir())points.add(new Vec3i(x,3,z));\n        // Floor lights under solid columns do not illuminate the surrounding room.\n        // Perimeter strips cover the narrow passages behind the corner columns.\n        for(int t=-n+1;t<n;t+=4) {\n            points.add(new Vec3i(t,3,-n+1));points.add(new Vec3i(t,3,n-1));\n            points.add(new Vec3i(-n+1,3,t));points.add(new Vec3i(n-1,3,t));\n        }\n        points.add(new Vec3i(n-1,3,n-1));\n        int index=0;for(var point:points)a.lightFixture(\"floor_light_\"+(index++),point,BlockStateRef.of(\"glowstone\"),15);\n        a.entrance(\"north\",new Vec3i(0,4,-n+1),\"NORTH\",Materials.stone(),3);\n        a.entrance(\"east\",new Vec3i(n-1,4,0),\"EAST\",Materials.stone(),3);\n        return a.snapshot();\n    }\n}\n",
+          "Marker.java": "import com.wjz.worldsmith.core.draw.*;\nimport com.wjz.worldsmith.authoring.*;\npublic final class Marker implements StructureProgram {\n    public AuthoredStructure generate(AuthoringContext a) {\n        var c=a.canvas(Box.of(-4,0,-4,4,7,4));a.origin(new Vec3i(0,0,0));\n        c.pen(\"stone_bricks\").fill(Box.of(-4,0,-4,4,2,4));\n        c.pen(\"air\").fill(Box.of(-4,3,-4,4,7,4));\n        for(int x:new int[]{-3,3})for(int z:new int[]{-3,3})c.pen(\"stone_bricks\").fill(Box.of(x,3,z,x,5,z));\n        c.pen(\"dark_oak_planks\").fill(Box.of(-4,6,-4,4,6,4));a.component(\"roof\",Box.of(-4,6,-4,4,6,4));\n        return a.snapshot();\n    }\n}\n"
+        },
+        "targets": {
+          "pavilion": {
+            "entryClass": "Pavilion",
+            "files": [
+              "Pavilion.java",
+              "Materials.java"
+            ]
+          },
+          "marker": {
+            "entryClass": "Marker",
+            "files": [
+              "Marker.java"
+            ]
+          }
+        }
+      },
+      "capture": {
+        "PROJECT": "/projectId"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "grand",
+        "requestId": "grand-r1",
+        "sourceRef": {
+          "projectId": "$PROJECT",
+          "revision": 1,
+          "target": "pavilion"
+        },
+        "parameters": {
+          "kind": "grand"
+        },
+        "seeds": [
+          20260906
+        ]
+      },
+      "capture": {
+        "JOB_GRAND": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_GRAND"
+      },
+      "capture": {
+        "DRAW_GRAND": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preflight_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_GRAND"
+      }
+    },
+    {
+      "tool": "worldsmith_preview_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_GRAND",
+        "view": "isometric"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "court",
+        "requestId": "court-r1",
+        "sourceRef": {
+          "projectId": "$PROJECT",
+          "revision": 1,
+          "target": "pavilion"
+        },
+        "parameters": {
+          "kind": "court"
+        },
+        "seeds": [
+          20260906
+        ]
+      },
+      "capture": {
+        "JOB_COURT": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_COURT"
+      },
+      "capture": {
+        "DRAW_COURT": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preflight_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_COURT"
+      }
+    },
+    {
+      "tool": "worldsmith_preview_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_COURT",
+        "view": "isometric"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "wing",
+        "requestId": "wing-r1",
+        "sourceRef": {
+          "projectId": "$PROJECT",
+          "revision": 1,
+          "target": "pavilion"
+        },
+        "parameters": {
+          "kind": "wing"
+        },
+        "seeds": [
+          20260906
+        ]
+      },
+      "capture": {
+        "JOB_WING": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_WING"
+      },
+      "capture": {
+        "DRAW_WING": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preflight_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_WING"
+      }
+    },
+    {
+      "tool": "worldsmith_preview_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_WING",
+        "view": "isometric"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "marker",
+        "requestId": "marker-r1",
+        "sourceRef": {
+          "projectId": "$PROJECT",
+          "revision": 1,
+          "target": "marker"
+        },
+        "parameters": {
+          "kind": "marker"
+        },
+        "seeds": [
+          20260906
+        ]
+      },
+      "capture": {
+        "JOB_MARKER": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_MARKER"
+      },
+      "capture": {
+        "DRAW_MARKER": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preflight_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_MARKER"
+      }
+    },
+    {
+      "tool": "worldsmith_preview_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_MARKER",
+        "view": "isometric"
+      }
+    },
+    {
+      "tool": "worldsmith_put_drawing_source",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "courts",
+        "expectedRevision": 1,
+        "changes": {
+          "Materials.java": "import com.wjz.worldsmith.core.draw.*;\npublic final class Materials {\n    public static BlockStateRef stone(){return BlockStateRef.of(\"stone_bricks\");}\n    public static String roof(){return \"spruce_planks\";}\n}\n"
+        }
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "grand",
+        "requestId": "grand-r2",
+        "sourceRef": {
+          "projectId": "$PROJECT",
+          "revision": 2,
+          "target": "pavilion"
+        },
+        "parameters": {
+          "kind": "grand"
+        },
+        "seeds": [
+          20260906
+        ]
+      },
+      "capture": {
+        "JOB_GRAND": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_GRAND"
+      },
+      "capture": {
+        "DRAW_GRAND": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preflight_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_GRAND"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "court",
+        "requestId": "court-r2",
+        "sourceRef": {
+          "projectId": "$PROJECT",
+          "revision": 2,
+          "target": "pavilion"
+        },
+        "parameters": {
+          "kind": "court"
+        },
+        "seeds": [
+          20260906
+        ]
+      },
+      "capture": {
+        "JOB_COURT": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_COURT"
+      },
+      "capture": {
+        "DRAW_COURT": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preflight_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_COURT"
+      }
+    },
+    {
+      "tool": "worldsmith_build_drawing",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "name": "wing",
+        "requestId": "wing-r2",
+        "sourceRef": {
+          "projectId": "$PROJECT",
+          "revision": 2,
+          "target": "pavilion"
+        },
+        "parameters": {
+          "kind": "wing"
+        },
+        "seeds": [
+          20260906
+        ]
+      },
+      "capture": {
+        "JOB_WING": "/jobId"
+      }
+    },
+    {
+      "tool": "worldsmith_get_drawing_job",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "jobId": "$JOB_WING"
+      },
+      "capture": {
+        "DRAW_WING": "/drawingIds/0"
+      },
+      "waitUntil": {
+        "path": "/stage",
+        "value": "SUCCEEDED"
+      }
+    },
+    {
+      "tool": "worldsmith_preflight_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "drawingId": "$DRAW_WING"
+      }
+    },
+    {
+      "tool": "worldsmith_resume_session",
+      "arguments": {
+        "sessionId": "$SESSION"
+      },
+      "capture": {
+        "REVISION": "/revision"
+      }
+    },
+    {
+      "tool": "worldsmith_put_architecture_draft",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "expectedRevision": "$REVISION",
+        "architecture": {
+          "policyVersion": 1,
+          "worldTheme": "Stone colonnades and timber-roofed open courts",
+          "groups": [
+            {
+              "structure": "civic_group",
+              "title": "Monumental civic court",
+              "role": "LANDMARK",
+              "centerpiece": "grand_hall",
+              "themeFit": "The strongest expression of this world's stone colonnades",
+              "layoutIntent": "Raised central court with two connected halls",
+              "distinction": "Monumental height, long approach and focal roof",
+              "discovery": "Repeated eligible dry land candidates, not a guaranteed instance",
+              "required": [
+                {
+                  "role": "centre",
+                  "blueprints": [
+                    "grand_hall"
+                  ],
+                  "minCount": 1,
+                  "maxCount": 1
+                },
+                {
+                  "role": "supporting halls",
+                  "blueprints": [
+                    "wing"
+                  ],
+                  "minCount": 2,
+                  "maxCount": 2
+                }
+              ]
+            },
+            {
+              "structure": "outpost_group",
+              "title": "Working outpost",
+              "role": "REGULAR",
+              "centerpiece": "outpost_court",
+              "themeFit": "Small utilitarian expression of the same material language",
+              "layoutIntent": "One service hall and an optional workshop",
+              "distinction": "Asymmetric smaller-scale working settlement",
+              "discovery": "Dry surface sites in the example biome",
+              "required": [
+                {
+                  "role": "centre",
+                  "blueprints": [
+                    "outpost_court"
+                  ],
+                  "minCount": 1,
+                  "maxCount": 1
+                },
+                {
+                  "role": "service hall",
+                  "blueprints": [
+                    "wing"
+                  ],
+                  "minCount": 1,
+                  "maxCount": 1
+                }
+              ],
+              "optional": [
+                {
+                  "role": "workshop",
+                  "blueprints": [
+                    "workshop"
+                  ],
+                  "minCount": 0,
+                  "maxCount": 1
+                }
+              ]
+            }
+          ],
+          "standalone": [
+            {
+              "structure": "wayside",
+              "purpose": "Independent wayside shelter",
+              "themeFit": "A small open colonnade in the same world"
+            }
+          ]
+        },
+        "structures": [
+          {
+            "id": "civic_group",
+            "blueprint": {
+              "id": "grand_hall",
+              "authored": {
+                "variants": [
+                  "$DRAW_GRAND"
+                ]
+              },
+              "portBindings": {
+                "north": {
+                  "pool": "halls",
+                  "required": true
+                },
+                "east": {
+                  "pool": "halls",
+                  "required": true
+                }
+              }
+            },
+            "placement": {
+              "biomes": [
+                "frostash_flats"
+              ],
+              "terrainFit": {
+                "surface": "LAND_SURFACE",
+                "maxHeightDifference": 3
+              }
+            },
+            "assembly": {
+              "pieces": {
+                "wing": {
+                  "id": "wing",
+                  "authored": {
+                    "variants": [
+                      "$DRAW_WING"
+                    ]
+                  },
+                  "portBindings": {}
+                }
+              },
+              "pools": {
+                "halls": [
+                  {
+                    "piece": "wing",
+                    "weight": 1
+                  }
+                ]
+              },
+              "variants": 2,
+              "maxPieces": 3,
+              "maxDepth": 1,
+              "maxRadius": 80
+            }
+          },
+          {
+            "id": "outpost_group",
+            "blueprint": {
+              "id": "outpost_court",
+              "authored": {
+                "variants": [
+                  "$DRAW_COURT"
+                ]
+              },
+              "portBindings": {
+                "east": {
+                  "pool": "halls",
+                  "required": true
+                },
+                "north": {
+                  "pool": "shops",
+                  "required": false,
+                  "chance": 0.55
+                }
+              }
+            },
+            "placement": {
+              "biomes": [
+                "frostash_flats"
+              ],
+              "terrainFit": {
+                "surface": "LAND_SURFACE",
+                "maxHeightDifference": 3
+              }
+            },
+            "assembly": {
+              "pieces": {
+                "wing": {
+                  "id": "wing",
+                  "authored": {
+                    "variants": [
+                      "$DRAW_WING"
+                    ]
+                  },
+                  "portBindings": {}
+                },
+                "workshop": {
+                  "id": "workshop",
+                  "authored": {
+                    "variants": [
+                      "$DRAW_WING"
+                    ]
+                  },
+                  "portBindings": {}
+                }
+              },
+              "pools": {
+                "halls": [
+                  {
+                    "piece": "wing",
+                    "weight": 1
+                  }
+                ],
+                "shops": [
+                  {
+                    "piece": "workshop",
+                    "weight": 1
+                  }
+                ]
+              },
+              "variants": 4,
+              "maxPieces": 3,
+              "maxDepth": 1,
+              "maxRadius": 80
+            }
+          },
+          {
+            "id": "wayside",
+            "blueprint": {
+              "id": "marker",
+              "authored": {
+                "variants": [
+                  "$DRAW_MARKER"
+                ]
+              },
+              "portBindings": {}
+            },
+            "placement": {
+              "biomes": [
+                "frostash_flats"
+              ],
+              "terrainFit": {
+                "surface": "LAND_SURFACE",
+                "maxHeightDifference": 3
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "tool": "worldsmith_preview_structure",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "blueprint": {
+          "id": "grand_hall",
+          "authored": {
+            "variants": [
+              "$DRAW_GRAND"
+            ]
+          },
+          "portBindings": {
+            "north": {
+              "pool": "halls",
+              "required": true
+            },
+            "east": {
+              "pool": "halls",
+              "required": true
+            }
+          }
+        },
+        "hideComponents": [
+          "roof"
+        ],
+        "views": [
+          "isometric",
+          "front"
+        ],
+        "overlays": [
+          "lighting",
+          "access",
+          "ports"
+        ]
+      }
+    },
+    {
+      "tool": "worldsmith_validate_architecture",
+      "arguments": {
+        "sessionId": "$SESSION"
+      }
+    },
+    {
+      "tool": "worldsmith_write_pack",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "displayName": "Authoring workbench example",
+        "terrain": "$TERRAIN",
+        "biomes": "$BIOMES",
+        "features": "$FEATURES"
+      }
+    },
+    {
+      "tool": "worldsmith_authoring_stats",
+      "arguments": {
+        "sessionId": "$SESSION"
+      }
+    },
+    {
+      "tool": "worldsmith_finish_world",
+      "arguments": {
+        "sessionId": "$SESSION"
+      }
+    }
+  ]
+}

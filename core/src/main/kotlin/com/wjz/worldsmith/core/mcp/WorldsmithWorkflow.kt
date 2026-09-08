@@ -25,6 +25,7 @@ data class WorkflowStep(
     val structures: Map<String, WorldStructureDefinition> = emptyMap(),
     val architecture: StructureArchitecture? = null,
     val revision: Long = 0,
+    val archived:Boolean=false,
 )
 
 /**
@@ -63,18 +64,19 @@ object WorldsmithWorkflow {
             "order and do not stop until $FINISH_TOOL answers complete=true.\n\n" +
             "Design terrain, biomes, features and world-specific architecture yourself. New guided worlds require at least two distinct building groups, " +
             "one independent structure, and at least one monumental theme-defining group. Read contract/architecture, plan required/optional members, " +
-            "and light occupied interiors explicitly. Do not reuse a default style across players. The player's prompt is the standard " +
+            "and light occupied interiors explicitly. Use designGuide to translate the theme into form and playable spaces; numerical gates are not design targets. " +
+            "Do not reuse a default style across players. The player's prompt is the standard " +
             "for land/ocean balance, scale, relief, height, caves, rivers, lakes, ocean depth, biome count and " +
-            "biome distribution. `howToDesign` gives the order those decisions go in and the joins where two " +
+            "biome distribution. Full-mode `howToDesign` gives the order those decisions go in and the joins where two " +
             "documents have to agree; `contracts` holds the field vocabulary, one document each for terrain, " +
-            "biome, feature, structure, draw and architecture planning, and $CONTRACT_TOOL hands any of them back if you need to re-read one; " +
+            "biome, feature, structure, draw and architecture planning (indexes in summary mode). Use $CONTRACT_TOOL for full text or a named section; " +
             "`climatePlacement` describes optional semantic presets plus the exact raw axes. Worldsmith " +
             "validates what you send and " +
             "reports exactly what is wrong, so a rejected pack is a repair job rather than a restart: change " +
             "only what the diagnostics name and send the whole document again.\n\n" +
             "Use the Java Draw SDK as the primary geometry route: submit source through MCP, wait for the MC-side worker, " +
             "inspect returned model images, revise, then reference frozen drawing ids from structure metadata. The AI needs only MCP; " +
-            "the player needs no Python, JDK or external compiler. One in-game confirmation is required per authoring session after restart. " +
+            "the player needs no Python, JDK or external compiler. Source confirmation follows the host setting; WAITING_APPROVAL needs a player action. " +
             "SDK geometry, architecture composition and world deployment remain separate modules.\n\n" +
             "complete=true means the content-addressed pack reads back and passes Core checks, native structure export/readback, " +
             "Minecraft's full data-pack reload and preset activation in the current Create World context. WAITING_NATIVE_CONTEXT " +
@@ -118,12 +120,12 @@ object WorldsmithWorkflow {
         WorkflowStep(
             order = 5,
             tool = ARCHITECTURE_TOOL,
-            instruction = "Read contract/architecture. Derive multiple groups from this world's theme, each with a centerpiece, required and optional roles, distinct purpose/layout and discovery intent. Include a monumental LANDMARK group and independent structures. Submit the plan before authoring executable members.",
+            instruction = "Read contract/architecture including creative-brief and form-function-and-family. Translate this theme into silhouette, structural/material language and spatial experience in existing plan fields. Differentiate groups by function, plan, section and massing, not only names/colours. Compose a focal LANDMARK, supporting places and independent structures. Submit the plan before geometry.",
         ),
         WorkflowStep(
             order = 6,
             tool = "worldsmith_build_drawing",
-            instruction = "Read contract/draw. Submit a complete Java 21 DrawProgram plus optional helper files, a stable build name, a new requestId and 1..8 seeds. Build each logical building independently. Required session approval happens inside Minecraft, never through an MCP approval tool.",
+            instruction = "Read contract/draw section authoring-workbench and architecture section visual-quality-loop. Register source targets and prefer StructureProgram (DrawProgram remains compatible). Develop one representative main building through clay massing, facade rhythm/depth, usable interiors, integrated lighting and selective detail; inspect between passes before expanding families. Reuse craft components, not one resized hall for every function. Confirmation follows the host setting.",
         ),
         WorkflowStep(
             order = 7,
@@ -133,12 +135,12 @@ object WorldsmithWorkflow {
         WorkflowStep(
             order = 8,
             tool = "worldsmith_preview_drawing",
-            instruction = "Inspect isometric, front/back or slice model PNG content from each successful frozen drawing. Fix silhouette, openings, floors and distribution of lights by rebuilding. Preview uses simplified cube shapes/materials/light, not the Minecraft renderer.",
+            instruction = "Inspect actual PNG content: opposite isometrics/top in clay for massing, all elevations in material mode, then occupied-storey cutaways. Note the largest visible flaw, make a specific repair and compare the SAME returned frame/view/mode. Review worldsmith_preview_assembly for group hierarchy, spacing and approach too. Preview approximates block shapes/colours; machine checks and image availability alone never prove visual quality or in-game appearance.",
         ),
         WorkflowStep(
             order = 9,
             tool = STRUCTURE_TOOL,
-            instruction = "Reference drawing.variants in the planned group definitions and standalone structures. Keep metadata in original drawing coordinates; use old JSON build operations only for compatibility. Declare lighting for every root and child blueprint: READABLE occupied spaces with actual light fixtures, or EXTERIOR_ONLY for open designs. Submit complete definitions one at a time. Required ports must produce the member counts promised by the plan.",
+            instruction = "Run worldsmith_preflight_structure and repair spatial diagnostics; model images remain available on semantic failure. Reference authored.variants to import geometry-linked semantic data, or drawing.variants for legacy manual metadata. Use worldsmith_put_architecture_draft for atomic related plan/member changes. Declare lighting for every root and child blueprint: READABLE occupied spaces with actual light fixtures, or EXTERIOR_ONLY for open designs. Submit complete definitions one at a time. Required ports must produce the member counts promised by the plan.",
         ),
         WorkflowStep(
             order = 10,
@@ -172,19 +174,25 @@ class WorkflowSessions @JvmOverloads constructor(
     private val maxSessions: Int = DEFAULT_MAX_SESSIONS,
     private val idFactory: () -> String = { UUID.randomUUID().toString().replace("-", "") },
     private val directory: Path? = null,
+    private val writer:(Path,ByteArray)->Unit = com.wjz.worldsmith.core.drawhost.DurableFiles::write,
 ) {
     init {
         require(maxSessions >= 1) { "maxSessions must be at least 1" }
     }
 
     private val sessions = LinkedHashMap<String, WorkflowSession>()
+    private val recoveryProblems=mutableListOf<String>()
+    val recoveryDiagnostics:List<String> get()=recoveryProblems.toList()
     init {
         directory?.let { root ->
             Files.createDirectories(root)
             Files.list(root).use { files -> files.filter { it.fileName.toString().matches(Regex("[a-f0-9]{32}\\.json")) }.sorted().forEach { path ->
                 require(sessions.size<128) { "Session store exceeds 128 records" }
-                val s=WorldsmithJson.decode<WorkflowSession>(Files.readString(path))
-                require(path.fileName.toString()==s.id+".json"); sessions[s.id]=s
+                runCatching {
+                    require(Files.size(path)<=8*1024*1024 && !Files.isSymbolicLink(path))
+                    val s=WorldsmithJson.decode<WorkflowSession>(Files.readString(path))
+                    require(path.fileName.toString()==s.id+".json"); sessions[s.id]=s
+                }.onFailure {recoveryProblems+="${path.fileName}: ${it.message}; file preserved"}
             } }
         }
     }
@@ -193,13 +201,13 @@ class WorkflowSessions @JvmOverloads constructor(
     fun begin(prompt: String): WorkflowSession {
         require(sessions.values.count { !it.finished } < maxSessions && sessions.size<128) { "Active session capacity reached; resume existing drafts rather than discarding them" }
         val session = WorkflowSession(idFactory(), prompt)
-        sessions[session.id] = session
         save(session)
+        sessions[session.id] = session
         return session
     }
 
     @Synchronized
-    fun find(id: String): WorkflowSession? = sessions[id]
+    fun find(id: String): WorkflowSession? = sessions[id] ?: archivedRecord(id)
 
     /** Returns null when the id is unknown, which the caller reports rather than throws. */
     @Synchronized
@@ -235,17 +243,48 @@ class WorkflowSessions @JvmOverloads constructor(
     @Synchronized
     fun size(): Int = sessions.size
     @Synchronized fun all(): List<WorkflowSession> = sessions.values.toList()
+    @Synchronized fun archivedSessions():List<WorkflowSession> {
+        val root=directory?.resolve("archive") ?: return emptyList();if(!Files.isDirectory(root))return emptyList()
+        return Files.list(root).use {it.filter {p->p.fileName.toString().matches(Regex("[a-f0-9]{32}\\.json"))}.sorted().map {p->archivedRecord(p.fileName.toString().removeSuffix(".json"))}.filter {it!=null}.toList().filterNotNull()}
+    }
+    @Synchronized fun archive(id:String):WorkflowSession {
+        val current=sessions[id] ?: return requireNotNull(archivedRecord(id)) {"Unknown session"}
+        val root=requireNotNull(directory) {"Archiving requires a persistent session store"}
+        val archived=current.copy(archived=true);writer(root.resolve("archive/$id.json"),WorldsmithJson.encode(archived).toByteArray(Charsets.UTF_8))
+        Files.deleteIfExists(root.resolve("$id.json"));sessions.remove(id);return archived
+    }
+    @Synchronized fun resume(id:String):WorkflowSession? {
+        sessions[id]?.let {return it}
+        val current=archivedRecord(id) ?: return null
+        require(sessions.size<128 && (current.finished || sessions.values.count {!it.finished}<maxSessions)) {"Active session capacity reached"}
+        val resumed=current.copy(archived=false);save(resumed);sessions[id]=resumed
+        directory?.let {Files.deleteIfExists(it.resolve("archive/$id.json"))};return resumed
+    }
+    /** Architecture and all changed definitions share one durable revision boundary. */
+    @Synchronized fun putArchitectureDraft(id:String,expectedRevision:Long,architecture:StructureArchitecture?,structures:List<WorldStructureDefinition>,remove:List<String> = emptyList()):WorkflowSession? = update(id) {
+        require(it.revision==expectedRevision) {"DRAFT_REVISION_CONFLICT: expected $expectedRevision, current ${it.revision}"}
+        val next=it.structures-remove.toSet()+structures.associateBy {s->s.id}
+        require(next.size<=48 && structures.map {s->s.id}.distinct().size==structures.size)
+        if(next==it.structures && (architecture ?: it.architecture)==it.architecture)it else
+            it.copy(architecture=architecture ?: it.architecture,structures=next,revision=it.revision+1,packId=null,finished=false)
+    }
     @Synchronized fun invalidate(id:String):WorkflowSession? = update(id) { it.copy(packId=null,finished=false,revision=it.revision+1) }
 
     private fun update(id: String, change: (WorkflowSession) -> WorkflowSession): WorkflowSession? {
         val current = sessions[id] ?: return null
         val updated = change(current)
-        sessions[id] = updated
         save(updated)
+        sessions[id] = updated
         return updated
     }
 
-    private fun save(session:WorkflowSession) { directory?.let { DrawingHost.atomic(it.resolve(session.id+".json"),WorldsmithJson.encode(session).toByteArray(Charsets.UTF_8)) } }
+    private fun save(session:WorkflowSession) { directory?.let { writer(it.resolve(session.id+".json"),WorldsmithJson.encode(session).toByteArray(Charsets.UTF_8)) } }
+    private fun archivedRecord(id:String):WorkflowSession? {
+        if(!id.matches(Regex("[a-f0-9]{32}")))return null
+        val p=directory?.resolve("archive/$id.json") ?: return null;if(!Files.isRegularFile(p))return null
+        return runCatching {require(Files.size(p)<=8*1024*1024&&!Files.isSymbolicLink(p));WorldsmithJson.decode<WorkflowSession>(Files.readString(p)).also {require(it.id==id)}}
+            .getOrElse {throw IllegalStateException("Archived session $id is unreadable; file preserved: ${it.message}",it)}
+    }
 
     companion object {
         const val DEFAULT_MAX_SESSIONS: Int = 8
