@@ -1,7 +1,7 @@
 package com.wjz.worldsmith.client.content.creature;
 
 import com.wjz.worldsmith.core.content.CreatureBone;
-import com.wjz.worldsmith.core.content.CreatureCombatState;
+import com.wjz.worldsmith.core.content.CreaturePose;
 import java.util.*;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.geom.ModelPart;
@@ -65,30 +65,11 @@ public final class CreatureModel extends EntityModel<CreatureRenderState> {
 
     @Override public void setupAnim(CreatureRenderState state) {
         super.setupAnim(state);
-        float idlePhase = (state.appearanceSeed & 1023) * .006135923F;
+        var frame = new CreaturePose.Frame(state.ageInTicks, state.walkAnimationPos, state.walkAnimationSpeed,
+            state.yRot, state.xRot, state.appearanceSeed, state.action);
         for (var entry : animated) {
-            var b = entry.bone(); var p = entry.part();
-            float phase = state.walkAnimationPos * .6662F + b.getGaitPhase() * Mth.DEG_TO_RAD;
-            float amplitude = Math.min(state.walkAnimationSpeed, 1.0F) * 1.2F;
-            switch (b.getRole()) {
-                case HEAD -> {
-                    p.yRot += Mth.clamp(state.yRot, -65, 65) * Mth.DEG_TO_RAD;
-                    p.xRot += Mth.clamp(state.xRot, -40, 40) * Mth.DEG_TO_RAD;
-                    if (state.action == CreatureCombatState.WINDUP.ordinal()) p.xRot -= .25F;
-                    if (state.action == CreatureCombatState.STRIKE.ordinal()) p.xRot += .55F;
-                }
-                case LEG_LEFT -> p.xRot += Mth.cos(phase) * amplitude;
-                case LEG_RIGHT -> p.xRot += Mth.cos(phase + Mth.PI) * amplitude;
-                case ARM_LEFT, ARM_RIGHT -> {
-                    float offset = b.getRole() == com.wjz.worldsmith.core.content.CreatureBoneRole.ARM_LEFT ? Mth.PI : 0;
-                    p.xRot += Mth.cos(phase + offset) * amplitude * .6F;
-                    if (state.action == CreatureCombatState.WINDUP.ordinal()) p.xRot -= 1.3F;
-                    if (state.action == CreatureCombatState.STRIKE.ordinal()) p.xRot -= .4F;
-                    if (state.action == CreatureCombatState.RECOVERY.ordinal()) p.xRot -= .2F;
-                }
-                case TAIL -> p.yRot += Mth.sin(state.ageInTicks * .08F + idlePhase) * .16F + Mth.cos(phase) * amplitude * .15F;
-                case NONE -> { }
-            }
+            var rotation = CreaturePose.rotation(entry.bone(), frame);
+            var part = entry.part(); part.xRot = rotation.x(); part.yRot = rotation.y(); part.zRot = rotation.z();
         }
     }
 }

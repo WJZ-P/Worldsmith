@@ -120,3 +120,14 @@ state-machine, event, script, spell or animation-JSON fields.
 If related geometry uses custom blocks, use `worldsmith:content/<blockId>` with
 no property suffix; source does not name native block slots. This creature
 schema has no drops field, so it does not create block drops from prose alone.
+
+## Construction and preview tools
+
+For new models, read `worldsmith_get_creature_authoring_contract` and prefer a
+`worldsmith_build_creature` recipe over hand-calculating every UV. Named bones/cubes,
+mirrored limbs and automatic box UVs compile to this same runtime schema. Inspect
+`worldsmith_preview_creature` model/sheet/uv images before committing a definition.
+A diagnostic UV guide is not a finished skin. Upload a painted PNG of the exact
+atlas size, rebuild with textureAsset, then merge the returned definition into the
+current CreatureLibrary at its shared draft revision. Build artifacts never activate
+a world or implement special Boss phases automatically.

@@ -112,3 +112,11 @@ Bundles and slot assignments are embedded in the native datapack carried by the
 save. Runtime has no AI/network calls during chunk generation or entity ticks.
 Current generated content targets one local integrated-server world; remote
 asset/binding negotiation is not installed. Regenerate old unreleased formats.
+
+For creature construction, prefer `worldsmith_get_creature_authoring_contract` and
+`worldsmith_build_creature` for named bones/cubes, mirrored limbs and automatic UVs.
+Inspect actual textured models and the shared procedural poses with
+`worldsmith_preview_creature`. Guide textures are diagnostic only; bind the painted
+PNG before merging a definition. Joined-world creative content is available in the
+Worldsmith tab as bound BlockItems and species-specific summoners; a future ordinary
+item domain can join that catalog without exposing unbound native slots.

@@ -24,6 +24,9 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         put("newPackFormatEnabled",true);put("legacyPackFormats",JsonArray(emptyList()));put("activationVerified",false)
         put("runtimeScope","one local integrated-server world; remote multiplayer content negotiation is not installed")
         put("assetAuthoring","actual PNG upload or indexed-pixel texture authoring; not a hosted image-generation service")
+        put("creatureAuthoring", "deterministic bone/cube recipes, mirroring, automatic UVs and frozen textured pose previews")
+        put("creatureAuthoringContract", "worldsmith_get_creature_authoring_contract")
+        put("creativeModeContentTab", nativeAdapterPresent)
         put("customBlockReference","worldsmith:content/<blockId>; no arbitrary state properties or raw host slot ids")
         put("nextTool","worldsmith_get_content_contract")
     }
@@ -52,6 +55,8 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         )
     }
     fun assetBytes(session:WorkflowSession?):Map<String,ByteArray> = session?.contentAssets?.mapValues {(_,asset)->requireNotNull(assets) {"Asset storage is not installed"}.read(asset)}.orEmpty()
+    fun textureBytes(session:WorkflowSession,id:String):ByteArray = requireNotNull(assets) {"Asset storage is not installed"}
+        .read(requireNotNull(session.contentAssets[id]) {"Texture is not attached to this session"})
     private fun session(a:JsonObject)=requireNotNull(sessions.find(McpJson.string(a,"sessionId"))) {"Unknown session; begin or resume a world draft"}
     private fun current(a:JsonObject)=session(a).also {
         require(!it.archived) {"Resume the archived draft before editing"}

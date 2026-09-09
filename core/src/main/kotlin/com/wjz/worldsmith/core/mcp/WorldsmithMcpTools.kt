@@ -82,9 +82,10 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private val packStore=ManagedPackStore(this.packDirectory)
     private val publicationService=PackPublicationService(packStore,sessions,publicationHost,drawingService)
     private val contentService=WorldContentMcpService(packStore,nativeChecks!=null,sessions,this.packDirectory.resolveSibling("content-assets"))
+    private val creatureAuthoringService=CreatureAuthoringMcpService(sessions,contentService,this.packDirectory.resolveSibling("creature-work"))
     init {drawings.completionChecks=structureService::completed;drawingService.inspectDrawing=structureService::inspectDrawing}
 
-    fun all(): List<McpTool> = contentService.tools()+drawingService.tools()+structureService.tools()+listOf(
+    fun all(): List<McpTool> = contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+listOf(
         McpTool("worldsmith_list_sessions", "List saved world drafts", "List persistent sessions without executing sources.", objectSchema(mapOf("includeArchived" to buildJsonObject {put("type","boolean")}),emptyList()), true, handler=::listSavedSessions),
         McpTool("worldsmith_resume_session", "Resume a world draft", "Restore plan/drafts and job references without executing code. Source confirmation follows the configured host policy.", sessionSchema(), true, handler=::resumeSession),
         McpTool("worldsmith_build_drawing", "Build a drawing with Java", "Build Java 21 StructureProgram or DrawProgram, using a source project target or inline sources. Runs in the MC-side worker, not in worldgen. Returns a job id; use a new requestId for each revision. Develop one representative building and inspect its model before expanding a family.", drawingBuildSchema(), false, handler=drawingService::build),
