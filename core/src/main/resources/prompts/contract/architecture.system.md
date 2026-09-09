@@ -299,3 +299,11 @@ Run preflight before scaling out a new component or composition. Inspect dark/er
 regions and repair only affected source targets, metadata or layout. Use atomic
 worldsmith_put_architecture_draft when related plan/member changes belong together.
 Engineering gates prove deployability and readability estimates, not aesthetic quality.
+
+## World bundle version boundary
+
+Published worlds use bundle format 3 with seven typed modules and verified assets.
+Architecture policyVersion remains 1. Blueprint schema remains 1; structure
+libraries use module schema 1 or module schema 2 when freezing SDK artifacts.
+These domain versions do not select the world bundle format. Legacy world bundle
+formats 1/2 are rejected; do not advertise their previous load path.

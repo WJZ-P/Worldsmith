@@ -1,12 +1,37 @@
 {
-	"formatVersion": 1,
-	"id": "0a243bb4747640ca6e490e74f8d34a7cf7c676bfb817aadaee7f6f47b72eb709",
-	"displayName": "Ashlands",
-	"description": "A wind-scoured industrial wasteland used by the procedural terrain compiler fixture.",
-	"files": {
-		"terrain": "terrain.json",
-		"biomes": "biomes.json",
-		"features": "features.json",
-		"structures": "structures.json"
-	}
+  "formatVersion": 3,
+  "id": "bc930b1bf16024b79df3cce15608f5c33f18295c89cbb990ce35001efa9ac804",
+  "displayName": "Ashlands",
+  "description": "A wind-scoured industrial wasteland used by the procedural terrain compiler fixture.",
+  "modules": {
+    "terrain": {
+      "schemaVersion": 1,
+      "path": "terrain.json"
+    },
+    "biomes": {
+      "schemaVersion": 1,
+      "path": "biomes.json"
+    },
+    "features": {
+      "schemaVersion": 1,
+      "path": "features.json"
+    },
+    "structures": {
+      "schemaVersion": 1,
+      "path": "structures.json"
+    },
+    "theme": {
+      "schemaVersion": 1,
+      "path": "theme.json"
+    },
+    "blocks": {
+      "schemaVersion": 1,
+      "path": "blocks.json"
+    },
+    "creatures": {
+      "schemaVersion": 1,
+      "path": "creatures.json"
+    }
+  },
+  "assets": []
 }

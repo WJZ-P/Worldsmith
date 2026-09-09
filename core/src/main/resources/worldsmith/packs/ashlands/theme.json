@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "ashlands",
+  "title": "The Ashlands",
+  "premise": "An industrial civilization exhausted its lands; wind and deep water are reclaiming the ruins.",
+  "playerRole": "A wandering surveyor rebuilding an understanding of the broken landscape.",
+  "worldRules": ["Terrain and ecology tell the same story of erosion and recovery.", "Ancient industrial remnants remain rare landmarks rather than uniform decoration."],
+  "mainConflict": "Discover whether a living homeland can emerge from the exhausted world.",
+  "beats": [{"id": "survey", "title": "Read the land", "description": "Cross the landforms and locate the drowned depths before deciding where recovery begins.", "content": [{"kind": "terrain", "id": "main"}, {"kind": "biome", "id": "abyss"}]}]
+}

@@ -7,14 +7,15 @@ import com.wjz.worldsmith.core.model.SurfaceHydrology
 import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.WorldsmithPack
 import com.wjz.worldsmith.core.structure.StructureValidator
+import com.wjz.worldsmith.core.content.*
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO
 
 object WorldsmithPackValidator {
-    private const val FORMAT_VERSION = 1
     private val ID = Regex("^[0-9a-f]{64}$")
 
     fun validate(pack: WorldsmithPack): List<Diagnostic> = buildList {
         val manifest = pack.manifest
-        if (manifest.formatVersion !in 1..2) {
+        if (manifest.formatVersion != WorldContentBundleIO.FORMAT_VERSION) {
             add(error("manifest.formatVersion", "UNSUPPORTED_PACK_FORMAT", "Unsupported pack format ${manifest.formatVersion}"))
         }
         if (!ID.matches(manifest.id)) {
@@ -25,14 +26,51 @@ object WorldsmithPackValidator {
         if (manifest.displayName.isBlank()) {
             add(error("manifest.displayName", "EMPTY_DISPLAY_NAME", "Pack display name must not be blank"))
         }
-        listOf(
-            "terrain" to manifest.files.terrain,
-            "biomes" to manifest.files.biomes,
-            "features" to manifest.files.features,
-            "structures" to manifest.files.structures,
-        ).forEach { (name, path) ->
-            if (path.startsWith('/') || path.split('/').any { it == ".." }) {
-                add(error("manifest.files.$name", "UNSAFE_PACK_PATH", "Pack content paths must stay inside the pack"))
+        try { WorldContentBundleIO.validateManifest(manifest) } catch (e: IllegalArgumentException) {
+            add(error("manifest", "INVALID_CONTENT_MANIFEST", e.message ?: "Invalid module manifest"))
+        }
+
+        val contentPlan = ExistingWorldContentModules.registry().plan(ExistingWorldContentModules.input(pack))
+        addAll(contentPlan.diagnostics)
+        val assets = try { ContentAssetValidation.verifyAll(manifest.assets, pack.assets) } catch (e: Exception) {
+            add(error("assets", "CONTENT_ASSET_INTEGRITY", e.message ?: "Asset integrity check failed")); emptyMap()
+        }
+        val descriptors = manifest.assets.associateBy { it.id }
+        fun checkTextureAddress(id: String, path: String) {
+            descriptors[id]?.let { asset ->
+                if (asset.id != asset.sha256)
+                    add(error(path, "CONTENT_TEXTURE_ADDRESS_MISMATCH", "Native texture references must be their asset's SHA-256, not a different logical alias"))
+            }
+        }
+        pack.blocks.blocks.forEachIndexed { i, block ->
+            checkTextureAddress(block.textureAsset, "blocks.blocks[$i].textureAsset")
+            if ((descriptors[block.textureAsset]?.byteLength ?: 0L) > 1024 * 1024)
+                add(error("blocks.blocks[$i].textureAsset", "BLOCK_TEXTURE_BYTE_BUDGET", "Native block PNG textures must be at most 1 MiB"))
+            assets[block.textureAsset]?.let { size ->
+                if (size.width != size.height || size.width !in 16..256 || size.width and (size.width - 1) != 0)
+                    add(error("blocks.blocks[$i].textureAsset", "BLOCK_TEXTURE_DIMENSIONS", "Block textures must be square power-of-two PNGs, 16..256 pixels"))
+            }
+        }
+        pack.creatures.creatures.forEachIndexed { i, creature ->
+            checkTextureAddress(creature.model.texture, "creatures.creatures[$i].model.texture")
+            assets[creature.model.texture]?.let { size ->
+                if (size.width != creature.model.textureWidth || size.height != creature.model.textureHeight)
+                    add(error("creatures.creatures[$i].model.texture", "CREATURE_TEXTURE_DIMENSIONS", "PNG dimensions must match the model UV atlas"))
+            }
+        }
+        val knownBlocks = pack.blocks.blocks.map { it.id }.toSet()
+        pack.structures.drawingAssets.forEach { (drawingId, drawing) ->
+            drawing.voxels().map { it.block().state().id() }.toSet().filter { it.startsWith(ExistingWorldContentModules.LOCAL_BLOCK_PREFIX) }.forEach { ref ->
+                if (ref.removePrefix(ExistingWorldContentModules.LOCAL_BLOCK_PREFIX) !in knownBlocks)
+                    add(error("structures.artifacts.$drawingId", "CONTENT_REFERENCE_MISSING", "Frozen drawing references missing logical block '$ref'"))
+            }
+        }
+        if (manifest.formatVersion == WorldContentBundleIO.FORMAT_VERSION) {
+            try {
+                val actual = WorldContentBundleIO.encode(pack).manifest.id
+                if (actual != pack.computedId) add(error("manifest.id", "PACK_CONTENT_MUTATED", "Typed content differs from its immutable loaded hash; freeze a new bundle"))
+            } catch (e: Exception) {
+                add(error("content", "CONTENT_BUNDLE_INVALID", e.message ?: "Bundle encoding failed"))
             }
         }
 

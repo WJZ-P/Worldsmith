@@ -5,18 +5,43 @@ import com.wjz.worldsmith.core.structure.*
 import com.wjz.worldsmith.core.validation.*
 import kotlinx.serialization.json.*
 import java.nio.file.*
+import com.wjz.worldsmith.core.content.CustomBlockLibrary
 
 class StructureMcpService(private val directory:Path,private val host:DrawingHost,private val sessions:WorkflowSessions,
     private val native:StructureNativeHost?,private val preview:StructurePreviewService,private val metrics:DrawingMcpService) {
     val authored=AuthoredDraftResolver(host)
-    private val checks=StructureCheckService(native)
+    private val checks=linkedMapOf<String,Pair<String,StructureCheckService>>()
+    private fun nativeFor(sid:String?):StructureNativeHost? {
+        if(sid==null)return native
+        val session=requireNotNull(sessions.find(sid)) { "Unknown workflow session" }
+        val blocks=session.contentModules["blocks"]?.let {McpJson.decode<CustomBlockLibrary>(it)} ?: CustomBlockLibrary()
+        return native?.forContent(sid,blocks)
+    }
+    private fun checksFor(sid:String):StructureCheckService {
+        val scoped=try {nativeFor(sid.takeIf {it.isNotEmpty()})}catch(e:IllegalArgumentException) {
+            // A broken content draft is a native-stage diagnostic, not a reason to discard usable geometry.
+            object:StructureNativeHost {
+                override val identity="invalid-content-scope:$sid:${e.message}"
+                override fun query(ids:List<String>,search:String,limit:Int):JsonObject=throw e
+                override fun inspect(geometry:CompiledStructure)=listOf(Diagnostic("contentModules.blocks","INVALID_NATIVE_CONTENT_CONTEXT",DiagnosticSeverity.ERROR,e.message ?: "Invalid custom block context"))
+            }
+        }
+        val identity=scoped?.identity.orEmpty()
+        return synchronized(checks) {
+            checks[sid]?.takeIf {it.first==identity}?.second ?: StructureCheckService(scoped).also {
+                checks[sid]=identity to it
+                while(checks.size>64)checks.remove(checks.keys.first())
+            }
+        }
+    }
     fun tools():List<McpTool> {
         val string=McpJson.type("string");val obj=McpJson.type("object");val integer=McpJson.type("integer")
         return listOf(
             McpTool("worldsmith_preflight_structure","Preflight a drawing or structure","Inspect geometry, semantic, native, assembly and deployment stages separately. Errors retain usable model geometry. Accept structure, blueprint, or drawingId.",McpJson.schema(mapOf("sessionId" to string,"structure" to obj,"blueprint" to obj,"drawingId" to string),listOf("sessionId")),true,handler=::preflight),
-            McpTool("worldsmith_query_block_states","Query native block vocabulary","Query block/state strings or search registered ids. Return legal properties and actual emission, without exporting NBT.",McpJson.schema(mapOf("ids" to McpJson.array(),"search" to string,"limit" to integer),emptyList()),true,handler={a->
-                if(native==null)McpToolResult.success(buildJsonObject {put("stage","NOT_RUN");put("message","A bootstrapped native host is required")})
-                else McpToolResult.success(native.query(McpJson.strings(a,"ids"),a["search"]?.jsonPrimitive?.content.orEmpty(),a["limit"]?.jsonPrimitive?.int ?: 32))
+            McpTool("worldsmith_query_block_states","Query native block vocabulary","Query block/state strings or search registered ids. Optional sessionId also resolves that draft's logical custom blocks. Return legal properties and actual emission, without exporting NBT.",McpJson.schema(mapOf("sessionId" to string,"ids" to McpJson.array(),"search" to string,"limit" to integer),emptyList()),true,handler={a->
+                val scoped=nativeFor(a["sessionId"]?.jsonPrimitive?.content)
+                if(scoped==null)McpToolResult.success(buildJsonObject {put("stage","NOT_RUN");put("message","A bootstrapped native host is required")})
+                else McpToolResult.success(scoped.query(McpJson.strings(a,"ids"),a["search"]?.jsonPrimitive?.content.orEmpty(),a["limit"]?.jsonPrimitive?.int ?: 32))
             }),
             McpTool("worldsmith_put_architecture_draft","Commit coherent architecture revision","Atomically commit a plan plus changed structures and removals at expectedRevision. Store repairable drafts; publication still requires strict checks.",McpJson.schema(mapOf("sessionId" to string,"expectedRevision" to integer,"architecture" to obj,"structures" to buildJsonObject {put("type","array");put("items",obj)},"remove" to McpJson.array()),listOf("sessionId","expectedRevision")),false,handler=::putDraft),
             McpTool("worldsmith_archive_session","Archive a draft without deleting it","Archive session and terminal jobs to release active capacity. Cancel active jobs first. Resume restores data only.",McpJson.schema(mapOf("sessionId" to string),listOf("sessionId")),false,handler={a->
@@ -49,7 +74,7 @@ class StructureMcpService(private val directory:Path,private val host:DrawingHos
     }
     fun inspect(sid:String,d:WorldStructureDefinition,assemblyContext:Boolean=true):StructureInspection {
         val library=attach(sid,StructureLibrary(structures=listOf(d)),true);val components=authored.components(sid,d.blueprint)
-        val result=checks.inspect(d,library.drawingAssets,components,sid,assemblyContext)
+        val result=checksFor(sid).inspect(d,library.drawingAssets,components,sid,assemblyContext)
         for((stage,data)in result.report.stages)metrics.record(sid,stage,data.elapsedMillis)
         return result
     }

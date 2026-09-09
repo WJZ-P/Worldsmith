@@ -21,6 +21,12 @@ class ManagedPackStore(private val packDirectory:Path) {
     }
 
     fun persist(manifest: WorldsmithPackManifest, contents: Map<String, String>, binaries: Map<String,ByteArray> = emptyMap()): Path {
+        com.wjz.worldsmith.core.pack.WorldContentBundleIO.validateManifest(manifest)
+        require(PACK_ID.matches(manifest.id)) { "Invalid content address" }
+        require(contents.keys.all { com.wjz.worldsmith.core.content.WorldContentRegistry.validRelativePath(it) && it.endsWith(".json") && it != "worldsmith.json" })
+        val pngPaths=manifest.assets.map { requireNotNull(it.path) }.toSet()
+        require(binaries.keys.all { it in pngPaths || it.matches(Regex("drawings/[a-f0-9]{64}\\.wsdraw")) })
+        require(com.wjz.worldsmith.core.hash.WorldsmithHashUtil.finalizeManifest(manifest,contents,binaries).id==manifest.id) { "Bundle contents do not match their content address" }
         Files.createDirectories(packDirectory)
         val target = packDirectory.resolve(manifest.id)
         if (Files.exists(target)) {
@@ -32,7 +38,8 @@ class ManagedPackStore(private val packDirectory:Path) {
         try {
             writeUtf8(pending.resolve("worldsmith.json"), WorldsmithJson.encode(manifest))
             contents.forEach { (name, content) -> writeUtf8(pending.resolve(name), content) }
-            binaries.forEach { (name, bytes) -> require(name.matches(Regex("drawings/[a-f0-9]{64}\\.wsdraw")));val p=pending.resolve(name);Files.createDirectories(p.parent);Files.write(p,bytes) }
+            binaries.forEach { (name, bytes) -> val p=pending.resolve(name);Files.createDirectories(p.parent);Files.write(p,bytes) }
+            verifyExistingTarget(pending,manifest.id)
             try {
                 Files.move(pending, target, StandardCopyOption.ATOMIC_MOVE)
             } catch (_: AtomicMoveNotSupportedException) {

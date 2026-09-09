@@ -5,6 +5,7 @@ import com.wjz.worldsmith.core.validation.Diagnostic
 import kotlinx.serialization.Serializable
 import java.nio.file.Path
 import com.wjz.worldsmith.core.draw.DrawStructure
+import com.wjz.worldsmith.core.content.CustomBlockLibrary
 
 @Serializable data class PublicationStatus(val stage: String, val message: String = "", val diagnostics: List<Diagnostic> = emptyList()) {
     val complete: Boolean get() = stage == "PUBLISHED"
@@ -18,4 +19,10 @@ fun interface PublicationHost {
     }
 }
 
-fun interface DrawingExportHost { fun export(drawing: DrawStructure): ByteArray }
+fun interface DrawingExportHost {
+    fun export(drawing: DrawStructure): ByteArray
+    fun exportContent(drawing:DrawStructure, scope:String, blocks:CustomBlockLibrary):ByteArray {
+        require(blocks.blocks.isEmpty()) { "This drawing export host does not support scoped custom blocks" }
+        return export(drawing)
+    }
+}

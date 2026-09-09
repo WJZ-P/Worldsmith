@@ -13,7 +13,7 @@ import org.junit.jupiter.api.io.TempDir
 class StructureWorkflowTest {
     @TempDir lateinit var root:Path
     private val tools by lazy {WorldsmithMcpTools(root.resolve("packs"))}
-    private fun call(name:String,args:JsonObject=JsonObject(emptyMap()))=tools.all().single {it.name==name}.handler(args)
+    private fun call(name:String,args:JsonObject=JsonObject(emptyMap()))=tools.all().single {it.name==name}.handler(if(name==WorldsmithWorkflow.WRITE_TOOL) StructureTestWorld.writeArgs(tools,args) else args)
     private fun begin()=call(WorldsmithWorkflow.BEGIN_TOOL,buildJsonObject {put("prompt","A forest of shrines")}).structuredContent.getValue("sessionId").jsonPrimitive.content
     private fun example()=WorldsmithJson.format.decodeFromJsonElement<StructureBlueprint>(call("worldsmith_get_structure_example").structuredContent.getValue("blueprint"))
     private fun definition()=WorldStructureDefinition("forest_shrine",example().copy(lighting=StructureLighting(StructureLightingMode.EXTERIOR_ONLY)),StructurePlacement(listOf("ashfall_plain"),terrainFit=StructureTerrainFit(foundation=StructureFoundation(FoundationMode.FILL,"foundation",6))))

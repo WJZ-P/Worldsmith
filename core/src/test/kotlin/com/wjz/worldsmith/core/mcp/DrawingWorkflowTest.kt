@@ -79,18 +79,18 @@ class DrawingWorkflowTest {
                 val checked=rpc(endpoint,WorldsmithWorkflow.ARCHITECTURE_VALIDATE_TOOL,buildJsonObject {put("sessionId",session)})
                 assertTrue(body(checked).getValue("valid").jsonPrimitive.boolean,checked.toString())
                 val template=body(rpc(endpoint,WorldsmithWorkflow.TEMPLATE_TOOL))
-                val writeArgs=buildJsonObject {put("sessionId",session);put("displayName","SDK round trip");listOf("terrain","biomes","features").forEach {put(it,template.getValue(it))}}
-                val saved=rpc(endpoint,WorldsmithWorkflow.WRITE_TOOL,writeArgs);assertFalse(saved.get("isError")?.jsonPrimitive?.boolean == true,saved.toString())
+                fun writeArgs()=buildJsonObject {put("sessionId",session);put("expectedRevision",sessions.find(session)!!.revision);put("displayName","SDK round trip");listOf("terrain","biomes","features","theme").forEach {put(it,template.getValue(it))}}
+                val saved=rpc(endpoint,WorldsmithWorkflow.WRITE_TOOL,writeArgs());assertFalse(saved.get("isError")?.jsonPrimitive?.boolean == true,saved.toString())
                 savedPath=Path.of(body(saved).getValue("path").jsonPrimitive.content)
                 val pack=WorldsmithPackLoader.loadDirectory(savedPath!!)
-                assertEquals(2,pack.manifest.formatVersion);assertEquals(pack.manifest.id,pack.computedId)
+                assertEquals(3,pack.manifest.formatVersion);assertEquals(2,pack.structures.schemaVersion);assertEquals(pack.manifest.id,pack.computedId)
                 assertEquals(80,pack.structures.drawingAssets.getValue(drawingId).bounds().width())
                 assertTrue(Files.exists(savedPath!!.resolve("drawings/$drawingId.wsdraw")))
                 fun finish()=rpc(endpoint,WorldsmithWorkflow.FINISH_TOOL,buildJsonObject {put("sessionId",session)})
                 assertFalse(body(finish()).getValue("complete").jsonPrimitive.boolean)
                 nativeStage="FAILED";val failed=finish();assertTrue(failed.get("isError")?.jsonPrimitive?.boolean == true);assertFalse(body(failed).getValue("complete").jsonPrimitive.boolean)
                 nativeStage="PUBLISHED";mutateDuringFinish=true;assertFalse(body(finish()).getValue("complete").jsonPrimitive.boolean)
-                mutateDuringFinish=false;rpc(endpoint,WorldsmithWorkflow.WRITE_TOOL,writeArgs)
+                mutateDuringFinish=false;rpc(endpoint,WorldsmithWorkflow.WRITE_TOOL,writeArgs())
                 assertTrue(body(finish()).getValue("complete").jsonPrimitive.boolean);assertTrue(body(finish()).getValue("minecraftCompiled").jsonPrimitive.boolean)
                 assertFalse(body(finish()).getValue("landmarkInstancesVerified").jsonPrimitive.boolean)
             }

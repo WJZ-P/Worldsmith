@@ -14,39 +14,60 @@ import java.util.HexFormat
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.structure.StructureIndex
 import com.wjz.worldsmith.core.structure.StructurePackIO
+import com.wjz.worldsmith.core.content.ContentAssetValidation
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import com.wjz.worldsmith.core.model.TerrainPlan
+import com.wjz.worldsmith.core.model.BiomePlan
+import com.wjz.worldsmith.core.model.FeatureLibrary
+import com.wjz.worldsmith.core.structure.StructureBlueprint
+import com.wjz.worldsmith.core.content.WorldTheme
+import com.wjz.worldsmith.core.content.CustomBlockLibrary
+import com.wjz.worldsmith.core.content.CreatureLibrary
 
 /** Computes the immutable id of the files that affect world generation. */
 object WorldsmithHashUtil {
-    private const val HASH_DOMAIN = "worldsmith-generation-pack-v1"
+    private const val HASH_DOMAIN = "worldsmith-world-content-bundle-v3"
 
     @JvmStatic @JvmOverloads
     fun computeGenerationId(manifest: WorldsmithPackManifest, contents: Map<String, String>,binaries:Map<String,ByteArray> = emptyMap()): String {
+        WorldContentBundleIO.validateManifest(manifest)
+        require(contents.size <= 1024 && contents.values.sumOf { it.toByteArray(StandardCharsets.UTF_8).size.toLong() } <= WorldContentBundleIO.MAX_TEXT_BYTES) { "Bundle text budget exceeded" }
+        require(binaries.size <= 1024 && binaries.values.sumOf { it.size.toLong() } <= WorldContentBundleIO.MAX_DRAWING_BYTES + ContentAssetValidation.MAX_TOTAL_BYTES) { "Bundle binary budget exceeded" }
         val digest = MessageDigest.getInstance("SHA-256")
         updateField(digest, "domain", HASH_DOMAIN)
         updateField(digest, "formatVersion", manifest.formatVersion.toString())
 
-        listOf(
-            "terrain" to manifest.files.terrain,
-            "biomes" to manifest.files.biomes,
-            "features" to manifest.files.features,
-            "structures" to manifest.files.structures,
-        ).forEach { (role, path) ->
+        manifest.modules.toSortedMap().forEach { (role, file) ->
+            val path = file.path
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             val parsed = Json.parseToJsonElement(raw)
-            updateField(digest, "$role:$path", canonicalJson(normalize(role, parsed)))
+            require(parsed.jsonObject["schemaVersion"]?.jsonPrimitive?.intOrNull == file.schemaVersion) { "Module schema differs from manifest: $role" }
+            updateField(digest, "module:$role", file.schemaVersion.toString())
+            updateField(digest, "$role:$path", canonicalJson(normalizeTyped(role, raw)))
         }
 
-        val index = WorldsmithJson.decode<StructureIndex>(requireNotNull(contents[manifest.files.structures]))
+        val index = WorldsmithJson.decode<StructureIndex>(requireNotNull(contents[manifest.modulePath("structures")]))
         StructurePackIO.paths(index).forEach { path ->
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
-            updateField(digest, "blueprint:$path", canonicalJson(Json.parseToJsonElement(raw)))
+            updateField(digest, "blueprint:$path", canonicalJson(WorldsmithJson.format.encodeToJsonElement(StructureBlueprint.serializer(), WorldsmithJson.decode<StructureBlueprint>(raw))))
         }
         index.artifacts.toSortedMap().forEach { (id,meta)->
-            require(id.matches(Regex("[a-f0-9]{64}")) && meta.id==id && manifest.formatVersion==2)
+            require(id.matches(Regex("[a-f0-9]{64}")) && meta.id==id)
             val bytes=requireNotNull(binaries[meta.path]) { "Missing frozen drawing ${meta.path}" }
             require(com.wjz.worldsmith.core.draw.DrawSnapshotCodec.hash(bytes)==meta.dataHash)
             updateField(digest,"drawing:${meta.path}",meta.dataHash)
         }
+
+        ContentAssetValidation.verifyAll(manifest.assets, manifest.assets.associate { it.id to requireNotNull(binaries[it.path]) { "Missing asset bytes: ${it.id}" } })
+        manifest.assets.sortedBy { it.id }.forEach { asset ->
+            updateField(digest, "asset:${asset.id}", canonicalJson(WorldsmithJson.format.encodeToJsonElement(com.wjz.worldsmith.core.content.ContentAsset.serializer(), asset)))
+        }
+        val expectedTexts = manifest.modules.values.map { it.path }.toSet() + StructurePackIO.paths(index)
+        val expectedBinaries = index.artifacts.values.map { it.path }.toSet() + manifest.assets.map { requireNotNull(it.path) }
+        require(contents.keys == expectedTexts && binaries.keys == expectedBinaries) { "Bundle contains missing or untracked files" }
 
         return HexFormat.of().formatHex(digest.digest())
     }
@@ -84,5 +105,17 @@ object WorldsmithHashUtil {
             return JsonObject(element - "seed")
         }
         return element
+    }
+
+    /** Defaults and optional fields are semantic, not an accidental dependence on author JSON spelling. */
+    private fun normalizeTyped(role: String, raw: String): JsonElement = when (role) {
+        "terrain" -> WorldsmithJson.format.encodeToJsonElement(TerrainPlan.serializer(), WorldsmithJson.decode<TerrainPlan>(raw))
+        "biomes" -> WorldsmithJson.format.encodeToJsonElement(BiomePlan.serializer(), WorldsmithJson.decode<BiomePlan>(raw))
+        "features" -> WorldsmithJson.format.encodeToJsonElement(FeatureLibrary.serializer(), WorldsmithJson.decode<FeatureLibrary>(raw))
+        "structures" -> WorldsmithJson.format.encodeToJsonElement(StructureIndex.serializer(), WorldsmithJson.decode<StructureIndex>(raw))
+        "theme" -> WorldsmithJson.format.encodeToJsonElement(WorldTheme.serializer(), WorldsmithJson.decode<WorldTheme>(raw))
+        "blocks" -> WorldsmithJson.format.encodeToJsonElement(CustomBlockLibrary.serializer(), WorldsmithJson.decode<CustomBlockLibrary>(raw))
+        "creatures" -> WorldsmithJson.format.encodeToJsonElement(CreatureLibrary.serializer(), WorldsmithJson.decode<CreatureLibrary>(raw))
+        else -> error("Uninstalled content module '$role'")
     }
 }

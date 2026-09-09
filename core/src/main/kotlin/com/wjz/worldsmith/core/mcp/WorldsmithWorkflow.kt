@@ -26,6 +26,8 @@ data class WorkflowStep(
     val architecture: StructureArchitecture? = null,
     val revision: Long = 0,
     val archived:Boolean=false,
+    val contentModules: Map<String, kotlinx.serialization.json.JsonObject> = emptyMap(),
+    val contentAssets: Map<String, com.wjz.worldsmith.core.content.ContentAsset> = emptyMap(),
 )
 
 /**
@@ -62,6 +64,11 @@ object WorldsmithWorkflow {
     const val OVERVIEW: String =
         "You are designing one Minecraft world from the player's description. Work through `procedure` in " +
             "order and do not stop until $FINISH_TOOL answers complete=true.\n\n" +
+            "Start with one persistent WorldTheme: premise, player role, world rules, conflict and narrative beats linked to actual content. " +
+            "Use worldsmith_get_content_contract for theme/blocks/creatures, then author real PNG textures and typed content modules. " +
+            "worldsmith_put_content_modules and texture tools use expectedRevision from worldsmith_get_content_draft; all edits share architecture's revision. " +
+            "Custom blocks use worldsmith:content/<id>, fixed native profiles and immutable world slots. Creatures use grounded native hosts, cuboid rigs and bounded server behaviors. " +
+            "Quests/achievements are future modules: narrative beats are not executable quests. Only format-3 bundles are supported. " +
             "Design terrain, biomes, features and world-specific architecture yourself. New guided worlds require at least two distinct building groups, " +
             "one independent structure, and at least one monumental theme-defining group. Read contract/architecture, plan required/optional members, " +
             "and light occupied interiors explicitly. Use designGuide to translate the theme into form and playable spaces; numerical gates are not design targets. " +
@@ -85,7 +92,11 @@ object WorldsmithWorkflow {
             "Report the pack name, biome count and saved location only after the final native receipt."
 
 
-    val PROCEDURE: List<WorkflowStep> = listOf(
+    val PROCEDURE: List<WorkflowStep> = (listOf(
+        WorkflowStep(0,"worldsmith_get_content_framework","Read installed modules and capacity/lifecycle boundaries; no planned module may be silently treated as implemented."),
+        WorkflowStep(0,"worldsmith_get_content_contract","Read theme, blocks and creatures contracts. Establish one shared premise/player role/rules/conflict and linked narrative beats before designing content."),
+        WorkflowStep(0,"worldsmith_put_content_modules","Commit complete theme and initial content drafts at expectedRevision. Use create_pixel_texture or put_texture_asset for actual PNGs, inspect their previews and bind the returned hash to custom blocks/creature rigs. Record each returned revision. Draft links may be repaired incrementally; all links must resolve at publication."),
+    ) + listOf(
         WorkflowStep(
             order = 1,
             tool = TEMPLATE_TOOL,
@@ -151,7 +162,7 @@ object WorldsmithWorkflow {
             order = 11,
             tool = WRITE_TOOL,
             instruction =
-                "Send the whole pack with this sessionId. Preserve the template's technical terrain envelope, " +
+                "Read the current shared draft revision and send sessionId plus expectedRevision. Supply theme/terrain/biomes/features inline or use committed content drafts; blocks/creatures and verified PNG assets are frozen with the same bundle. Preserve the template's technical terrain envelope, " +
                     "but replace its shape with a procedural intent chosen from the player's prompt; design the " +
                     "biomes and features to match it. Include the planned architecture and all definitions, or omit structures to use the session drafts. " +
                     "Architecture policy is checked again before any files are saved. A reply carrying " +
@@ -164,7 +175,7 @@ object WorldsmithWorkflow {
                 "Call it with this sessionId. It re-reads the pack from disk and re-validates it. Stop when it " +
                     "answers complete=true. Native pending phases need a later check; WAITING_NATIVE_CONTEXT needs the player to open Create World. Native failures require repair, not an automatic retry loop.",
         ),
-    )
+    )).mapIndexed { index, step -> step.copy(order=index+1) }
 }
 
 /** Atomically persisted guided drafts. Completed and unfinished records are retained;
@@ -212,7 +223,7 @@ class WorkflowSessions @JvmOverloads constructor(
     /** Returns null when the id is unknown, which the caller reports rather than throws. */
     @Synchronized
     fun recordPack(id: String, packId: String): WorkflowSession? = update(id) {
-        it.copy(packId = packId, finished = it.finished && it.packId == packId)
+        it.copy(packId = packId, finished = it.finished && it.packId == packId, revision=it.revision+if(it.packId==packId)0 else 1)
     }
 
     @Synchronized
@@ -270,6 +281,21 @@ class WorkflowSessions @JvmOverloads constructor(
     }
     @Synchronized fun invalidate(id:String):WorkflowSession? = update(id) { it.copy(packId=null,finished=false,revision=it.revision+1) }
 
+    /** All world modules and asset handles share the architecture/publication revision. */
+    @Synchronized fun putContent(id:String, expectedRevision:Long,
+        modules:Map<String,kotlinx.serialization.json.JsonObject> = emptyMap(),
+        assets:Map<String,com.wjz.worldsmith.core.content.ContentAsset> = emptyMap(),
+        removeAssets:List<String> = emptyList()):WorkflowSession? = update(id) {
+        require(it.revision==expectedRevision) { "DRAFT_REVISION_CONFLICT: expected $expectedRevision, current ${it.revision}" }
+        require(modules.keys.all { key -> key in setOf("theme","terrain","features","biomes","blocks","creatures") }) { "Use the architecture tools for structures; unknown content modules are not installed" }
+        val nextModules=it.contentModules+modules
+        val nextAssets=(it.contentAssets-removeAssets.toSet())+assets
+        require(nextAssets.size<=com.wjz.worldsmith.core.content.ContentAssetValidation.MAX_ASSETS)
+        require(nextAssets.values.sumOf { a->requireNotNull(a.byteLength) }<=com.wjz.worldsmith.core.content.ContentAssetValidation.MAX_TOTAL_BYTES)
+        if(nextModules==it.contentModules && nextAssets==it.contentAssets) it else
+            it.copy(contentModules=nextModules,contentAssets=nextAssets,revision=it.revision+1,packId=null,finished=false)
+    }
+
     private fun update(id: String, change: (WorkflowSession) -> WorkflowSession): WorkflowSession? {
         val current = sessions[id] ?: return null
         val updated = change(current)
@@ -278,7 +304,11 @@ class WorkflowSessions @JvmOverloads constructor(
         return updated
     }
 
-    private fun save(session:WorkflowSession) { directory?.let { writer(it.resolve(session.id+".json"),WorldsmithJson.encode(session).toByteArray(Charsets.UTF_8)) } }
+    private fun save(session:WorkflowSession) {
+        val bytes=WorldsmithJson.encode(session).toByteArray(Charsets.UTF_8)
+        require(bytes.size<=8*1024*1024) { "Session document budget exceeded; frozen assets remain outside the draft" }
+        directory?.let { writer(it.resolve(session.id+".json"),bytes) }
+    }
     private fun archivedRecord(id:String):WorkflowSession? {
         if(!id.matches(Regex("[a-f0-9]{32}")))return null
         val p=directory?.resolve("archive/$id.json") ?: return null;if(!Files.isRegularFile(p))return null

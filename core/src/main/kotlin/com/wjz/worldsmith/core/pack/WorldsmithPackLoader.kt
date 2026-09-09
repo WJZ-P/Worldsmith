@@ -12,6 +12,8 @@ import com.wjz.worldsmith.core.structure.StructurePackIO
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import com.wjz.worldsmith.core.content.*
+import com.wjz.worldsmith.core.structure.StructureLibrary
 
 fun interface WorldsmithPackSource {
     fun readText(relativePath: String): String
@@ -22,15 +24,17 @@ class DirectoryWorldsmithPackSource(root: Path) : WorldsmithPackSource {
     private val root = root.toAbsolutePath().normalize()
 
     override fun readText(relativePath: String): String {
-        val target = root.resolve(relativePath).normalize()
-        require(target.startsWith(root)) { "Pack path escapes its root: $relativePath" }
-        return Files.readString(target, StandardCharsets.UTF_8)
+        return readBounded(relativePath, WorldContentBundleIO.MAX_TEXT_BYTES).toString(StandardCharsets.UTF_8)
     }
     override fun readBytes(relativePath:String):ByteArray {
+        return readBounded(relativePath, com.wjz.worldsmith.core.draw.DrawSnapshotCodec.MAX_BYTES)
+    }
+    private fun readBounded(relativePath: String, limit: Int): ByteArray {
+        require(WorldContentRegistry.validRelativePath(relativePath)) { "Invalid pack relative path" }
         val target=root.resolve(relativePath).normalize()
-        require(target.startsWith(root) && target.toRealPath().startsWith(root.toRealPath()) && !Files.isSymbolicLink(target))
-        require(Files.size(target)<=com.wjz.worldsmith.core.draw.DrawSnapshotCodec.MAX_BYTES) { "Drawing file too large" }
-        return Files.readAllBytes(target)
+        require(target.startsWith(root) && target.toRealPath().startsWith(root.toRealPath()) && !Files.isSymbolicLink(target) && Files.isRegularFile(target)) { "Pack path escapes its root" }
+        require(Files.size(target) <= limit) { "Pack file too large" }
+        return Files.newInputStream(target).use { it.readNBytes(limit + 1) }.also { require(it.size <= limit) { "Pack file grew beyond budget" } }
     }
 }
 
@@ -41,18 +45,15 @@ class ClasspathWorldsmithPackSource(
     private val root = root.trim('/').also { require(it.isNotBlank()) { "Classpath pack root must not be blank" } }
 
     override fun readText(relativePath: String): String {
-        require(!relativePath.startsWith('/') && ".." !in relativePath.split('/')) {
-            "Pack path must be relative: $relativePath"
-        }
-        val resource = "$root/$relativePath"
-        return classLoader.getResourceAsStream(resource)?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }
-            ?: error("Pack resource '$resource' was not found")
+        return readBounded(relativePath, WorldContentBundleIO.MAX_TEXT_BYTES).toString(StandardCharsets.UTF_8)
     }
     override fun readBytes(relativePath:String):ByteArray {
-        require(relativePath.matches(Regex("drawings/[a-f0-9]{64}\\.wsdraw")))
-        return requireNotNull(classLoader.getResourceAsStream("$root/$relativePath")).use {
-            val bytes=it.readNBytes(com.wjz.worldsmith.core.draw.DrawSnapshotCodec.MAX_BYTES+1)
-            require(bytes.size<=com.wjz.worldsmith.core.draw.DrawSnapshotCodec.MAX_BYTES);bytes
+        return readBounded(relativePath, com.wjz.worldsmith.core.draw.DrawSnapshotCodec.MAX_BYTES)
+    }
+    private fun readBounded(relativePath: String, limit: Int): ByteArray {
+        require(WorldContentRegistry.validRelativePath(relativePath)) { "Invalid classpath pack path" }
+        return requireNotNull(classLoader.getResourceAsStream("$root/$relativePath")) { "Pack resource '$root/$relativePath' was not found" }.use {
+            it.readNBytes(limit + 1).also { bytes -> require(bytes.size <= limit) { "Pack resource too large" } }
         }
     }
 }
@@ -68,16 +69,36 @@ object WorldsmithPackLoader {
 
     fun load(source: WorldsmithPackSource): WorldsmithPack {
         val manifest = WorldsmithJson.decode<WorldsmithPackManifest>(source.readText(MANIFEST))
-        val contents = listOf(manifest.files.terrain, manifest.files.biomes, manifest.files.features, manifest.files.structures)
-            .associateWith(source::readText).toMutableMap()
-        val index = WorldsmithJson.decode<StructureIndex>(contents.getValue(manifest.files.structures))
-        StructurePackIO.paths(index).forEach { contents[it] = source.readText(it) }
-        val terrain = WorldsmithJson.decode<TerrainPlan>(contents.getValue(manifest.files.terrain))
-        val biomes = WorldsmithJson.decode<BiomePlan>(contents.getValue(manifest.files.biomes))
-        val features = WorldsmithJson.decode<FeatureLibrary>(contents.getValue(manifest.files.features))
+        WorldContentBundleIO.validateManifest(manifest)
+        val contents = linkedMapOf<String, String>()
+        var textBytes = 0L
+        fun readText(path: String) {
+            if (path in contents) return
+            val text = source.readText(path)
+            textBytes += text.toByteArray(StandardCharsets.UTF_8).size
+            require(textBytes <= WorldContentBundleIO.MAX_TEXT_BYTES) { "Bundle text budget exceeded while reading '$path'" }
+            contents[path] = text
+        }
+        manifest.modules.values.forEach { readText(it.path) }
+        val index = WorldsmithJson.decode<StructureIndex>(contents.getValue(manifest.modulePath("structures")))
+        StructurePackIO.paths(index).forEach(::readText)
+        val terrain = WorldsmithJson.decode<TerrainPlan>(contents.getValue(manifest.modulePath("terrain")))
+        val biomes = WorldsmithJson.decode<BiomePlan>(contents.getValue(manifest.modulePath("biomes")))
+        val features = WorldsmithJson.decode<FeatureLibrary>(contents.getValue(manifest.modulePath("features")))
+        val theme = WorldsmithJson.decode<WorldTheme>(contents.getValue(manifest.modulePath("theme")))
+        val blocks = WorldsmithJson.decode<CustomBlockLibrary>(contents.getValue(manifest.modulePath("blocks")))
+        val creatures = WorldsmithJson.decode<CreatureLibrary>(contents.getValue(manifest.modulePath("creatures")))
         require(index.artifacts.size<=512 && index.artifacts.all { (id,v)->id.matches(Regex("[a-f0-9]{64}")) && v.id==id })
-        val binaries=index.artifacts.values.associate { it.path to source.readBytes(it.path) }
+        var drawingBytes = 0L
+        val binaries=index.artifacts.values.associate { artifact ->
+            val bytes = source.readBytes(artifact.path)
+            drawingBytes += bytes.size
+            require(drawingBytes <= WorldContentBundleIO.MAX_DRAWING_BYTES) { "Frozen drawing byte budget exceeded" }
+            artifact.path to bytes
+        }.toMutableMap()
+        manifest.assets.forEach { asset -> binaries.getOrPut(requireNotNull(asset.path)) { source.readBytes(asset.path) } }
         val computedId = WorldsmithHashUtil.computeGenerationId(manifest, contents,binaries)
-        return WorldsmithPack(manifest, terrain, biomes, features, computedId, StructurePackIO.load(index, contents,binaries))
+        return WorldsmithPack(manifest, terrain, biomes, features, computedId, StructurePackIO.load(index, contents,binaries),
+            theme, blocks, creatures, manifest.assets.associate { it.id to binaries.getValue(requireNotNull(it.path)) })
     }
 }

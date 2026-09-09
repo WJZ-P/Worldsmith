@@ -7,7 +7,7 @@ The player prompt decides style and world identity. New guided MCP worlds follow
 contract/architecture: multiple groups, independent structures, a monumental LANDMARK
 group and readable occupied interiors. Empty libraries remain valid for legacy or
 standalone pack workflows, not new guided publications.
-Examples teach grammar, not a mandatory architectural style. Blueprint schema remains 1; libraries/packs containing SDK frozen data use format 2.
+Examples teach grammar, not a mandatory architectural style. Blueprint schema remains 1; structure libraries containing SDK frozen data use module schema 2. Every published world uses bundle format 3; these are distinct version numbers.
 
 ## SDK geometry and semantic metadata
 
@@ -42,8 +42,7 @@ The existing complete plan envelope [-96,96] X/Z, height 128, 262144 authored ce
 rejection names the exceeded limit; preview/native NBT export remains available for
 larger drawings, without shrinking or scattering them.
 
-New SDK packs freeze palette/RLE geometry and versioned source provenance in format 2.
-Old format 1 packs keep their original load path. Native validation checks real states,
+The structure module freezes palette/RLE geometry and versioned source provenance in module schema 2 inside a format-3 world bundle. Manual structure libraries may use module schema 1; legacy world bundle formats 1/2 are rejected. Native validation checks real states,
 mirrors/rotations, door/bed/double-plant pairs, emitter levels and typed block entities
 before publication. No source execution occurs on loading a published pack or in worldgen.
 

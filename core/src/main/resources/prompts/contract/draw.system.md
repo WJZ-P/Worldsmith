@@ -47,7 +47,7 @@ not an agent runner: this reference tool does not execute source code.
   Tiles share the building's fitted transform/datum; roads join authored entrances.
   Oversize output still supports model preview and `worldsmith_export_drawing`
   (native NBT returned as an MCP embedded resource), but deployment reports limits.
-- Format 2 packs contain palette/RLE/gzip frozen drawings, source provenance and
+- Format 3 world bundles contain structure-module schema 2 palette/RLE/gzip frozen drawings, source provenance and
   compiler/SDK/target-data-version metadata; hashes cover these plus structure policy.
   Loaders and chunk generation consume data ONLY. Neither published source nor
   resumed unfinished source is executed automatically. Format 1 remains readable.

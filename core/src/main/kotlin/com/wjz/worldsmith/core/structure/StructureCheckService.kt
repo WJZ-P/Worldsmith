@@ -5,12 +5,17 @@ import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.validation.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import com.wjz.worldsmith.core.content.CustomBlockLibrary
 
 /** The native adapter inspects live block state vocabulary without exporting a whole data pack. */
 interface StructureNativeHost {
     val identity:String
     fun query(ids:List<String>,search:String,limit:Int):JsonObject
     fun inspect(geometry:CompiledStructure):List<Diagnostic>
+    fun forContent(scope:String, blocks:CustomBlockLibrary):StructureNativeHost {
+        require(blocks.blocks.isEmpty()) { "This native inspection host does not support scoped custom blocks" }
+        return this
+    }
 }
 @Serializable data class StructureCheckStage(val state:String,val totalDiagnostics:Int=0,val diagnostics:List<Diagnostic> = emptyList(),val elapsedMillis:Long=0)
 @Serializable data class StructureCheckReport(val structureId:String,val stages:Map<String,StructureCheckStage>,val valid:Boolean,val readyForPublication:Boolean=false,val repeatedDiagnostics:Int=0)

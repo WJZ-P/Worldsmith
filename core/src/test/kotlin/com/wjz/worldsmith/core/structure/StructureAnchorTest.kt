@@ -3,6 +3,7 @@ package com.wjz.worldsmith.core.structure
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import com.wjz.worldsmith.core.model.*
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 import com.wjz.worldsmith.core.validation.WorldsmithPackValidator
@@ -16,8 +17,10 @@ class StructureAnchorTest {
 
     private fun pack(target: StructureAnchorTarget? = null, placement: AnchorPlacement = AnchorPlacement.Fixed(0,0)): WorldsmithPack {
         val shape = (base.terrain.shape as TerrainShape.Procedural).copy(anchors=listOf(Anchor("holy_peak",placement,100,30.0)))
-        return base.copy(terrain=base.terrain.copy(shape=shape), structures=StructureLibrary(structures=listOf(
+        val changed = base.copy(terrain=base.terrain.copy(shape=shape), structures=StructureLibrary(structures=listOf(
             WorldStructureDefinition("temple",floor,StructurePlacement(listOf(base.biomes.biomes.first().id),anchor=target)))))
+        val frozen = WorldContentBundleIO.encode(changed)
+        return changed.copy(manifest = frozen.manifest, computedId = frozen.manifest.id)
     }
 
     @Test fun `omitting the anchor keeps the existing random spread JSON and defaults`() {
@@ -60,9 +63,7 @@ class StructureAnchorTest {
         val files=StructurePackIO.files(p.structures)
         val loaded=StructurePackIO.load(WorldsmithJson.decode(files.getValue("structures.json")),files)
         assertEquals(p.structures,loaded)
-        fun hash(library:StructureLibrary)=WorldsmithHashUtil.computeGenerationId(p.manifest,mapOf(
-            "terrain.json" to WorldsmithJson.encode(p.terrain),"biomes.json" to WorldsmithJson.encode(p.biomes),"features.json" to WorldsmithJson.encode(p.features)
-        )+StructurePackIO.files(library))
+        fun hash(library:StructureLibrary)=WorldContentBundleIO.encode(p.copy(structures = library)).manifest.id
         val entry=p.structures.structures.single()
         val changed=entry.copy(placement=entry.placement.copy(anchor=entry.placement.anchor!!.copy(offsetX=14)))
         assertNotEquals(hash(p.structures),hash(StructureLibrary(structures=listOf(changed))))

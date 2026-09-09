@@ -1,65 +1,36 @@
 package com.wjz.worldsmith.core.hash
 
-import com.wjz.worldsmith.core.model.WorldsmithPackFiles
-import com.wjz.worldsmith.core.model.WorldsmithPackManifest
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotEquals
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO
+import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
+import kotlinx.serialization.json.*
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class WorldsmithHashUtilTest {
-    private val manifest = WorldsmithPackManifest(
-        formatVersion = 1,
-        id = "0".repeat(64),
-        displayName = "Ignored metadata",
-        description = "Ignored metadata",
-        files = WorldsmithPackFiles("terrain.json", "biomes.json", "features.json"),
-    )
+    private val base = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
+    private val files = WorldContentBundleIO.encode(base)
 
-    @Test
-    fun `whitespace and object key order do not change id`() {
-        val compact = mapOf(
-            "terrain.json" to "{\"height\":384,\"seaLevel\":63}",
-            "biomes.json" to "{\"biomes\":[{\"id\":\"a\",\"weight\":1}]}",
-            "features.json" to "{\"features\":[{\"id\":\"x\",\"density\":0.5}]}",
-            "structures.json" to "{\"schemaVersion\":1,\"structures\":[]}",
-        )
-        val formatted = mapOf(
-            "terrain.json" to "{ \"seaLevel\": 63, \"height\": 384 }",
-            "biomes.json" to "{\n  \"biomes\": [{\"weight\": 1, \"id\": \"a\"}]\n}",
-            "features.json" to "{\"features\": [{\"density\": 0.5, \"id\": \"x\"}]}",
-            "structures.json" to "{\"schemaVersion\":1,\"structures\":[]}",
-        )
-
-        assertEquals(
-            WorldsmithHashUtil.computeGenerationId(manifest, compact),
-            WorldsmithHashUtil.computeGenerationId(manifest, formatted),
-        )
+    @Test fun `whitespace and object key order do not change id`() {
+        val compact = files.texts.mapValues { (_, text) -> Json.parseToJsonElement(text).toString() }
+        val reversed = files.texts.mapValues { (_, text) ->
+            JsonObject(Json.parseToJsonElement(text).jsonObject.entries.reversed().associate { it.toPair() }).toString()
+        }
+        assertEquals(WorldsmithHashUtil.computeGenerationId(files.manifest, compact), WorldsmithHashUtil.computeGenerationId(files.manifest, reversed))
     }
 
-    @Test
-    fun `fixed seed changes id while missing seed remains a random recipe`() {
-        val randomSeed = contents("{\"height\":384}")
-        val explicitRandomSeed = contents("{\"height\":384,\"seed\":null}")
-        val fixedSeed = contents("{\"height\":384,\"seed\":42}")
-
-        assertEquals(
-            WorldsmithHashUtil.computeGenerationId(manifest, randomSeed),
-            WorldsmithHashUtil.computeGenerationId(manifest, explicitRandomSeed),
-        )
-        assertNotEquals(
-            WorldsmithHashUtil.computeGenerationId(manifest, randomSeed),
-            WorldsmithHashUtil.computeGenerationId(manifest, fixedSeed),
-        )
-        assertEquals(
-            WorldsmithHashUtil.computeGenerationId(manifest, fixedSeed),
-            WorldsmithHashUtil.finalizeManifest(manifest, fixedSeed).id,
-        )
+    @Test fun `fixed seed changes id while missing seed remains a random recipe`() {
+        val terrain = Json.parseToJsonElement(files.texts.getValue("terrain.json")).jsonObject
+        fun content(seed: JsonElement?) = files.texts + ("terrain.json" to JsonObject((terrain - "seed") + (seed?.let { mapOf("seed" to it) } ?: emptyMap())).toString())
+        val random = content(null)
+        val explicitRandom = content(JsonNull)
+        val fixed = content(JsonPrimitive(42))
+        assertEquals(WorldsmithHashUtil.computeGenerationId(files.manifest, random), WorldsmithHashUtil.computeGenerationId(files.manifest, explicitRandom))
+        assertNotEquals(WorldsmithHashUtil.computeGenerationId(files.manifest, random), WorldsmithHashUtil.computeGenerationId(files.manifest, fixed))
+        assertEquals(WorldsmithHashUtil.computeGenerationId(files.manifest, fixed), WorldsmithHashUtil.finalizeManifest(files.manifest, fixed).id)
     }
 
-    private fun contents(terrain: String) = mapOf(
-        "terrain.json" to terrain,
-        "biomes.json" to "{\"biomes\":[]}",
-        "features.json" to "{\"features\":[]}",
-        "structures.json" to "{\"schemaVersion\":1,\"structures\":[]}",
-    )
+    @Test fun `explicit default fields and omitted defaults have one semantic identity`() {
+        val emptyBlocks = files.texts + ("blocks.json" to "{\"schemaVersion\":1}")
+        assertEquals(files.manifest.id, WorldsmithHashUtil.computeGenerationId(files.manifest, emptyBlocks))
+    }
 }

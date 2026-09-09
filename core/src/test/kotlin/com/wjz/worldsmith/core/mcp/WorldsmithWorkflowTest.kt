@@ -36,7 +36,7 @@ class WorldsmithWorkflowTest {
     private val tools: WorldsmithMcpTools by lazy { WorldsmithMcpTools(packDirectory.resolve("packs"), publicationHost=PublicationHost { _,_->PublicationStatus("PUBLISHED") }) }
 
     private fun call(name: String, arguments: JsonObject = JsonObject(emptyMap())): McpToolResult =
-        tools.all().single { it.name == name }.handler(arguments)
+        tools.all().single { it.name == name }.handler(if(name==WorldsmithWorkflow.WRITE_TOOL) StructureTestWorld.writeArgs(tools,arguments) else arguments)
 
     private fun begin(prompt: String = "a wind-scoured wasteland"): JsonObject =
         call(WorldsmithWorkflow.BEGIN_TOOL, buildJsonObject { put("prompt", prompt) }).structuredContent
@@ -306,10 +306,10 @@ class WorldsmithWorkflowTest {
         val session=StructureTestWorld.call(tools,WorldsmithWorkflow.BEGIN_TOOL,buildJsonObject {put("prompt","stone courts")}).structuredContent.text("sessionId")
         StructureTestWorld.install(tools,session)
         val template=StructureTestWorld.call(tools,WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
-        val written=StructureTestWorld.call(tools,WorldsmithWorkflow.WRITE_TOOL,buildJsonObject {
+        val written=StructureTestWorld.call(tools,WorldsmithWorkflow.WRITE_TOOL,StructureTestWorld.writeArgs(tools,buildJsonObject {
             put("sessionId",session);put("displayName","Native required")
             listOf("terrain","biomes","features").forEach {put(it,template.getValue(it))}
-        })
+        }))
         assertFalse(written.isError,written.text)
         repeat(2) {
             val result=StructureTestWorld.call(tools,WorldsmithWorkflow.FINISH_TOOL,buildJsonObject {put("sessionId",session)})
