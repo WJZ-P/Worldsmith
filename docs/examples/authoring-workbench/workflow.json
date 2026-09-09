@@ -22,6 +22,78 @@
       }
     },
     {
+      "tool": "worldsmith_get_content_contract",
+      "arguments": {
+        "module": "theme"
+      }
+    },
+    {
+      "tool": "worldsmith_get_content_draft",
+      "arguments": {
+        "sessionId": "$SESSION"
+      },
+      "capture": {
+        "CONTENT_REVISION": "/revision"
+      }
+    },
+    {
+      "tool": "worldsmith_put_content_modules",
+      "arguments": {
+        "sessionId": "$SESSION",
+        "expectedRevision": "$CONTENT_REVISION",
+        "modules": {
+          "theme": {
+            "schemaVersion": 1,
+            "id": "stone_courts",
+            "title": "Courts of the Returning Light",
+            "premise": "A dispersed civilization preserves its civic memory in stone colonnades, open courts and timber-roofed refuges.",
+            "playerRole": "A traveler tracing how public life connects the monumental court, working outposts and wayside shelters.",
+            "worldRules": [
+              "Monumental and modest places share stone colonnades but serve different daily functions.",
+              "Open approaches and readable interior spaces make civic memory explorable rather than decorative."
+            ],
+            "mainConflict": "Discover how a scattered society keeps its common identity across a harsh landscape.",
+            "beats": [
+              {
+                "id": "arrival",
+                "title": "Find the civic heart",
+                "description": "Read the contrast between the monumental civic court and its practical outposts.",
+                "content": [
+                  {
+                    "kind": "terrain",
+                    "id": "main"
+                  },
+                  {
+                    "kind": "structure",
+                    "id": "civic_group"
+                  },
+                  {
+                    "kind": "structure",
+                    "id": "outpost_group"
+                  }
+                ]
+              }
+            ]
+          },
+          "terrain": "$TERRAIN",
+          "biomes": "$BIOMES",
+          "features": "$FEATURES",
+          "blocks": {
+            "schemaVersion": 1,
+            "blocks": []
+          },
+          "creatures": {
+            "schemaVersion": 1,
+            "creatures": []
+          }
+        }
+      },
+      "capture": {
+        "THEME": "/modules/theme",
+        "CONTENT_REVISION": "/revision"
+      }
+    },
+    {
       "tool": "worldsmith_get_contract",
       "arguments": {
         "id": "draw",
@@ -806,13 +878,24 @@
       }
     },
     {
+      "tool": "worldsmith_get_content_draft",
+      "arguments": {
+        "sessionId": "$SESSION"
+      },
+      "capture": {
+        "CONTENT_REVISION": "/revision"
+      }
+    },
+    {
       "tool": "worldsmith_write_pack",
       "arguments": {
         "sessionId": "$SESSION",
         "displayName": "Authoring workbench example",
         "terrain": "$TERRAIN",
         "biomes": "$BIOMES",
-        "features": "$FEATURES"
+        "features": "$FEATURES",
+        "expectedRevision": "$CONTENT_REVISION",
+        "theme": "$THEME"
       }
     },
     {

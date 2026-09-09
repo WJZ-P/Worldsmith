@@ -3,6 +3,12 @@
 Worldsmith is being built as a Fabric mod that turns a prompt into a
 deterministic Minecraft world-generation blueprint.
 
+The longer-term target is a complete world-content platform spanning terrain,
+biomes, features, structures, custom blocks and creatures. The first shared
+[content-framework layer](docs/world-content-framework.md) now provides typed
+module adapters, logical references, shared asset storage and lifecycle planning.
+Custom block and ground-creature runtimes are installed with bounded native hosts and a local-world lifecycle; executable quests and achievements remain future modules.
+
 ## Development baseline
 
 - Minecraft Java Edition `26.2`
@@ -23,11 +29,11 @@ The current player-facing flow is:
 
 ```text
 Player prompt
-  -> MCP terrain and biome contracts
-  -> portable Worldsmith Pack JSON
+  -> MCP theme, content and worldgen contracts
+  -> version-3 bundle (7 typed modules + immutable PNG/drawing assets)
   -> deterministic validation
   -> Minecraft 26.2 target compiler
-  -> selected Create World preset
+  -> verified native data + client resources + selected Create World preset
 ```
 
 The AI-facing source of truth lives under
@@ -45,11 +51,7 @@ NBT export. It remains separate from architecture composition and placement.
 The [Structure Agent](docs/structure-agent.md) connects Java submission, hidden
 worker compilation, model-image preview, composition and native publication through MCP.
 
-Java drawings freeze into format 2 data and are referenced by structure metadata.
-The bounded JSON building grammar (fills, shells, lines, roofs, repeats and local
-modules) remains a format 1 compatibility entry. Both routes compile
-into Minecraft templates with biome placement, rigid terrain fitting and
-bounded foundations. Structure sources participate in the pack hash.
+The format-3 world bundle freezes Java drawing geometry, structure metadata and source provenance. Structure module schemas 1/2 select bounded JSON or frozen drawing data; they are not backward-compatible world-bundle formats. Both routes compile into native templates with biome placement and terrain fitting.
 
 See [structure building and MCP previews](docs/structure-building.md).
 New guided worlds also follow [the architecture-agent policy](docs/architecture-agent.md):
@@ -68,3 +70,23 @@ The executable AI contract is
 ```powershell
 ./gradlew.bat runClient
 ```
+
+## Unified world content
+
+[World content framework](docs/world-content-framework.md) describes the seven
+installed modules: theme, terrain, features, biomes, structures, blocks, creatures.
+MCP has revision-checked drafts, genuine PNG upload/indexed-pixel authoring, linked
+narrative beats, immutable bundle hashing and full publication gates.
+
+Custom blocks use 128 startup hosts (32 each stone/wood/metal/glass), not arbitrary
+live registry mutation. Ground creatures use typed cuboid rigs, native entity hosts
+and bounded server-side behavior/animation. See [blocks](docs/custom-block-runtime.md)
+and [creatures](docs/custom-creature-runtime.md).
+
+Generated datapacks carry the complete bundle and stable block bindings with the
+save; reopening never depends on an AI, authoring drafts or a config pack copy.
+Client resources are prepared before local-server startup and publication.
+Current scope is local integrated-server worlds. Remote content negotiation,
+executable quests/achievements, free-form behavior scripts and arbitrary block
+physical shapes are not installed. Old unreleased world-bundle formats 1/2 must
+be regenerated; existing files are not silently migrated.

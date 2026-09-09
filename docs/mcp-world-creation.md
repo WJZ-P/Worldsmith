@@ -35,14 +35,14 @@ Use Worldsmith to create a silent black-ocean world with salt flats and ruined o
 The guided MCP contract requires this sequence:
 
 1. `worldsmith_begin_world`
-2. `worldsmith_get_pack_template`
+2. `worldsmith_get_content_framework`, then `worldsmith_get_content_contract` for theme, blocks and creatures. Establish the shared premise/rules/conflict and linked narrative beats; author actual PNGs and commit typed modules with `worldsmith_put_content_modules` at `expectedRevision`. Read `worldsmith_get_content_draft` after conflicts and retain each returned revision. Then read `worldsmith_get_pack_template` for field shapes.
 3. Read the world style and analyze biome distribution
 4. Read `worldsmith_get_contract` id `architecture`, then `worldsmith_plan_architecture`
 5. Prefer geometry-linked StructureProgram source targets (DrawProgram remains compatible). Build with `worldsmith_build_drawing`, query `worldsmith_get_drawing_job`, inspect actual `worldsmith_preview_drawing` images and revise before expanding a family. Study clay massing, elevations, occupied-floor cutaways and the assembled layout. Source confirmation follows the configured host policy.
 6. Reference frozen drawing ids and submit metadata with `worldsmith_put_structure`
 7. `worldsmith_validate_architecture` checks real variants, required/optional members,
    landmark scale and occupied-space lighting
-8. `worldsmith_write_pack` (repair and repeat on validation errors)
+8. `worldsmith_write_pack` with `sessionId` and the current `expectedRevision`. It uses inline or committed module documents and freezes all attached PNG assets into format 3 (repair precise diagnostics on errors).
 9. `worldsmith_finish_world`
 
 The first tool returns terrain, biome, feature, structure, draw and architecture contracts. The terrain
@@ -54,7 +54,7 @@ placement, environment, surface grammar and features. The template supplies the
 technical envelope; it is not a fixed terrain design.
 
 `complete=true` requires Core checks, native structure export/readback, the full Minecraft
-data-pack reload and preset activation in the current Create World context.
+data-pack reload, verified client asset reload, stable world bindings and preset activation in the current Create World context.
 Missing context returns `WAITING_NATIVE_CONTEXT`; open Create World, then check again.
 Native failures never fall back to Core-only completion. World instance placement remains unverified. The final pack remains in:
 
@@ -91,3 +91,28 @@ JDK, javac or Python. The hidden worker is not an OS filesystem/network sandbox.
 
 
 新版创作入口与示例：[Structure Authoring Workbench](structure-authoring-workbench.md)。
+
+## Shared content framework
+
+The [world content framework](world-content-framework.md) installs seven typed
+modules. `worldsmith_get_content_framework` reports native adapter availability;
+`worldsmith_plan_world_content` reports catalog links, not a game activation.
+`worldsmith_inspect_world_content` revalidates a saved bundle.
+
+Authoring tools share one persistent revision with architecture: `get_content_draft`,
+`put_content_modules`, `put_texture_asset`, `create_pixel_texture`, and
+`preview_texture_asset` (all with the `worldsmith_` prefix). Texture IDs are the
+SHA-256 of real PNG bytes; pixel creation is explicit palette/rows authoring,
+not a hosted image model. `write_pack` consumes a changed pack's revision too.
+
+Native export embeds the complete bundle under `worldsmith-content/` and its slot
+map under `worldsmith-runtime/block-bindings.json`. The datapack travels with the
+save. Loading the local world restores and verifies these resources before server
+startup, and cancellation/disconnect clears only the owning resource scope.
+Reload rejects changes to a running world's immutable identity before replacing
+its resource manager. Missing/corrupt assets and conflicting selected bundles
+are errors; they do not silently remap old chunks.
+
+Only format 3 is accepted. The current native lifecycle is for one local integrated
+world; dedicated/remote content negotiation is not installed. The theme's beats
+are durable narrative intent, not executable quests or achievement criteria.
