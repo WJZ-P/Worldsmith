@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "minecraft:model",
+    "model": "worldsmith:item/creature_summoner"
+  }
+}

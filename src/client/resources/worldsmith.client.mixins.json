@@ -8,7 +8,8 @@
 		"WorldTypeEntryMixin",
 		"PackRepositorySourcesAccessor",
 		"MinecraftWorldContentLoadMixin",
-		"CreateWorldContentCancelMixin"
+		"CreateWorldContentCancelMixin",
+		"CreativeModeTabsContentMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

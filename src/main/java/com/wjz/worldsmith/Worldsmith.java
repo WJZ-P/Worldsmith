@@ -14,6 +14,7 @@ public final class Worldsmith implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		com.wjz.worldsmith.content.WorldContentLifecycle.initialize();
+		com.wjz.worldsmith.content.creative.WorldsmithCreativeContent.register();
 		WorldsmithWorldgen.initialize();
 		LOGGER.info(
 			"Worldsmith initialized for Minecraft 26.2 with blueprint schema {}",

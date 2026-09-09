@@ -144,6 +144,10 @@
   "block.worldsmith.content.block.wood.30": "[Worldsmith] Unbound block slot (wood 30)",
   "block.worldsmith.content.block.wood.31": "[Worldsmith] Unbound block slot (wood 31)",
   "generator.worldsmith.wasteland": "Wasteland",
+  "item.worldsmith.creature_summoner": "Creature Summoner",
+  "item.worldsmith.creature_summoner.named": "Summon %s",
+  "item.worldsmith.creature_summoner.unavailable": "Creature Summoner (Different World or Missing Species)",
+  "itemGroup.worldsmith.world_content": "Worldsmith: Current World",
   "worldsmith.config.api_key": "API key",
   "worldsmith.config.api_key.tooltip": "Stored in plain text in config/worldsmith.json. For AWS Bedrock this is the access key id.",
   "worldsmith.config.api_key.tooltip.env": "Leave blank to read %s from the environment instead.",
@@ -178,6 +182,11 @@
   "worldsmith.config.timeout_seconds": "Request timeout",
   "worldsmith.config.timeout_seconds.tooltip": "Seconds to wait for one reply before giving up.",
   "worldsmith.config.title": "Worldsmith",
+  "worldsmith.creative.blocked_spawn": "This creature needs a clear, permitted position with enough room for its body.",
+  "worldsmith.creative.creative_only": "Worldsmith creature summoners require Creative mode.",
+  "worldsmith.creative.missing_species": "This summoner does not reference a creature defined in this world.",
+  "worldsmith.creative.spawn_unavailable": "This creature is unavailable under the current world settings or difficulty.",
+  "worldsmith.creative.wrong_world": "This summoner belongs to a different world. Take a fresh one from this world's Worldsmith tab.",
   "worldsmith.draw.approval.body": "Session %s will run AI-authored Java in a separate process under your account. Time and memory are limited, but this is not a filesystem/network sandbox. Approve only a trusted AI client. Approval ends when the client restarts.",
   "worldsmith.draw.approval.title": "Allow AI Java authoring for this world?"
 }

@@ -12,6 +12,7 @@ public final class WorldsmithClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		com.wjz.worldsmith.client.content.WorldContentClientLifecycle.initialize();
+		com.wjz.worldsmith.client.content.WorldsmithCreativeContentClient.initialize();
 		Worldsmith.LOGGER.info("Worldsmith client initialized");
 
         WorldsmithWorldCreationBridge.initialize();

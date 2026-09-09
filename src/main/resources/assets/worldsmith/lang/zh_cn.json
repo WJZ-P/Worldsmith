@@ -162,5 +162,14 @@
 	"block.worldsmith.content.block.wood.28": "[Worldsmith] 未绑定方块槽位（wood 28）",
 	"block.worldsmith.content.block.wood.29": "[Worldsmith] 未绑定方块槽位（wood 29）",
 	"block.worldsmith.content.block.wood.30": "[Worldsmith] 未绑定方块槽位（wood 30）",
-	"block.worldsmith.content.block.wood.31": "[Worldsmith] 未绑定方块槽位（wood 31）"
+	"block.worldsmith.content.block.wood.31": "[Worldsmith] 未绑定方块槽位（wood 31）",
+	"item.worldsmith.creature_summoner": "生物召唤器",
+	"item.worldsmith.creature_summoner.named": "召唤：%s",
+	"item.worldsmith.creature_summoner.unavailable": "生物召唤器（来自其他世界或物种缺失）",
+	"itemGroup.worldsmith.world_content": "Worldsmith：当前世界",
+	"worldsmith.creative.blocked_spawn": "请在允许交互、没有阻挡且容得下生物身体的位置召唤。",
+	"worldsmith.creative.creative_only": "Worldsmith 生物召唤器仅供创造模式使用。",
+	"worldsmith.creative.missing_species": "这件召唤器没有引用当前世界中已定义的物种。",
+	"worldsmith.creative.spawn_unavailable": "当前世界设置或难度下，这种生物暂不适合生成。",
+	"worldsmith.creative.wrong_world": "这件召唤器属于另一个世界，请从当前世界的 Worldsmith 分类页重新获取。"
 }

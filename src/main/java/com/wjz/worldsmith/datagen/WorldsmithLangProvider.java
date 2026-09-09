@@ -33,6 +33,19 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 
 		addSettingsScreen(builder);
 		addUnboundBlockHosts(builder);
+		addCreativeContent(builder);
+	}
+
+	private static void addCreativeContent(TranslationBuilder builder) {
+		builder.add("itemGroup.worldsmith.world_content", "Worldsmith: Current World");
+		builder.add("item.worldsmith.creature_summoner", "Creature Summoner");
+		builder.add("item.worldsmith.creature_summoner.named", "Summon %s");
+		builder.add("item.worldsmith.creature_summoner.unavailable", "Creature Summoner (Different World or Missing Species)");
+		builder.add("worldsmith.creative.creative_only", "Worldsmith creature summoners require Creative mode.");
+		builder.add("worldsmith.creative.missing_species", "This summoner does not reference a creature defined in this world.");
+		builder.add("worldsmith.creative.wrong_world", "This summoner belongs to a different world. Take a fresh one from this world's Worldsmith tab.");
+		builder.add("worldsmith.creative.blocked_spawn", "This creature needs a clear, permitted position with enough room for its body.");
+		builder.add("worldsmith.creative.spawn_unavailable", "This creature is unavailable under the current world settings or difficulty.");
 	}
 
 	/** Diagnostic fallbacks remain named before a world-scoped resource pack is activated. */
