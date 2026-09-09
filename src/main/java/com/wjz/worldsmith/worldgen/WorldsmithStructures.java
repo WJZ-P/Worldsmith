@@ -33,13 +33,13 @@ public final class WorldsmithStructures {
                     "; this native exporter is "+current+" / "+com.wjz.worldsmith.core.drawhost.DrawingVersions.NATIVE_COMPILER+". Rebuild explicitly for this target; loading a pack never executes its source.");
         }
         // Check every palette entry and generated state, even in a low-weight variant.
-        pack.structures().getBlueprints().values().forEach(b->b.getPalette().values().forEach(WorldsmithStructureTemplates::resolve));
-        pack.structures().getTemplates().values().forEach(variants->variants.forEach(g->g.getVoxels().stream().map(StructureVoxel::getMaterial).distinct().forEach(WorldsmithStructureTemplates::resolve)));
+        pack.structures().getBlueprints().values().forEach(b->b.getPalette().values().forEach(m->WorldsmithStructureTemplates.resolve(m,pack.blockResolver())));
+        pack.structures().getTemplates().values().forEach(variants->variants.forEach(g->g.getVoxels().stream().map(StructureVoxel::getMaterial).distinct().forEach(m->WorldsmithStructureTemplates.resolve(m,pack.blockResolver()))));
         for(var definition:pack.pack().getStructures().getStructures()) {
             var site=site(pack,definition);
             var plans=pack.structures().getPlans().get(definition.getId()).stream().map(p->plan(pack,definition,p)).toList();
             var rotations=definition.getPlacement().getRotations().stream().map(r->Rotation.valueOf(r.name())).toList();
-            var settings=new WorldsmithTemplateStructure.Settings(plans,rotations,site,layout(pack,definition),roads(definition));
+            var settings=new WorldsmithTemplateStructure.Settings(plans,rotations,site,layout(pack,definition),roads(pack,definition));
             var allowed=HolderSet.direct(definition.getPlacement().getBiomes().stream().map(id->biomes.getOrThrow(pack.biomeKey(id))).toList());
             // This codec check also protects direct exporter callers that bypassed the MCP validator.
             WorldsmithTemplateStructure.Settings.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE,settings).getOrThrow();
@@ -49,7 +49,7 @@ public final class WorldsmithStructures {
 
     static WorldsmithStructureSite site(CompiledPack pack,WorldStructureDefinition d) {
         var fit=d.getPlacement().getTerrainFit();var foundation=fit.getFoundation();var terrain=pack.terrain();
-        var block=foundation.getMaterial()==null?Blocks.STONE.defaultBlockState():WorldsmithStructureTemplates.resolve(d.getBlueprint().getPalette().get(foundation.getMaterial()));
+        var block=foundation.getMaterial()==null?Blocks.STONE.defaultBlockState():WorldsmithStructureTemplates.resolve(d.getBlueprint().getPalette().get(foundation.getMaterial()),pack.blockResolver());
         var range=fit.getVerticalRange();
         int min=range==null?terrain.getMinY():Math.max(terrain.getMinY(),range.getMinY());
         int max=range==null?terrain.getMinY()+terrain.getHeight()-1:Math.min(terrain.getMinY()+terrain.getHeight()-1,range.getMaxY());
@@ -76,17 +76,17 @@ public final class WorldsmithStructures {
             for(var patch:blueprint.getVariation().getInstancePatches()) {
                 List<net.minecraft.world.level.block.state.BlockState> states=new ArrayList<>();
                 for(String key:patch.getMaterials()) {
-                    states.add(WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(key)));
+                    states.add(WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(key),pack.blockResolver()));
                     var alternatives=blueprint.getVariation().getMaterials().get(key);
-                    if(alternatives!=null)for(var option:alternatives)states.add(WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(option.getMaterial())));
+                    if(alternatives!=null)for(var option:alternatives)states.add(WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(option.getMaterial()),pack.blockResolver()));
                 }
                 var byBlock=new LinkedHashMap<net.minecraft.world.level.block.Block,net.minecraft.world.level.block.state.BlockState>();
                 for(var state:states){if(!WorldsmithInstanceProcessor.stable(state))throw new IllegalArgumentException("Instance source must be a stable full cube");byBlock.putIfAbsent(state.getBlock(),state);}
-                patches.add(new WorldsmithInstanceProcessor.Patch(List.copyOf(byBlock.values()),WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(patch.getReplacement())),patch.getProbability(),patch.getScale()));
+                patches.add(new WorldsmithInstanceProcessor.Patch(List.copyOf(byBlock.values()),WorldsmithStructureTemplates.resolve(blueprint.getPalette().get(patch.getReplacement()),pack.blockResolver()),patch.getProbability(),patch.getScale()));
             }
             if(geometry.getLighting()!=null)for(var light:geometry.getLighting().getSources()) {
                 var voxel=geometry.getVoxels().stream().filter(v->v.getPosition().equals(light.getAt())).findFirst().orElseThrow();
-                var block=WorldsmithStructureTemplates.resolve(voxel.getMaterial()).getBlock();
+                var block=WorldsmithStructureTemplates.resolve(voxel.getMaterial(),pack.blockResolver()).getBlock();
                 if(patches.stream().anyMatch(patch->patch.sources().stream().anyMatch(state->state.getBlock()==block)&&patch.replacement().getLightEmission()<light.getLevel()))
                     throw new IllegalArgumentException("Instance patches must preserve declared lighting at "+light.getAt());
             }
@@ -151,10 +151,10 @@ public final class WorldsmithStructures {
         return new WorldsmithStructureLayout.Member(pack.structureKey(definition.getId()).identifier(),pack.id(),rule.getSpacingChunks(),rule.getSeparationChunks(),salt(pack.id()+":"+definition.getId()),
             new BoundingBox(minX-padding,0,minZ-padding,maxX+padding,0,maxZ+padding),WorldsmithStructureAnchor.resolve(pack,rule.getAnchor()),region);
     }
-    static Optional<WorldsmithRoadSettings> roads(WorldStructureDefinition d) {
+    static Optional<WorldsmithRoadSettings> roads(CompiledPack pack,WorldStructureDefinition d) {
         var a=d.getAssembly();if(a==null||a.getRoads()==null)return Optional.empty();var r=a.getRoads();var palette=d.getBlueprint().getPalette();
-        var stairs=Optional.ofNullable(r.getStairMaterial()).map(k->{var state=WorldsmithStructureTemplates.resolve(palette.get(k));if(!(state.getBlock() instanceof net.minecraft.world.level.block.StairBlock))throw new IllegalArgumentException("Road stairMaterial must be stairs");return state.setValue(net.minecraft.world.level.block.StairBlock.HALF,net.minecraft.world.level.block.state.properties.Half.BOTTOM).setValue(net.minecraft.world.level.block.StairBlock.SHAPE,net.minecraft.world.level.block.state.properties.StairsShape.STRAIGHT);});
-        return Optional.of(new WorldsmithRoadSettings(WorldsmithStructureTemplates.resolve(palette.get(r.getMaterial())),stairs,Optional.ofNullable(r.getBridgeMaterial()).map(k->WorldsmithStructureTemplates.resolve(palette.get(k))),r.getWidth(),r.getMaxSpan(),r.getMaxCut(),a.getMaxRadius(),a.getTerrainFollowing(),a.getMaxElevationDifference()));
+        var stairs=Optional.ofNullable(r.getStairMaterial()).map(k->{var state=WorldsmithStructureTemplates.resolve(palette.get(k),pack.blockResolver());if(!(state.getBlock() instanceof net.minecraft.world.level.block.StairBlock))throw new IllegalArgumentException("Road stairMaterial must be stairs");return state.setValue(net.minecraft.world.level.block.StairBlock.HALF,net.minecraft.world.level.block.state.properties.Half.BOTTOM).setValue(net.minecraft.world.level.block.StairBlock.SHAPE,net.minecraft.world.level.block.state.properties.StairsShape.STRAIGHT);});
+        return Optional.of(new WorldsmithRoadSettings(WorldsmithStructureTemplates.resolve(palette.get(r.getMaterial()),pack.blockResolver()),stairs,Optional.ofNullable(r.getBridgeMaterial()).map(k->WorldsmithStructureTemplates.resolve(palette.get(k),pack.blockResolver())),r.getWidth(),r.getMaxSpan(),r.getMaxCut(),a.getMaxRadius(),a.getTerrainFollowing(),a.getMaxElevationDifference()));
     }
 
     static BlockPos pos(BuildPos p){return new BlockPos(p.getX(),p.getY(),p.getZ());}

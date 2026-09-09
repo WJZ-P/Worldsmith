@@ -6,6 +6,7 @@ import com.wjz.worldsmith.core.drawhost.*;
 import com.wjz.worldsmith.core.model.*;
 import com.wjz.worldsmith.core.serialization.WorldsmithJson;
 import com.wjz.worldsmith.core.structure.*;
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO;
 import java.nio.file.*;
 import java.util.*;
 import net.minecraft.SharedConstants;
@@ -112,9 +113,11 @@ final class WorldsmithDrawingIntegrationTest {
         };
         var group=new WorldStructureDefinition("sdk_group",authored.apply("sdk_hall",true),placement,assembly);
         var single=new WorldStructureDefinition("sdk_standalone",authored.apply("sdk_single",false),placement);
-        var library=new StructureLibrary(2,List.of(group,single),null,Map.of(),Map.of(),Map.of(id,drawing));
-        var hash="d".repeat(64);
-        return CompiledPack.scoped(new WorldsmithPack(new WorldsmithPackManifest(2,hash,"SDK native smoke","Targeted integration fixture",base.getManifest().getFiles()),base.getTerrain(),base.getBiomes(),base.getFeatures(),hash,library));
+        var artifact=host.artifact(SESSION,id,false);
+        var source=host.source(artifact);
+        var library=new StructureLibrary(2,List.of(group,single),null,Map.of(id,artifact),Map.of(source.getHash(),source),Map.of(id,drawing));
+        return CompiledPack.scoped(WorldContentBundleIO.create("SDK native smoke","Targeted integration fixture",
+            base.getTerrain(),base.getBiomes(),base.getFeatures(),library,base.getTheme(),base.getBlocks(),base.getCreatures(),base.getAssets()));
     }
 
     @Test void workerDrawingRemainsThreeLogicalBuildingsAcrossTilesRotationsAndSaveReload() throws Exception {

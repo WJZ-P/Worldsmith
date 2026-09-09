@@ -4,6 +4,7 @@ import com.wjz.worldsmith.core.draw.DrawBlock;
 import com.wjz.worldsmith.core.draw.DrawStructure;
 import com.wjz.worldsmith.core.draw.Vec3i;
 import com.wjz.worldsmith.core.structure.BuildMaterial;
+import com.wjz.worldsmith.content.WorldBlockBindings;
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -30,6 +31,10 @@ public final class WorldsmithDrawExporter {
 
 	/** Requires Minecraft bootstrap/registries, but no running world, Python, commands or chunk access. */
 	public static CompoundTag encode(DrawStructure drawing) {
+		return encode(drawing, null);
+	}
+
+	public static CompoundTag encode(DrawStructure drawing, WorldBlockBindings.Resolver customBlocks) {
 		var bounds = drawing.bounds(); var root = new CompoundTag();
 		root.putInt("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());
 		root.put("size", ints(bounds.width(), bounds.height(), bounds.depth()));
@@ -41,7 +46,7 @@ public final class WorldsmithDrawExporter {
 		for (var voxel : drawing.voxels()) {
 			BlockState state = resolved.computeIfAbsent(voxel.block(), block -> {
 				var source = block.state(); var orientation = block.orientation();
-				var original = WorldsmithStructureTemplates.resolve(new BuildMaterial(source.id(), source.properties()));
+				var original = WorldsmithStructureTemplates.resolve(new BuildMaterial(source.id(), source.properties()), customBlocks);
 				// Preserve native semantics for stairs, rails, doors, signs and modded block states.
 				return original.mirror(orientation.mirrorX() ? Mirror.FRONT_BACK : Mirror.NONE)
 					.rotate(Rotation.values()[orientation.quarterTurns()]);
@@ -61,7 +66,11 @@ public final class WorldsmithDrawExporter {
 
 	/** Coordinates are normalized to the drawing's minimum corner. The NBT file is gzip-compressed and replaced atomically where supported. */
 	public static ExportResult write(DrawStructure drawing, Path destination) throws IOException {
-		CompoundTag encoded = encode(drawing);
+		return write(drawing, destination, null);
+	}
+
+	public static ExportResult write(DrawStructure drawing, Path destination, WorldBlockBindings.Resolver customBlocks) throws IOException {
+		CompoundTag encoded = encode(drawing, customBlocks);
 		Path target = destination.toAbsolutePath().normalize();
 		Files.createDirectories(target.getParent());
 		Path temporary = Files.createTempFile(target.getParent(), ".worldsmith-draw-", ".nbt.tmp");

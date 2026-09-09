@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 public final class WorldsmithClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
+		com.wjz.worldsmith.client.content.WorldContentClientLifecycle.initialize();
 		Worldsmith.LOGGER.info("Worldsmith client initialized");
 
         WorldsmithWorldCreationBridge.initialize();

@@ -1,5 +1,8 @@
 package com.wjz.worldsmith.worldgen;
 
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO;
+import com.wjz.worldsmith.content.WorldContentRuntime;
+
 import static org.junit.jupiter.api.Assertions.*;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
@@ -71,7 +74,7 @@ final class WorldsmithStructureTest {
         var compiled=WorldsmithPackExporter.compilePatch(pack,vanilla);
         Path output=temp.resolve("export");
         int written=WorldsmithPackExporter.write(pack,compiled,output);
-        assertEquals(55,written,"normal 52 files plus structure, structure set and NBT");
+        assertEquals(55+WorldContentRuntime.prepare(pack).serverResources().size(),written,"normal 52 files plus structure, structure set, NBT and the embedded verified world bundle");
         Identifier id=pack.structureTemplateId("forest_shrine");
         Path nbt=output.resolve("data/worldsmith/structure/"+id.getPath()+".nbt");
         assertTrue(Files.size(nbt)>100);
@@ -182,9 +185,24 @@ final class WorldsmithStructureTest {
         TerrainPlan terrain=new TerrainPlan(base.getSchemaVersion(),54L,-64,384,1,2,63,base.getDefaultBlock(),base.getDefaultFluid(),WorldsmithTerrainSamplingTest.shape(.97,2,.1,1,0,0,.1,0),true,true,false,base.getSpawnTargets());
         var placement=new com.wjz.worldsmith.core.structure.StructurePlacement(source.getBiomes().getBiomes().stream().map(BiomeDefinition::getId).toList(),24,8,List.of(BuildRotation.NONE,BuildRotation.CLOCKWISE_90),new StructureTerrainFit(StructureSurface.LAND_SURFACE,4,new StructureFoundation(FoundationMode.FILL,"foundation",6,List.of())),2,null);
         var library=new StructureLibrary(1,List.of(new WorldStructureDefinition("shrine",example(),placement)));
-        String id="d".repeat(64);
-        var m=source.getManifest();
-        return CompiledPack.scoped(new WorldsmithPack(new WorldsmithPackManifest(1,id,"Shrine fixture","Test",m.getFiles()),terrain,source.getBiomes(),source.getFeatures(),id,library));
+        return CompiledPack.scoped(WorldContentBundleIO.create("Shrine fixture","Test",terrain,
+            biomesWithoutHydrologyRules(source.getBiomes()),source.getFeatures(),library,
+            source.getTheme(),source.getBlocks(),source.getCreatures(),source.getAssets()));
+    }
+
+    /** Structure-only terrain fixtures deliberately disable rivers/lakes. Remove only inherited
+     * surface rules that require those absent signals; preserve the biome and all geometry checks. */
+    static BiomePlan biomesWithoutHydrologyRules(BiomePlan biomes) {
+        var json=JsonParser.parseString(WorldsmithJson.INSTANCE.getFormat().encodeToString(BiomePlan.Companion.serializer(),biomes)).getAsJsonObject();
+        for(var biome:json.getAsJsonArray("biomes")) {
+            var rules=biome.getAsJsonObject().getAsJsonObject("surface").getAsJsonArray("rules");
+            if(rules==null)continue;
+            for(var iterator=rules.iterator();iterator.hasNext();) {
+                var rule=iterator.next().getAsJsonObject();var conditions=rule.getAsJsonObject("conditions");
+                if(conditions!=null && conditions.has("hydrology"))iterator.remove();
+            }
+        }
+        return WorldsmithJson.INSTANCE.getFormat().decodeFromString(BiomePlan.Companion.serializer(),json.toString());
     }
 
     static final class FlatWorld implements InvocationHandler {

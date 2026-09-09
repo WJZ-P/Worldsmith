@@ -16,6 +16,8 @@ import com.wjz.worldsmith.mcp.WorldsmithMcpService;
 import com.wjz.worldsmith.mixin.client.CreateWorldScreenAccessor;
 import com.wjz.worldsmith.worldgen.CompiledPack;
 import com.wjz.worldsmith.worldgen.WorldsmithPackExporter;
+import com.wjz.worldsmith.content.WorldContentRuntime;
+import com.wjz.worldsmith.client.content.WorldContentClientRuntime;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -69,7 +71,7 @@ public final class WorldsmithWorldCreationBridge {
 	private static volatile String activePackId;
     private static final Map<String,PublicationStatus> PUBLICATIONS=new ConcurrentHashMap<>();
     private static final java.util.concurrent.ExecutorService EXPORTS=Executors.newSingleThreadExecutor(r->{var t=new Thread(r,"worldsmith-native-export");t.setDaemon(true);return t;});
-    private static final String COMPILER_VERSION=com.wjz.worldsmith.core.drawhost.DrawingVersions.NATIVE_COMPILER;
+    private static final String COMPILER_VERSION=com.wjz.worldsmith.core.drawhost.DrawingVersions.NATIVE_COMPILER+":content-runtime-1";
 
 	private WorldsmithWorldCreationBridge() {
 	}
@@ -109,6 +111,24 @@ public final class WorldsmithWorldCreationBridge {
         String message=cause.getMessage()==null?cause.getClass().getSimpleName():cause.getMessage();
         PUBLICATIONS.put(id,new PublicationStatus("FAILED",message,List.of(new com.wjz.worldsmith.core.validation.Diagnostic("native","NATIVE_PUBLICATION_FAILED",DiagnosticSeverity.ERROR,message))));
         Worldsmith.LOGGER.error("Native publication failed for {}",id,failure);
+    }
+
+    /** Genuine cancellation only; temporary native reload screens must retain the same publication. */
+    public static void onCancelled(CreateWorldScreen screen) {
+        var state=SCREENS.remove(screen);
+        if(state==null)return;
+        ++state.serial;
+        String scope=state.content==null ? state.appliedPackId : state.content.scope();
+        state.applyingPackId=null;state.appliedPackId=null;state.validatedContext=null;
+        if(scope==null)return;
+        PUBLICATIONS.put(scope,new PublicationStatus("WAITING_NATIVE_CONTEXT","Creation was cancelled; the immutable bundle is preserved",List.of()));
+        var client=Minecraft.getInstance();
+        WorldContentClientRuntime.whenIdle().thenComposeAsync(ignored -> {
+            if(client.getSingleplayerServer()!=null || client.level!=null || client.gui.screen() instanceof CreateWorldScreen
+                || com.wjz.worldsmith.client.content.WorldContentStartupBarrier.isLoading()
+                || !scope.equals(WorldContentClientRuntime.activeScope()))return CompletableFuture.completedFuture(null);
+            return WorldContentClientRuntime.clear(scope);
+        },client).exceptionally(error->{Worldsmith.LOGGER.error("Cancelled creation resource cleanup failed",error);return null;});
     }
 
 	/** Called by Fabric after a Create World screen has initialized. */
@@ -202,9 +222,14 @@ public final class WorldsmithWorldCreationBridge {
 	}
 
     private static void applyPack(CreateWorldScreen screen,ScreenState state,String packId) {
+        if(com.wjz.worldsmith.client.content.WorldContentStartupBarrier.isLoading()) {
+            PUBLICATIONS.put(packId,new PublicationStatus("WAITING_NATIVE_CONTEXT","A local world is starting; reopen Create World before publishing another bundle",List.of()));
+            return;
+        }
         var access=(CreateWorldScreenAccessor)screen;
         var uiState=access.worldsmith$getUiState();
-        if(packId.equals(state.appliedPackId) && state.validatedContext==uiState.getSettings().worldgenLoadContext()) {
+        if(packId.equals(state.appliedPackId) && state.validatedContext==uiState.getSettings().worldgenLoadContext()
+            && packId.equals(WorldContentClientRuntime.activeScope())) {
             // Re-select explicitly if the player changed the preset on the same screen.
             var preset=state.validatedContext.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(state.appliedPresetKey);
             uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));
@@ -225,15 +250,19 @@ public final class WorldsmithWorldCreationBridge {
             CompletableFuture.supplyAsync(()->{
                 try {
                     var pack=loadManagedPack(packId);var compiled=CompiledPack.scoped(pack);
-                    exportAtomically(compiled,context,directory,folder);return compiled;
+                    exportAtomically(compiled,context,directory,folder);
+                    return new Exported(compiled,WorldContentRuntime.prepare(compiled));
                 } catch(Exception e){throw new java.util.concurrent.CompletionException(e);}
-            },EXPORTS).whenComplete((compiled,failure)->Minecraft.getInstance().execute(()->{
+            },EXPORTS).whenComplete((exported,failure)->Minecraft.getInstance().execute(()->{
                 if(state.serial!=serial || !packId.equals(state.applyingPackId))return;
                 if(failure!=null){state.applyingPackId=null;failed(packId,failure);return;}
                 if(Minecraft.getInstance().gui.screen()!=screen || uiState.getSettings().worldgenLoadContext()!=context || !packId.equals(activePackId)) {
                     state.applyingPackId=null;PUBLICATIONS.put(packId,new PublicationStatus("WAITING_NATIVE_CONTEXT","Creation context changed; return to Create World to retry",List.of()));return;
                 }
                 try {
+                    var compiled=exported.compiled();
+                    state.content=WorldContentClientRuntime.prepare(exported.content());
+                    state.resourceReloading=false;
                     var repository=repository(access,uiState.getSettings().dataConfiguration());String repositoryId="file/"+folder;
                     if(!repository.getAvailableIds().contains(repositoryId))throw new IllegalStateException("Minecraft did not discover the exported pack");
                     var selected=new ArrayList<>(repository.getSelectedIds());selected.removeIf(id->id.startsWith(REPOSITORY_PREFIX));selected.add(repositoryId);repository.setSelected(selected);
@@ -262,7 +291,7 @@ public final class WorldsmithWorldCreationBridge {
 	) {
 		String packId = state.applyingPackId;
 		ResourceKey<WorldPreset> presetKey = state.presetKey;
-		if (packId == null || presetKey == null) {
+		if (packId == null || presetKey == null || state.resourceReloading) {
 			return;
 		}
 		if (!uiState.getSettings().dataConfiguration().dataPacks().getEnabled().contains(state.repositoryId)) {
@@ -277,22 +306,31 @@ public final class WorldsmithWorldCreationBridge {
 			return;
 		}
 
-		Long seed = state.seed;
-        // Clear applying first to avoid listener recursion, but commit the success
-        // cache only AFTER both UI mutations finish successfully.
-		state.applyingPackId = null;
-		state.repositoryId = null;
-		state.presetKey = null;
-		state.seed = null;
-        try {
-            if(!packId.equals(activePackId))return;
-            uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));
-            if (seed != null)uiState.setSeed(Long.toString(seed));
-        } catch(Exception e){state.appliedPackId=null;state.validatedContext=null;failed(packId,e);return;}
-        state.appliedPackId = packId;state.appliedPresetKey=presetKey;state.appliedSeed=seed;
-        state.validatedContext = uiState.getSettings().worldgenLoadContext();
-		PUBLICATIONS.put(packId,new PublicationStatus("PUBLISHED","Native structure readback, registry reload and activation succeeded",List.of()));
-		Worldsmith.LOGGER.info("Worldsmith pack {} is available and selected in More World Options", packId);
+        Long seed=state.seed; long serial=state.serial;
+        var targetContext=uiState.getSettings().worldgenLoadContext();
+        var content=state.content;
+        if(content==null){state.applyingPackId=null;failed(packId,new IllegalStateException("Missing prepared native content"));return;}
+        state.resourceReloading=true;
+        PUBLICATIONS.put(packId,new PublicationStatus("CLIENT_RESOURCES","Reloading and verifying generated block and creature assets",List.of()));
+        content.activate().whenCompleteAsync((ignored,failure)->{
+            if(state.serial!=serial || !packId.equals(activePackId) || uiState.getSettings().worldgenLoadContext()!=targetContext) {
+                if(failure==null)content.rollback().exceptionally(rollback->{Worldsmith.LOGGER.error("Stale publication rollback failed",rollback);return null;});
+                if(state.serial==serial){state.applyingPackId=null;state.resourceReloading=false;}
+                return;
+            }
+            state.resourceReloading=false;state.applyingPackId=null;state.repositoryId=null;state.presetKey=null;state.seed=null;
+            if(failure!=null){state.appliedPackId=null;state.validatedContext=null;failed(packId,failure);return;}
+            try {
+                uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));
+                if(seed!=null)uiState.setSeed(Long.toString(seed));
+                state.appliedPackId=packId;state.appliedPresetKey=presetKey;state.appliedSeed=seed;state.validatedContext=targetContext;
+                PUBLICATIONS.put(packId,new PublicationStatus("PUBLISHED","Native data reload, verified client assets, world bindings and preset activation succeeded",List.of()));
+                Worldsmith.LOGGER.info("Worldsmith bundle {} is available with verified content resources",packId);
+            } catch(Exception error) {
+                state.appliedPackId=null;state.validatedContext=null;failed(packId,error);
+                content.rollback().exceptionally(rollback->{Worldsmith.LOGGER.error("Publication rollback failed",rollback);return null;});
+            }
+        },Minecraft.getInstance());
 	}
 
 	private static void abort(
@@ -444,5 +482,8 @@ public final class WorldsmithWorldCreationBridge {
         private String lastAttemptPackId;
         private ResourceKey<WorldPreset> appliedPresetKey;
         private Long appliedSeed;
+        private WorldContentClientRuntime.Prepared content;
+        private boolean resourceReloading;
 	}
+    private record Exported(CompiledPack compiled,WorldContentRuntime.Prepared content) {}
 }

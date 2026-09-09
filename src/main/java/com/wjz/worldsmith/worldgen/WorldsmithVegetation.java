@@ -151,7 +151,7 @@ public final class WorldsmithVegetation {
 
 	public static void bootstrapConfigured(CompiledPack pack, BootstrapContext<ConfiguredFeature<?, ?>> context) {
 		FeatureLibrary library = pack.features();
-		MaterialResolver resolver = new MaterialResolver();
+		MaterialResolver resolver = pack.materialResolver();
 
 		for (FeatureDefinition feature : library.getFeatures()) {
 			context.register(configuredKey(pack, feature.getId()), configure(feature, resolver));

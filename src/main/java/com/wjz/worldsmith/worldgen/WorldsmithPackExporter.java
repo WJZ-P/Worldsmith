@@ -160,6 +160,17 @@ public final class WorldsmithPackExporter {
 		}
 		written += writeTags(root, pack);
 		written += WorldsmithStructureTemplates.write(pack, compiled.full(), root, null);
+        if (pack.scoped()) {
+            // Save-owned definitions/assets and exact slot identity travel with the native datapack.
+            // Reopening the world must not depend on the author's config or draft directories.
+            var content = com.wjz.worldsmith.content.WorldContentRuntime.prepare(pack);
+            for (var file : content.serverResources().entrySet()) {
+                Path target = root.resolve(file.getKey()).normalize();
+                if (!target.startsWith(root.normalize())) throw new IOException("Invalid generated content resource path");
+                Files.createDirectories(target.getParent());
+                Files.write(target,file.getValue()); written++;
+            }
+        }
 		return written;
 	}
 

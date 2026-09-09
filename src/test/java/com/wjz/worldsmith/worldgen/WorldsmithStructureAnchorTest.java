@@ -1,5 +1,8 @@
 package com.wjz.worldsmith.worldgen;
 
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO;
+import com.wjz.worldsmith.content.WorldContentRuntime;
+
 import static org.junit.jupiter.api.Assertions.*;
 import com.mojang.serialization.JsonOps;
 import com.wjz.worldsmith.core.model.*;
@@ -122,7 +125,7 @@ final class WorldsmithStructureAnchorTest {
         var encoded=net.minecraft.world.level.levelgen.structure.placement.StructurePlacement.CODEC.encodeStart(ops,grid).getOrThrow();
         assertEquals(grid.anchor(),assertInstanceOf(WorldsmithAnchorStructurePlacement.class,
             net.minecraft.world.level.levelgen.structure.placement.StructurePlacement.CODEC.parse(ops,encoded).getOrThrow()).anchor());
-        assertEquals(55,WorldsmithPackExporter.write(pack,compiled,temp));
+        assertEquals(55+WorldContentRuntime.prepare(pack).serverResources().size(),WorldsmithPackExporter.write(pack,compiled,temp));
         assertTrue(Files.exists(temp.resolve("data/worldsmith/structure/"+pack.structureTemplateId("floor").getPath()+".nbt")));
     }
 
@@ -189,7 +192,8 @@ final class WorldsmithStructureAnchorTest {
         var placement=new com.wjz.worldsmith.core.structure.StructurePlacement(source.getBiomes().getBiomes().stream().map(BiomeDefinition::getId).toList(),24,8,
             List.of(BuildRotation.NONE,BuildRotation.CLOCKWISE_90),new StructureTerrainFit(StructureSurface.LAND_SURFACE,12,new StructureFoundation(FoundationMode.FILL,"stone",16,List.of())),2,target);
         var structures=new StructureLibrary(1,List.of(new WorldStructureDefinition("temple",blueprint(),placement)));
-        String id="8".repeat(64);
-        return CompiledPack.scoped(new WorldsmithPack(new WorldsmithPackManifest(1,id,"Anchor structure","Test",source.getManifest().getFiles()),terrain,source.getBiomes(),source.getFeatures(),id,structures));
+        return CompiledPack.scoped(WorldContentBundleIO.create("Anchor structure","Test",terrain,
+            WorldsmithStructureTest.biomesWithoutHydrologyRules(source.getBiomes()),source.getFeatures(),structures,
+            source.getTheme(),source.getBlocks(),source.getCreatures(),source.getAssets()));
     }
 }

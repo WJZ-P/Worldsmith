@@ -103,6 +103,18 @@ public final class BiomeCompiler {
 			BiomeDefaultFeatures.farmAnimals(mobs);
 		}
 
+        if (!pack.pack().getCreatures().getCreatures().isEmpty()) {
+            var biomeBindings = new java.util.LinkedHashMap<String,String>();
+            pack.definitions().forEach(b -> biomeBindings.put(b.getId(),pack.biomeKey(b.getId()).identifier().toString()));
+            var snapshot = com.wjz.worldsmith.content.creature.CreatureRuntime.prepare(pack.id(),pack.pack().getCreatures(),biomeBindings);
+            for (var entry : com.wjz.worldsmith.content.creature.CreatureRuntime.perBiomeSpawnEntries(snapshot,pack.biomeKey(definition.getId()).identifier().toString())) {
+                var type = entry.category()==com.wjz.worldsmith.core.content.CreatureCategory.HOSTILE
+                    ? com.wjz.worldsmith.content.creature.CreatureRuntime.hostileType()
+                    : com.wjz.worldsmith.content.creature.CreatureRuntime.passiveType();
+                mobs.addSpawn(type.getCategory(), entry.weight(), new MobSpawnSettings.SpawnerData(type,entry.minGroup(),entry.maxGroup()));
+            }
+        }
+
 		BiomeEnvironment environment = definition.getEnvironment();
 		BiomeSpecialEffects.Builder effects = new BiomeSpecialEffects.Builder()
 			.waterColor(rgb(environment.getTint().getWater()))

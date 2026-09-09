@@ -149,9 +149,16 @@ public final class WorldsmithMcpService {
             requestedAutoApprove=autoApprove;
             drawingHost=new DrawingHost(packDirectory().resolveSibling("drawing-work"),drawingRuntime(),SharedConstants.getCurrentVersion().dataVersion().version(),sourceApproval,new DrawingExecutionLimits(),autoApprove);
             var sessions=new WorkflowSessions(8,()->java.util.UUID.randomUUID().toString().replace("-",""),packDirectory().resolveSibling("drafts"));
-            WorldsmithMcpTools tools = new WorldsmithMcpTools(packDirectory(), runtimeInfo(), packFinished,new ClasspathPromptTemplateRepository(),new ClasspathStyleCatalog(),sessions,drawingHost,publicationHost,drawing->{
-                try {var output=new java.io.ByteArrayOutputStream();net.minecraft.nbt.NbtIo.writeCompressed(com.wjz.worldsmith.worldgen.WorldsmithDrawExporter.encode(drawing),output);return output.toByteArray();}
-                catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
+            WorldsmithMcpTools tools = new WorldsmithMcpTools(packDirectory(), runtimeInfo(), packFinished,new ClasspathPromptTemplateRepository(),new ClasspathStyleCatalog(),sessions,drawingHost,publicationHost,new com.wjz.worldsmith.core.mcp.DrawingExportHost(){
+                @Override public byte[] export(com.wjz.worldsmith.core.draw.DrawStructure drawing) { return encode(drawing,null); }
+                @Override public byte[] exportContent(com.wjz.worldsmith.core.draw.DrawStructure drawing,String scope,com.wjz.worldsmith.core.content.CustomBlockLibrary blocks) {
+                    var resolver=com.wjz.worldsmith.content.WorldBlockBindings.resolver(com.wjz.worldsmith.core.content.CustomBlockBindings.plan(scope,blocks));
+                    return encode(drawing,resolver);
+                }
+                private byte[] encode(com.wjz.worldsmith.core.draw.DrawStructure drawing,com.wjz.worldsmith.content.WorldBlockBindings.Resolver resolver) {
+                    try {var output=new java.io.ByteArrayOutputStream();net.minecraft.nbt.NbtIo.writeCompressed(com.wjz.worldsmith.worldgen.WorldsmithDrawExporter.encode(drawing,resolver),output);return output.toByteArray();}
+                    catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
+                }
             },new com.wjz.worldsmith.worldgen.WorldsmithAuthoringNativeHost());
 			McpHttpServer started = new McpHttpServer(tools.all(), modVersion());
 			URI endpoint = started.start(port);

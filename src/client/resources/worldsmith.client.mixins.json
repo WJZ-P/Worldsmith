@@ -5,7 +5,10 @@
 	"client": [
 		"CreateWorldScreenAccessor",
 		"DebugEntryBiomeMixin",
-		"WorldTypeEntryMixin"
+		"WorldTypeEntryMixin",
+		"PackRepositorySourcesAccessor",
+		"MinecraftWorldContentLoadMixin",
+		"CreateWorldContentCancelMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

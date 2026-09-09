@@ -2,6 +2,8 @@ package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.core.structure.StructureInteraction;
 import com.wjz.worldsmith.core.structure.StructureLoot;
+import com.wjz.worldsmith.content.WorldBlockBindings;
+import com.wjz.worldsmith.content.WorldsmithCustomBlocks;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -36,6 +38,11 @@ public final class WorldsmithStructureInteractions {
 
     public static CompoundTag encode(StructureInteraction spec, BlockState state, BlockPos pos,
         HolderLookup.Provider registries, Identifier inlineLoot) {
+        return encode(spec,state,pos,registries,inlineLoot,null);
+    }
+
+    public static CompoundTag encode(StructureInteraction spec, BlockState state, BlockPos pos,
+        HolderLookup.Provider registries, Identifier inlineLoot, WorldBlockBindings.Resolver customBlocks) {
         if(!(state.getBlock() instanceof EntityBlock factory))throw new IllegalArgumentException("Interaction target is not a block entity: "+state);
         BlockEntity entity=factory.newBlockEntity(pos,state);
         if(entity==null)throw new IllegalArgumentException("Block entity factory returned no entity");
@@ -49,7 +56,7 @@ public final class WorldsmithStructureInteractions {
                 if(id==null)throw new IllegalArgumentException("Inline loot requires an exported table id");
                 randomizable.setLootTable(ResourceKey.create(Registries.LOOT_TABLE,id),0L);
             } else for(var item:contents.getItems()) {
-                Item type=item(item.getItem());var stack=new ItemStack(type,item.getCount());
+                Item type=item(item.getItem(),customBlocks);var stack=new ItemStack(type,item.getCount());
                 if(item.getSlot()<0||item.getSlot()>=inventory.getContainerSize()||item.getCount()>stack.getMaxStackSize())throw new IllegalArgumentException("Item exceeds the actual container capacity or stack limit");
                 inventory.setItem(item.getSlot(),stack);
             }
@@ -76,16 +83,25 @@ public final class WorldsmithStructureInteractions {
     }
 
     public static LootTable loot(StructureLoot source) {
+        return loot(source,null);
+    }
+
+    public static LootTable loot(StructureLoot source, WorldBlockBindings.Resolver customBlocks) {
         var pool=LootPool.lootPool().setRolls(UniformGenerator.between(source.getMinRolls(),source.getMaxRolls()));
         for(var entry:source.getEntries()) {
-            Item item=item(entry.getItem());
+            Item item=item(entry.getItem(),customBlocks);
             if(entry.getMaxCount()>new ItemStack(item).getMaxStackSize())throw new IllegalArgumentException("Loot count exceeds this item's stack limit: "+entry.getItem());
             pool.add(LootItem.lootTableItem(item).setWeight(entry.getWeight())
                 .apply(SetItemCountFunction.setCount(UniformGenerator.between(entry.getMinCount(),entry.getMaxCount()))));
         }
         return LootTable.lootTable().setParamSet(LootContextParamSets.CHEST).withPool(pool).build();
     }
-    private static Item item(String id) {
+    private static Item item(String id, WorldBlockBindings.Resolver customBlocks) {
+        if(WorldsmithCustomBlocks.isReservedNativeId(id))throw new IllegalArgumentException("Structure loot must reference a logical block-item alias, not an internal slot: "+id);
+        if(id.startsWith("worldsmith:content/")) {
+            if(customBlocks==null)throw new IllegalArgumentException("Logical block items need an explicit world compilation context: "+id);
+            return customBlocks.resolveItem(id);
+        }
         Item item=BuiltInRegistries.ITEM.getOptional(Identifier.parse(id)).orElseThrow(()->new IllegalArgumentException("Unknown structure item: "+id));
         if(item==Items.AIR)throw new IllegalArgumentException("Omit empty inventory slots instead of inserting air");
         return item;

@@ -7,6 +7,9 @@ import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
 import com.wjz.worldsmith.core.structure.CompiledStructureCatalog;
 import com.wjz.worldsmith.core.structure.StructureCatalogCompiler;
+import com.wjz.worldsmith.core.content.CustomBlockBindingSnapshot;
+import com.wjz.worldsmith.core.content.CustomBlockBindings;
+import com.wjz.worldsmith.content.WorldBlockBindings;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,14 +40,20 @@ public final class CompiledPack {
 	private final List<CompiledBiome> biomes;
 	private final Map<String, CompiledBiome> byId;
 	private final CompiledStructureCatalog structures;
+	private final WorldBlockBindings.Resolver blockResolver;
 
     private CompiledPack(WorldsmithPack pack, String resourcePrefix) {
+        this(pack, resourcePrefix, null);
+    }
+
+    private CompiledPack(WorldsmithPack pack, String resourcePrefix, CustomBlockBindingSnapshot previousBindings) {
         for(var artifact:pack.getStructures().getArtifacts().values()) {
             if(artifact.getTargetDataVersion()!=net.minecraft.SharedConstants.getCurrentVersion().dataVersion().version())
                 throw new IllegalArgumentException("Drawing target data version differs from this Minecraft version; rebuild/export explicitly rather than executing archived source");
         }
 		this.pack = pack;
 		this.resourcePrefix = resourcePrefix;
+		this.blockResolver = WorldBlockBindings.resolver(CustomBlockBindings.plan(pack.getManifest().getId(), pack.getBlocks(), previousBindings));
 		this.structures = StructureCatalogCompiler.compile(pack.getStructures());
 		this.biomes = CompiledBiomes.compile(pack.getBiomes(), this::biomeKey);
 		Map<String, CompiledBiome> index = new LinkedHashMap<>();
@@ -67,12 +76,20 @@ public final class CompiledPack {
 	 * and preset distinct without asking the model to invent globally unique ids.
 	 */
 	public static CompiledPack scoped(WorldsmithPack pack) {
+		return scoped(pack, null);
+	}
+
+	public static CompiledPack scoped(WorldsmithPack pack, CustomBlockBindingSnapshot previousBindings) {
 		String id = pack.getManifest().getId();
 		if (!id.matches("[0-9a-f]{64}")) {
 			throw new IllegalArgumentException("A scoped pack needs a lowercase SHA-256 id");
 		}
-		return new CompiledPack(pack, "generated/" + id + "/");
+		return new CompiledPack(pack, "generated/" + id + "/", previousBindings);
 	}
+
+	public CustomBlockBindingSnapshot blockBindings() { return blockResolver.snapshot(); }
+	public WorldBlockBindings.Resolver blockResolver() { return blockResolver; }
+	public MaterialResolver materialResolver() { return new MaterialResolver(blockResolver); }
 
 	public WorldsmithPack pack() {
 		return this.pack;

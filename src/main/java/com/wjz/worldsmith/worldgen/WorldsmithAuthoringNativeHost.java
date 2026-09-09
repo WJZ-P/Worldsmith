@@ -5,6 +5,10 @@ import com.wjz.worldsmith.core.draw.BlockStateRef;
 import com.wjz.worldsmith.core.serialization.WorldsmithJson;
 import com.wjz.worldsmith.core.structure.*;
 import com.wjz.worldsmith.core.validation.*;
+import com.wjz.worldsmith.content.WorldBlockBindings;
+import com.wjz.worldsmith.content.WorldsmithCustomBlocks;
+import com.wjz.worldsmith.core.content.CustomBlockBindings;
+import com.wjz.worldsmith.core.content.CustomBlockLibrary;
 import java.util.*;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
@@ -15,18 +19,29 @@ import net.minecraft.world.level.block.state.properties.*;
 
 /** Read-only live registry/preflight adapter. No compiler, chunks, or NBT export. */
 public final class WorldsmithAuthoringNativeHost implements StructureNativeHost {
-    @Override public String getIdentity(){return SharedConstants.getCurrentVersion().dataVersion().version()+":"+System.identityHashCode(BuiltInRegistries.BLOCK)+":authoring-check-1";}
+    private final WorldBlockBindings.Resolver customBlocks;
+    public WorldsmithAuthoringNativeHost() { this(null); }
+    public WorldsmithAuthoringNativeHost(WorldBlockBindings.Resolver customBlocks) { this.customBlocks=customBlocks; }
+    @Override public StructureNativeHost forContent(String scope, CustomBlockLibrary blocks) {
+        return new WorldsmithAuthoringNativeHost(WorldBlockBindings.resolver(CustomBlockBindings.plan(scope,blocks)));
+    }
+    @Override public String getIdentity(){return SharedConstants.getCurrentVersion().dataVersion().version()+":"+System.identityHashCode(BuiltInRegistries.BLOCK)+":authoring-check-2:"+
+        (customBlocks==null?"native":com.wjz.worldsmith.content.GeneratedBlockResources.sha256(CustomBlockBindings.encode(customBlocks.snapshot()).getBytes(java.nio.charset.StandardCharsets.UTF_8)));}
     @Override public kotlinx.serialization.json.JsonObject query(List<String> ids,String search,int limit){
         if(limit<1||limit>64||ids.size()>64||search.length()>128)throw new IllegalArgumentException("Query supports at most 64 entries and a 128-character search");
-        var candidates=ids.isEmpty()?BuiltInRegistries.BLOCK.keySet().stream().map(Object::toString).filter(s->s.contains(search)).sorted().toList():ids;
+        var vocabulary=java.util.stream.Stream.concat(BuiltInRegistries.BLOCK.keySet().stream().map(Object::toString).filter(id->!WorldsmithCustomBlocks.isReservedNativeId(id)),
+            customBlocks==null?java.util.stream.Stream.<String>empty():customBlocks.nativeIds().keySet().stream());
+        var candidates=ids.isEmpty()?vocabulary.filter(s->s.contains(search)).sorted().toList():ids;
         var entries=new JsonArray();
         for(String requested:candidates.stream().limit(limit).toList()) {
             var item=new JsonObject();item.addProperty("requested",requested);
             try {
-                var source=BlockStateRef.parse(requested);var base=WorldsmithStructureTemplates.resolve(new BuildMaterial(source.id(),Map.of()));
+                var source=BlockStateRef.parse(requested);var base=resolve(new BuildMaterial(source.id(),Map.of()));
                 item.addProperty("id",source.id());item.addProperty("defaultState",base.toString());
-                var properties=new JsonObject();for(var property:base.getBlock().getStateDefinition().getProperties())properties.add(property.getName(),values(property));item.add("properties",properties);
-                var state=WorldsmithStructureTemplates.resolve(new BuildMaterial(source.id(),source.properties()));item.addProperty("state",state.toString());item.addProperty("lightEmission",state.getLightEmission());
+                var properties=new JsonObject();boolean logical=source.id().startsWith("worldsmith:content/");
+                if(!logical)for(var property:base.getBlock().getStateDefinition().getProperties())properties.add(property.getName(),values(property));item.add("properties",properties);
+                item.addProperty("immutableDefinition",logical);
+                var state=resolve(new BuildMaterial(source.id(),source.properties()));item.addProperty("state",state.toString());item.addProperty("lightEmission",state.getLightEmission());
             } catch(IllegalArgumentException e){item.addProperty("error",e.getMessage());}
             entries.add(item);
         }
@@ -39,7 +54,7 @@ public final class WorldsmithAuthoringNativeHost implements StructureNativeHost 
         for(var voxel:geometry.getVoxels()) {
             var material=voxel.getMaterial();var p=voxel.getPosition();if(invalid.contains(material))continue;
             try {
-                var state=resolved.computeIfAbsent(material,WorldsmithStructureTemplates::resolve).mirror(voxel.getMirrorX()?Mirror.FRONT_BACK:Mirror.NONE).rotate(Rotation.values()[voxel.getQuarterTurns()]);
+                var state=resolved.computeIfAbsent(material,this::resolve).mirror(voxel.getMirrorX()?Mirror.FRONT_BACK:Mirror.NONE).rotate(Rotation.values()[voxel.getQuarterTurns()]);
                 cells.put(new BlockPos(p.getX(),p.getY(),p.getZ()),state);
             } catch(IllegalArgumentException e){invalid.add(material);problems.add(problem(geometry,"NATIVE_BLOCK_STATE",p,e.getMessage(),"a registered block and legal property values",material.toString(),"Use worldsmith_query_block_states before changing the source"));}
         }
@@ -57,5 +72,6 @@ public final class WorldsmithAuthoringNativeHost implements StructureNativeHost 
         return List.copyOf(problems);
     }
     private static BuildPos pos(BlockPos p){return new BuildPos(p.getX(),p.getY(),p.getZ());}
+    private BlockState resolve(BuildMaterial material){return WorldsmithStructureTemplates.resolve(material,customBlocks);}
     private static Diagnostic problem(CompiledStructure g,String code,BuildPos at,String message,String expected,String actual,String hint){return new Diagnostic("blocks",code,DiagnosticSeverity.ERROR,message,"native",g.getId(),null,at,null,expected,actual,hint,Map.of());}
 }

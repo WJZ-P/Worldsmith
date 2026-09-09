@@ -22,6 +22,8 @@ import com.wjz.worldsmith.core.model.TerrainPlan;
 import com.wjz.worldsmith.core.model.TerrainShape;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
 import com.wjz.worldsmith.core.model.WorldsmithPackManifest;
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO;
+import com.wjz.worldsmith.content.WorldContentRuntime;
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.file.Files;
@@ -70,7 +72,7 @@ final class WorldsmithPackExporterTest {
 		int written = WorldsmithPackExporter.export(WorldsmithPacks.builtinCompiled(), vanilla, output);
 
 		assertEquals(52, written, "51 data files plus pack.mcmeta");
-		Path expectedData = Path.of("src/main/generated/data").toAbsolutePath().normalize();
+		Path expectedData = Path.of(System.getProperty("worldsmith.projectRoot", "."), "src/main/generated/data").toAbsolutePath().normalize();
 		Path actualData = output.resolve("data");
 		Set<String> expectedFiles = jsonFiles(expectedData);
 		Set<String> actualFiles = jsonFiles(actualData);
@@ -157,7 +159,7 @@ final class WorldsmithPackExporterTest {
 		RegistrySetBuilder.PatchedRegistries compiled = WorldsmithPackExporter.compilePatch(runtime, activeWorldgen);
 		Path output = this.tempDirectory.resolve("scoped");
 
-		assertEquals(52, WorldsmithPackExporter.write(runtime, compiled, output));
+		assertEquals(52 + WorldContentRuntime.prepare(runtime).serverResources().size(), WorldsmithPackExporter.write(runtime, compiled, output));
 		String prefix = "generated/" + runtime.id();
 		assertTrue(Files.isRegularFile(
 			output.resolve("data/worldsmith/worldgen/biome").resolve(prefix).resolve("abyss.json")
@@ -219,29 +221,20 @@ final class WorldsmithPackExporterTest {
 			template.getLegacyRandomSource(),
 			template.getSpawnTargets()
 		);
-		String id = "a".repeat(64);
-		WorldsmithPackManifest oldManifest = source.getManifest();
-		WorldsmithPackManifest manifest = new WorldsmithPackManifest(
-			oldManifest.getFormatVersion(),
-			id,
-			"Procedural test",
-			"Compiler fixture",
-			oldManifest.getFiles()
-		);
-		CompiledPack runtime = CompiledPack.scoped(new WorldsmithPack(
-			manifest,
-			terrain,
-			source.getBiomes(),
-			source.getFeatures(),
-			id, source.getStructures()
+		// This fixture selects FLUID rivers; do not inherit the Ashlands-only dry-bed surface rules.
+		CompiledPack runtime = CompiledPack.scoped(WorldContentBundleIO.create(
+			"Procedural test", "Compiler fixture", terrain,
+			WorldsmithStructureTest.biomesWithoutHydrologyRules(source.getBiomes()), source.getFeatures(), source.getStructures(),
+			source.getTheme(), source.getBlocks(), source.getCreatures(), source.getAssets()
 		));
+		String id = runtime.id();
 
 		HolderLookup.Provider activeWorldgen =
 			WorldsmithPackExporter.compilePatch(WorldsmithPacks.builtinCompiled(), vanilla).full();
 		RegistrySetBuilder.PatchedRegistries compiled = WorldsmithPackExporter.compilePatch(runtime, activeWorldgen);
 		Path output = this.tempDirectory.resolve("procedural");
 
-		assertEquals(52, WorldsmithPackExporter.write(runtime, compiled, output));
+		assertEquals(52 + WorldContentRuntime.prepare(runtime).serverResources().size(), WorldsmithPackExporter.write(runtime, compiled, output));
 		JsonElement proceduralBiome = readJson(
 			output.resolve("data/worldsmith/worldgen/biome/generated")
 				.resolve(id)

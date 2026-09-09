@@ -3,6 +3,8 @@ package com.wjz.worldsmith.worldgen;
 import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.MaterialSelector;
 import com.wjz.worldsmith.core.model.WeightedMaterial;
+import com.wjz.worldsmith.content.WorldBlockBindings;
+import com.wjz.worldsmith.content.WorldsmithCustomBlocks;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -35,6 +37,9 @@ import net.minecraft.world.level.levelgen.feature.stateproviders.WeightedStatePr
  */
 public final class MaterialResolver {
 	private final List<String> problems = new ArrayList<>();
+	private final WorldBlockBindings.Resolver customBlocks;
+	public MaterialResolver() { this(null); }
+	public MaterialResolver(WorldBlockBindings.Resolver customBlocks) { this.customBlocks = customBlocks; }
 
 	public BlockState resolve(MaterialSelector selector, Block fallback) {
 		if (!selector.getWeighted().isEmpty()) {
@@ -46,6 +51,12 @@ public final class MaterialResolver {
 		List<TagKey<Block>> requiredTags = this.tags(selector);
 		boolean tagsValid = requiredTags.size() == selector.getRequiredTags().size();
 		for (String id : selector.getPreferredIds()) {
+			if (WorldsmithCustomBlocks.isReservedNativeId(id)) throw new IllegalArgumentException("Portable materials must reference logical custom block ids, not native slots: " + id);
+			if (id.startsWith("worldsmith:content/")) {
+				if (!selector.getRequiredTags().isEmpty()) throw new IllegalArgumentException("Custom block material selectors must use explicit logical ids without requiredTags before datapack reload");
+				if (customBlocks == null) throw new IllegalArgumentException("Custom block alias needs an explicit world compilation context: " + id);
+				return customBlocks.resolve(id);
+			}
 			Identifier parsed = Identifier.tryParse(id);
 			if (parsed == null) {
 				this.problems.add("'" + id + "' is not a valid identifier (role " + selector.getSemanticRole() + ")");
@@ -65,6 +76,7 @@ public final class MaterialResolver {
 
 		if (!requiredTags.isEmpty() && tagsValid) {
 			Optional<Block> tagged = BuiltInRegistries.BLOCK.listElements()
+				.filter(holder -> !WorldsmithCustomBlocks.isReservedNativeId(holder.key().identifier().toString()))
 				.filter(holder -> requiredTags.stream().allMatch(holder::is))
 				.sorted(Comparator.comparing(holder -> holder.key().identifier().toString()))
 				.map(Holder.Reference::value)

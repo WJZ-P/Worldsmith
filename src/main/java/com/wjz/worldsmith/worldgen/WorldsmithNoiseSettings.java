@@ -78,7 +78,7 @@ public final class WorldsmithNoiseSettings {
 
 		TerrainPlan terrain = pack.terrain();
 		requireOverworldEnvelope(terrain);
-		MaterialResolver resolver = new MaterialResolver();
+		MaterialResolver resolver = pack.materialResolver();
 		SurfaceRules.RuleSource surfaceRule = WorldsmithSurfaceRules.build(pack, biomes, resolver);
 
 		context.register(pack.noiseSettingsKey(), new NoiseGeneratorSettings(

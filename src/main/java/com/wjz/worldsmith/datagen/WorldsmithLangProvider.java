@@ -3,6 +3,9 @@ package com.wjz.worldsmith.datagen;
 import com.wjz.worldsmith.worldgen.CompiledBiome;
 import com.wjz.worldsmith.worldgen.WorldsmithPacks;
 import com.wjz.worldsmith.worldgen.WorldsmithWorldPresets;
+import com.wjz.worldsmith.core.content.CustomBlockProfile;
+import com.wjz.worldsmith.core.content.CustomBlockValidation;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import net.fabricmc.fabric.api.datagen.v1.FabricPackOutput;
 import net.fabricmc.fabric.api.datagen.v1.provider.FabricLanguageProvider;
@@ -29,6 +32,19 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		}
 
 		addSettingsScreen(builder);
+		addUnboundBlockHosts(builder);
+	}
+
+	/** Diagnostic fallbacks remain named before a world-scoped resource pack is activated. */
+	private static void addUnboundBlockHosts(TranslationBuilder builder) {
+		for (CustomBlockProfile profile : CustomBlockProfile.values()) {
+			String name = profile.name().toLowerCase(Locale.ROOT);
+			for (int slot = 0; slot < CustomBlockValidation.SLOTS_PER_PROFILE; slot++) {
+				String index = String.format(Locale.ROOT, "%02d", slot);
+				builder.add("block.worldsmith.content.block." + name + "." + index,
+					"[Worldsmith] Unbound block slot (" + name + " " + index + ")");
+			}
+		}
 	}
 
 	/** Strings for the optional Cloth Config screen. */

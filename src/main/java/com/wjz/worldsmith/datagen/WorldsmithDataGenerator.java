@@ -15,6 +15,7 @@ public final class WorldsmithDataGenerator implements DataGeneratorEntrypoint {
 		pack.addProvider(WorldsmithBiomeTagProvider::new);
 		pack.addProvider(WorldsmithWorldPresetTagProvider::new);
 		pack.addProvider(WorldsmithLangProvider::new);
+		pack.addProvider(WorldsmithContentValidationProvider::new);
 	}
 
 	/**
