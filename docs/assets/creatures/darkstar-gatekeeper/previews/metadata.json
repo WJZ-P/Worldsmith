@@ -1,0 +1,73 @@
+{
+    "textureSha256": "f44025dd96bb9751ae23652d81f785b3416482518fd552a8424d448417d24083",
+    "minecraftScreenshot": false,
+    "visibleFaces": 168,
+    "view": "isometric",
+    "shadedPixels": 257309,
+    "cutoutAlphaThreshold": 26,
+    "textureWidth": 256,
+    "textureHeight": 256,
+    "renderer": "worldsmith-creature-preview-v1",
+    "kind": "offline_model_preview",
+    "frameModelUnits": [
+        -26.0,
+        -1.394462775392114,
+        -40.4148190284685,
+        26.0,
+        81.67275167940667,
+        26.284423673820633
+    ],
+    "width": 1280,
+    "height": 1000,
+    "limitations": [
+        "Simplified studio illumination",
+        "No Minecraft render pipeline",
+        "No server AI or combat simulation"
+    ],
+    "boneCount": 14,
+    "cameraElevationDegrees": 22.0,
+    "sharedPoseEvaluator": "CreaturePose",
+    "creatureId": "darkstar_gatekeeper",
+    "cubeCount": 56,
+    "cameraYawDegrees": 35.0,
+    "pixelsPerModelUnit": 7.144406171195809,
+    "projection": "orthographic",
+    "uvMapping": "native_box_uv",
+    "pose": "idle",
+    "files": {
+        "hero.png": {
+            "byteLength": 84383,
+            "sha256": "adceb1ded02fa78c53647043e24dfbf40960de2efd55397f205d95171b603f88"
+        },
+        "sheet.png": {
+            "byteLength": 319063,
+            "sha256": "aae1a92499e59a6dd2389f9428e04d25d6d418baa76a38b86804d084f8b4c3d5"
+        },
+        "uv-debug.png": {
+            "byteLength": 346283,
+            "sha256": "62a6adce61dc9e0220380e4795cbaca2c5659fb8fb81ff3501a645061e54a078"
+        },
+        "pose-idle.png": {
+            "byteLength": 84383,
+            "sha256": "adceb1ded02fa78c53647043e24dfbf40960de2efd55397f205d95171b603f88"
+        },
+        "pose-walk.png": {
+            "byteLength": 84935,
+            "sha256": "8c82f07448e1c7742c89fd6d63ce6d1ad7a6b7d437cde8a3b35d2e1abb2a05d8"
+        },
+        "pose-windup.png": {
+            "byteLength": 93609,
+            "sha256": "db02b429339efd807400fbf8860b1083418e384cc3dc63c14ae246d670b12a0e"
+        },
+        "pose-strike.png": {
+            "byteLength": 85028,
+            "sha256": "8fe4870797dfadaec4e5b68447be62447fd6b404c5d0ebbe10a5b5ca5d05d6a2"
+        },
+        "pose-recovery.png": {
+            "byteLength": 83589,
+            "sha256": "3db37267286b62b5cd16fb77723e8e2c3850e07879a65cf69c5e1c1c1b159f80"
+        }
+    },
+    "sourceDefinition": "W:\\data\\GithubProjects\\Worldsmith\\docs\\assets\\creatures\\darkstar-gatekeeper\\creature.json",
+    "sourceTexture": "W:\\data\\GithubProjects\\Worldsmith\\docs\\assets\\creatures\\darkstar-gatekeeper\\texture.png"
+}

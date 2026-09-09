@@ -1,0 +1,768 @@
+{
+    "id": "darkstar_gatekeeper",
+    "displayName": "黯星守门者",
+    "category": "HOSTILE",
+    "schemaVersion": 1,
+    "atlasWidth": 256,
+    "atlasHeight": 256,
+    "padding": 2,
+    "themeRole": "An ancient dark-stone gate guardian, with bronze bindings and an exposed amethyst heart.",
+    "attributes": {
+        "health": 240.0,
+        "speed": 0.19,
+        "followRange": 32.0,
+        "attackDamage": 8.0,
+        "knockbackResistance": 0.7,
+        "width": 2.4,
+        "height": 4.95
+    },
+    "behavior": {
+        "passiveMode": "WANDER",
+        "territoryRadius": 32,
+        "attackReach": 3.0,
+        "windupTicks": 24,
+        "recoveryTicks": 32
+    },
+    "spawn": {
+        "biomes": [],
+        "weight": 10,
+        "minGroup": 1,
+        "maxGroup": 3,
+        "minLight": 0,
+        "maxLight": 15
+    },
+    "bones": [
+        {
+            "id": "root",
+            "pivot": {
+                "x": 0.0,
+                "y": 24.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "role": "NONE",
+            "gaitPhase": 0.0,
+            "cubes": []
+        },
+        {
+            "id": "pelvis",
+            "parent": "root",
+            "pivot": {
+                "x": 0.0,
+                "y": -32.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "role": "NONE",
+            "gaitPhase": 0.0,
+            "cubes": [
+                {
+                    "id": "hipStone",
+                    "origin": {
+                        "x": -11.0,
+                        "y": -6.0,
+                        "z": -7.0
+                    },
+                    "size": {
+                        "x": 22.0,
+                        "y": 12.0,
+                        "z": 14.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "waistBand",
+                    "origin": {
+                        "x": -12.0,
+                        "y": -5.0,
+                        "z": -8.0
+                    },
+                    "size": {
+                        "x": 24.0,
+                        "y": 3.0,
+                        "z": 16.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                },
+                {
+                    "id": "frontGuard",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 3.0,
+                        "z": -10.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 14.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "stone_engraved",
+                    "mirror": false
+                },
+                {
+                    "id": "beltSeal",
+                    "origin": {
+                        "x": -3.0,
+                        "y": -3.0,
+                        "z": -10.0
+                    },
+                    "size": {
+                        "x": 6.0,
+                        "y": 5.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "amethyst",
+                    "mirror": false
+                }
+            ]
+        },
+        {
+            "id": "torso",
+            "parent": "pelvis",
+            "pivot": {
+                "x": 0.0,
+                "y": -12.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "role": "NONE",
+            "gaitPhase": 0.0,
+            "cubes": [
+                {
+                    "id": "chestStone",
+                    "origin": {
+                        "x": -12.0,
+                        "y": -12.0,
+                        "z": -7.0
+                    },
+                    "size": {
+                        "x": 24.0,
+                        "y": 24.0,
+                        "z": 14.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "collar",
+                    "origin": {
+                        "x": -11.0,
+                        "y": -14.0,
+                        "z": -7.0
+                    },
+                    "size": {
+                        "x": 22.0,
+                        "y": 3.0,
+                        "z": 14.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                },
+                {
+                    "id": "sternumPlate",
+                    "origin": {
+                        "x": -7.0,
+                        "y": -10.0,
+                        "z": -9.0
+                    },
+                    "size": {
+                        "x": 14.0,
+                        "y": 16.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                },
+                {
+                    "id": "heartCrystal",
+                    "origin": {
+                        "x": -4.0,
+                        "y": -7.0,
+                        "z": -12.0
+                    },
+                    "size": {
+                        "x": 8.0,
+                        "y": 10.0,
+                        "z": 5.0
+                    },
+                    "materialRole": "amethyst",
+                    "mirror": false
+                },
+                {
+                    "id": "ribLeft",
+                    "origin": {
+                        "x": -12.0,
+                        "y": 2.0,
+                        "z": -9.0
+                    },
+                    "size": {
+                        "x": 4.0,
+                        "y": 7.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "stone_engraved",
+                    "mirror": false
+                },
+                {
+                    "id": "ribRight",
+                    "origin": {
+                        "x": 8.0,
+                        "y": 2.0,
+                        "z": -9.0
+                    },
+                    "size": {
+                        "x": 4.0,
+                        "y": 7.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "stone_engraved",
+                    "mirror": false
+                },
+                {
+                    "id": "backSpine",
+                    "origin": {
+                        "x": -3.0,
+                        "y": -10.0,
+                        "z": 7.0
+                    },
+                    "size": {
+                        "x": 6.0,
+                        "y": 22.0,
+                        "z": 4.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                },
+                {
+                    "id": "backPlate",
+                    "origin": {
+                        "x": -10.0,
+                        "y": -8.0,
+                        "z": 7.0
+                    },
+                    "size": {
+                        "x": 20.0,
+                        "y": 16.0,
+                        "z": 2.0
+                    },
+                    "materialRole": "stone_engraved",
+                    "mirror": false
+                }
+            ]
+        },
+        {
+            "id": "head",
+            "parent": "torso",
+            "pivot": {
+                "x": 0.0,
+                "y": -18.0,
+                "z": -2.0
+            },
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "role": "HEAD",
+            "gaitPhase": 0.0,
+            "cubes": [
+                {
+                    "id": "helmet",
+                    "origin": {
+                        "x": -7.0,
+                        "y": -9.0,
+                        "z": -6.0
+                    },
+                    "size": {
+                        "x": 14.0,
+                        "y": 13.0,
+                        "z": 12.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "brow",
+                    "origin": {
+                        "x": -8.0,
+                        "y": -6.0,
+                        "z": -7.0
+                    },
+                    "size": {
+                        "x": 16.0,
+                        "y": 3.0,
+                        "z": 4.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                },
+                {
+                    "id": "faceMask",
+                    "origin": {
+                        "x": -5.0,
+                        "y": -3.0,
+                        "z": -7.0
+                    },
+                    "size": {
+                        "x": 10.0,
+                        "y": 6.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "stone_engraved",
+                    "mirror": false
+                },
+                {
+                    "id": "eyeLeft",
+                    "origin": {
+                        "x": -5.0,
+                        "y": -3.0,
+                        "z": -8.0
+                    },
+                    "size": {
+                        "x": 3.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "materialRole": "amethyst",
+                    "mirror": false
+                },
+                {
+                    "id": "eyeRight",
+                    "origin": {
+                        "x": 2.0,
+                        "y": -3.0,
+                        "z": -8.0
+                    },
+                    "size": {
+                        "x": 3.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    },
+                    "materialRole": "amethyst",
+                    "mirror": false
+                },
+                {
+                    "id": "chinSeal",
+                    "origin": {
+                        "x": -2.0,
+                        "y": 1.0,
+                        "z": -9.0
+                    },
+                    "size": {
+                        "x": 4.0,
+                        "y": 4.0,
+                        "z": 2.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                }
+            ]
+        },
+        {
+            "id": "hornL",
+            "parent": "head",
+            "pivot": {
+                "x": -5.0,
+                "y": -7.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": -18.0
+            },
+            "role": "NONE",
+            "gaitPhase": 0.0,
+            "cubes": [
+                {
+                    "id": "rootBand",
+                    "origin": {
+                        "x": -3.0,
+                        "y": -2.0,
+                        "z": -3.0
+                    },
+                    "size": {
+                        "x": 6.0,
+                        "y": 4.0,
+                        "z": 6.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                },
+                {
+                    "id": "horn",
+                    "origin": {
+                        "x": -2.0,
+                        "y": -10.0,
+                        "z": -2.0
+                    },
+                    "size": {
+                        "x": 4.0,
+                        "y": 10.0,
+                        "z": 4.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "tip",
+                    "origin": {
+                        "x": -1.0,
+                        "y": -13.0,
+                        "z": -1.0
+                    },
+                    "size": {
+                        "x": 2.0,
+                        "y": 4.0,
+                        "z": 2.0
+                    },
+                    "materialRole": "amethyst",
+                    "mirror": false
+                }
+            ]
+        },
+        {
+            "id": "armL",
+            "parent": "torso",
+            "pivot": {
+                "x": -18.0,
+                "y": -8.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "role": "ARM_LEFT",
+            "gaitPhase": 0.0,
+            "cubes": [
+                {
+                    "id": "upperArm",
+                    "origin": {
+                        "x": -5.0,
+                        "y": 0.0,
+                        "z": -5.0
+                    },
+                    "size": {
+                        "x": 10.0,
+                        "y": 18.0,
+                        "z": 10.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "shoulderCap",
+                    "origin": {
+                        "x": -7.0,
+                        "y": -5.0,
+                        "z": -7.0
+                    },
+                    "size": {
+                        "x": 14.0,
+                        "y": 9.0,
+                        "z": 14.0
+                    },
+                    "materialRole": "stone_engraved",
+                    "mirror": false
+                },
+                {
+                    "id": "upperBinding",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 5.0,
+                        "z": -6.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 3.0,
+                        "z": 12.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                },
+                {
+                    "id": "shoulderCrystal",
+                    "origin": {
+                        "x": -8.0,
+                        "y": -3.0,
+                        "z": -4.0
+                    },
+                    "size": {
+                        "x": 3.0,
+                        "y": 5.0,
+                        "z": 8.0
+                    },
+                    "materialRole": "amethyst",
+                    "mirror": false
+                }
+            ]
+        },
+        {
+            "id": "armL_forearm",
+            "parent": "armL",
+            "pivot": {
+                "x": 0.0,
+                "y": 17.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "role": "NONE",
+            "gaitPhase": 0.0,
+            "cubes": [
+                {
+                    "id": "forearm",
+                    "origin": {
+                        "x": -5.0,
+                        "y": 0.0,
+                        "z": -5.0
+                    },
+                    "size": {
+                        "x": 10.0,
+                        "y": 15.0,
+                        "z": 10.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "bracer",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 1.0,
+                        "z": -7.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 10.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "stone_engraved",
+                    "mirror": false
+                },
+                {
+                    "id": "wristBinding",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 11.0,
+                        "z": -6.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 3.0,
+                        "z": 12.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                },
+                {
+                    "id": "fist",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 13.0,
+                        "z": -7.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 10.0,
+                        "z": 13.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "knuckles",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 14.0,
+                        "z": -9.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 4.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                }
+            ]
+        },
+        {
+            "id": "legL",
+            "parent": "pelvis",
+            "pivot": {
+                "x": -7.0,
+                "y": 4.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "role": "LEG_LEFT",
+            "gaitPhase": 0.0,
+            "cubes": [
+                {
+                    "id": "thigh",
+                    "origin": {
+                        "x": -5.0,
+                        "y": 0.0,
+                        "z": -5.0
+                    },
+                    "size": {
+                        "x": 10.0,
+                        "y": 17.0,
+                        "z": 10.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "thighPlate",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 1.0,
+                        "z": -7.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 12.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "stone_engraved",
+                    "mirror": false
+                },
+                {
+                    "id": "kneeBinding",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 13.0,
+                        "z": -6.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 4.0,
+                        "z": 12.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                }
+            ]
+        },
+        {
+            "id": "legL_shin",
+            "parent": "legL",
+            "pivot": {
+                "x": 0.0,
+                "y": 16.0,
+                "z": 0.0
+            },
+            "rotation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "role": "NONE",
+            "gaitPhase": 0.0,
+            "cubes": [
+                {
+                    "id": "shin",
+                    "origin": {
+                        "x": -4.0,
+                        "y": 0.0,
+                        "z": -4.0
+                    },
+                    "size": {
+                        "x": 8.0,
+                        "y": 10.0,
+                        "z": 8.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "shinPlate",
+                    "origin": {
+                        "x": -5.0,
+                        "y": 0.0,
+                        "z": -6.0
+                    },
+                    "size": {
+                        "x": 10.0,
+                        "y": 9.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "stone_engraved",
+                    "mirror": false
+                },
+                {
+                    "id": "boot",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 8.0,
+                        "z": -8.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 4.0,
+                        "z": 15.0
+                    },
+                    "materialRole": "stone_dark",
+                    "mirror": false
+                },
+                {
+                    "id": "toeCap",
+                    "origin": {
+                        "x": -6.0,
+                        "y": 9.0,
+                        "z": -9.0
+                    },
+                    "size": {
+                        "x": 12.0,
+                        "y": 3.0,
+                        "z": 3.0
+                    },
+                    "materialRole": "bronze",
+                    "mirror": false
+                }
+            ]
+        }
+    ],
+    "mirrors": [
+        {
+            "sourceRoot": "hornL",
+            "targetRoot": "hornR",
+            "shareUv": true
+        },
+        {
+            "sourceRoot": "armL",
+            "targetRoot": "armR",
+            "shareUv": true
+        },
+        {
+            "sourceRoot": "legL",
+            "targetRoot": "legR",
+            "shareUv": true
+        }
+    ]
+}

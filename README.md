@@ -90,3 +90,18 @@ Current scope is local integrated-server worlds. Remote content negotiation,
 executable quests/achievements, free-form behavior scripts and arbitrary block
 physical shapes are not installed. Old unreleased world-bundle formats 1/2 must
 be regenerated; existing files are not silently migrated.
+
+## Creature authoring and creative inventory
+
+[Creature authoring](docs/creature-authoring.md) adds a Java-friendly builder, JSON
+recipes, mirrored limbs, automatic box UV layout and actual textured pose previews.
+The offline and native renderers share the same pose evaluator. A UV guide is clearly
+marked and never automatically published as a finished skin.
+
+[World-scoped creative content](docs/creative-content.md) adds a dedicated creative
+tab for the joined world's blocks and creature summoners, with a provider interface
+for a future ordinary-item domain. Undefined/foreign content is not exposed.
+
+[Darkstar Gatekeeper](docs/assets/creatures/darkstar-gatekeeper/README.md) is a reusable
+appearance example with a real generated UV skin and rendered multi-view images;
+it does not add a special Boss combat system.

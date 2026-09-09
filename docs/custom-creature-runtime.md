@@ -62,6 +62,26 @@ Low-level creature APIs, used by the aggregate service:
 
 Flying, swimming navigation, taming, breeding, riding, multipart bosses, projectiles, equipment, custom loot, scripted keyframe timelines, inverse kinematics, animation sound events, runtime code generation and automatic per-world network asset transfer are not implemented by this module. Quest/achievement integration can reference creature logical IDs through the common catalog without pretending those gameplay systems already exist. The common world lifecycle decides which client/server deployment modes are currently available.
 
+## Offline creature authoring preview
+
+`CreaturePreview` renders the actual verified PNG on the actual cuboid hierarchy, without opening Minecraft. It reproduces native box-UV face topology (including the bottom face's V reversal and mirrored cube winding), nearest texture sampling and cutout transparency. Per-pixel depth resolves overlapping geometry rather than relying on face-centre sorting. Studio illumination is intentionally simplified.
+
+`CreaturePose` is now the single procedural pose evaluator used by both this preview and the native `CreatureModel`. Preview poses select representative inputs for `idle`, `walk`, `windup`, `strike` and `recovery`; they are not a captured animation or an AI/combat simulation. A shared comparison frame covers the standard poses and a sampled gait/tail cycle, keeping the same view and preview time at the same scale across poses.
+
+Public pure-core entry points:
+
+```java
+CreaturePreview.png(definition, pngBytes, "isometric", "idle");
+CreaturePreview.render(definition, pngBytes,
+    CreaturePreview.Options.defaults("front", "walk").withSize(1280, 1000));
+CreaturePreview.sheet(definition, pngBytes);
+CreaturePreview.uvDebug(definition, pngBytes);
+```
+
+Views include front/back/left/right/top and two opposing three-quarter views. Optional controls expose time, head angles, transparent background, clay shading and an explicitly overlaid collision box. Image dimensions are bounded at 1600 pixels; raster work is bounded separately. The texture's SHA-256, PNG integrity and dimensions must match the creature definition before rendering. The UV debug image is annotated and is **not** an importable skin.
+
+The `:core:previewCreature` JavaExec task takes `-PcreatureFile`, `-PtextureFile` and `-PpreviewDir`. It produces `hero.png`, `sheet.png`, `uv-debug.png`, five pose PNGs and `metadata.json` containing identity, camera parameters and output hashes. Every preview is identified as offline rather than an in-game screenshot. Producing and inspecting these artifacts is separate from the regression test suite.
+
 ## Verification boundaries
 
 `CustomCreaturesTest` checks typed round trips, hierarchy/UV/size limits, finite values, spawn/behavior constraints and exact single-hit combat transitions. `CreatureRuntimeTest` checks prepare-vs-activate separation, category/biome/light eligibility, native spawn entry planning and deep immutable snapshots. `WorldContentRuntimeTest` covers portable directory/ZIP restore, selected-pack ambiguity/integrity, ownership reservations, stale leases and resource byte immutability. A successful compile and these tests establish code/data contracts, not visual or combat playtesting; native bootstrap and an isolated game runtime smoke test are separate checks.
