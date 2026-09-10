@@ -84,6 +84,7 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
             put("blockCount",pack.blocks.blocks.size);put("creatureCount",pack.creatures.creatures.size)
             put("themeTitle",pack.theme.title);put("narrativeBeatCount",pack.theme.beats.size)
             put("itemCount",pack.items.items.size)
+            put("questCount",pack.quests.quests.size)
             put("assetCount",pack.manifest.assets.size);put("packFormat",pack.manifest.formatVersion)
             put("clientResourcesVerified",true);put("runtimeScope","local_integrated_world")
             put("groupCount", pack.structures.architecture?.groups?.size ?: 0)

@@ -92,6 +92,8 @@ object WorldsmithPackLoader {
             else WorldsmithJson.decode<CreatureLibrary>(creaturesText)
         val items = if (manifest.formatVersion == WorldContentBundleIO.LEGACY_FORMAT_VERSION) CustomItemLibrary()
             else WorldsmithJson.decode<CustomItemLibrary>(contents.getValue(manifest.modulePath("items")))
+        val quests = if ("quests" !in manifest.modules) QuestLibrary()
+            else WorldsmithJson.decode<QuestLibrary>(contents.getValue(manifest.modulePath("quests")))
         require(index.artifacts.size<=512 && index.artifacts.all { (id,v)->id.matches(Regex("[a-f0-9]{64}")) && v.id==id })
         var drawingBytes = 0L
         val binaries=index.artifacts.values.associate { artifact ->
@@ -103,6 +105,6 @@ object WorldsmithPackLoader {
         manifest.assets.forEach { asset -> binaries.getOrPut(requireNotNull(asset.path)) { source.readBytes(asset.path) } }
         val computedId = WorldsmithHashUtil.computeGenerationId(manifest, contents,binaries)
         return WorldsmithPack(manifest, terrain, biomes, features, computedId, StructurePackIO.load(index, contents,binaries),
-            theme, blocks, creatures, manifest.assets.associate { it.id to binaries.getValue(requireNotNull(it.path)) }, items)
+            theme, blocks, creatures, manifest.assets.associate { it.id to binaries.getValue(requireNotNull(it.path)) }, items, quests)
     }
 }

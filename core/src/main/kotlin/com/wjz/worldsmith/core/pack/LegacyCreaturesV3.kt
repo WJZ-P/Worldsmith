@@ -41,7 +41,7 @@ object LegacyCreaturesV3 {
             val fields = entry.jsonObject
             val drops = fields["drops"]
             require(drops == null || drops == JsonNull || drops is JsonArray && drops.isEmpty()) {
-                "Format 3 contains no creature drop rules; publish new linked content as format 4"
+                "Format 3 contains no creature drop rules; publish new linked content as a current-format bundle"
             }
             JsonObject(fields - "drops")
         }

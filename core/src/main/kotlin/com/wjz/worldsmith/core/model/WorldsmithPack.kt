@@ -41,9 +41,11 @@ class WorldsmithPack @JvmOverloads constructor(
     val creatures: CreatureLibrary = CreatureLibrary(),
     assets: Map<String, ByteArray> = emptyMap(),
     items: CustomItemLibrary = CustomItemLibrary(),
+    quests: QuestLibrary = QuestLibrary(),
 ) {
     private val frozenAssets = assets.mapValues { (_, bytes) -> bytes.copyOf() }
     val items: CustomItemLibrary = CustomItemValidation.freeze(items)
+    val quests: QuestLibrary = QuestValidation.freeze(quests)
     /** Callers never receive the immutable bundle's backing bytes. */
     val assets: Map<String, ByteArray> get() = frozenAssets.mapValues { (_, bytes) -> bytes.copyOf() }
 
@@ -51,6 +53,6 @@ class WorldsmithPack @JvmOverloads constructor(
         biomes: BiomePlan = this.biomes, features: FeatureLibrary = this.features, computedId: String = this.computedId,
         structures: StructureLibrary = this.structures, theme: WorldTheme = this.theme,
         blocks: CustomBlockLibrary = this.blocks, creatures: CreatureLibrary = this.creatures,
-        assets: Map<String, ByteArray> = this.assets, items: CustomItemLibrary = this.items) =
-        WorldsmithPack(manifest, terrain, biomes, features, computedId, structures, theme, blocks, creatures, assets, items)
+        assets: Map<String, ByteArray> = this.assets, items: CustomItemLibrary = this.items, quests: QuestLibrary = this.quests) =
+        WorldsmithPack(manifest, terrain, biomes, features, computedId, structures, theme, blocks, creatures, assets, items, quests)
 }

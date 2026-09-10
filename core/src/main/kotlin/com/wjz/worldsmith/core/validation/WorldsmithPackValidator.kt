@@ -31,9 +31,11 @@ object WorldsmithPackValidator {
             add(error("manifest", "INVALID_CONTENT_MANIFEST", e.message ?: "Invalid module manifest"))
         }
         if (manifest.formatVersion == WorldContentBundleIO.LEGACY_FORMAT_VERSION) {
-            if (pack.items.items.isNotEmpty()) add(error("items", "ITEMS_REQUIRE_FORMAT4", "Format 3 contains no ordinary item module; freeze linked content as format 4"))
-            if (pack.creatures.creatures.any { it.drops.isNotEmpty() }) add(error("creatures", "CREATURE_DROPS_REQUIRE_FORMAT4", "Format 3 does not contain creature drop behavior; freeze linked content as format 4"))
+            if (pack.items.items.isNotEmpty()) add(error("items", "ITEMS_REQUIRE_FORMAT4", "Format 3 contains no ordinary item module; freeze linked content as a new current-format bundle"))
+            if (pack.creatures.creatures.any { it.drops.isNotEmpty() }) add(error("creatures", "CREATURE_DROPS_REQUIRE_FORMAT4", "Format 3 does not contain creature drop behavior; freeze linked content as a new current-format bundle"))
         }
+        if (manifest.formatVersion < 5 && pack.quests.quests.isNotEmpty())
+            add(error("quests", "QUESTS_REQUIRE_FORMAT5", "Formats 3/4 contain no quest gameplay; freeze the main line as format 5"))
 
         val contentPlan = ExistingWorldContentModules.registry().plan(ExistingWorldContentModules.input(pack))
         addAll(contentPlan.diagnostics)
@@ -72,6 +74,11 @@ object WorldsmithPackValidator {
                     if (maximum > item.maxStackSize) add(error(path, "CONTENT_ITEM_STACK_LIMIT", "Each reward entry is one stack: ${item.id} permits at most ${item.maxStackSize}, requested $maximum"))
                 }
             }
+        }
+        pack.quests.quests.forEachIndexed { i, quest ->
+            quest.rewards.forEachIndexed { j, reward -> checkItemStack(reward.item, reward.count, "quests.quests[$i].rewards[$j].count") }
+            // Delivery counts deliberately cross stack boundaries and accumulate real contributions.
+            // They are not capped to one item's maxStackSize as reward entries are.
         }
         pack.creatures.creatures.forEachIndexed { i, creature ->
             checkTextureAddress(creature.model.texture, "creatures.creatures[$i].model.texture")

@@ -8,6 +8,8 @@ import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 import com.wjz.worldsmith.core.validation.WorldsmithPackValidator
 import kotlinx.serialization.json.*
 import java.nio.file.Path
+import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.util.Base64
 
 /** Durable modular authoring; planning, semantic validation and activation are separate receipts. */
@@ -15,16 +17,22 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
     private val sessions:WorkflowSessions=WorkflowSessions(), assetDirectory:Path?=null) {
     private val registry=ExistingWorldContentModules.registry()
     private val assets=assetDirectory?.let {ContentAssetStore(it,ContentAssetValidation.MAX_ASSET_BYTES)}
+    private val textureInbox=assetDirectory?.resolveSibling("texture-inbox")?.let {
+        Files.createDirectories(it);require(!Files.isSymbolicLink(it)) {"Texture inbox must be a regular directory"};it.toRealPath()
+    }
     fun capabilities():JsonObject=buildJsonObject {
-        put("frameworkVersion",3);put("packFormat",4)
-        put("implementedLayer","typed eight-module bundles, world-bound items, rewards, PNG assets and revision-checked authoring")
+        put("frameworkVersion",4);put("packFormat",5)
+        put("implementedLayer","typed nine-module bundles, linear quest progress, world-bound items and portable texture authoring")
         put("installedModules",McpJson.encode(registry.descriptors));put("plannedModules",McpJson.encode(ExistingWorldContentModules.plannedModules))
         put("customBlockRuntime",nativeAdapterPresent);put("customCreatureRuntime",nativeAdapterPresent)
         put("customItemRuntime",nativeAdapterPresent);put("creatureDrops",nativeAdapterPresent)
         put("geckoLibIntegration",false);put("nativeAdapterPresent",nativeAdapterPresent)
-        put("newPackFormatEnabled",true);put("legacyPackFormats",McpJson.encode(listOf(3)));put("legacyFormatsReadOnly",true);put("activationVerified",false)
+        put("newPackFormatEnabled",true);put("legacyPackFormats",McpJson.encode(listOf(3,4)));put("legacyFormatsReadOnly",true);put("activationVerified",false)
+        put("linearQuestRuntime",nativeAdapterPresent)
         put("runtimeScope","one local integrated-server world; remote multiplayer content negotiation is not installed")
         put("assetAuthoring","actual PNG upload or indexed-pixel texture authoring; not a hosted image-generation service")
+        put("textureWorkflowContract","worldsmith_get_texture_workflow")
+        put("modelIndependentTextureRecipes",true)
         put("creatureAuthoring", "deterministic bone/cube recipes, mirroring, automatic UVs and frozen textured pose previews")
         put("creatureAuthoringContract", "worldsmith_get_creature_authoring_contract")
         put("creativeModeContentTab", nativeAdapterPresent)
@@ -37,8 +45,15 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         val revision=mapOf("sessionId" to str,"expectedRevision" to integer)
         return listOf(
             McpTool("worldsmith_get_content_framework","Read world content capabilities","Read installed modules and lifecycle boundaries; does not activate content.",McpJson.schema(emptyMap(),emptyList()),true,handler={McpToolResult.success(capabilities())}),
-            McpTool("worldsmith_get_content_contract","Read a typed content contract","Read exact theme, blocks, creatures or items fields and limits before authoring. Existing worldgen domain contracts remain separate.",McpJson.schema(mapOf("module" to str),listOf("module")),true,handler={contract(McpJson.string(it,"module"))}),
-            McpTool("worldsmith_put_content_modules","Commit a world content draft","Atomically merge complete typed module documents at expectedRevision: theme, blocks, creatures, items, terrain, biomes, features. Structure tools own architecture. removeAssets detaches obsolete handles without deleting their stored bytes. Repairable links may remain in drafts. Invalidates publication.",McpJson.schema(revision+mapOf("modules" to obj,"removeAssets" to McpJson.array()),listOf("sessionId","expectedRevision","modules")),false,handler=::putModules),
+            McpTool("worldsmith_get_texture_workflow","Read reusable texture production workflow","Explain item icons, block tiles and creature UV atlases, plus model-independent recipes and PNG import. The mod does not supply a proprietary image-generation model.",McpJson.schema(emptyMap(),emptyList()),true,handler={ textureWorkflow() }),
+            McpTool("worldsmith_build_texture","Build a reusable procedural pixel texture","Compile a bounded TextureRecipe with palette, seed and fill/noise/checker/line/stamp operations. No image model, executable source or network calls. Attaches a real PNG at expectedRevision.",McpJson.schema(revision+mapOf("recipe" to obj),listOf("sessionId","expectedRevision","recipe")),false,handler={a->
+                current(a);val raw=a.getValue("recipe");require(raw.toString().toByteArray().size<=1024*1024) {"Texture recipe exceeds 1 MiB"}
+                val recipe=McpJson.decode<TextureRecipe>(raw);val result=attach(a,TextureRecipes.render(recipe))
+                result.copy(structuredContent=JsonObject(result.structuredContent+buildJsonObject {put("recipeVersion",TextureRecipes.VERSION);put("seed",recipe.seed);put("imageModelUsed",false)}))
+            }),
+            McpTool("worldsmith_import_texture_file","Import a PNG from the dedicated texture inbox","Read a single PNG filename from the configured host-local texture inbox, avoiding base64 through the model. No arbitrary paths, URLs or symlinks. Optional fitWidth/fitHeight plus resample=nearest explicitly resizes the entire image, preserving the original file.",McpJson.schema(revision+mapOf("filename" to str,"fitWidth" to integer,"fitHeight" to integer,"resample" to str),listOf("sessionId","expectedRevision","filename")),false,handler=::importTexture),
+            McpTool("worldsmith_get_content_contract","Read a typed content contract","Read exact theme, blocks, creatures, items or quests fields and limits before authoring. Existing worldgen domain contracts remain separate.",McpJson.schema(mapOf("module" to str),listOf("module")),true,handler={contract(McpJson.string(it,"module"))}),
+            McpTool("worldsmith_put_content_modules","Commit a world content draft","Atomically merge complete typed module documents at expectedRevision: theme, blocks, creatures, items, quests, terrain, biomes, features. Structure tools own architecture. removeAssets detaches obsolete handles without deleting their stored bytes. Repairable links may remain in drafts. Invalidates publication.",McpJson.schema(revision+mapOf("modules" to obj,"removeAssets" to McpJson.array()),listOf("sessionId","expectedRevision","modules")),false,handler=::putModules),
             McpTool("worldsmith_get_content_draft","Read current world content draft","Read durable modules, immutable asset handles and shared revision without executing sources.",McpJson.schema(mapOf("sessionId" to str),listOf("sessionId")),true,handler={draft(session(it))}),
             McpTool("worldsmith_put_texture_asset","Attach an immutable PNG texture","Upload actual PNG bytes as base64. Validates bytes and dimensions and attaches its content address at expectedRevision. No filesystem path or URL is accepted.",McpJson.schema(revision+mapOf("pngBase64" to str),listOf("sessionId","expectedRevision","pngBase64")),false,handler={a->current(a);attach(a,ContentTextureMcp.upload(McpJson.string(a,"pngBase64")))}),
             McpTool("worldsmith_create_pixel_texture","Author an indexed-pixel PNG","Create a real PNG from palette colors (#RRGGBB/#RRGGBBAA) and rectangular rows of zero-based color indices, up to 256x256. Return the actual preview and durable handle.",McpJson.schema(revision+mapOf("palette" to McpJson.array(),"rows" to buildJsonObject {put("type","array");put("items",buildJsonObject {put("type","array");put("items",integer)})}),listOf("sessionId","expectedRevision","palette","rows")),false,handler={a->current(a);attach(a,ContentTextureMcp.pixels(McpJson.strings(a,"palette"),a.getValue("rows").jsonArray.map {row->row.jsonArray.map {it.jsonPrimitive.int}}))}),
@@ -48,7 +63,7 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
                 McpToolResult.success(buildJsonObject {put("asset",McpJson.encode(portable(handle)));put("verified",true)},images=listOf(McpImage(Base64.getEncoder().encodeToString(bytes))))
             }),
             McpTool("worldsmith_plan_world_content","Plan a modular world draft","Read-only symbols, links and capabilities. Accept scope/modules/assets or sessionId for durable drafts. Not full semantic validation or activation.",McpJson.schema(mapOf("sessionId" to str,"scope" to str,"modules" to obj,"assets" to buildJsonObject {put("type","array");put("items",obj)}),emptyList()),true,handler={a->result(registry.plan(if("sessionId" in a) input(session(a)) else McpJson.decode<WorldContentInput>(a),availableCapabilities()))}),
-            McpTool("worldsmith_inspect_world_content","Inspect a saved content bundle","Re-read and validate a format-3 or format-4 bundle, then report its catalog and compile order. Does not assert successful game resource reload.",McpJson.schema(mapOf("id" to str),listOf("id")),true,handler={a->
+            McpTool("worldsmith_inspect_world_content","Inspect a saved content bundle","Re-read and validate a format-3, format-4 or format-5 bundle, then report its catalog and compile order. Does not assert successful game resource reload.",McpJson.schema(mapOf("id" to str),listOf("id")),true,handler={a->
                 val path=store.managed(McpJson.string(a,"id")) ?: return@McpTool McpToolResult.error("Unknown managed pack")
                 val pack=WorldsmithPackLoader.loadDirectory(path);val diagnostics=WorldsmithPackValidator.validate(pack)
                 if(diagnostics.any {it.severity==DiagnosticSeverity.ERROR}) McpToolResult.error("Saved bundle needs repair",buildJsonObject {put("diagnostics",McpJson.encode(diagnostics))})
@@ -69,9 +84,9 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         val remove=McpJson.strings(a,"removeAssets");require(remove.all {it in s.contentAssets}) {"Unknown attached asset"}
         require(modules.isNotEmpty() || remove.isNotEmpty());require(modules.values.sumOf {it.toString().toByteArray().size.toLong()}<=4*1024*1024) {"Module edit exceeds 4 MiB"}
         modules.forEach {(id,document)->when(id) {
-            "theme"->McpJson.decode<WorldTheme>(document);"blocks"->McpJson.decode<CustomBlockLibrary>(document);"creatures"->McpJson.decode<CreatureLibrary>(document);"items"->McpJson.decode<CustomItemLibrary>(document)
+            "theme"->McpJson.decode<WorldTheme>(document);"blocks"->McpJson.decode<CustomBlockLibrary>(document);"creatures"->McpJson.decode<CreatureLibrary>(document);"items"->McpJson.decode<CustomItemLibrary>(document);"quests"->McpJson.decode<QuestLibrary>(document)
             "terrain"->McpJson.decode<TerrainPlan>(document);"biomes"->McpJson.decode<BiomePlan>(document);"features"->McpJson.decode<FeatureLibrary>(document)
-            else->error("Unknown authorable module '$id'; structure tools own architecture; quests/achievements are not installed")
+            else->error("Unknown authorable module '$id'; structure tools own architecture; achievements are not installed")
         }}
         return draft(requireNotNull(sessions.putContent(s.id,s.revision,modules,removeAssets=remove)) {"Draft is not active"})
     }
@@ -83,6 +98,32 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         return McpToolResult.success(buildJsonObject {put("sessionId",s.id);put("revision",saved.revision);put("asset",McpJson.encode(portable(handle)));put("width",texture.width);put("height",texture.height);put("published",false)},images=listOf(McpImage(Base64.getEncoder().encodeToString(texture.bytes))))
     }
     private fun portable(asset:ContentAsset)=asset.copy(path=ContentAssetValidation.path(asset.sha256))
+    private fun importTexture(a:JsonObject):McpToolResult {
+        current(a)
+        val name=McpJson.string(a,"filename")
+        require(name.matches(Regex("[a-zA-Z0-9][a-zA-Z0-9_.-]{0,123}\\.png")) && !name.contains("..")) {"Use one plain PNG filename, not a directory or URL"}
+        val inbox=requireNotNull(textureInbox) {"Texture inbox is not configured on this host"}
+        val file=inbox.resolve(name)
+        require(Files.isRegularFile(file,NOFOLLOW_LINKS) && file.toRealPath().startsWith(inbox) && Files.size(file) in 1..ContentAssetValidation.MAX_ASSET_BYTES.toLong()) {"Texture inbox file is missing, linked, empty or oversized"}
+        val bytes=Files.newInputStream(file).use {it.readNBytes(ContentAssetValidation.MAX_ASSET_BYTES+1)}
+        val original=ContentTextureMcp.upload(Base64.getEncoder().encodeToString(bytes))
+        require(("fitWidth" in a)==("fitHeight" in a)) {"Supply both fitWidth and fitHeight"}
+        val resample=a["resample"]?.jsonPrimitive?.content ?: "none"
+        require(resample in setOf("none","nearest"))
+        val texture=if("fitWidth" in a)TextureRecipes.fit(original,a.getValue("fitWidth").jsonPrimitive.int,a.getValue("fitHeight").jsonPrimitive.int,resample) else original
+        val result=attach(a,texture)
+        return result.copy(structuredContent=JsonObject(result.structuredContent+buildJsonObject {
+            put("sourceFilename",name);put("sourceSha256",original.descriptor.sha256);put("sourceWidth",original.width);put("sourceHeight",original.height)
+            put("resampled",original.descriptor.sha256!=texture.descriptor.sha256);put("sourcePreserved",true)
+        }))
+    }
+    private fun textureWorkflow()=McpToolResult.success(buildJsonObject {
+        val contract=javaClass.classLoader.getResourceAsStream("prompts/contract/textures.system.md")?.bufferedReader()?.use {it.readText()} ?: error("Missing texture workflow contract")
+        put("contract",contract);put("imageModelProvidedByMod",false);put("providerIndependent",true)
+        put("textureInbox",textureInbox?.toString()?.let(::JsonPrimitive) ?: JsonNull)
+        put("fileImportRequiresSameHostOrClientTransfer",true);put("rawPngUploadTool","worldsmith_put_texture_asset")
+        put("recipeTool","worldsmith_build_texture");put("creatureUvTool","worldsmith_build_creature")
+    })
     private fun input(s:WorkflowSession)=WorldContentInput(s.id,s.contentModules+mapOf("structures" to McpJson.encode(com.wjz.worldsmith.core.structure.StructureLibrary(structures=s.structures.values.toList(),architecture=s.architecture)).jsonObject),s.contentAssets.values.map(::portable))
     private fun draft(s:WorkflowSession)=McpToolResult.success(buildJsonObject {
         put("sessionId",s.id);put("revision",s.revision);put("modules",JsonObject(s.contentModules));put("assets",McpJson.encode(s.contentAssets.values.map(::portable)))
@@ -99,7 +140,7 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         return if(plan.catalogValid) McpToolResult.success(body) else McpToolResult.error("World content plan needs repair",body)
     }
     private fun contract(module:String):McpToolResult {
-        require(module in setOf("theme","blocks","creatures","items")) {"Use worldsmith_get_contract for other worldgen domains"}
+        require(module in setOf("theme","blocks","creatures","items","quests")) {"Use worldsmith_get_contract for other worldgen domains"}
         val text=javaClass.classLoader.getResourceAsStream("prompts/contract/$module.system.md")?.bufferedReader()?.use {it.readText()} ?: error("Missing content contract: $module")
         return McpToolResult.success(buildJsonObject {put("module",module);put("schemaVersion",1);put("contract",text)})
     }

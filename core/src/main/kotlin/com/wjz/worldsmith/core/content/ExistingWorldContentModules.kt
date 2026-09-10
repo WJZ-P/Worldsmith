@@ -111,6 +111,21 @@ object ExistingWorldContentModules {
                     beat.content.mapIndexed { j, key -> ContentReference(key, "theme.beats[$i].content[$j]") }) },
                 diagnostics = WorldThemeValidation.validate(theme).map { it.copy(path = "theme.${it.path}") })
         },
+        TypedModule(ContentModuleDescriptor("quests", listOf("quest"), listOf(1), compileAfter = listOf("theme"), requirements = listOf(
+            ContentRequirement("quests.server_progress", 1, ContentLifecycle.WORLD_BINDING),
+            ContentRequirement("quests.client_journal", 1, ContentLifecycle.CLIENT_RESOURCES),
+        ), description = "A single linear main line: verified creature kills, explicit item delivery and once-only item rewards"), QuestLibrary.serializer()) { library, raw ->
+            ContentContribution(library.quests.mapIndexed { i, quest ->
+                val path = "quests.quests[$i]"
+                val document = raw.getValue("quests").jsonArray[i]
+                val references = quest.prerequisites.mapIndexed { j, id -> ContentReference(ContentKey("quest", id), "$path.prerequisites[$j]") } +
+                    quest.objectives.mapIndexedNotNull { j, objective ->
+                        (objective as? QuestObjective.KillCreature)?.let { ContentReference(ContentKey("creature", it.creature), "$path.objectives[$j].creature") }
+                    } + listOfNotNull(quest.themeBeat?.let { ContentReference(ContentKey("narrative_beat", it), "$path.themeBeat") }) +
+                    localBlockReferences(document, path)
+                ContentEntry(ContentKey("quest", quest.id), "quests", path, references, nativeReferences = nativeReferences(document))
+            }, diagnostics = QuestValidation.validate(library).map { it.copy(path = "quests.${it.path}") })
+        },
     ))
 
     fun input(pack: WorldsmithPack) = WorldContentInput(pack.manifest.id, linkedMapOf(
@@ -124,6 +139,7 @@ object ExistingWorldContentModules {
         "creatures" to WorldsmithJson.format.encodeToJsonElement(pack.creatures).jsonObject,
     ).apply {
         if (pack.manifest.formatVersion >= 4) put("items", WorldsmithJson.format.encodeToJsonElement(pack.items).jsonObject)
+        if (pack.manifest.formatVersion >= 5) put("quests", WorldsmithJson.format.encodeToJsonElement(pack.quests).jsonObject)
     }, pack.manifest.assets)
 
     /** Names describe installed adapter capabilities, not a successful native activation receipt. */
@@ -131,10 +147,10 @@ object ExistingWorldContentModules {
         "custom_blocks.native_hosts" to 1, "world_content.client_resources" to 1, "world_content.world_binding" to 1,
         "creatures.native_hosts" to 1, "assets.entity_models" to 1, "creatures.world_behaviors" to 1,
         "custom_items.native_host" to 1, "custom_items.world_stacks" to 1,
+        "quests.server_progress" to 1, "quests.client_journal" to 1,
     )
 
     val plannedModules = listOf(
-        ContentModuleDescriptor("quests", listOf("quest"), emptyList(), description = "Future executable quest objectives and progression; not installed or accepted"),
         ContentModuleDescriptor("achievements", listOf("achievement"), emptyList(), description = "Future world-specific achievement criteria and rewards; not installed or accepted"),
     )
 

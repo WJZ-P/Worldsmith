@@ -61,7 +61,7 @@ worker, inspect returned model images, revise, and attach frozen drawing ids to
 contract/structure metadata. Required and optional roles must match actual assembly variants;
 every occupied indoor space needs authored readable night lighting. Blueprints own
 geometry/material choices; placement references real biome ids. Validate the complete
-architecture before publication. Format 4 freezes all eight typed modules, PNG assets, SDK geometry, metadata and source provenance. Old unreleased bundle formats require regeneration. Native export/readback and reload precede completion. No network or AI calls occur during chunk generation. A validated
+architecture before publication. Format 5 freezes all nine typed modules, PNG assets, SDK geometry, metadata and source provenance. Old unreleased bundle formats require regeneration. Native export/readback and reload precede completion. No network or AI calls occur during chunk generation. A validated
 landmark plan is not proof of a placed instance.
 
 
@@ -84,14 +84,13 @@ Use worldsmith_authoring_stats for host work; never call request gaps model-thin
 
 ## One theme, one immutable content bundle
 
-Begin with `worldsmith_get_content_framework` and read theme/blocks/creatures/items using
+Begin with `worldsmith_get_content_framework` and read theme/blocks/creatures/items/quests using
 `worldsmith_get_content_contract`. Establish the world's premise, player role,
 rules, main conflict and narrative beats linked to real terrain/biomes/structures,
-blocks or creatures. Narrative beats preserve creative intent; executable quests
-and achievements are not yet installed.
+blocks or creatures. Narrative beats preserve creative intent; a separate linear quests module can make explicit kill/delivery goals executable; achievements remain uninstalled.
 
 Use `worldsmith_put_content_modules` for complete typed theme, terrain, features,
-biomes, blocks, creatures and ordinary items documents. Architecture and frozen Java drawings keep
+biomes, blocks, creatures, ordinary items and quests documents. Architecture and frozen Java drawings keep
 their dedicated tools. All changes use the SAME durable session revision: read
 `worldsmith_get_content_draft`, send expectedRevision, and keep returned revisions.
 A conflict means re-read/merge; never silently overwrite another agent's draft.
@@ -105,13 +104,13 @@ profiles. Do not invent raw host slots, arbitrary state properties, custom stair
 or unsupported flight/swimming/behavior code.
 
 Plan catalog links with `worldsmith_plan_world_content`; it never implies native
-activation. `worldsmith_write_pack` freezes a format-4 bundle with all eight
+activation. `worldsmith_write_pack` freezes a format-5 bundle with all nine
 modules and its verified PNGs at expectedRevision. `worldsmith_finish_world` also
 requires native data reload, verified client resources and preset selection.
 Bundles and slot assignments are embedded in the native datapack carried by the
 save. Runtime has no AI/network calls during chunk generation or entity ticks.
 Current generated content targets one local integrated-server world; remote
-asset/binding negotiation is not installed. Formats 1/2 require regeneration; format 3 remains read-only with its original identity.
+asset/binding negotiation is not installed. Formats 1/2 require regeneration; formats 3/4 remain read-only with their original identities.
 
 For creature construction, prefer `worldsmith_get_creature_authoring_contract` and
 `worldsmith_build_creature` for named bones/cubes, mirrored limbs and automatic UVs.
@@ -126,3 +125,15 @@ structures: `worldsmith:item/<id>` names a real world-bound item, not a raw regi
 host. The items contract describes icons, stack limits, rarity and creature/container
 drops. This layer provides obtainable resources/relics; do not claim crafting,
 custom equipment, quests or achievements merely from a themed reward description.
+
+For texture production, call `worldsmith_get_texture_workflow`. The same public
+interfaces work for any MCP client: bounded deterministic pixel recipes, dedicated
+PNG inbox import (optional explicit nearest resizing), raw PNG upload and actual
+previews. External image-generation tools are owned by the AI client, not bundled
+or required by this mod. Never assume another AI has the current client's image model.
+
+For a playable main line, explicitly author quests linked to real species/items and
+optional narrative beats. Only kill_creature/deliver_item are installed. Delivery
+consumes actual main-inventory items on player request; claim is separate, once-only,
+and requires reward space. The J journal reports server progress. MCP publication
+completeness does not mean a player has completed these quests.
