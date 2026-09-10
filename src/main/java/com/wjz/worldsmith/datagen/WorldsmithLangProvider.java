@@ -34,6 +34,52 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		addSettingsScreen(builder);
 		addUnboundBlockHosts(builder);
 		addCreativeContent(builder);
+		addQuestJournal(builder);
+	}
+
+	private static void addQuestJournal(TranslationBuilder builder) {
+		builder.add("key.category.worldsmith.quests", "Worldsmith");
+		builder.add("key.worldsmith.quest_journal", "Open quest journal");
+		builder.add("worldsmith.quests.title", "World Quest Journal");
+		builder.add("worldsmith.quests.local_only", "The quest journal is available in local Worldsmith integrated worlds.");
+		builder.add("worldsmith.quests.channel_unavailable", "The quest service is not ready. Refresh in a moment.");
+		builder.add("worldsmith.quests.world_changed", "World context changed. Reopen the journal for the current world.");
+		builder.add("worldsmith.quests.loading", "Loading the server quest journal...");
+		builder.add("worldsmith.quests.processing", "Waiting for the server to confirm this action...");
+		builder.add("worldsmith.quests.timeout", "No server response yet. Refresh to confirm the saved state before retrying.");
+		builder.add("worldsmith.quests.server_authority", "Progress and rewards are confirmed by the server. The world keeps running while this journal is open.");
+		builder.add("worldsmith.quests.previous", "Previous quest page");
+		builder.add("worldsmith.quests.next", "Next quest page");
+		builder.add("worldsmith.quests.deliver", "Deliver items");
+		builder.add("worldsmith.quests.claim", "Claim rewards");
+		builder.add("worldsmith.quests.delivery_hint", "Delivery consumes matching items from your main inventory. Partial deliveries count; merely holding items does not.");
+		builder.add("worldsmith.quests.claim_hint", "Complete every objective to claim once. If inventory space is insufficient, rewards stay unclaimed and are not dropped.");
+		builder.add("worldsmith.quests.refresh", "Refresh");
+		builder.add("worldsmith.quests.small_window", "Reduce GUI scale or enlarge the window to view the quest journal.");
+		builder.add("worldsmith.quests.empty", "This world has no available main-line quests.");
+		builder.add("worldsmith.quests.locked_hint", "Claim the prerequisite quest's rewards to unlock this quest.");
+		builder.add("worldsmith.quests.objectives", "Objectives");
+		builder.add("worldsmith.quests.rewards", "Rewards");
+		builder.add("worldsmith.quests.no_rewards", "No item rewards.");
+		builder.add("worldsmith.quests.reward", "%s × %s");
+		builder.add("worldsmith.quests.objective.kill_creature", "Defeat %s: %s / %s");
+		builder.add("worldsmith.quests.objective.deliver_item", "Delivered %s: %s / %s");
+		builder.add("worldsmith.quests.status.locked", "Locked");
+		builder.add("worldsmith.quests.status.active", "Active");
+		builder.add("worldsmith.quests.status.ready", "Ready");
+		builder.add("worldsmith.quests.status.claimed", "Claimed");
+		builder.add("worldsmith.quests.feedback.none", "Journal refreshed.");
+		builder.add("worldsmith.quests.feedback.delivered", "Items delivered; progress updated.");
+		builder.add("worldsmith.quests.feedback.claimed", "Rewards claimed.");
+		builder.add("worldsmith.quests.feedback.no_materials", "No matching items to deliver. Inventory and progress are unchanged.");
+		builder.add("worldsmith.quests.feedback.no_space", "Not enough inventory space. Rewards remain unclaimed.");
+		builder.add("worldsmith.quests.feedback.locked", "This quest is not unlocked yet.");
+		builder.add("worldsmith.quests.feedback.not_ready", "Complete every objective before claiming rewards.");
+		builder.add("worldsmith.quests.feedback.already_claimed", "These rewards have already been claimed.");
+		builder.add("worldsmith.quests.feedback.stale_revision", "Progress changed since the last view. Review the refreshed state before acting again.");
+		builder.add("worldsmith.quests.feedback.scope_mismatch", "This request belongs to a different world. Reopen the current journal.");
+		builder.add("worldsmith.quests.feedback.unavailable", "No quest journal is available in this world.");
+		builder.add("worldsmith.quests.feedback.error", "The server rejected this action. See its message and refresh before retrying.");
 	}
 
 	private static void addCreativeContent(TranslationBuilder builder) {
