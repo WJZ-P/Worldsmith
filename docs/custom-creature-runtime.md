@@ -60,7 +60,7 @@ Low-level creature APIs, used by the aggregate service:
 
 ## Deliberately not claimed in schema 1
 
-Flying, swimming navigation, taming, breeding, riding, multipart bosses, projectiles, equipment, custom loot, scripted keyframe timelines, inverse kinematics, animation sound events, runtime code generation and automatic per-world network asset transfer are not implemented by this module. Quest/achievement integration can reference creature logical IDs through the common catalog without pretending those gameplay systems already exist. The common world lifecycle decides which client/server deployment modes are currently available.
+Flying, swimming navigation, taming, breeding, riding, multipart bosses, projectiles, equipment, scripted keyframe timelines, inverse kinematics, animation sound events, runtime code generation and automatic per-world network asset transfer are not implemented by this module. Quest/achievement integration can reference creature logical IDs through the common catalog without pretending those gameplay systems already exist. The common world lifecycle decides which client/server deployment modes are currently available.
 
 ## Offline creature authoring preview
 
@@ -85,3 +85,14 @@ The `:core:previewCreature` JavaExec task takes `-PcreatureFile`, `-PtextureFile
 ## Verification boundaries
 
 `CustomCreaturesTest` checks typed round trips, hierarchy/UV/size limits, finite values, spawn/behavior constraints and exact single-hit combat transitions. `CreatureRuntimeTest` checks prepare-vs-activate separation, category/biome/light eligibility, native spawn entry planning and deep immutable snapshots. `WorldContentRuntimeTest` covers portable directory/ZIP restore, selected-pack ambiguity/integrity, ownership reservations, stale leases and resource byte immutability. A successful compile and these tests establish code/data contracts, not visual or combat playtesting; native bootstrap and an isolated game runtime smoke test are separate checks.
+
+## Bounded death rewards
+
+Optional `drops` now supports independent item/count/chance/player-kill rules. The
+server resolves all reward references and stack limits during snapshot preparation,
+then uses the normal native death-loot stage and native mob-drop gamerule to issue
+fresh canonical stacks once. Explicit ordinary-item aliases retain their bundle/id,
+model, name and stack components. There is no looting multiplier, equipment-drop
+DSL, quest progress or arbitrary condition script. Empty drops are omitted from
+serialization; format-3 restoration rejects new nonempty reward semantics.
+See [items and rewards](items-and-rewards.md) for the actual contract.

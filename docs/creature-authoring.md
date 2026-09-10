@@ -31,3 +31,5 @@ Java 源码只在开发者显式调用本地 CLI 时执行；MCP 编译的是配
 [创造模式内容目录](creative-content.md) 自动枚举当前世界已激活内容，并为未来普通物品提供 Provider 接口。
 
 [黯星守门者完整外观素材](assets/creatures/darkstar-gatekeeper/README.md) 包括源贴图、256×256 运行时贴图、模型配方和真实效果图。
+
+配方和 Java Builder 现可透传可选 drops（Builder.drops），重建时保留已设计的奖励；参见 [物品与奖励](items-and-rewards.md)。此字段不改变骨骼、UV 或动作模型。
