@@ -1,29 +1,29 @@
-# Worldsmith 世界内容地基：格式 4
+# Worldsmith 世界内容地基：格式 5
 
 ## 目标与真实边界
 
 一个世界拥有一个持续保存的主线主题；地形、群系、生态装饰、建筑、自定义方块和自定义生物引用同一套内容身份与冻结资产。
 创作阶段可以迭代任意模块，发布阶段必须形成可校验的完整内容快照。游戏运行阶段消费冻结数据和原生实现，不在方块、区块或实体 tick 中执行作者源码或调用大模型。
 
-本仓库的未发布格式 1/2 不再作为磁盘兼容目标。新写入格式为 **4**；格式 **3** 保留只读恢复及其原有内容哈希。`WorldsmithPackFiles` 仅暂留源代码构造兼容；它不再序列化，存储和加载必须读取 `manifest.modules`。
+本仓库的未发布格式 1/2 不再作为磁盘兼容目标。新写入格式为 **5**；格式 **3/4** 保留只读恢复及其原有内容哈希。`WorldsmithPackFiles` 仅暂留源代码构造兼容；它不再序列化，存储和加载必须读取 `manifest.modules`。
 
 公共层已经实现：
 
-- 八个有类型的模块：`theme`、`blocks`、`terrain`、`features`、`biomes`、`creatures`、`structures`、`items`。
+- 九个有类型的模块：`theme`、`blocks`、`terrain`、`features`、`biomes`、`creatures`、`structures`、`items`、`quests`。
 - 本地符号、跨模块引用、确定性编译依赖、能力与生命周期要求。
 - PNG 字节验证、内容寻址、资源预算，以及包含全部模块和资产的不可变内容哈希。
 - 新格式加载、统一编码、类型化内存投影、主题持久化与损坏诊断。
-- 未安装的 `quests` 和 `achievements` 模块明确报错，而不是被当成已实现玩法保存。
+- 有界单线 quests 模块已安装；achievements 仍未安装，不被当成已实现玩法保存。
 
 **内容有效、具备宿主能力、完成准备、实际激活是四件不同的事。** 本文的编译计划和内容测试不等于游戏内验收。
 
 ## 模块与清单
 
-`worldsmith.json` 的结构如下；省略号仅供阅读，新格式实际文件必须给出八个模块及完整哈希：
+`worldsmith.json` 的结构如下；省略号仅供阅读，新格式实际文件必须给出九个模块及完整哈希：
 
 ```json
 {
-  "formatVersion": 4,
+  "formatVersion": 5,
   "id": "<64 位小写 SHA-256>",
   "displayName": "月石诸国",
   "description": "主题驱动的完整世界",
@@ -35,13 +35,14 @@
     "biomes": {"schemaVersion": 1, "path": "biomes.json"},
     "creatures": {"schemaVersion": 1, "path": "creatures.json"},
     "items": {"schemaVersion": 1, "path": "items.json"},
+    "quests": {"schemaVersion": 1, "path": "quests.json"},
     "structures": {"schemaVersion": 2, "path": "structures.json"}
   },
   "assets": []
 }
 ```
 
-八个模块都出现；非引导的底层内容包允许空方块、生物和建筑库。MCP 的引导创作仍保留现有建筑质量契约：至少两个建筑群、独立建筑与一个主题地标，发布时再次验证；底层格式与引导流程的约束不是同一层。
+九个模块都出现；非引导的底层内容包允许空方块、生物和建筑库。MCP 的引导创作仍保留现有建筑质量契约：至少两个建筑群、独立建筑与一个主题地标，发布时再次验证；底层格式与引导流程的约束不是同一层。
 结构模块继续以 `StructureIndex` 加独立蓝图文件和冻结绘图二进制保存，在内存中投影为 `StructureLibrary`。其他模块各自保存类型化文档。
 
 路径必须相对、无跳转、无冲突。模块文档不得占用 `worldsmith.json`、`assets/`、`drawings/`、`structures/` 等保留位置；目录读取也检查真实路径，阻止符号链接越过包根。
@@ -96,7 +97,7 @@ blocks → terrain → features → biomes → creatures → structures → them
 - 方块纹理进一步要求 16..256 的方形、二次幂纹理，编码文件最多 1 MiB；生物纹理实际尺寸必须匹配其模型 UV 图集声明。方块与生物的纹理引用必须直接等于资产 SHA-256，不能使用另一个看起来像摘要的逻辑别名。
 - `WorldsmithPack.assets` 复制输入字节，并只返回独立字节数组，外部修改不会篡改已冻结资源。
 
-新哈希使用格式 4 独立域，包括模块身份、模式版本、路径、全部类型化文档、结构蓝图、冻结绘图及资产描述与已验证摘要。计算前先进行类型化反序列化与规范化序列化，再对对象键排序，因此 JSON 排版、对象键顺序和省略默认值不改变语义身份。
+新哈希使用格式 5 独立域，包括模块身份、模式版本、路径、全部类型化文档、结构蓝图、冻结绘图及资产描述与已验证摘要。计算前先进行类型化反序列化与规范化序列化，再对对象键排序，因此 JSON 排版、对象键顺序和省略默认值不改变语义身份。
 
 主题文字、纹理、行为、地形及源码出处变化会生成新 ID。清单展示用的 `displayName`/`description` 不参与身份，主题模块内的标题和设定参与。未声明的额外输入文件拒绝进入编码/哈希边界。验证时还会重新计算类型化内容哈希，发现冻结后修改会报 `PACK_CONTENT_MUTATED`。
 
@@ -109,7 +110,7 @@ blocks → terrain → features → biomes → creatures → structures → them
 ```kotlin
 val pack = WorldContentBundleIO.create(
     displayName, description, terrain, biomes, features, structures,
-    theme, blocks, creatures, assetsById, items
+    theme, blocks, creatures, assetsById, items, quests
 )
 val diagnostics = WorldsmithPackValidator.validate(pack)
 val frozen = WorldContentBundleIO.encode(pack)
@@ -159,3 +160,14 @@ GeckoLib 可以作为以后实体关键帧动画的表现后端，但不是世�
 items 模块定义资源／遗物的图标、名称、稀有度与堆叠限制。逻辑引用 `worldsmith:item/<id>` 连接创造分类、物种死亡掉落和建筑容器奖励；原生 ItemStack 保留世界身份与完整组件。它不是工具、装备、食物动作或任务 DSL。参见 [物品与奖励](items-and-rewards.md)。
 
 格式 3 使用冻结的旧字段投影和原域计算身份，items 为空且新 drops 被拒绝；格式 4 才包含第八模块和掉落语义。读取旧包不会把它悄悄升级，也不会使同名新物品接管旧内容。新创作只写格式 4，格式 1/2 继续要求重新生成。
+
+## 主线任务与素材复用
+
+第九模块 quests 定义单条线性主线，可关联 themeBeat，目标仅 kill_creature 和 deliver_item。
+进度由服务器按玩家／世界保存；主动分次交付才消费物品并增加进度，所有目标完成后单独一次领奖，
+满背包时领奖无变化。玩家附件和 Inventory 一起保存，客户端只显示快照与发送意图。
+详见 [主线任务](mainline-quests.md)；这并非全局跨存储事务或完整任务树／NPC系统。
+
+格式 4 保持其八模块及原域、quests 为空；格式 3 保持七模块、旧生物字段投影、items/quests 为空。
+新内容使用格式 5。素材生成服务不与 AI 厂商绑定：确定性像素配方、专用 inbox 导入、实际 PNG
+校验／哈希／模型预览都通过 MCP 公开。外部生图模型由调用方自己提供，参见 [贴图复用](texture-authoring.md)。

@@ -1,0 +1,1 @@
+{"schemaVersion":1,"width":16,"height":16,"palette":["#00000000","#CBB6FFFF","#9257DFFF","#492A7FFF"],"seed":0,"operations":[{"kind":"fill","color":0},{"kind":"stamp","x":4,"y":3,"rows":["....a...","...aba..","..abbca.",".abbbcca",".abbbcca","..bbcca.","...cca..","....a..."],"glyphs":{"a":1,"b":2,"c":3}}]}
