@@ -61,7 +61,7 @@ worker, inspect returned model images, revise, and attach frozen drawing ids to
 contract/structure metadata. Required and optional roles must match actual assembly variants;
 every occupied indoor space needs authored readable night lighting. Blueprints own
 geometry/material choices; placement references real biome ids. Validate the complete
-architecture before publication. Format 3 freezes all seven typed modules, PNG assets, SDK geometry, metadata and source provenance. Old unreleased bundle formats require regeneration. Native export/readback and reload precede completion. No network or AI calls occur during chunk generation. A validated
+architecture before publication. Format 4 freezes all eight typed modules, PNG assets, SDK geometry, metadata and source provenance. Old unreleased bundle formats require regeneration. Native export/readback and reload precede completion. No network or AI calls occur during chunk generation. A validated
 landmark plan is not proof of a placed instance.
 
 
@@ -84,14 +84,14 @@ Use worldsmith_authoring_stats for host work; never call request gaps model-thin
 
 ## One theme, one immutable content bundle
 
-Begin with `worldsmith_get_content_framework` and read theme/blocks/creatures using
+Begin with `worldsmith_get_content_framework` and read theme/blocks/creatures/items using
 `worldsmith_get_content_contract`. Establish the world's premise, player role,
 rules, main conflict and narrative beats linked to real terrain/biomes/structures,
 blocks or creatures. Narrative beats preserve creative intent; executable quests
 and achievements are not yet installed.
 
 Use `worldsmith_put_content_modules` for complete typed theme, terrain, features,
-biomes, blocks and creatures documents. Architecture and frozen Java drawings keep
+biomes, blocks, creatures and ordinary items documents. Architecture and frozen Java drawings keep
 their dedicated tools. All changes use the SAME durable session revision: read
 `worldsmith_get_content_draft`, send expectedRevision, and keep returned revisions.
 A conflict means re-read/merge; never silently overwrite another agent's draft.
@@ -105,13 +105,13 @@ profiles. Do not invent raw host slots, arbitrary state properties, custom stair
 or unsupported flight/swimming/behavior code.
 
 Plan catalog links with `worldsmith_plan_world_content`; it never implies native
-activation. `worldsmith_write_pack` freezes a format-3 bundle with all seven
+activation. `worldsmith_write_pack` freezes a format-4 bundle with all eight
 modules and its verified PNGs at expectedRevision. `worldsmith_finish_world` also
 requires native data reload, verified client resources and preset selection.
 Bundles and slot assignments are embedded in the native datapack carried by the
 save. Runtime has no AI/network calls during chunk generation or entity ticks.
 Current generated content targets one local integrated-server world; remote
-asset/binding negotiation is not installed. Regenerate old unreleased formats.
+asset/binding negotiation is not installed. Formats 1/2 require regeneration; format 3 remains read-only with its original identity.
 
 For creature construction, prefer `worldsmith_get_creature_authoring_contract` and
 `worldsmith_build_creature` for named bones/cubes, mirrored limbs and automatic UVs.
@@ -120,3 +120,9 @@ Inspect actual textured models and the shared procedural poses with
 PNG before merging a definition. Joined-world creative content is available in the
 Worldsmith tab as bound BlockItems and species-specific summoners; a future ordinary
 item domain can join that catalog without exposing unbound native slots.
+
+Use ordinary items and explicit reward links to connect exploration, creatures and
+structures: `worldsmith:item/<id>` names a real world-bound item, not a raw registry
+host. The items contract describes icons, stack limits, rarity and creature/container
+drops. This layer provides obtainable resources/relics; do not claim crafting,
+custom equipment, quests or achievements merely from a themed reward description.

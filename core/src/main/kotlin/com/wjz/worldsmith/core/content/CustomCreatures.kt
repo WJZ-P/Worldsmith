@@ -3,13 +3,16 @@ package com.wjz.worldsmith.core.content
 import com.wjz.worldsmith.core.validation.Diagnostic
 import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /** Ground creatures are data, never generated executable tick code. Model units are 1/16 block. */
 @Serializable
 data class CreatureLibrary(val schemaVersion: Int = 1, val creatures: List<CreatureDefinition> = emptyList())
 
 @Serializable
-data class CreatureDefinition(
+@OptIn(ExperimentalSerializationApi::class)
+data class CreatureDefinition @JvmOverloads constructor(
     val id: String,
     val displayName: String,
     val category: CreatureCategory,
@@ -18,6 +21,19 @@ data class CreatureDefinition(
     val behavior: CreatureBehavior = CreatureBehavior(),
     val spawn: CreatureSpawn = CreatureSpawn(),
     val themeRole: String = "",
+    /** Empty is omitted even with encodeDefaults=true, preserving existing format-3 canonical documents. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val drops: List<CreatureDrop> = emptyList(),
+)
+
+/** Independent bounded rolls; each successful entry produces one complete item stack. */
+@Serializable
+data class CreatureDrop @JvmOverloads constructor(
+    val item: String,
+    val minCount: Int = 1,
+    val maxCount: Int = 1,
+    val chance: Double = 1.0,
+    val requirePlayerKill: Boolean = false,
 )
 
 @Serializable enum class CreatureCategory { PASSIVE, HOSTILE }
@@ -81,13 +97,14 @@ object CustomCreatureValidator {
     const val MAX_CREATURES = 128
     const val MAX_BONES = 64
     const val MAX_CUBES = 256
+    const val MAX_DROPS = 16
     private val idPattern = Regex("[a-z0-9][a-z0-9_./-]{0,95}")
     private val shaPattern = Regex("[0-9a-f]{64}")
 
     /** Kotlin read-only List alone is not immutable to Java callers; freeze every nested collection. */
     @JvmStatic fun freeze(library: CreatureLibrary): CreatureLibrary = library.copy(creatures = java.util.List.copyOf(library.creatures.map { c ->
         c.copy(model = c.model.copy(bones = java.util.List.copyOf(c.model.bones.map { b -> b.copy(cubes = java.util.List.copyOf(b.cubes)) })),
-            spawn = c.spawn.copy(biomes = java.util.List.copyOf(c.spawn.biomes)))
+            spawn = c.spawn.copy(biomes = java.util.List.copyOf(c.spawn.biomes)), drops = java.util.List.copyOf(c.drops))
     }))
 
     @JvmStatic fun validate(library: CreatureLibrary): List<Diagnostic> {
@@ -102,6 +119,18 @@ object CustomCreatureValidator {
             if (!ids.add(c.id)) error("$p.id", "Duplicate creature id '${c.id}'")
             if (c.displayName.isBlank() || c.displayName.length > 128) error("$p.displayName", "Display name must contain 1 to 128 characters")
             if (c.themeRole.length > 2048) error("$p.themeRole", "Theme role is limited to 2048 characters")
+            if (c.drops.size > MAX_DROPS) error("$p.drops", "At most $MAX_DROPS independent drop entries are supported")
+            c.drops.forEachIndexed { j, drop ->
+                val q = "$p.drops[$j]"
+                if (drop.item.length > 160 || !Regex("[a-z0-9_.-]+:[a-z0-9_./-]+").matches(drop.item) ||
+                    drop.item.substringAfter(':').split('/').any { it.isEmpty() || it == "." || it == ".." } || drop.item == "minecraft:air")
+                    error("$q.item", "Use a non-air namespaced item or a logical world item/block-item alias")
+                if (drop.item.startsWith("worldsmith:content/block/") || drop.item.startsWith("worldsmith:content/item/"))
+                    error("$q.item", "Rewards reference logical content, never reserved native item or block hosts")
+                if (drop.minCount !in 1..64 || drop.maxCount !in drop.minCount..64)
+                    error(q, "Each drop is one stack; use 1 <= minCount <= maxCount <= 64 and respect the item's native stack limit")
+                if (!drop.chance.isFinite() || drop.chance !in 0.0..1.0) error("$q.chance", "Drop chance must be finite and between 0 and 1")
+            }
             if (!shaPattern.matches(c.model.texture)) error("$p.model.texture", "Texture must reference a lowercase SHA-256 PNG asset id")
             if (c.model.textureWidth !in 16..512 || c.model.textureWidth.countOneBits() != 1 ||
                 c.model.textureHeight !in 16..512 || c.model.textureHeight.countOneBits() != 1) error("$p.model", "Texture dimensions must be powers of two between 16 and 512")

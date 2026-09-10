@@ -131,3 +131,11 @@ A diagnostic UV guide is not a finished skin. Upload a painted PNG of the exact
 atlas size, rebuild with textureAsset, then merge the returned definition into the
 current CreatureLibrary at its shared draft revision. Build artifacts never activate
 a world or implement special Boss phases automatically.
+
+## Obtainable rewards
+
+Format-4 creatures may include `drops` entries with `item`, `minCount`, `maxCount`,
+`chance`, and `requirePlayerKill`. Read the `items` content contract for aliases,
+limits and examples. This is ordinary server-side death loot, not a new attack or
+quest system. Keep drops in the authoring recipe too when rebuilding a creature;
+otherwise a freshly generated definition correctly has no authored drops.

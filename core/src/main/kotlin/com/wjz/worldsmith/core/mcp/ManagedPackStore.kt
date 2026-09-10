@@ -21,6 +21,7 @@ class ManagedPackStore(private val packDirectory:Path) {
     }
 
     fun persist(manifest: WorldsmithPackManifest, contents: Map<String, String>, binaries: Map<String,ByteArray> = emptyMap()): Path {
+        require(manifest.formatVersion==com.wjz.worldsmith.core.pack.WorldContentBundleIO.FORMAT_VERSION) { "New managed bundles must use the current writer format; legacy format 3 is read-only" }
         com.wjz.worldsmith.core.pack.WorldContentBundleIO.validateManifest(manifest)
         require(PACK_ID.matches(manifest.id)) { "Invalid content address" }
         require(contents.keys.all { com.wjz.worldsmith.core.content.WorldContentRegistry.validRelativePath(it) && it.endsWith(".json") && it != "worldsmith.json" })

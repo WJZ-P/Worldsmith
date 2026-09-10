@@ -9,13 +9,14 @@ import com.wjz.worldsmith.core.model.WorldsmithPack
 import com.wjz.worldsmith.core.structure.StructureValidator
 import com.wjz.worldsmith.core.content.*
 import com.wjz.worldsmith.core.pack.WorldContentBundleIO
+import com.wjz.worldsmith.core.structure.StructureInteraction
 
 object WorldsmithPackValidator {
     private val ID = Regex("^[0-9a-f]{64}$")
 
     fun validate(pack: WorldsmithPack): List<Diagnostic> = buildList {
         val manifest = pack.manifest
-        if (manifest.formatVersion != WorldContentBundleIO.FORMAT_VERSION) {
+        if (manifest.formatVersion !in WorldContentBundleIO.LEGACY_FORMAT_VERSION..WorldContentBundleIO.FORMAT_VERSION) {
             add(error("manifest.formatVersion", "UNSUPPORTED_PACK_FORMAT", "Unsupported pack format ${manifest.formatVersion}"))
         }
         if (!ID.matches(manifest.id)) {
@@ -28,6 +29,10 @@ object WorldsmithPackValidator {
         }
         try { WorldContentBundleIO.validateManifest(manifest) } catch (e: IllegalArgumentException) {
             add(error("manifest", "INVALID_CONTENT_MANIFEST", e.message ?: "Invalid module manifest"))
+        }
+        if (manifest.formatVersion == WorldContentBundleIO.LEGACY_FORMAT_VERSION) {
+            if (pack.items.items.isNotEmpty()) add(error("items", "ITEMS_REQUIRE_FORMAT4", "Format 3 contains no ordinary item module; freeze linked content as format 4"))
+            if (pack.creatures.creatures.any { it.drops.isNotEmpty() }) add(error("creatures", "CREATURE_DROPS_REQUIRE_FORMAT4", "Format 3 does not contain creature drop behavior; freeze linked content as format 4"))
         }
 
         val contentPlan = ExistingWorldContentModules.registry().plan(ExistingWorldContentModules.input(pack))
@@ -51,12 +56,40 @@ object WorldsmithPackValidator {
                     add(error("blocks.blocks[$i].textureAsset", "BLOCK_TEXTURE_DIMENSIONS", "Block textures must be square power-of-two PNGs, 16..256 pixels"))
             }
         }
+        pack.items.items.forEachIndexed { i, item ->
+            checkTextureAddress(item.textureAsset, "items.items[$i].textureAsset")
+            if ((descriptors[item.textureAsset]?.byteLength ?: 0L) > CustomItemValidation.MAX_TEXTURE_BYTES)
+                add(error("items.items[$i].textureAsset", "ITEM_TEXTURE_BYTE_BUDGET", "Ordinary item PNG icons must be at most 1 MiB"))
+            assets[item.textureAsset]?.let { size ->
+                if (size.width != size.height || size.width !in 16..256 || size.width and (size.width - 1) != 0)
+                    add(error("items.items[$i].textureAsset", "ITEM_TEXTURE_DIMENSIONS", "Item icons must be square power-of-two PNGs, 16..256 pixels"))
+            }
+        }
+        val itemDefinitions = pack.items.items.associateBy { it.id }
+        fun checkItemStack(reference: String, maximum: Int, path: String) {
+            if (reference.startsWith(ExistingWorldContentModules.LOCAL_ITEM_PREFIX)) {
+                itemDefinitions[reference.removePrefix(ExistingWorldContentModules.LOCAL_ITEM_PREFIX)]?.let { item ->
+                    if (maximum > item.maxStackSize) add(error(path, "CONTENT_ITEM_STACK_LIMIT", "Each reward entry is one stack: ${item.id} permits at most ${item.maxStackSize}, requested $maximum"))
+                }
+            }
+        }
         pack.creatures.creatures.forEachIndexed { i, creature ->
             checkTextureAddress(creature.model.texture, "creatures.creatures[$i].model.texture")
             assets[creature.model.texture]?.let { size ->
                 if (size.width != creature.model.textureWidth || size.height != creature.model.textureHeight)
                     add(error("creatures.creatures[$i].model.texture", "CREATURE_TEXTURE_DIMENSIONS", "PNG dimensions must match the model UV atlas"))
             }
+            creature.drops.forEachIndexed { j, drop -> checkItemStack(drop.item, drop.maxCount, "creatures.creatures[$i].drops[$j].maxCount") }
+        }
+        pack.structures.structures.forEachIndexed { i, structure ->
+            val blueprints = listOf(structure.blueprint to "structures.structures[$i].blueprint") +
+                structure.assembly?.pieces.orEmpty().map { (id, blueprint) -> blueprint to "structures.structures[$i].assembly.pieces.$id" }
+            blueprints.forEach { (blueprint, path) -> blueprint.interactions.forEachIndexed { j, interaction ->
+                if (interaction is StructureInteraction.Container) {
+                    interaction.items.forEachIndexed { k, item -> checkItemStack(item.item, item.count, "$path.interactions[$j].items[$k].count") }
+                    interaction.loot?.entries?.forEachIndexed { k, entry -> checkItemStack(entry.item, entry.maxCount, "$path.interactions[$j].loot.entries[$k].maxCount") }
+                }
+            } }
         }
         val knownBlocks = pack.blocks.blocks.map { it.id }.toSet()
         pack.structures.drawingAssets.forEach { (drawingId, drawing) ->
@@ -65,7 +98,7 @@ object WorldsmithPackValidator {
                     add(error("structures.artifacts.$drawingId", "CONTENT_REFERENCE_MISSING", "Frozen drawing references missing logical block '$ref'"))
             }
         }
-        if (manifest.formatVersion == WorldContentBundleIO.FORMAT_VERSION) {
+        if (manifest.formatVersion in WorldContentBundleIO.LEGACY_FORMAT_VERSION..WorldContentBundleIO.FORMAT_VERSION) {
             try {
                 val actual = WorldContentBundleIO.encode(pack).manifest.id
                 if (actual != pack.computedId) add(error("manifest.id", "PACK_CONTENT_MUTATED", "Typed content differs from its immutable loaded hash; freeze a new bundle"))

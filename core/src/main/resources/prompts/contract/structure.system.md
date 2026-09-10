@@ -506,3 +506,11 @@ pick the same precompiled blueprint variant. Explicit protectedAreas remain inta
 Only stable full cubes without block entities, fluids or gravity participate.
 Doors/stairs, carving, clutter, plants and topology changes are not part of this
 runtime pass. Existing precompiled CHOOSE/decay remains available separately.
+
+## World-bound ordinary item rewards
+
+Format-4 container fixed inventory and inline loot also accept
+`worldsmith:item/<localItemId>` from the items module, in addition to real native
+items and `worldsmith:content/<blockId>` BlockItems. Read the items contract first.
+The exporter retains each item's world identity and canonical components; do not
+replace a logical item reference with its internal shared host registry ID.

@@ -13,18 +13,20 @@ data class WorldContentBundleFiles(
     val binaries: Map<String, ByteArray>,
 )
 
-/** Single format-3 serialization boundary used by persistence, hashing and export. */
+/** Format-4 authoring boundary; format 3 is retained only for reading and faithful save re-embedding. */
 object WorldContentBundleIO {
-    const val FORMAT_VERSION = 3
-    val REQUIRED_MODULES = setOf("theme", "terrain", "features", "biomes", "structures", "blocks", "creatures")
+    const val FORMAT_VERSION = 4
+    const val LEGACY_FORMAT_VERSION = 3
+    val LEGACY_MODULES = setOf("theme", "terrain", "features", "biomes", "structures", "blocks", "creatures")
+    val REQUIRED_MODULES = LEGACY_MODULES + "items"
     const val MAX_TEXT_BYTES = 24 * 1024 * 1024
     const val MAX_DRAWING_BYTES = 256L * 1024 * 1024
 
-    @JvmStatic
+    @JvmStatic @JvmOverloads
     fun create(displayName: String, description: String, terrain: TerrainPlan, biomes: BiomePlan,
         features: FeatureLibrary, structures: StructureLibrary = StructureLibrary(), theme: WorldTheme,
         blocks: CustomBlockLibrary = CustomBlockLibrary(), creatures: CreatureLibrary = CreatureLibrary(),
-        assets: Map<String, ByteArray> = emptyMap()): WorldsmithPack {
+        assets: Map<String, ByteArray> = emptyMap(), items: CustomItemLibrary = CustomItemLibrary()): WorldsmithPack {
         val descriptors = assets.toSortedMap().map { (id, bytes) ->
             val hash = ContentAssetValidation.hash(bytes)
             ContentAsset(id, hash, "image/png", bytes.size.toLong(), ContentAssetValidation.path(hash))
@@ -35,7 +37,7 @@ object WorldContentBundleIO {
         }
         val manifest = WorldsmithPackManifest(FORMAT_VERSION, "0".repeat(64), displayName, description,
             modules = modules, assets = descriptors)
-        val draft = WorldsmithPack(manifest, terrain, biomes, features, manifest.id, structures, theme, blocks, creatures, assets)
+        val draft = WorldsmithPack(manifest, terrain, biomes, features, manifest.id, structures, theme, blocks, creatures, assets, items)
         val files = encode(draft)
         return draft.copy(manifest = files.manifest, computedId = files.manifest.id)
     }
@@ -51,7 +53,13 @@ object WorldContentBundleIO {
         put("features", WorldsmithJson.encode(pack.features))
         put("biomes", WorldsmithJson.encode(pack.biomes))
         put("blocks", WorldsmithJson.encode(pack.blocks))
-        put("creatures", WorldsmithJson.encode(pack.creatures))
+        if (pack.manifest.formatVersion == LEGACY_FORMAT_VERSION) {
+            require(pack.items.items.isEmpty()) { "Format 3 does not contain ordinary items; create a format-4 bundle for new content" }
+            put("creatures", LegacyCreaturesV3.encode(pack.creatures))
+        } else {
+            put("creatures", WorldsmithJson.encode(pack.creatures))
+            put("items", WorldsmithJson.encode(pack.items))
+        }
         val structureFiles = StructurePackIO.files(pack.structures)
         texts.putAll(structureFiles - StructurePackIO.INDEX_FILE)
         put("structures", structureFiles.getValue(StructurePackIO.INDEX_FILE))
@@ -66,8 +74,9 @@ object WorldContentBundleIO {
 
     @JvmStatic
     fun validateManifest(manifest: WorldsmithPackManifest) {
-        require(manifest.formatVersion == FORMAT_VERSION) { "Worldsmith requires content bundle format 3; regenerate unreleased format 1/2 content" }
-        require(manifest.modules.keys == REQUIRED_MODULES) { "Exactly the installed modules are required: ${REQUIRED_MODULES.sorted()}; quests and achievements are not installed" }
+        require(manifest.formatVersion in LEGACY_FORMAT_VERSION..FORMAT_VERSION) { "Worldsmith reads bundle formats 3/4 and creates format 4; unreleased formats 1/2 are not supported" }
+        val expected = if (manifest.formatVersion == LEGACY_FORMAT_VERSION) LEGACY_MODULES else REQUIRED_MODULES
+        require(manifest.modules.keys == expected) { "Format ${manifest.formatVersion} requires exactly ${expected.sorted()}; quests and achievements are not installed" }
         require(manifest.displayName.isNotBlank() && manifest.displayName.length <= 160 && manifest.description.length <= 8192) { "Invalid bundle display metadata" }
         require(manifest.modules.values.map { it.path }.distinct().size == manifest.modules.size) { "Module documents must have distinct paths" }
         manifest.modules.forEach { (id, file) ->

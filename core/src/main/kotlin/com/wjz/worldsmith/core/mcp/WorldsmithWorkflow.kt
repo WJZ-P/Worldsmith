@@ -68,7 +68,7 @@ object WorldsmithWorkflow {
             "Use worldsmith_get_content_contract for theme/blocks/creatures, then author real PNG textures and typed content modules. " +
             "worldsmith_put_content_modules and texture tools use expectedRevision from worldsmith_get_content_draft; all edits share architecture's revision. " +
             "Custom blocks use worldsmith:content/<id>, fixed native profiles and immutable world slots. Creatures use grounded native hosts, cuboid rigs and bounded server behaviors. " +
-            "Quests/achievements are future modules: narrative beats are not executable quests. Only format-3 bundles are supported. " +
+            "Quests/achievements are future modules: narrative beats are not executable quests. New bundles use format 4; format 3 remains read-only. " +
             "Design terrain, biomes, features and world-specific architecture yourself. New guided worlds require at least two distinct building groups, " +
             "one independent structure, and at least one monumental theme-defining group. Read contract/architecture, plan required/optional members, " +
             "and light occupied interiors explicitly. Use designGuide to translate the theme into form and playable spaces; numerical gates are not design targets. " +
@@ -94,7 +94,7 @@ object WorldsmithWorkflow {
 
     val PROCEDURE: List<WorkflowStep> = (listOf(
         WorkflowStep(0,"worldsmith_get_content_framework","Read installed modules and capacity/lifecycle boundaries; no planned module may be silently treated as implemented."),
-        WorkflowStep(0,"worldsmith_get_content_contract","Read theme, blocks and creatures contracts. Establish one shared premise/player role/rules/conflict and linked narrative beats before designing content."),
+        WorkflowStep(0,"worldsmith_get_content_contract","Read theme, blocks, creatures and items contracts. Establish one shared premise/player role/rules/conflict and linked narrative beats before designing content."),
         WorkflowStep(0,"worldsmith_put_content_modules","Commit complete theme and initial content drafts at expectedRevision. Use create_pixel_texture or put_texture_asset for actual PNGs, inspect their previews and bind the returned hash to custom blocks/creature rigs. Record each returned revision. Draft links may be repaired incrementally; all links must resolve at publication."),
     ) + listOf(
         WorkflowStep(
@@ -162,7 +162,7 @@ object WorldsmithWorkflow {
             order = 11,
             tool = WRITE_TOOL,
             instruction =
-                "Read the current shared draft revision and send sessionId plus expectedRevision. Supply theme/terrain/biomes/features inline or use committed content drafts; blocks/creatures and verified PNG assets are frozen with the same bundle. Preserve the template's technical terrain envelope, " +
+                "Read the current shared draft revision and send sessionId plus expectedRevision. Supply theme/terrain/biomes/features inline or use committed content drafts; blocks/creatures/items and verified PNG assets are frozen with the same bundle. Preserve the template's technical terrain envelope, " +
                     "but replace its shape with a procedural intent chosen from the player's prompt; design the " +
                     "biomes and features to match it. Include the planned architecture and all definitions, or omit structures to use the session drafts. " +
                     "Architecture policy is checked again before any files are saved. A reply carrying " +
@@ -287,7 +287,7 @@ class WorkflowSessions @JvmOverloads constructor(
         assets:Map<String,com.wjz.worldsmith.core.content.ContentAsset> = emptyMap(),
         removeAssets:List<String> = emptyList()):WorkflowSession? = update(id) {
         require(it.revision==expectedRevision) { "DRAFT_REVISION_CONFLICT: expected $expectedRevision, current ${it.revision}" }
-        require(modules.keys.all { key -> key in setOf("theme","terrain","features","biomes","blocks","creatures") }) { "Use the architecture tools for structures; unknown content modules are not installed" }
+        require(modules.keys.all { key -> key in setOf("theme","terrain","features","biomes","blocks","creatures","items") }) { "Use the architecture tools for structures; unknown content modules are not installed" }
         val nextModules=it.contentModules+modules
         val nextAssets=(it.contentAssets-removeAssets.toSet())+assets
         require(nextAssets.size<=com.wjz.worldsmith.core.content.ContentAssetValidation.MAX_ASSETS)

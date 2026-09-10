@@ -20,6 +20,7 @@ data class CreatureRecipe(
     val spawn: CreatureSpawn = CreatureSpawn(),
     val bones: List<BoneRecipe>,
     val mirrors: List<MirrorRecipe> = emptyList(),
+    val drops: List<CreatureDrop> = emptyList(),
 )
 
 @Serializable

@@ -11,6 +11,7 @@ class CreatureBuilder private constructor(private val id: String, private val di
     private var attributes = CreatureAttributes()
     private var behavior = CreatureBehavior()
     private var spawn = CreatureSpawn()
+    private var drops:List<CreatureDrop> = emptyList()
     private val bones = linkedMapOf<String, BoneRecipe>()
     private val mirrors = mutableListOf<MirrorRecipe>()
 
@@ -29,6 +30,7 @@ class CreatureBuilder private constructor(private val id: String, private val di
     fun behavior(passiveMode: CreaturePassiveMode, territoryRadius: Int, attackReach: Double, windupTicks: Int, recoveryTicks: Int) =
         behavior(CreatureBehavior(passiveMode, territoryRadius, attackReach, windupTicks, recoveryTicks))
     fun spawn(value: CreatureSpawn) = apply { spawn = value }
+    fun drops(value:List<CreatureDrop>) = apply { drops = value.toList() }
     fun spawn(biomes: List<String>, weight: Int, minGroup: Int, maxGroup: Int, minLight: Int, maxLight: Int) =
         spawn(CreatureSpawn(biomes.toList(), weight, minGroup, maxGroup, minLight, maxLight))
 
@@ -47,7 +49,7 @@ class CreatureBuilder private constructor(private val id: String, private val di
 
     fun recipe() = CreatureRecipe(id, displayName, category, atlasWidth = atlasWidth, atlasHeight = atlasHeight,
         padding = padding, themeRole = themeRole, attributes = attributes, behavior = behavior,
-        spawn = spawn.copy(biomes = spawn.biomes.toList()), bones = bones.values.map { it.copy(cubes = it.cubes.toList()) }, mirrors = mirrors.toList())
+        spawn = spawn.copy(biomes = spawn.biomes.toList()), bones = bones.values.map { it.copy(cubes = it.cubes.toList()) }, mirrors = mirrors.toList(), drops=drops.toList())
     fun build(textureSha256: String) = CreatureAuthoring.compile(recipe(), textureSha256)
     fun guide() = CreatureAuthoring.guide(recipe())
 

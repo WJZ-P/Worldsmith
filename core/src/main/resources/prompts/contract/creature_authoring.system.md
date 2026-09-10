@@ -54,7 +54,7 @@ or painted asset is silently overwritten or evicted.
 }
 ```
 
-Optional `attributes`, `behavior`, and `spawn` are exactly the fields from the
+Optional `attributes`, `behavior`, `spawn`, and `drops` are exactly the fields from the
 creature runtime contract; they do not become new behavior scripts. Defaults are
 provided by the current runtime DTOs. The illustrated model is a field-shape example,
 not a complete art-directed creature.

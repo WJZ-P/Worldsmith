@@ -26,10 +26,13 @@ import com.wjz.worldsmith.core.structure.StructureBlueprint
 import com.wjz.worldsmith.core.content.WorldTheme
 import com.wjz.worldsmith.core.content.CustomBlockLibrary
 import com.wjz.worldsmith.core.content.CreatureLibrary
+import com.wjz.worldsmith.core.content.CustomItemLibrary
+import com.wjz.worldsmith.core.pack.LegacyCreaturesV3
 
 /** Computes the immutable id of the files that affect world generation. */
 object WorldsmithHashUtil {
-    private const val HASH_DOMAIN = "worldsmith-world-content-bundle-v3"
+    private const val HASH_DOMAIN_V3 = "worldsmith-world-content-bundle-v3"
+    private const val HASH_DOMAIN_V4 = "worldsmith-world-content-bundle-v4"
 
     @JvmStatic @JvmOverloads
     fun computeGenerationId(manifest: WorldsmithPackManifest, contents: Map<String, String>,binaries:Map<String,ByteArray> = emptyMap()): String {
@@ -37,7 +40,7 @@ object WorldsmithHashUtil {
         require(contents.size <= 1024 && contents.values.sumOf { it.toByteArray(StandardCharsets.UTF_8).size.toLong() } <= WorldContentBundleIO.MAX_TEXT_BYTES) { "Bundle text budget exceeded" }
         require(binaries.size <= 1024 && binaries.values.sumOf { it.size.toLong() } <= WorldContentBundleIO.MAX_DRAWING_BYTES + ContentAssetValidation.MAX_TOTAL_BYTES) { "Bundle binary budget exceeded" }
         val digest = MessageDigest.getInstance("SHA-256")
-        updateField(digest, "domain", HASH_DOMAIN)
+        updateField(digest, "domain", if (manifest.formatVersion == WorldContentBundleIO.LEGACY_FORMAT_VERSION) HASH_DOMAIN_V3 else HASH_DOMAIN_V4)
         updateField(digest, "formatVersion", manifest.formatVersion.toString())
 
         manifest.modules.toSortedMap().forEach { (role, file) ->
@@ -46,7 +49,9 @@ object WorldsmithHashUtil {
             val parsed = Json.parseToJsonElement(raw)
             require(parsed.jsonObject["schemaVersion"]?.jsonPrimitive?.intOrNull == file.schemaVersion) { "Module schema differs from manifest: $role" }
             updateField(digest, "module:$role", file.schemaVersion.toString())
-            updateField(digest, "$role:$path", canonicalJson(normalizeTyped(role, raw)))
+            val normalized = if (manifest.formatVersion == WorldContentBundleIO.LEGACY_FORMAT_VERSION && role == "creatures")
+                LegacyCreaturesV3.normalize(raw) else normalizeTyped(role, raw)
+            updateField(digest, "$role:$path", canonicalJson(normalized))
         }
 
         val index = WorldsmithJson.decode<StructureIndex>(requireNotNull(contents[manifest.modulePath("structures")]))
@@ -116,6 +121,7 @@ object WorldsmithHashUtil {
         "theme" -> WorldsmithJson.format.encodeToJsonElement(WorldTheme.serializer(), WorldsmithJson.decode<WorldTheme>(raw))
         "blocks" -> WorldsmithJson.format.encodeToJsonElement(CustomBlockLibrary.serializer(), WorldsmithJson.decode<CustomBlockLibrary>(raw))
         "creatures" -> WorldsmithJson.format.encodeToJsonElement(CreatureLibrary.serializer(), WorldsmithJson.decode<CreatureLibrary>(raw))
+        "items" -> WorldsmithJson.format.encodeToJsonElement(CustomItemLibrary.serializer(), WorldsmithJson.decode<CustomItemLibrary>(raw))
         else -> error("Uninstalled content module '$role'")
     }
 }

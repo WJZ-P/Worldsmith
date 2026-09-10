@@ -5,6 +5,8 @@ import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.structure.StructureLibrary
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.*
+import com.wjz.worldsmith.core.validation.Diagnostic
+import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 
 /** Installed domain modules share one catalog; native execution remains a separate lifecycle. */
 object ExistingWorldContentModules {
@@ -14,7 +16,10 @@ object ExistingWorldContentModules {
 
     private class TypedModule<T>(override val descriptor: ContentModuleDescriptor, private val serializer: DeserializationStrategy<T>,
         private val inspect: (T, JsonObject) -> ContentContribution) : WorldContentModule {
-        override fun describe(document: JsonObject) = inspect(WorldsmithJson.format.decodeFromJsonElement(serializer, document), document)
+        override fun describe(document: JsonObject): ContentContribution {
+            val result = inspect(WorldsmithJson.format.decodeFromJsonElement(serializer, document), document)
+            return result.copy(diagnostics = result.diagnostics + logicalAliasDiagnostics(document, descriptor.id))
+        }
     }
 
     fun registry() = WorldContentRegistry(listOf(
@@ -77,16 +82,25 @@ object ExistingWorldContentModules {
                     ContentEntry(ContentKey("block_item", block.id), "blocks", path, references = listOf(ContentReference(ContentKey("block", block.id), "$path.id"))))
             }, diagnostics = CustomBlockValidation.validate(library).map { it.copy(path = "blocks.${it.path}") })
         },
+        TypedModule(ContentModuleDescriptor("items", listOf("item"), listOf(1), requirements = listOf(
+            ContentRequirement("custom_items.native_host", 1, ContentLifecycle.BOOTSTRAP),
+            ContentRequirement("world_content.client_resources", 1, ContentLifecycle.CLIENT_RESOURCES),
+            ContentRequirement("custom_items.world_stacks", 1, ContentLifecycle.WORLD_BINDING),
+        ), description = "Ordinary resource/relic item stacks with immutable icons and world-scoped identity; no tool or food actions"), CustomItemLibrary.serializer()) { library, _ ->
+            ContentContribution(library.items.mapIndexed { i, item -> ContentEntry(ContentKey("item", item.id), "items", "items.items[$i]", assets = listOf(item.textureAsset)) },
+                diagnostics = CustomItemValidation.validate(library).map { it.copy(path = "items.${it.path}") })
+        },
         TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1), compileAfter = listOf("biomes"), requirements = listOf(
             ContentRequirement("creatures.native_hosts", 1, ContentLifecycle.BOOTSTRAP),
             ContentRequirement("assets.entity_models", 1, ContentLifecycle.CLIENT_RESOURCES),
             ContentRequirement("creatures.world_behaviors", 1, ContentLifecycle.WORLD_BINDING),
-        ), description = "Ground creature hosts, cuboid rigs, procedural animation and server-side behaviors"), CreatureLibrary.serializer()) { library, _ ->
+        ), description = "Ground creature hosts, cuboid rigs, procedural animation, server behaviors and bounded item drops"), CreatureLibrary.serializer()) { library, raw ->
             ContentContribution(library.creatures.mapIndexed { i, creature ->
                 val path = "creatures.creatures[$i]"
                 ContentEntry(ContentKey("creature", creature.id), "creatures", path,
-                    creature.spawn.biomes.mapIndexed { j, biome -> ContentReference(ContentKey("biome", biome), "$path.spawn.biomes[$j]") },
-                    assets = listOf(creature.model.texture))
+                    creature.spawn.biomes.mapIndexed { j, biome -> ContentReference(ContentKey("biome", biome), "$path.spawn.biomes[$j]") } +
+                        localBlockReferences(raw.getValue("creatures").jsonArray[i], path),
+                    assets = listOf(creature.model.texture), nativeReferences = nativeReferences(raw.getValue("creatures").jsonArray[i]))
             }, diagnostics = CustomCreatureValidator.validate(library).map { it.copy(path = "creatures.${it.path}") })
         },
         TypedModule(ContentModuleDescriptor("theme", listOf("theme", "narrative_beat"), listOf(1),
@@ -108,12 +122,15 @@ object ExistingWorldContentModules {
         "theme" to WorldsmithJson.format.encodeToJsonElement(pack.theme).jsonObject,
         "blocks" to WorldsmithJson.format.encodeToJsonElement(pack.blocks).jsonObject,
         "creatures" to WorldsmithJson.format.encodeToJsonElement(pack.creatures).jsonObject,
-    ), pack.manifest.assets)
+    ).apply {
+        if (pack.manifest.formatVersion >= 4) put("items", WorldsmithJson.format.encodeToJsonElement(pack.items).jsonObject)
+    }, pack.manifest.assets)
 
     /** Names describe installed adapter capabilities, not a successful native activation receipt. */
     fun nativeCapabilities() = listOf("terrain", "features", "biomes", "structures").associate { "worldgen.$it" to 1 } + mapOf(
         "custom_blocks.native_hosts" to 1, "world_content.client_resources" to 1, "world_content.world_binding" to 1,
         "creatures.native_hosts" to 1, "assets.entity_models" to 1, "creatures.world_behaviors" to 1,
+        "custom_items.native_host" to 1, "custom_items.world_stacks" to 1,
     )
 
     val plannedModules = listOf(
@@ -126,10 +143,10 @@ object ExistingWorldContentModules {
         fun collect(value: JsonElement) {
             when (value) {
                 is JsonObject -> value.forEach { (key, child) ->
-                    if (key in setOf("block", "item", "particle") && child is JsonPrimitive && child.isString && ':' in child.content && !child.content.startsWith(LOCAL_BLOCK_PREFIX))
+                    if (key in setOf("block", "item", "particle") && child is JsonPrimitive && child.isString && ':' in child.content && !child.content.startsWith(LOCAL_BLOCK_PREFIX) && !child.content.startsWith(LOCAL_ITEM_PREFIX))
                         result += NativeContentReference(key, child.content)
                     if (key == "preferredIds" && child is JsonArray) child.forEach { item ->
-                        (item as? JsonPrimitive)?.contentOrNull?.takeUnless { it.startsWith(LOCAL_BLOCK_PREFIX) }?.let { result += NativeContentReference("block", it) }
+                        (item as? JsonPrimitive)?.contentOrNull?.takeUnless { it.startsWith(LOCAL_BLOCK_PREFIX) || it.startsWith(LOCAL_ITEM_PREFIX) }?.let { result += NativeContentReference("block", it) }
                     }
                     collect(child)
                 }
@@ -142,17 +159,42 @@ object ExistingWorldContentModules {
     }
 
     const val LOCAL_BLOCK_PREFIX = "worldsmith:content/"
+    const val LOCAL_ITEM_PREFIX = "worldsmith:item/"
     private fun localBlockReferences(value: JsonElement, path: String): List<ContentReference> {
         val refs = mutableListOf<ContentReference>()
-        fun visit(value: JsonElement, at: String) {
+        fun visit(value: JsonElement, at: String, field: String = "") {
             when (value) {
-                is JsonObject -> value.forEach { (key, child) -> visit(child, "$at.$key") }
-                is JsonArray -> value.forEachIndexed { i, child -> visit(child, "$at[$i]") }
-                is JsonPrimitive -> if (value.isString && value.content.startsWith(LOCAL_BLOCK_PREFIX))
-                    refs += ContentReference(ContentKey("block", value.content.removePrefix(LOCAL_BLOCK_PREFIX).substringBefore('[')), at)
+                is JsonObject -> value.forEach { (key, child) -> visit(child, "$at.$key", key) }
+                is JsonArray -> value.forEachIndexed { i, child -> visit(child, "$at[$i]", field) }
+                is JsonPrimitive -> if (value.isString && field in setOf("block", "item", "preferredIds")) {
+                    if (value.content.startsWith(LOCAL_BLOCK_PREFIX))
+                        refs += ContentReference(ContentKey(if (field == "item") "block_item" else "block", value.content.removePrefix(LOCAL_BLOCK_PREFIX).substringBefore('[')), at)
+                    else if (value.content.startsWith(LOCAL_ITEM_PREFIX))
+                        refs += ContentReference(ContentKey("item", value.content.removePrefix(LOCAL_ITEM_PREFIX)), at)
+                }
             }
         }
         visit(value, path)
         return refs
+    }
+
+    private fun logicalAliasDiagnostics(document: JsonElement, path: String): List<Diagnostic> = buildList {
+        fun visit(value: JsonElement, at: String, field: String = "") {
+            when (value) {
+                is JsonObject -> value.forEach { (key, child) -> visit(child, "$at.$key", key) }
+                is JsonArray -> value.forEachIndexed { i, child -> visit(child, "$at[$i]", field) }
+                is JsonPrimitive -> if (value.isString && field in setOf("block", "item", "preferredIds", "particle")) {
+                    val text = value.content
+                    if (text.startsWith("worldsmith:content/item/") || text.startsWith("worldsmith:content/block/"))
+                        add(Diagnostic(at, "CONTENT_NATIVE_HOST_FORBIDDEN", DiagnosticSeverity.ERROR, "Authored content uses logical item or block ids, never reserved native hosts"))
+                    if (text.startsWith(LOCAL_ITEM_PREFIX)) {
+                        if (field != "item") add(Diagnostic(at, "CONTENT_REFERENCE_KIND", DiagnosticSeverity.ERROR, "An ordinary item alias belongs in an item field, not a block material or particle field"))
+                        if (!CustomItemValidation.validId(text.removePrefix(LOCAL_ITEM_PREFIX)))
+                            add(Diagnostic(at, "CONTENT_ITEM_ALIAS_INVALID", DiagnosticSeverity.ERROR, "Use worldsmith:item/<localId> without native slot ids, state properties or reserved path sequences"))
+                    }
+                }
+            }
+        }
+        visit(document, path)
     }
 }

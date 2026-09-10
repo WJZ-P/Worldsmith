@@ -40,7 +40,7 @@ object CreatureAuthoring {
     private fun definition(recipe: CreatureRecipe, rig: Rig, texture: String): CreatureDefinition {
         val result = CreatureDefinition(recipe.id, recipe.displayName, recipe.category,
             CreatureModel(texture, recipe.atlasWidth, recipe.atlasHeight, rig.bones), recipe.attributes, recipe.behavior,
-            recipe.spawn.copy(biomes = recipe.spawn.biomes.toList()), recipe.themeRole)
+            recipe.spawn.copy(biomes = recipe.spawn.biomes.toList()), recipe.themeRole,recipe.drops.toList())
         val library = CreatureLibrary(creatures = listOf(result))
         val errors = CustomCreatureValidator.validate(library)
         require(errors.isEmpty()) { errors.take(16).joinToString("; ") { "${it.path}: ${it.message}" } }
