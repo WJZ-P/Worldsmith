@@ -10,6 +10,8 @@ import com.wjz.worldsmith.core.structure.StructureCatalogCompiler;
 import com.wjz.worldsmith.core.content.CustomBlockBindingSnapshot;
 import com.wjz.worldsmith.core.content.CustomBlockBindings;
 import com.wjz.worldsmith.content.WorldBlockBindings;
+import com.wjz.worldsmith.content.item.CustomItemRuntime;
+import com.wjz.worldsmith.content.creature.CreatureRuntime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +43,8 @@ public final class CompiledPack {
 	private final Map<String, CompiledBiome> byId;
 	private final CompiledStructureCatalog structures;
 	private final WorldBlockBindings.Resolver blockResolver;
+	private final CustomItemRuntime.Snapshot itemResolver;
+	private final CreatureRuntime.Snapshot creatureSnapshot;
 
     private CompiledPack(WorldsmithPack pack, String resourcePrefix) {
         this(pack, resourcePrefix, null);
@@ -54,11 +58,15 @@ public final class CompiledPack {
 		this.pack = pack;
 		this.resourcePrefix = resourcePrefix;
 		this.blockResolver = WorldBlockBindings.resolver(CustomBlockBindings.plan(pack.getManifest().getId(), pack.getBlocks(), previousBindings));
+		this.itemResolver = CustomItemRuntime.prepare(pack.getManifest().getId(), pack.getItems());
 		this.structures = StructureCatalogCompiler.compile(pack.getStructures());
 		this.biomes = CompiledBiomes.compile(pack.getBiomes(), this::biomeKey);
 		Map<String, CompiledBiome> index = new LinkedHashMap<>();
 		this.biomes.forEach(biome -> index.put(biome.id(), biome));
 		this.byId = Map.copyOf(index);
+		Map<String,String> biomeBindings = new LinkedHashMap<>();
+		this.biomes.forEach(biome -> biomeBindings.put(biome.id(), biome.key().identifier().toString()));
+		this.creatureSnapshot = CreatureRuntime.prepare(id(),pack.getCreatures(),biomeBindings,itemResolver,blockResolver);
 	}
 
 	/** Built-in compilation uses the stable unscoped resource ids written by datagen. */
@@ -90,6 +98,8 @@ public final class CompiledPack {
 	public CustomBlockBindingSnapshot blockBindings() { return blockResolver.snapshot(); }
 	public WorldBlockBindings.Resolver blockResolver() { return blockResolver; }
 	public MaterialResolver materialResolver() { return new MaterialResolver(blockResolver); }
+	public CustomItemRuntime.Snapshot itemResolver() { return itemResolver; }
+	public CreatureRuntime.Snapshot creatureSnapshot() { return creatureSnapshot; }
 
 	public WorldsmithPack pack() {
 		return this.pack;

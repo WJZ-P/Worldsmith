@@ -3,6 +3,7 @@ package com.wjz.worldsmith.content.creative;
 import com.wjz.worldsmith.content.WorldBlockBindings;
 import com.wjz.worldsmith.content.WorldsmithCustomBlocks;
 import com.wjz.worldsmith.content.creature.CreatureRuntime;
+import com.wjz.worldsmith.content.item.CustomItemRuntime;
 import com.wjz.worldsmith.core.content.CustomBlockBindingSnapshot;
 import net.fabricmc.fabric.api.creativetab.v1.FabricCreativeModeTab;
 import net.minecraft.core.Registry;
@@ -54,10 +55,10 @@ public final class WorldsmithCreativeContent {
         @Override public ItemStack stack() { return stack.copy(); }
     }
 
-    public record Context(String scope, WorldBlockBindings.Resolver blocks, CreatureRuntime.Snapshot creatures) {
+    public record Context(String scope, WorldBlockBindings.Resolver blocks, CreatureRuntime.Snapshot creatures, CustomItemRuntime.Snapshot items) {
         public Context {
-            Objects.requireNonNull(scope); Objects.requireNonNull(blocks); Objects.requireNonNull(creatures);
-            if (!scope.equals(blocks.snapshot().getScope()) || !scope.equals(creatures.bundleHash()))
+            Objects.requireNonNull(scope); Objects.requireNonNull(blocks); Objects.requireNonNull(creatures); Objects.requireNonNull(items);
+            if (!scope.equals(blocks.snapshot().getScope()) || !scope.equals(creatures.bundleHash()) || !scope.equals(items.bundleHash()))
                 throw new IllegalArgumentException("Creative catalog domains belong to different worlds");
         }
     }
@@ -66,7 +67,7 @@ public final class WorldsmithCreativeContent {
         List<Entry> entries(Context context);
     }
 
-    /** Extension point for a later independent item domain; it does not register or implement such a domain. */
+    /** Additional domains share this catalog; registering a provider does not mutate any world definition. */
     public static synchronized void registerProvider(String id, Provider provider) {
         if (id == null || !id.matches("[a-z0-9][a-z0-9_.-]{0,63}") || PROVIDERS.containsKey(id))
             throw new IllegalArgumentException("Invalid or duplicate creative content provider id: " + id);
@@ -88,6 +89,8 @@ public final class WorldsmithCreativeContent {
         registerProvider("creatures", context -> context.creatures.definitions().values().stream()
             .sorted(java.util.Comparator.comparing(definition -> definition.getId()))
             .map(definition -> new Entry(definition.getId(), Kind.CREATURE, summonStack(context.scope, definition.getId()))).toList());
+        registerProvider("items", context -> context.items.definitions().values().stream()
+            .map(definition -> new Entry(definition.getId(), Kind.ITEM, context.items.stack(CustomItemRuntime.LOGICAL_PREFIX + definition.getId(), 1))).toList());
         Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, TAB_KEY, FabricCreativeModeTab.builder()
             .title(Component.translatable("itemGroup.worldsmith.world_content"))
             .icon(() -> new ItemStack(Items.MAP))
@@ -103,11 +106,12 @@ public final class WorldsmithCreativeContent {
     }
 
     /** Client publication uses only active, resource-verified runtime snapshots, never authoring drafts. */
-    public static synchronized void publish(CustomBlockBindingSnapshot blocks, CreatureRuntime.Snapshot creatures) {
+    public static synchronized void publish(CustomBlockBindingSnapshot blocks, CreatureRuntime.Snapshot creatures, CustomItemRuntime.Snapshot items) {
         if (!registered) return;
         if (publishedContext != null && publishedProviderRevision == providerRevision
-            && publishedContext.scope.equals(creatures.bundleHash()) && publishedContext.blocks.snapshot().equals(blocks)) return;
-        Context context = new Context(creatures.bundleHash(), WorldBlockBindings.resolver(blocks), creatures);
+            && publishedContext.scope.equals(creatures.bundleHash()) && publishedContext.blocks.snapshot().equals(blocks)
+            && publishedContext.items.definitions().equals(items.definitions())) return;
+        Context context = new Context(creatures.bundleHash(), WorldBlockBindings.resolver(blocks), creatures, items);
         Map<String, Entry> unique = new LinkedHashMap<>();
         Set<ItemStack> uniqueStacks = ItemStackLinkedSet.createTypeAndComponentsSet();
         Set<String> boundHosts = Set.copyOf(context.blocks.nativeIds().values());
@@ -126,6 +130,11 @@ public final class WorldsmithCreativeContent {
                     CreatureSpawnToken token = stack.get(CREATURE_SPAWN);
                     if (token == null || !context.scope.equals(token.bundleHash()) || !context.creatures.definitions().containsKey(token.species()))
                         throw new IllegalArgumentException("Creative provider exposed an undefined or foreign creature");
+                }
+                if (stack.getItem() == CustomItemRuntime.host()) {
+                    var identity = stack.get(CustomItemRuntime.identityComponent());
+                    if (!context.items.isCanonical(stack) || entry.kind != Kind.ITEM || identity == null || !entry.id.equals(identity.itemId()))
+                        throw new IllegalArgumentException("Creative provider exposed an undefined, foreign or noncanonical ordinary item");
                 }
                 String key = entry.kind + ":" + entry.id;
                 if (unique.putIfAbsent(key, entry) != null) throw new IllegalArgumentException("Duplicate logical creative entry: " + key);

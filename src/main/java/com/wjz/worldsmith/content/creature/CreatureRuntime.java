@@ -1,6 +1,9 @@
 package com.wjz.worldsmith.content.creature;
 
 import com.wjz.worldsmith.core.content.*;
+import com.wjz.worldsmith.content.WorldBlockBindings;
+import com.wjz.worldsmith.content.WorldRewardItems;
+import com.wjz.worldsmith.content.item.CustomItemRuntime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
@@ -13,6 +16,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.*;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -50,7 +54,15 @@ public final class CreatureRuntime {
     public static Snapshot prepare(String bundleHash, CreatureLibrary library) { return prepare(bundleHash, library, Map.of()); }
 
     public static Snapshot prepare(String bundleHash, CreatureLibrary library, Map<String, String> biomeBindings) {
+        return prepare(bundleHash, library, biomeBindings, null, null);
+    }
+
+    /** Full publication preparation resolves reward stacks now, not when a creature later dies. */
+    public static Snapshot prepare(String bundleHash, CreatureLibrary library, Map<String, String> biomeBindings,
+                                   CustomItemRuntime.Snapshot items, WorldBlockBindings.Resolver blocks) {
         if (!bundleHash.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("Creature snapshot needs an immutable SHA-256 bundle identity");
+        if (items != null && !items.bundleHash().equals(bundleHash) || blocks != null && !blocks.snapshot().getScope().equals(bundleHash))
+            throw new IllegalArgumentException("Creature reward resolvers must belong to the same immutable bundle");
         var diagnostics = CustomCreatureValidator.validate(library);
         if (!diagnostics.isEmpty()) throw new IllegalArgumentException("Invalid creature library: " + diagnostics);
         // Detach and freeze every authoring collection, including Java-visible nested lists.
@@ -58,7 +70,7 @@ public final class CreatureRuntime {
         var definitions = new LinkedHashMap<String, CreatureDefinition>();
         frozen.getCreatures().forEach(d -> definitions.put(d.getId(), d));
         biomeBindings.values().forEach(Identifier::parse);
-        return new Snapshot(bundleHash, definitions, biomeBindings);
+        return new Snapshot(bundleHash, definitions, biomeBindings, items, blocks);
     }
 
     public static void bind(ServerLevel level, Snapshot snapshot) {
@@ -113,12 +125,59 @@ public final class CreatureRuntime {
         private final String bundleHash;
         private final Map<String, CreatureDefinition> definitions;
         private final Map<String, String> biomeBindings;
-        private Snapshot(String hash, Map<String, CreatureDefinition> definitions, Map<String, String> biomes) {
+        private final Map<String, List<PreparedDrop>> rewards;
+        private final CustomItemRuntime.Snapshot items;
+        private final WorldBlockBindings.Resolver blocks;
+        private final boolean needsItemContext;
+        private final boolean needsBlockContext;
+        private Snapshot(String hash, Map<String, CreatureDefinition> definitions, Map<String, String> biomes,
+                         CustomItemRuntime.Snapshot items, WorldBlockBindings.Resolver blocks) {
             this.bundleHash = hash; this.definitions = Collections.unmodifiableMap(definitions); this.biomeBindings = Map.copyOf(biomes);
+            this.items = items; this.blocks = blocks;
+            Map<String, List<PreparedDrop>> prepared = new LinkedHashMap<>(); boolean customItems = false, customBlocks = false;
+            for (var definition : definitions.values()) {
+                List<PreparedDrop> entries = new ArrayList<>();
+                for (var drop : definition.getDrops()) {
+                    // Resolving the maximum validates the true per-item stack limit as well as registry identity.
+                    WorldRewardItems.stack(drop.getItem(), drop.getMaxCount(), blocks, items);
+                    entries.add(new PreparedDrop(drop));
+                    customItems |= drop.getItem().startsWith("worldsmith:item/");
+                    customBlocks |= drop.getItem().startsWith("worldsmith:content/");
+                }
+                prepared.put(definition.getId(), List.copyOf(entries));
+            }
+            rewards = Map.copyOf(prepared); needsItemContext = customItems; needsBlockContext = customBlocks;
         }
         public String bundleHash() { return bundleHash; }
         public Map<String, CreatureDefinition> definitions() { return definitions; }
         public Map<String, String> biomeBindings() { return biomeBindings; }
+
+        /** Death caller must be the owning server world; fresh canonical stacks retain all item components. */
+        public List<ItemStack> deathDrops(ServerLevel level, String creatureId, boolean killedByPlayer, RandomSource random) {
+            if (WORLDS.get(level) != this) throw new IllegalStateException("Creature rewards requested outside their bound server world");
+            if (!definitions.containsKey(creatureId)) throw new IllegalArgumentException("Missing creature reward definition: " + creatureId);
+            if (needsItemContext) {
+                var current = CustomItemRuntime.snapshot(level);
+                if (current == null || !current.bundleHash().equals(bundleHash) || !current.definitions().equals(items.definitions()))
+                    throw new IllegalStateException("The creature's immutable custom-item reward context is no longer active");
+            }
+            if (needsBlockContext && !Objects.equals(WorldBlockBindings.active(), blocks.snapshot()))
+                throw new IllegalStateException("The creature's immutable block-item reward context is no longer active");
+            List<ItemStack> result = new ArrayList<>();
+            for (var entry : rewards.get(creatureId)) {
+                CreatureDrop rule = entry.rule;
+                if (rule.getRequirePlayerKill() && !killedByPlayer || rule.getChance() <= 0 || rule.getChance() < 1 && random.nextDouble() >= rule.getChance()) continue;
+                int count = rule.getMinCount() == rule.getMaxCount() ? rule.getMinCount() : rule.getMinCount() + random.nextInt(rule.getMaxCount() - rule.getMinCount() + 1);
+                // The immutable factory is reused, not a shallow-copied mutable text/lore component object.
+                result.add(WorldRewardItems.stack(rule.getItem(), count, blocks, items));
+            }
+            return List.copyOf(result);
+        }
+
+        private static final class PreparedDrop {
+            final CreatureDrop rule;
+            PreparedDrop(CreatureDrop rule) { this.rule = rule; }
+        }
         public List<CreatureDefinition> candidates(String biome, CreatureCategory category, int light) {
             return definitions.values().stream().filter(d -> d.getCategory() == category)
                 .filter(d -> d.getSpawn().getBiomes().stream().anyMatch(id -> biome.equals(biomeBindings.get(id))))

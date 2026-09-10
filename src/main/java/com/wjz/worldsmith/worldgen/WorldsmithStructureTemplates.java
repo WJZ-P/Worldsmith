@@ -102,7 +102,7 @@ public final class WorldsmithStructureTemplates {
                 if(registries==null)throw new IllegalArgumentException("Block entity content requires registry-aware export");
                 var pos=voxel.getPosition();var payload=geometry.getInteractions().get(interaction);
                 block.put("nbt",WorldsmithStructureInteractions.encode(payload,state,new net.minecraft.core.BlockPos(pos.getX(),pos.getY(),pos.getZ()),registries,
-                    pack==null?null:pack.structureLootId(geometry.getId(),geometry.getInteractionIds().isEmpty()?interaction:geometry.getInteractionIds().get(interaction)),pack==null?null:pack.blockResolver()));
+                    pack==null?null:pack.structureLootId(geometry.getId(),geometry.getInteractionIds().isEmpty()?interaction:geometry.getInteractionIds().get(interaction)),pack==null?null:pack.blockResolver(),pack==null?null:pack.itemResolver()));
             }
             blocks.add(block);
         }
@@ -158,7 +158,7 @@ public final class WorldsmithStructureTemplates {
         }
         for(var blueprint:pack.structures().getBlueprints().values())for(int i=0;i<blueprint.getInteractions().size();i++) {
             if(!(blueprint.getInteractions().get(i) instanceof StructureInteraction.Container container)||container.getLoot()==null)continue;
-            var table=WorldsmithStructureInteractions.loot(container.getLoot(),pack.blockResolver());
+            var table=WorldsmithStructureInteractions.loot(container.getLoot(),pack.blockResolver(),pack.itemResolver());
             var ops=registries.createSerializationContext(JsonOps.INSTANCE);
             var json=LootTable.DIRECT_CODEC.encodeStart(ops,table).getOrThrow();
             LootTable.DIRECT_CODEC.parse(ops,json).getOrThrow();

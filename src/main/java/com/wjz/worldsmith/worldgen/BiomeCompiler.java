@@ -104,9 +104,7 @@ public final class BiomeCompiler {
 		}
 
         if (!pack.pack().getCreatures().getCreatures().isEmpty()) {
-            var biomeBindings = new java.util.LinkedHashMap<String,String>();
-            pack.definitions().forEach(b -> biomeBindings.put(b.getId(),pack.biomeKey(b.getId()).identifier().toString()));
-            var snapshot = com.wjz.worldsmith.content.creature.CreatureRuntime.prepare(pack.id(),pack.pack().getCreatures(),biomeBindings);
+            var snapshot = pack.creatureSnapshot();
             for (var entry : com.wjz.worldsmith.content.creature.CreatureRuntime.perBiomeSpawnEntries(snapshot,pack.biomeKey(definition.getId()).identifier().toString())) {
                 var type = entry.category()==com.wjz.worldsmith.core.content.CreatureCategory.HOSTILE
                     ? com.wjz.worldsmith.content.creature.CreatureRuntime.hostileType()

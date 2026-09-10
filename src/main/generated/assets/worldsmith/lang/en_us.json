@@ -189,4 +189,5 @@
   "worldsmith.creative.wrong_world": "This summoner belongs to a different world. Take a fresh one from this world's Worldsmith tab.",
   "worldsmith.draw.approval.body": "Session %s will run AI-authored Java in a separate process under your account. Time and memory are limited, but this is not a filesystem/network sandbox. Approve only a trusted AI client. Approval ends when the client restarts.",
   "worldsmith.draw.approval.title": "Allow AI Java authoring for this world?"
+,"item.worldsmith.content.item.host":"[Worldsmith] Unbound World Item"
 }

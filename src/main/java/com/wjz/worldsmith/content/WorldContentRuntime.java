@@ -1,6 +1,8 @@
 package com.wjz.worldsmith.content;
 
 import com.wjz.worldsmith.content.creature.CreatureRuntime;
+import com.wjz.worldsmith.content.item.CustomItemRuntime;
+import com.wjz.worldsmith.content.item.GeneratedItemResources;
 import com.wjz.worldsmith.core.content.*;
 import com.wjz.worldsmith.core.draw.DrawSnapshotCodec;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
@@ -50,9 +52,12 @@ public final class WorldContentRuntime {
             if (!nativeId.equals("worldsmith:generated/" + pack.getManifest().getId() + "/" + logical))
                 throw new IllegalArgumentException("Portable embedded worlds require hash-scoped native biome identities");
         });
-        var creatures = CreatureRuntime.prepare(pack.getManifest().getId(), pack.getCreatures(), biomeBindings);
+        var items = CustomItemRuntime.prepare(pack.getManifest().getId(), pack.getItems());
+        items.definitions().values().forEach(item -> items.stack(CustomItemRuntime.LOGICAL_PREFIX + item.getId(), 1));
+        var creatures = CreatureRuntime.prepare(pack.getManifest().getId(), pack.getCreatures(), biomeBindings, items, WorldBlockBindings.resolver(bindings));
         var assets = pack.getAssets();
         Map<String, byte[]> client = new LinkedHashMap<>(GeneratedBlockResources.clientResources(bindings, blocks, assets));
+        GeneratedItemResources.clientResources(items, assets).forEach((path, bytes) -> putUnique(client, path, bytes));
         for (var definition : creatures.definitions().values()) {
             String asset = definition.getModel().getTexture();
             byte[] png = Objects.requireNonNull(assets.get(asset), "Missing creature PNG asset " + asset);
@@ -66,7 +71,7 @@ public final class WorldContentRuntime {
         bundle.getTexts().forEach((path, text) -> putUnique(server, EMBEDDED_ROOT + path, text.getBytes(StandardCharsets.UTF_8)));
         bundle.getBinaries().forEach((path, bytes) -> putUnique(server, EMBEDDED_ROOT + path, bytes));
         putUnique(server, BINDINGS_PATH, CustomBlockBindings.encode(bindings).getBytes(StandardCharsets.UTF_8));
-        return new Prepared(pack.getManifest().getId(), blocks, bindings, creatures, client, server);
+        return new Prepared(pack.getManifest().getId(), blocks, bindings, creatures, items, client, server);
     }
 
     public static Prepared prepare(WorldsmithPack pack, Map<String, String> biomeBindings) { return prepare(pack, biomeBindings, null); }
@@ -99,10 +104,15 @@ public final class WorldContentRuntime {
         if (owner.levels.stream().anyMatch(existing -> existing.getServer() != level.getServer()))
             throw new IllegalStateException("Native block hosts already belong to another live server");
         if (owner.levels.contains(level)) return;
+        var previousItems = CustomItemRuntime.snapshot(level);
+        var previousCreatures = CreatureRuntime.snapshot(level);
         try {
+            CustomItemRuntime.bind(level, owner.prepared.items);
             CreatureRuntime.bind(level, owner.prepared.creatures);
             owner.levels.add(level);
         } catch (RuntimeException failure) {
+            if (previousItems == null) CustomItemRuntime.unbind(level);
+            if (previousCreatures == null) CreatureRuntime.unbind(level);
             if (previous == null && owner.client == null && owner.levels.isEmpty()) {
                 owner.activation.rollback(); active = null;
             }
@@ -111,6 +121,7 @@ public final class WorldContentRuntime {
     }
 
     public static synchronized void unbindLevel(ServerLevel level) {
+        CustomItemRuntime.unbind(level);
         CreatureRuntime.unbind(level);
         if (active != null) active.levels.remove(level);
         releaseIfUnowned();
@@ -120,7 +131,7 @@ public final class WorldContentRuntime {
     public static synchronized void clearServer(MinecraftServer server) {
         if (active == null) return;
         var owned = active.levels.stream().filter(level -> level.getServer() == server).toList();
-        for (var level : owned) { CreatureRuntime.unbind(level); active.levels.remove(level); }
+        for (var level : owned) { CreatureRuntime.unbind(level); CustomItemRuntime.unbind(level); active.levels.remove(level); }
         releaseIfUnowned();
     }
 
@@ -161,7 +172,7 @@ public final class WorldContentRuntime {
 
     private static boolean equivalent(Prepared a, Prepared b) {
         return a.scope.equals(b.scope) && a.blockBindings.equals(b.blockBindings)
-            && a.creatures.biomeBindings().equals(b.creatures.biomeBindings());
+            && a.creatures.biomeBindings().equals(b.creatures.biomeBindings()) && a.items.definitions().equals(b.items.definitions());
     }
 
     private static void assertOwnedBindings(Active owner) {
@@ -210,10 +221,12 @@ public final class WorldContentRuntime {
                     if (target == null) {
                         if (active != null) active.client = null;
                         CreatureRuntime.clearClient();
+                        CustomItemRuntime.clearClient();
                     } else {
                         Active owner = acquire(target, true);
                         next = new ClientLease(target); owner.client = next;
                         CreatureRuntime.activateClient(target.creatures);
+                        CustomItemRuntime.activateClient(target.items);
                     }
                     if (previousClient != null) previousClient.closed = true;
                     finished = true; pendingClient = null;
@@ -240,17 +253,19 @@ public final class WorldContentRuntime {
         private final CustomBlockLibrary blocks;
         private final CustomBlockBindingSnapshot blockBindings;
         private final CreatureRuntime.Snapshot creatures;
+        private final CustomItemRuntime.Snapshot items;
         private final Map<String, byte[]> clientResources;
         private final Map<String, byte[]> serverResources;
-        private Prepared(String scope, CustomBlockLibrary blocks, CustomBlockBindingSnapshot bindings, CreatureRuntime.Snapshot creatures,
+        private Prepared(String scope, CustomBlockLibrary blocks, CustomBlockBindingSnapshot bindings, CreatureRuntime.Snapshot creatures, CustomItemRuntime.Snapshot items,
                          Map<String, byte[]> client, Map<String, byte[]> server) {
-            this.scope = scope; this.blocks = blocks; this.blockBindings = bindings; this.creatures = creatures;
+            this.scope = scope; this.blocks = blocks; this.blockBindings = bindings; this.creatures = creatures; this.items = items;
             this.clientResources = freezeBytes(client); this.serverResources = freezeBytes(server);
         }
         public String scope() { return scope; }
         public CustomBlockBindingSnapshot blockBindings() { return blockBindings; }
         public WorldBlockBindings.Resolver blockResolver() { return WorldBlockBindings.resolver(blockBindings); }
         public CreatureRuntime.Snapshot creatures() { return creatures; }
+        public CustomItemRuntime.Snapshot items() { return items; }
         public Map<String, byte[]> clientResources() { return freezeBytes(clientResources); }
         /** Includes the complete immutable bundle and exact slot mapping for storage inside the save's datapack. */
         public Map<String, byte[]> serverResources() { return freezeBytes(serverResources); }

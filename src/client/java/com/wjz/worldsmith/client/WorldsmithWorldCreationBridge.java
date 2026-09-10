@@ -71,7 +71,7 @@ public final class WorldsmithWorldCreationBridge {
 	private static volatile String activePackId;
     private static final Map<String,PublicationStatus> PUBLICATIONS=new ConcurrentHashMap<>();
     private static final java.util.concurrent.ExecutorService EXPORTS=Executors.newSingleThreadExecutor(r->{var t=new Thread(r,"worldsmith-native-export");t.setDaemon(true);return t;});
-    private static final String COMPILER_VERSION=com.wjz.worldsmith.core.drawhost.DrawingVersions.NATIVE_COMPILER+":content-runtime-1";
+    private static final String COMPILER_VERSION=com.wjz.worldsmith.core.drawhost.DrawingVersions.NATIVE_COMPILER+":content-runtime-2";
 
 	private WorldsmithWorldCreationBridge() {
 	}

@@ -37,6 +37,7 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 	}
 
 	private static void addCreativeContent(TranslationBuilder builder) {
+		builder.add("item.worldsmith.content.item.host", "[Worldsmith] Unbound World Item");
 		builder.add("itemGroup.worldsmith.world_content", "Worldsmith: Current World");
 		builder.add("item.worldsmith.creature_summoner", "Creature Summoner");
 		builder.add("item.worldsmith.creature_summoner.named", "Summon %s");

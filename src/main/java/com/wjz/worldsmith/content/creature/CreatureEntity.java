@@ -10,6 +10,7 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.*;
 import net.minecraft.world.entity.ai.goal.*;
@@ -19,6 +20,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.level.gamerules.GameRules;
 import org.slf4j.LoggerFactory;
 
 /** Server-authoritative ground mob. The client receives immutable identity and bounded animation state only. */
@@ -32,6 +34,7 @@ public class CreatureEntity extends PathfinderMob {
     private boolean diagnosed;
     private boolean suspendedForMissing;
     private boolean savedNoAi;
+    private boolean rewardsProcessed;
 
     public CreatureEntity(EntityType<? extends CreatureEntity> type, Level level) { super(type, level); }
 
@@ -130,11 +133,32 @@ public class CreatureEntity extends PathfinderMob {
         return CreatureRuntime.category(getType()) == CreatureCategory.HOSTILE;
     }
 
+    @Override protected void dropCustomDeathLoot(ServerLevel level, DamageSource source, boolean killedByPlayer) {
+        // This hook is reached after a real server killing blow, never from a client animation or arbitrary drop payload.
+        if (level() != level || !dead || !isDeadOrDying() || rewardsProcessed) return;
+        rewardsProcessed = true;
+        if (!level.getGameRules().get(GameRules.MOB_DROPS) || !shouldDropLoot(level)) return;
+        super.dropCustomDeathLoot(level, source, killedByPlayer);
+        var snapshot = CreatureRuntime.snapshot(level);
+        if (snapshot == null || !snapshot.bundleHash().equals(bundleHash()) || !snapshot.definitions().containsKey(creatureId())) {
+            LoggerFactory.getLogger("worldsmith.creatures").error("Creature {} reward rejected: missing immutable server definition {}:{}", getUUID(), bundleHash(), creatureId());
+            return;
+        }
+        try {
+            // All prototypes were resolved at publication; construct every roll before spawning any of them.
+            var drops = snapshot.deathDrops(level, creatureId(), killedByPlayer, getRandom());
+            for (var stack : drops) spawnAtLocation(level, stack);
+        } catch (RuntimeException failure) {
+            LoggerFactory.getLogger("worldsmith.creatures").error("Creature {} reward rejected for {}:{}; no retry after this death", getUUID(), bundleHash(), creatureId(), failure);
+        }
+    }
+
     @Override protected void addAdditionalSaveData(ValueOutput output) {
         super.addAdditionalSaveData(output);
         if (suspendedForMissing) output.putBoolean("NoAI", savedNoAi);
         output.putString("WorldsmithBundle", bundleHash()); output.putString("WorldsmithCreature", creatureId());
         output.putLong("WorldsmithAppearanceSeed", appearanceSeed());
+        output.putBoolean("WorldsmithRewardsProcessed", rewardsProcessed);
         if (origin != null) { output.putInt("WorldsmithOriginX", origin.getX()); output.putInt("WorldsmithOriginY", origin.getY()); output.putInt("WorldsmithOriginZ", origin.getZ()); }
     }
 
@@ -142,6 +166,7 @@ public class CreatureEntity extends PathfinderMob {
         super.readAdditionalSaveData(input);
         entityData.set(BUNDLE, input.getStringOr("WorldsmithBundle", "")); entityData.set(CREATURE, input.getStringOr("WorldsmithCreature", ""));
         entityData.set(APPEARANCE_SEED, input.getLongOr("WorldsmithAppearanceSeed", 0));
+        rewardsProcessed = input.getBooleanOr("WorldsmithRewardsProcessed", false);
         origin = new BlockPos(input.getIntOr("WorldsmithOriginX", blockPosition().getX()), input.getIntOr("WorldsmithOriginY", blockPosition().getY()), input.getIntOr("WorldsmithOriginZ", blockPosition().getZ()));
         configured = null;
     }

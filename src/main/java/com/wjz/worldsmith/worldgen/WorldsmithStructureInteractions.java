@@ -3,11 +3,14 @@ package com.wjz.worldsmith.worldgen;
 import com.wjz.worldsmith.core.structure.StructureInteraction;
 import com.wjz.worldsmith.core.structure.StructureLoot;
 import com.wjz.worldsmith.content.WorldBlockBindings;
-import com.wjz.worldsmith.content.WorldsmithCustomBlocks;
+import com.wjz.worldsmith.content.WorldRewardItems;
+import com.wjz.worldsmith.content.item.CustomItemRuntime;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -17,9 +20,7 @@ import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.Container;
 import net.minecraft.world.RandomizableContainer;
 import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.*;
 import net.minecraft.world.level.block.state.BlockState;
@@ -29,6 +30,8 @@ import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.entries.LootItem;
 import net.minecraft.world.level.storage.loot.functions.SetItemCountFunction;
+import net.minecraft.world.level.storage.loot.functions.SetComponentsFunction;
+import net.minecraft.world.level.storage.loot.functions.LootItemConditionalFunction;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.providers.number.UniformGenerator;
 
@@ -43,11 +46,17 @@ public final class WorldsmithStructureInteractions {
 
     public static CompoundTag encode(StructureInteraction spec, BlockState state, BlockPos pos,
         HolderLookup.Provider registries, Identifier inlineLoot, WorldBlockBindings.Resolver customBlocks) {
+        return encode(spec,state,pos,registries,inlineLoot,customBlocks,null);
+    }
+
+    public static CompoundTag encode(StructureInteraction spec, BlockState state, BlockPos pos,
+        HolderLookup.Provider registries, Identifier inlineLoot, WorldBlockBindings.Resolver customBlocks, CustomItemRuntime.Snapshot customItems) {
         if(!(state.getBlock() instanceof EntityBlock factory))throw new IllegalArgumentException("Interaction target is not a block entity: "+state);
         BlockEntity entity=factory.newBlockEntity(pos,state);
         if(entity==null)throw new IllegalArgumentException("Block entity factory returned no entity");
         ProblemReporter.Collector reporter=new ProblemReporter.Collector();
         var output=TagValueOutput.createWithContext(reporter,registries);
+        Map<Integer,ItemStack> expectedItems=new LinkedHashMap<>();
         if(spec instanceof StructureInteraction.Container contents) {
             if(!(entity instanceof Container inventory))throw new IllegalArgumentException("Container content targets a non-container block");
             if(contents.getLootTable()!=null || contents.getLoot()!=null) {
@@ -56,9 +65,10 @@ public final class WorldsmithStructureInteractions {
                 if(id==null)throw new IllegalArgumentException("Inline loot requires an exported table id");
                 randomizable.setLootTable(ResourceKey.create(Registries.LOOT_TABLE,id),0L);
             } else for(var item:contents.getItems()) {
-                Item type=item(item.getItem(),customBlocks);var stack=new ItemStack(type,item.getCount());
+                var stack=WorldRewardItems.stack(item.getItem(),item.getCount(),customBlocks,customItems);
                 if(item.getSlot()<0||item.getSlot()>=inventory.getContainerSize()||item.getCount()>stack.getMaxStackSize())throw new IllegalArgumentException("Item exceeds the actual container capacity or stack limit");
                 inventory.setItem(item.getSlot(),stack);
+                expectedItems.put(item.getSlot(),stack.copy());
             }
         }
         entity.saveWithFullMetadata(output);
@@ -79,6 +89,14 @@ public final class WorldsmithStructureInteractions {
         var tag=output.buildResult();
         entity.loadWithComponents(TagValueInput.create(reporter,registries,tag));
         if(!reporter.isEmpty())throw new IllegalArgumentException("Block entity readback failed: "+reporter.getReport());
+        if(!expectedItems.isEmpty()) {
+            Container inventory=(Container)entity;
+            for(var entry:expectedItems.entrySet()) {
+                var actual=inventory.getItem(entry.getKey());var expected=entry.getValue();
+                if(actual.getCount()!=expected.getCount()||!ItemStack.isSameItemSameComponents(actual,expected))
+                    throw new IllegalArgumentException("Structure reward identity/components changed during native container NBT readback");
+            }
+        }
         return tag;
     }
 
@@ -87,24 +105,34 @@ public final class WorldsmithStructureInteractions {
     }
 
     public static LootTable loot(StructureLoot source, WorldBlockBindings.Resolver customBlocks) {
+        return loot(source,customBlocks,null);
+    }
+
+    public static LootTable loot(StructureLoot source, WorldBlockBindings.Resolver customBlocks, CustomItemRuntime.Snapshot customItems) {
+        if(source.getMinRolls()<0||source.getMaxRolls()<source.getMinRolls()||source.getMaxRolls()>8||source.getEntries().isEmpty()||source.getEntries().size()>32)
+            throw new IllegalArgumentException("Inline structure loot requires bounded rolls and 1 through 32 entries");
         var pool=LootPool.lootPool().setRolls(UniformGenerator.between(source.getMinRolls(),source.getMaxRolls()));
         for(var entry:source.getEntries()) {
-            Item item=item(entry.getItem(),customBlocks);
-            if(entry.getMaxCount()>new ItemStack(item).getMaxStackSize())throw new IllegalArgumentException("Loot count exceeds this item's stack limit: "+entry.getItem());
-            pool.add(LootItem.lootTableItem(item).setWeight(entry.getWeight())
-                .apply(SetItemCountFunction.setCount(UniformGenerator.between(entry.getMinCount(),entry.getMaxCount()))));
+            if(entry.getMinCount()<1||entry.getMaxCount()<entry.getMinCount()||entry.getWeight()<1||entry.getWeight()>10000)
+                throw new IllegalArgumentException("Invalid bounded structure loot entry: "+entry.getItem());
+            // Keep the canonical stack patch, not just the generic host Item: identity, model, name,
+            // lore, rarity and per-definition stack size all belong to the actual reward.
+            ItemStack prototype=WorldRewardItems.stack(entry.getItem(),entry.getMaxCount(),customBlocks,customItems).copyWithCount(1);
+            var reward=LootItem.lootTableItem(prototype.getItem()).setWeight(entry.getWeight());
+            for(var component:prototype.getComponentsPatch().entrySet()) {
+                if(component.getValue().isEmpty())throw new IllegalArgumentException("Reward prototypes with removed native components are not supported: "+entry.getItem());
+                reward.apply(setComponent(component.getKey(),component.getValue().orElseThrow()));
+            }
+            reward.apply(SetItemCountFunction.setCount(UniformGenerator.between(entry.getMinCount(),entry.getMaxCount())));
+            pool.add(reward);
         }
         return LootTable.lootTable().setParamSet(LootContextParamSets.CHEST).withPool(pool).build();
     }
-    private static Item item(String id, WorldBlockBindings.Resolver customBlocks) {
-        if(WorldsmithCustomBlocks.isReservedNativeId(id))throw new IllegalArgumentException("Structure loot must reference a logical block-item alias, not an internal slot: "+id);
-        if(id.startsWith("worldsmith:content/")) {
-            if(customBlocks==null)throw new IllegalArgumentException("Logical block items need an explicit world compilation context: "+id);
-            return customBlocks.resolveItem(id);
-        }
-        Item item=BuiltInRegistries.ITEM.getOptional(Identifier.parse(id)).orElseThrow(()->new IllegalArgumentException("Unknown structure item: "+id));
-        if(item==Items.AIR)throw new IllegalArgumentException("Omit empty inventory slots instead of inserting air");
-        return item;
+
+    @SuppressWarnings("unchecked")
+    private static <T> LootItemConditionalFunction.Builder<?> setComponent(DataComponentType<T> type,Object value) {
+        // Value comes from the same typed DataComponentPatch entry, not from a user-supplied untyped map.
+        return SetComponentsFunction.setComponent(type,(T)value);
     }
     private static DyeColor color(String name) {return DyeColor.valueOf(name.toUpperCase(java.util.Locale.ROOT));}
     private static SignText text(List<String> lines,String color,boolean glow) {

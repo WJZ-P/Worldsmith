@@ -172,4 +172,5 @@
 	"worldsmith.creative.missing_species": "这件召唤器没有引用当前世界中已定义的物种。",
 	"worldsmith.creative.spawn_unavailable": "当前世界设置或难度下，这种生物暂不适合生成。",
 	"worldsmith.creative.wrong_world": "这件召唤器属于另一个世界，请从当前世界的 Worldsmith 分类页重新获取。"
+,"item.worldsmith.content.item.host":"[Worldsmith] 未绑定的世界物品"
 }

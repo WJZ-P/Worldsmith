@@ -4,6 +4,7 @@ import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.content.WorldBlockBindings;
 import com.wjz.worldsmith.content.creative.WorldsmithCreativeContent;
 import com.wjz.worldsmith.content.creature.CreatureRuntime;
+import com.wjz.worldsmith.content.item.CustomItemRuntime;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
 
@@ -25,9 +26,10 @@ public final class WorldsmithCreativeContentClient {
         if (client == null) { WorldsmithCreativeContent.clear(); return; }
         var blocks = WorldBlockBindings.active();
         var creatures = CreatureRuntime.clientSnapshot();
+        var items = CustomItemRuntime.clientSnapshot();
         String scope = WorldContentClientRuntime.activeScope();
-        if (client.level == null || client.player == null || !client.isLocalServer() || blocks == null || creatures == null
-            || scope == null || !scope.equals(blocks.getScope()) || !scope.equals(creatures.bundleHash())) {
+        if (client.level == null || client.player == null || !client.isLocalServer() || blocks == null || creatures == null || items == null
+            || scope == null || !scope.equals(blocks.getScope()) || !scope.equals(creatures.bundleHash()) || !scope.equals(items.bundleHash())) {
             WorldsmithCreativeContent.clear();
             failedScope = null;
             return;
@@ -35,7 +37,7 @@ public final class WorldsmithCreativeContentClient {
         long providers = WorldsmithCreativeContent.providerRevision();
         if (scope.equals(failedScope) && providers == failedProviderRevision) return;
         try {
-            WorldsmithCreativeContent.publish(blocks, creatures);
+            WorldsmithCreativeContent.publish(blocks, creatures, items);
             failedScope = null;
         } catch (RuntimeException failure) {
             WorldsmithCreativeContent.clear();
