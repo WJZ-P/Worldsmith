@@ -14,6 +14,7 @@ object StructurePackIO {
         val contents=linkedMapOf<String,String>()
         fun save(blueprint:StructureBlueprint):String {
             require(ID.matches(blueprint.id)) { "Invalid blueprint identifier" }
+            require(library.schemaVersion==2 || blueprint.interactions.none { it is StructureInteraction.BossSpawner }) { "Boss spawners require structure library schema 2" }
             val file="structures/${blueprint.id}.json";val text=WorldsmithJson.encode(blueprint)
             val previous=contents.putIfAbsent(file,text)
             require(previous==null || previous==text) { "Conflicting blueprint ${blueprint.id}" }
@@ -47,6 +48,7 @@ object StructurePackIO {
         fun read(path:String):StructureBlueprint {
             val b=WorldsmithJson.decode<StructureBlueprint>(requireNotNull(contents[path]))
             require(path=="structures/${b.id}.json") { "Blueprint id must match its file name" }
+            require(index.schemaVersion==2 || b.interactions.none { it is StructureInteraction.BossSpawner }) { "Boss spawners require structure library schema 2" }
             return b
         }
         val definitions=index.structures.map { entry ->

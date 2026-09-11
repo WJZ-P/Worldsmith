@@ -102,7 +102,7 @@ public final class WorldsmithStructureTemplates {
                 if(registries==null)throw new IllegalArgumentException("Block entity content requires registry-aware export");
                 var pos=voxel.getPosition();var payload=geometry.getInteractions().get(interaction);
                 block.put("nbt",WorldsmithStructureInteractions.encode(payload,state,new net.minecraft.core.BlockPos(pos.getX(),pos.getY(),pos.getZ()),registries,
-                    pack==null?null:pack.structureLootId(geometry.getId(),geometry.getInteractionIds().isEmpty()?interaction:geometry.getInteractionIds().get(interaction)),pack==null?null:pack.blockResolver(),pack==null?null:pack.itemResolver()));
+                    pack==null?null:pack.structureLootId(geometry.getId(),geometry.getInteractionIds().isEmpty()?interaction:geometry.getInteractionIds().get(interaction)),pack==null?null:pack.blockResolver(),pack==null?null:pack.itemResolver(),pack==null?null:pack.creatureSnapshot()));
             }
             blocks.add(block);
         }

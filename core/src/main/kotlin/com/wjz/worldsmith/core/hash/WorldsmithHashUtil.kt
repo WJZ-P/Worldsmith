@@ -23,6 +23,7 @@ import com.wjz.worldsmith.core.model.TerrainPlan
 import com.wjz.worldsmith.core.model.BiomePlan
 import com.wjz.worldsmith.core.model.FeatureLibrary
 import com.wjz.worldsmith.core.structure.StructureBlueprint
+import com.wjz.worldsmith.core.structure.StructureInteraction
 import com.wjz.worldsmith.core.content.WorldTheme
 import com.wjz.worldsmith.core.content.CustomBlockLibrary
 import com.wjz.worldsmith.core.content.CreatureLibrary
@@ -54,6 +55,8 @@ object WorldsmithHashUtil {
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             val parsed = Json.parseToJsonElement(raw)
             require(parsed.jsonObject["schemaVersion"]?.jsonPrimitive?.intOrNull == file.schemaVersion) { "Module schema differs from manifest: $role" }
+            if(manifest.formatVersion==WorldContentBundleIO.PREVIOUS_FORMAT_VERSION && role=="creatures")
+                require(WorldsmithJson.decode<CreatureLibrary>(raw).creatures.none {it.boss!=null}) {"Format 4 has no Boss behavior; publish Boss profiles in format 5 with creature schema 2"}
             updateField(digest, "module:$role", file.schemaVersion.toString())
             val normalized = if (manifest.formatVersion == WorldContentBundleIO.LEGACY_FORMAT_VERSION && role == "creatures")
                 LegacyCreaturesV3.normalize(raw) else normalizeTyped(role, raw)
@@ -63,7 +66,12 @@ object WorldsmithHashUtil {
         val index = WorldsmithJson.decode<StructureIndex>(requireNotNull(contents[manifest.modulePath("structures")]))
         StructurePackIO.paths(index).forEach { path ->
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
-            updateField(digest, "blueprint:$path", canonicalJson(WorldsmithJson.format.encodeToJsonElement(StructureBlueprint.serializer(), WorldsmithJson.decode<StructureBlueprint>(raw))))
+            val blueprint = WorldsmithJson.decode<StructureBlueprint>(raw)
+            if (blueprint.interactions.any { it is StructureInteraction.BossSpawner }) {
+                require(manifest.formatVersion >= 5) { "Boss spawner encounters require bundle format 5" }
+                require(index.schemaVersion == 2) { "Boss spawner encounters require structure schema 2" }
+            }
+            updateField(digest, "blueprint:$path", canonicalJson(WorldsmithJson.format.encodeToJsonElement(StructureBlueprint.serializer(), blueprint)))
         }
         index.artifacts.toSortedMap().forEach { (id,meta)->
             require(id.matches(Regex("[a-f0-9]{64}")) && meta.id==id)

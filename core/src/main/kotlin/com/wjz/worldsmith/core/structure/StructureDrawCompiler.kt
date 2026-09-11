@@ -27,7 +27,7 @@ object StructureDrawCompiler {
             access=b.access?.let { it.copy(entrances=it.entrances.map(::p),destinations=it.destinations.map(::p),requiredClear=it.requiredClear.map(::box)) },
             lighting=b.lighting?.let { it.copy(spaces=it.spaces.map(::box),sources=it.sources.map { s->s.copy(at=p(s.at)) }) },
             interactions=b.interactions.map { when(it) {
-                is StructureInteraction.Container->it.copy(at=p(it.at));is StructureInteraction.Sign->it.copy(at=p(it.at));is StructureInteraction.Banner->it.copy(at=p(it.at))
+                is StructureInteraction.Container->it.copy(at=p(it.at));is StructureInteraction.Sign->it.copy(at=p(it.at));is StructureInteraction.Banner->it.copy(at=p(it.at));is StructureInteraction.BossSpawner->it.copy(at=p(it.at))
             } })
         if(strict)need(normalized.origin.x in 0 until size.x && normalized.origin.z in 0 until size.z && normalized.origin.y==0,
             "DRAWING_ORIGIN_DATUM","Origin must be inside the drawing at its minimum-Y support datum; metadata uses original drawing coordinates")

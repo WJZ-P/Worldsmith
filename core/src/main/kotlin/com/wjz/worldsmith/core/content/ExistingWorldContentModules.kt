@@ -3,6 +3,7 @@ package com.wjz.worldsmith.core.content
 import com.wjz.worldsmith.core.model.*
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.structure.StructureLibrary
+import com.wjz.worldsmith.core.structure.StructureInteraction
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.*
 import com.wjz.worldsmith.core.validation.Diagnostic
@@ -44,7 +45,7 @@ object ExistingWorldContentModules {
                 ContentEntry(ContentKey("biome", biome.id), "biomes", path, references + localBlockReferences(raw.getValue("biomes").jsonArray[i], path), nativeReferences = nativeReferences(raw.getValue("biomes").jsonArray[i]))
             })
         },
-        TypedModule(descriptor("structures", listOf("structure", "blueprint", "drawing"), listOf("terrain", "biomes"), listOf(1, 2)), StructureLibrary.serializer()) { library, _ ->
+        TypedModule(descriptor("structures", listOf("structure", "blueprint", "drawing"), listOf("terrain", "biomes", "creatures"), listOf(1, 2)), StructureLibrary.serializer()) { library, _ ->
             val entries = mutableListOf<ContentEntry>()
             val assets = library.artifacts.toSortedMap().values.map { a ->
                 entries += ContentEntry(ContentKey("drawing", a.id), "structures", "structures.artifacts.${a.id}", assets = listOf(a.id))
@@ -65,7 +66,10 @@ object ExistingWorldContentModules {
                 val blueprints = listOf(structure.blueprint to "$path.blueprint") + structure.assembly?.pieces.orEmpty().map { (id, b) -> b to "$path.assembly.pieces.$id" }
                 blueprints.forEach { (blueprint, location) ->
                     entries += ContentEntry(blueprintKey(blueprint.id), "structures", location,
-                        blueprint.drawing?.variants.orEmpty().mapIndexed { j, id -> ContentReference(ContentKey("drawing", id), "$location.drawing.variants[$j]") } + localBlockReferences(WorldsmithJson.format.encodeToJsonElement(blueprint), location),
+                        blueprint.drawing?.variants.orEmpty().mapIndexed { j, id -> ContentReference(ContentKey("drawing", id), "$location.drawing.variants[$j]") } +
+                            blueprint.interactions.mapIndexedNotNull { j, interaction -> (interaction as? StructureInteraction.BossSpawner)?.let {
+                                ContentReference(ContentKey("creature", it.creatureId), "$location.interactions[$j].creatureId")
+                            } } + localBlockReferences(WorldsmithJson.format.encodeToJsonElement(blueprint), location),
                         nativeReferences = nativeReferences(WorldsmithJson.format.encodeToJsonElement(blueprint)))
                 }
             }
@@ -90,7 +94,7 @@ object ExistingWorldContentModules {
             ContentContribution(library.items.mapIndexed { i, item -> ContentEntry(ContentKey("item", item.id), "items", "items.items[$i]", assets = listOf(item.textureAsset)) },
                 diagnostics = CustomItemValidation.validate(library).map { it.copy(path = "items.${it.path}") })
         },
-        TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1), compileAfter = listOf("biomes"), requirements = listOf(
+        TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1, 2), compileAfter = listOf("biomes"), requirements = listOf(
             ContentRequirement("creatures.native_hosts", 1, ContentLifecycle.BOOTSTRAP),
             ContentRequirement("assets.entity_models", 1, ContentLifecycle.CLIENT_RESOURCES),
             ContentRequirement("creatures.world_behaviors", 1, ContentLifecycle.WORLD_BINDING),

@@ -6,6 +6,7 @@ import com.wjz.worldsmith.core.model.*
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.structure.StructureLibrary
 import com.wjz.worldsmith.core.structure.StructurePackIO
+import com.wjz.worldsmith.core.structure.StructureInteraction
 
 data class WorldContentBundleFiles(
     val manifest: WorldsmithPackManifest,
@@ -35,7 +36,7 @@ object WorldContentBundleIO {
         }
         ContentAssetValidation.verifyAll(descriptors, assets)
         val modules = REQUIRED_MODULES.sorted().associateWith { id ->
-            WorldsmithModuleFile(if (id == "structures") structures.schemaVersion else 1, "$id.json")
+            WorldsmithModuleFile(when(id) {"structures"->structures.schemaVersion;"creatures"->creatures.schemaVersion;else->1}, "$id.json")
         }
         val manifest = WorldsmithPackManifest(FORMAT_VERSION, "0".repeat(64), displayName, description,
             modules = modules, assets = descriptors)
@@ -47,6 +48,10 @@ object WorldContentBundleIO {
     @JvmStatic
     fun encode(pack: WorldsmithPack): WorldContentBundleFiles {
         validateManifest(pack.manifest)
+        if (pack.manifest.formatVersion < 5) require(pack.structures.structures.none { structure ->
+            (listOf(structure.blueprint) + structure.assembly?.pieces.orEmpty().values)
+                .any { blueprint -> blueprint.interactions.any { it is StructureInteraction.BossSpawner } }
+        }) { "Boss spawner encounters require bundle format 5" }
         ContentAssetValidation.verifyAll(pack.manifest.assets, pack.assets)
         val texts = linkedMapOf<String, String>()
         fun put(module: String, text: String) { texts[pack.manifest.modulePath(module)] = text }
@@ -59,6 +64,7 @@ object WorldContentBundleIO {
             require(pack.items.items.isEmpty()) { "Format 3 does not contain ordinary items; create a current-format bundle for new content" }
             put("creatures", LegacyCreaturesV3.encode(pack.creatures))
         } else {
+            if(pack.manifest.formatVersion<5)require(pack.creatures.creatures.none {it.boss!=null}) {"Boss profiles require format 5 and creature module schema 2"}
             put("creatures", WorldsmithJson.encode(pack.creatures))
             put("items", WorldsmithJson.encode(pack.items))
         }
@@ -88,7 +94,8 @@ object WorldContentBundleIO {
         require(manifest.displayName.isNotBlank() && manifest.displayName.length <= 160 && manifest.description.length <= 8192) { "Invalid bundle display metadata" }
         require(manifest.modules.values.map { it.path }.distinct().size == manifest.modules.size) { "Module documents must have distinct paths" }
         manifest.modules.forEach { (id, file) ->
-            require(file.schemaVersion in if (id == "structures") 1..2 else 1..1) { "Unsupported schema for module '$id'" }
+            val versions=if(id=="structures" || id=="creatures" && manifest.formatVersion>=5)1..2 else 1..1
+            require(file.schemaVersion in versions) { "Unsupported schema for module '$id' in bundle format ${manifest.formatVersion}" }
             require(WorldContentRegistry.validRelativePath(file.path) && file.path.endsWith(".json") &&
                 file.path != "worldsmith.json" && !file.path.startsWith("structures/") && !file.path.startsWith("assets/") && !file.path.startsWith("drawings/")) { "Invalid or reserved module document path" }
         }

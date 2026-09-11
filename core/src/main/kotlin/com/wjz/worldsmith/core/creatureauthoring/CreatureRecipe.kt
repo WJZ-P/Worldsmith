@@ -3,9 +3,12 @@ package com.wjz.worldsmith.core.creatureauthoring
 import com.wjz.worldsmith.core.content.*
 import com.wjz.worldsmith.core.validation.Diagnostic
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 
-/** Authoring input only. Compilation produces the existing creature runtime schema without extensions. */
+/** Authoring input only. Runtime schema 2 explicitly enables boss phases; ordinary schema-1 recipes stay unchanged. */
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
 data class CreatureRecipe(
     val id: String,
     val displayName: String,
@@ -21,6 +24,8 @@ data class CreatureRecipe(
     val bones: List<BoneRecipe>,
     val mirrors: List<MirrorRecipe> = emptyList(),
     val drops: List<CreatureDrop> = emptyList(),
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val boss: CreatureBossProfile? = null,
 )
 
 @Serializable

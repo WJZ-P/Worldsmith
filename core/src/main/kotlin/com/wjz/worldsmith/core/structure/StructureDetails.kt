@@ -67,6 +67,12 @@ import kotlinx.serialization.SerialName
     data class Sign(override val at:BuildPos, val front:List<String>, val back:List<String> = emptyList(), val color:String="black", val glowing:Boolean=false) : StructureInteraction
     @Serializable @SerialName("banner")
     data class Banner(override val at:BuildPos, val patterns:List<StructureBannerLayer>) : StructureInteraction
+    /** Repeatable landmark encounter. The immutable world scope is supplied only by native export. */
+    @Serializable @SerialName("boss_spawner")
+    data class BossSpawner @JvmOverloads constructor(
+        override val at:BuildPos, val creatureId:String, val respawnTicks:Int=2400,
+        val requiredPlayerRange:Int=16, val spawnRange:Int=4,
+    ) : StructureInteraction
 }
 @Serializable data class StructureItem(val slot:Int, val item:String, val count:Int=1)
 @Serializable data class StructureBannerLayer(val pattern:String, val color:String)

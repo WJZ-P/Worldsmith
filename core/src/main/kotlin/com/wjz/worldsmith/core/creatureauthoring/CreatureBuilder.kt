@@ -12,6 +12,7 @@ class CreatureBuilder private constructor(private val id: String, private val di
     private var behavior = CreatureBehavior()
     private var spawn = CreatureSpawn()
     private var drops:List<CreatureDrop> = emptyList()
+    private var boss:CreatureBossProfile? = null
     private val bones = linkedMapOf<String, BoneRecipe>()
     private val mirrors = mutableListOf<MirrorRecipe>()
 
@@ -31,6 +32,7 @@ class CreatureBuilder private constructor(private val id: String, private val di
         behavior(CreatureBehavior(passiveMode, territoryRadius, attackReach, windupTicks, recoveryTicks))
     fun spawn(value: CreatureSpawn) = apply { spawn = value }
     fun drops(value:List<CreatureDrop>) = apply { drops = value.toList() }
+    fun boss(value:CreatureBossProfile?) = apply { boss = value?.copy(phases = value.phases.toList()) }
     fun spawn(biomes: List<String>, weight: Int, minGroup: Int, maxGroup: Int, minLight: Int, maxLight: Int) =
         spawn(CreatureSpawn(biomes.toList(), weight, minGroup, maxGroup, minLight, maxLight))
 
@@ -47,9 +49,9 @@ class CreatureBuilder private constructor(private val id: String, private val di
         mirrors += MirrorRecipe(sourceRoot, targetRoot, shareUv)
     }
 
-    fun recipe() = CreatureRecipe(id, displayName, category, atlasWidth = atlasWidth, atlasHeight = atlasHeight,
+    fun recipe() = CreatureRecipe(id, displayName, category, schemaVersion = if(boss == null) 1 else 2, atlasWidth = atlasWidth, atlasHeight = atlasHeight,
         padding = padding, themeRole = themeRole, attributes = attributes, behavior = behavior,
-        spawn = spawn.copy(biomes = spawn.biomes.toList()), bones = bones.values.map { it.copy(cubes = it.cubes.toList()) }, mirrors = mirrors.toList(), drops=drops.toList())
+        spawn = spawn.copy(biomes = spawn.biomes.toList()), bones = bones.values.map { it.copy(cubes = it.cubes.toList()) }, mirrors = mirrors.toList(), drops=drops.toList(), boss=boss?.let {it.copy(phases=it.phases.toList())})
     fun build(textureSha256: String) = CreatureAuthoring.compile(recipe(), textureSha256)
     fun guide() = CreatureAuthoring.guide(recipe())
 

@@ -80,9 +80,12 @@ public final class WorldsmithContentValidationProvider implements DataProvider {
         require(registeredHosts == 128 && registeredItems == 128, "Expected 128 bounded block hosts and 128 block items");
         require(BuiltInRegistries.ENTITY_TYPE.getOptional(Identifier.parse(CreatureRuntime.PASSIVE_ID)).orElse(null) == CreatureRuntime.passiveType(), "Passive creature host missing");
         require(BuiltInRegistries.ENTITY_TYPE.getOptional(Identifier.parse(CreatureRuntime.HOSTILE_ID)).orElse(null) == CreatureRuntime.hostileType(), "Hostile creature host missing");
+        require(BuiltInRegistries.ENTITY_TYPE.getOptional(Identifier.parse(CreatureRuntime.ENCOUNTER_BOSS_ID)).orElse(null) == CreatureRuntime.encounterBossType(), "Landmark Boss host missing");
         require(CreatureRuntime.passiveType().getCategory() == MobCategory.CREATURE && CreatureRuntime.hostileType().getCategory() == MobCategory.MONSTER,
             "Creature hosts must preserve distinct native spawn-cap categories");
-        require(DefaultAttributes.hasSupplier(CreatureRuntime.passiveType()) && DefaultAttributes.hasSupplier(CreatureRuntime.hostileType()), "Creature native attribute suppliers missing");
+        require(CreatureRuntime.encounterBossType().getCategory() == MobCategory.MONSTER, "Landmark Boss host must retain hostile peaceful-mode behavior");
+        require(DefaultAttributes.hasSupplier(CreatureRuntime.passiveType()) && DefaultAttributes.hasSupplier(CreatureRuntime.hostileType())
+            && DefaultAttributes.hasSupplier(CreatureRuntime.encounterBossType()), "Creature native attribute suppliers missing");
 
         WorldsmithPack bundle = fixture();
         CompiledPack compiled = CompiledPack.scoped(bundle);
@@ -142,7 +145,7 @@ public final class WorldsmithContentValidationProvider implements DataProvider {
         report.addProperty("schemaVersion", 1); report.addProperty("probe", "native_fabric_datagen_content_runtime"); report.addProperty("passed", true);
         report.addProperty("minecraftVersion", SharedConstants.getCurrentVersion().name());
         report.addProperty("dataVersion", SharedConstants.getCurrentVersion().dataVersion().version());
-        report.addProperty("nativeBlockHosts", registeredHosts); report.addProperty("nativeBlockItems", registeredItems); report.addProperty("nativeCreatureHosts", 2);
+        report.addProperty("nativeBlockHosts", registeredHosts); report.addProperty("nativeBlockItems", registeredItems); report.addProperty("nativeCreatureHosts", 3);
         report.addProperty("nativeCreatureAttributeSuppliers", true); report.addProperty("logicalBlock", LOGICAL_BLOCK);
         report.addProperty("resolvedNativeBlock", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString()); report.addProperty("nativeLightEmission", state.getLightEmission());
         report.addProperty("nativeTemplateVoxels", 9); report.addProperty("nativeTemplateCompressedBytes", compressed.size()); report.addProperty("nativeTemplateReadback", true);

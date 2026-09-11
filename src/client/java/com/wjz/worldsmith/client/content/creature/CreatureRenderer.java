@@ -28,6 +28,7 @@ public final class CreatureRenderer extends MobRenderer<CreatureEntity, Creature
     public static void register() {
         EntityRenderers.register(CreatureRuntime.passiveType(), CreatureRenderer::new);
         EntityRenderers.register(CreatureRuntime.hostileType(), CreatureRenderer::new);
+        EntityRenderers.register(CreatureRuntime.encounterBossType(), CreatureRenderer::new);
     }
 
     @Override public CreatureRenderState createRenderState() { return new CreatureRenderState(); }
@@ -36,6 +37,7 @@ public final class CreatureRenderer extends MobRenderer<CreatureEntity, Creature
         super.extractRenderState(entity, state, partialTicks);
         state.definition = entity.definition(); state.bundleHash = entity.bundleHash();
         state.action = entity.action(); state.appearanceSeed = entity.appearanceSeed();
+        state.bossPhase = entity.bossPhase();
     }
 
     @Override public Identifier getTextureLocation(CreatureRenderState state) {

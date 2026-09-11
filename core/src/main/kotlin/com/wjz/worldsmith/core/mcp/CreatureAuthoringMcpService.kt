@@ -23,9 +23,9 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
         val str=McpJson.type("string");val obj=McpJson.type("object")
         return listOf(
             McpTool("worldsmith_get_creature_authoring_contract","Read creature construction and preview contract",
-                "Read the version-independent bone/cube builder recipe, mirroring, automatic UV layout and frozen preview flow. Does not add boss combat or execute Java source.",McpJson.schema(emptyMap(),emptyList()),true,handler={
+                "Read the version-independent bone/cube builder recipe, mirroring, automatic UV layout and frozen preview flow. Optional Boss profiles use the installed bounded phase system, never arbitrary Java tick code.",McpJson.schema(emptyMap(),emptyList()),true,handler={
                     val text=javaClass.classLoader.getResourceAsStream("prompts/contract/creature_authoring.system.md")?.bufferedReader()?.use {it.readText()} ?: error("Missing creature authoring contract")
-                    McpToolResult.success(buildJsonObject {put("contract",text);put("views",McpJson.encode(CreaturePreview.VIEWS));put("poses",McpJson.encode(CreaturePose.POSES));put("runtimeSchema",1)})
+                    McpToolResult.success(buildJsonObject {put("contract",text);put("views",McpJson.encode(CreaturePreview.VIEWS));put("poses",McpJson.encode(CreaturePose.POSES));put("runtimeSchemas",McpJson.encode(listOf(1,2)))})
                 }),
             McpTool("worldsmith_build_creature","Build a frozen creature model candidate",
                 "Compile a CreatureRecipe: named bones/cubes, mirrored limbs and automatic box UVs. Optional textureAsset must already be attached to the session. Without it the output is a diagnostic UV guide, not a final skin. Saves an immutable build artifact, but never changes content drafts or activates a world.",
@@ -37,7 +37,7 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
                 }),
             McpTool("worldsmith_preview_creature","Render an actual textured model or UV layout",
                 "Offline z-buffer rendering of the frozen model and verified PNG, with the same procedural pose evaluator as the native renderer. mode=model|sheet|uv; model views isometric/isometric_back/front/back/left/right/top; poses idle/walk/windup/strike/recovery. A model image is not a Minecraft screenshot or gameplay acceptance.",
-                McpJson.schema(mapOf("sessionId" to str,"buildId" to str,"mode" to str,"view" to str,"pose" to str),listOf("sessionId","buildId")),true,handler=::preview),
+                McpJson.schema(mapOf("sessionId" to str,"buildId" to str,"mode" to str,"view" to str,"pose" to str,"bossPhase" to McpJson.type("integer")),listOf("sessionId","buildId")),true,handler=::preview),
         )
     }
     private fun session(a:JsonObject)=requireNotNull(sessions.find(McpJson.string(a,"sessionId"))) {"Unknown session; begin or resume a world draft"}
@@ -78,21 +78,24 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
     private fun preview(a:JsonObject):McpToolResult {
         val sid=session(a).id;val id=McpJson.string(a,"buildId");val record=read(sid,id)
         val png=readTexture(sid,id,record);val mode=a["mode"]?.jsonPrimitive?.content ?: "model"
+        val bossPhase=a["bossPhase"]?.jsonPrimitive?.int ?: 0
+        require(bossPhase in 0 until (record.definition.boss?.phases?.size ?: 1)) {"bossPhase must select an existing Boss phase; ordinary creatures only have phase 0"}
         val rendered=when(mode) {
-            "model"->CreaturePreview.png(record.definition,png,a["view"]?.jsonPrimitive?.content ?: "isometric",a["pose"]?.jsonPrimitive?.content ?: "idle")
-            "sheet"->CreaturePreview.sheet(record.definition,png)
+            "model"->CreaturePreview.png(record.definition,png,CreaturePreview.Options.defaults(a["view"]?.jsonPrimitive?.content ?: "isometric",a["pose"]?.jsonPrimitive?.content ?: "idle").withBossPhase(bossPhase))
+            "sheet"->CreaturePreview.sheet(record.definition,png,bossPhase)
             "uv"->CreaturePreview.uvDebug(record.definition,png)
             else->error("Preview mode must be model, sheet or uv")
         }
         return McpToolResult.success(buildJsonObject {
             put("sessionId",sid);put("buildId",id);put("mode",mode);put("textureGuideOnly",record.textureGuideOnly)
+            put("bossPhase",bossPhase)
             put("offlineModelPreview",true);put("minecraftScreenshot",false);put("worldActivated",false)
         },images=listOf(McpImage(Base64.getEncoder().encodeToString(rendered))))
     }
     private fun payload(sid:String,id:String,record:BuildRecord)=buildJsonObject {
         put("sessionId",sid);put("buildId",id);put("recipe",McpJson.encode(record.recipe));put("definition",McpJson.encode(record.definition))
         put("uvLayout",McpJson.encode(record.uvLayout));put("texture",McpJson.encode(record.texture));put("textureGuideOnly",record.textureGuideOnly)
-        put("readyForContentDraft",!record.textureGuideOnly);put("runtimeSchema",1);put("worldActivated",false)
+        put("readyForContentDraft",!record.textureGuideOnly);put("runtimeSchema",if(record.definition.boss==null)1 else 2);put("worldActivated",false)
         put("publication",if(record.textureGuideOnly)"Paint the guide and attach the real PNG; rebuild with textureAsset. Guide textures are not auto-attached to world content." else "Merge this definition into the session CreatureLibrary using put_content_modules at the current revision; do not replace other species accidentally.")
     }
     private fun read(sid:String,id:String):BuildRecord {

@@ -24,6 +24,8 @@ object StructureValidator {
     @JvmStatic
     fun validate(library: StructureLibrary, biomes: BiomePlan): List<Diagnostic> = buildList {
         if(library.schemaVersion !in 1..2)add(error("schemaVersion","UNSUPPORTED_SCHEMA","Structure library schema must be 1 or 2"))
+        if(library.schemaVersion!=2 && library.structures.any { s -> (listOf(s.blueprint)+s.assembly?.pieces.orEmpty().values).any { b -> b.interactions.any { it is StructureInteraction.BossSpawner } } })
+            add(error("schemaVersion","BOSS_SPAWNER_SCHEMA_REQUIRED","Boss spawners require explicit structure library schema 2"))
         if(library.structures.size>MAX_STRUCTURES){add(error("structures","TOO_MANY_STRUCTURES","At most $MAX_STRUCTURES structure definitions per pack"));return@buildList}
         val catalog=try {StructureCatalogCompiler.compile(library)}catch(failure:StructureBuildException){add(failure.diagnostic);null}
         if(catalog!=null)addAll(catalog.templates.flatMap {(id,variants)->variants.flatMapIndexed {i,g->g.diagnostics.map {it.copy(path="blueprints.$id.variants[$i].${it.path}")}}})

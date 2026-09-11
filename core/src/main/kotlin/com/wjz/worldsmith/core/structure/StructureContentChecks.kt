@@ -44,6 +44,14 @@ internal object StructureContentChecks {
                     error(path,"INVALID_SIGN_TEXT","Each side has at most four literal text lines of 160 characters; choose a dye color")
                 is StructureInteraction.Banner -> if(entry.patterns.size>16||entry.patterns.any { !resource(it.pattern)||it.color !in colors })
                     error(path,"INVALID_BANNER_PATTERN","Use at most 16 namespaced patterns with dye colors")
+                is StructureInteraction.BossSpawner -> {
+                    if(!entry.creatureId.matches(Regex("[a-z0-9][a-z0-9_./-]{0,95}")) || entry.creatureId.split('/').any { it=="." || it==".." })
+                        error("$path.creatureId","INVALID_BOSS_SPAWNER","Use a normalized logical Boss creature id, never a native host id")
+                    if(entry.respawnTicks !in 200..30000 || entry.requiredPlayerRange !in 8..32 || entry.spawnRange !in 1..8)
+                        error(path,"INVALID_BOSS_SPAWNER","Use respawnTicks 200..30000, requiredPlayerRange 8..32, spawnRange 1..8")
+                    if(voxel?.material?.block!="minecraft:spawner")
+                        error(path,"BOSS_SPAWNER_BLOCK_REQUIRED","A Boss encounter must target a surviving minecraft:spawner block",entry.at)
+                }
             }
         }
     }

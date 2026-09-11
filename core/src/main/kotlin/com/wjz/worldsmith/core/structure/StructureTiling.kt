@@ -22,7 +22,7 @@ object StructureTiling {
             val interactions=g.interactions.withIndex().filter { inside(it.value.at) }
             StructureTile(offset,g.copy(size=size,origin=BuildPos(0,0,0),voxels=cells.map {it.copy(position=local(it.position))},
                 keepClear=g.keepClear.mapNotNull(::clip),protectedAreas=g.protectedAreas.mapNotNull(::clip),
-                interactions=interactions.map { (_,v)->when(v) {is StructureInteraction.Container->v.copy(at=local(v.at));is StructureInteraction.Sign->v.copy(at=local(v.at));is StructureInteraction.Banner->v.copy(at=local(v.at))} },
+                interactions=interactions.map { (_,v)->when(v) {is StructureInteraction.Container->v.copy(at=local(v.at));is StructureInteraction.Sign->v.copy(at=local(v.at));is StructureInteraction.Banner->v.copy(at=local(v.at));is StructureInteraction.BossSpawner->v.copy(at=local(v.at))} },
                 interactionIds=interactions.map {it.index},anchors=g.anchors.filterValues(::inside).mapValues { local(it.value) },lighting=null,ports=emptyList(),reachableFeet=emptyList(),storageFragment=true))
         }
     }

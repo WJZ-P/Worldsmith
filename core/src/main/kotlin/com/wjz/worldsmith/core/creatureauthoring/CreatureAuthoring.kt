@@ -40,15 +40,16 @@ object CreatureAuthoring {
     private fun definition(recipe: CreatureRecipe, rig: Rig, texture: String): CreatureDefinition {
         val result = CreatureDefinition(recipe.id, recipe.displayName, recipe.category,
             CreatureModel(texture, recipe.atlasWidth, recipe.atlasHeight, rig.bones), recipe.attributes, recipe.behavior,
-            recipe.spawn.copy(biomes = recipe.spawn.biomes.toList()), recipe.themeRole,recipe.drops.toList())
-        val library = CreatureLibrary(creatures = listOf(result))
+            recipe.spawn.copy(biomes = recipe.spawn.biomes.toList()), recipe.themeRole,recipe.drops.toList(),recipe.boss)
+        val library = CreatureLibrary(schemaVersion=recipe.schemaVersion,creatures = listOf(result))
         val errors = CustomCreatureValidator.validate(library)
         require(errors.isEmpty()) { errors.take(16).joinToString("; ") { "${it.path}: ${it.message}" } }
         return CustomCreatureValidator.freeze(library).creatures.single()
     }
 
     private fun rig(recipe: CreatureRecipe): Rig {
-        require(recipe.schemaVersion == 1) { "Creature authoring recipe schema must be 1" }
+        require(recipe.schemaVersion in 1..2) { "Creature authoring recipe schema must be 1 or 2" }
+        require(recipe.boss == null || recipe.schemaVersion == 2) { "Boss authoring requires explicit recipe schemaVersion 2" }
         require(listOf(recipe.atlasWidth, recipe.atlasHeight).all { it in 16..512 && it.countOneBits() == 1 }) { "Atlas dimensions must be powers of two, 16..512" }
         require(recipe.padding in 0..8 && recipe.mirrors.size <= 32) { "Use padding 0..8 and at most 32 mirror operations" }
         val bones = recipe.bones.map { it.copy(cubes = it.cubes.toList()) }.toMutableList()

@@ -46,6 +46,14 @@ public final class AuthoringContext {
     public AuthoringContext component(String id,Box region){named(id);components.put(id,region);return this;}
     public AuthoringContext container(Vec3i at,BlockStateRef state,List<Item> items){canvas().pen(Brush.solid(state)).set(at.x(),at.y(),at.z());interactions.add(Map.of("kind","container","at",AuthoredStructure.point(at),"items",items.stream().map(i->Map.of("slot",i.slot(),"item",i.item(),"count",i.count())).toList()));return this;}
     public record Item(int slot,String item,int count){}
+    /** Place a typed, repeatable Boss encounter; no entity NBT or executable commands are accepted. */
+    public AuthoringContext bossSpawner(Vec3i at,String creatureId){return bossSpawner(at,creatureId,2400,16,4);}
+    public AuthoringContext bossSpawner(Vec3i at,String creatureId,int respawnTicks,int requiredPlayerRange,int spawnRange){
+        if(creatureId==null || !creatureId.matches("[a-z0-9][a-z0-9_./-]{0,95}") || Arrays.stream(creatureId.split("/",-1)).anyMatch(p->p.equals(".")||p.equals("..")))throw new IllegalArgumentException("A normalized logical Boss creature id is required");
+        if(respawnTicks<200||respawnTicks>30000||requiredPlayerRange<8||requiredPlayerRange>32||spawnRange<1||spawnRange>8)throw new IllegalArgumentException("Boss spawner limits: respawnTicks 200..30000, player range 8..32, spawn range 1..8");
+        canvas().pen(Brush.solid(BlockStateRef.parse("minecraft:spawner"))).set(at.x(),at.y(),at.z());
+        interactions.add(Map.of("kind","boss_spawner","at",AuthoredStructure.point(at),"creatureId",creatureId,"respawnTicks",respawnTicks,"requiredPlayerRange",requiredPlayerRange,"spawnRange",spawnRange));return this;
+    }
     /** Paste a reusable component, prefix identifiers and transform every semantic marker with it. */
     public AuthoringContext instance(String id,AuthoredStructure child,GridTransform transform){
         named(id);canvas().pen("air").paste(child.drawing(),transform,true);

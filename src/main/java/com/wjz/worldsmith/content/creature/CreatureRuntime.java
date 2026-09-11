@@ -4,10 +4,13 @@ import com.wjz.worldsmith.core.content.*;
 import com.wjz.worldsmith.content.WorldBlockBindings;
 import com.wjz.worldsmith.content.WorldRewardItems;
 import com.wjz.worldsmith.content.item.CustomItemRuntime;
+import com.wjz.worldsmith.core.validation.Diagnostic;
+import com.wjz.worldsmith.core.validation.DiagnosticSeverity;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -16,19 +19,25 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.ai.attributes.Attribute;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.attributes.RangedAttribute;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.AABB;
 
 /** Static native hosts plus explicit, immutable, per-world logical bindings. No global draft activation. */
 public final class CreatureRuntime {
     public static final String PASSIVE_ID = "worldsmith:content/creature/passive";
     public static final String HOSTILE_ID = "worldsmith:content/creature/hostile";
+    public static final String ENCOUNTER_BOSS_ID = "worldsmith:content/creature/encounter_boss";
     private static final Map<ServerLevel, Snapshot> WORLDS = new ConcurrentHashMap<>();
     private static volatile Snapshot clientSnapshot;
     private static EntityType<CreatureEntity> passive;
     private static EntityType<HostileCreatureEntity> hostile;
+    private static EntityType<EncounterBossCreatureEntity> encounterBoss;
 
     private CreatureRuntime() {}
 
@@ -36,20 +45,35 @@ public final class CreatureRuntime {
         if (passive != null) return;
         var passiveKey = ResourceKey.create(Registries.ENTITY_TYPE, Identifier.parse(PASSIVE_ID));
         var hostileKey = ResourceKey.create(Registries.ENTITY_TYPE, Identifier.parse(HOSTILE_ID));
+        var encounterKey = ResourceKey.create(Registries.ENTITY_TYPE, Identifier.parse(ENCOUNTER_BOSS_ID));
         passive = Registry.register(BuiltInRegistries.ENTITY_TYPE, passiveKey,
             EntityType.Builder.of(CreatureEntity::new, MobCategory.CREATURE).sized(0.8F, 1.4F)
                 .clientTrackingRange(10).updateInterval(2).noLootTable().build(passiveKey));
         hostile = Registry.register(BuiltInRegistries.ENTITY_TYPE, hostileKey,
             EntityType.Builder.of(HostileCreatureEntity::new, MobCategory.MONSTER).sized(0.8F, 1.4F)
                 .clientTrackingRange(10).updateInterval(2).noLootTable().notInPeaceful().build(hostileKey));
+        encounterBoss = Registry.register(BuiltInRegistries.ENTITY_TYPE, encounterKey,
+            EntityType.Builder.of(EncounterBossCreatureEntity::new, MobCategory.MONSTER).sized(0.8F, 1.4F)
+                .clientTrackingRange(10).updateInterval(2).noLootTable().notInPeaceful().build(encounterKey));
         FabricDefaultAttributeRegistry.register(passive, CreatureEntity.createAttributes());
         FabricDefaultAttributeRegistry.register(hostile, CreatureEntity.createAttributes());
+        FabricDefaultAttributeRegistry.register(encounterBoss, CreatureEntity.createAttributes());
         SpawnPlacements.register(passive, SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, CreatureRuntime::checkSpawn);
         SpawnPlacements.register(hostile, SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, CreatureRuntime::checkSpawn);
+        // Only our typed spawner's explicit CustomSpawnRules may create this host; no natural selection.
+        SpawnPlacements.register(encounterBoss, SpawnPlacementTypes.ON_GROUND, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+            (type, level, reason, pos, random) -> false);
     }
 
     public static EntityType<CreatureEntity> passiveType() { return Objects.requireNonNull(passive, "CreatureRuntime.register must run during bootstrap"); }
     public static EntityType<HostileCreatureEntity> hostileType() { return Objects.requireNonNull(hostile, "CreatureRuntime.register must run during bootstrap"); }
+    public static EntityType<EncounterBossCreatureEntity> encounterBossType() { return Objects.requireNonNull(encounterBoss, "CreatureRuntime.register must run during bootstrap"); }
+
+    /** Existing natural/creative hosts remain valid; the separate encounter host is Boss-only. */
+    public static boolean matchesHost(EntityType<?> type, CreatureDefinition definition) {
+        return definition.getCategory() == CreatureCategory.HOSTILE
+            ? type == hostile || type == encounterBoss && definition.getBoss() != null : type == passive;
+    }
 
     public static Snapshot prepare(String bundleHash, CreatureLibrary library) { return prepare(bundleHash, library, Map.of()); }
 
@@ -67,10 +91,54 @@ public final class CreatureRuntime {
         if (!diagnostics.isEmpty()) throw new IllegalArgumentException("Invalid creature library: " + diagnostics);
         // Detach and freeze every authoring collection, including Java-visible nested lists.
         var frozen = CustomCreatureValidator.freeze(library);
+        var nativeDiagnostics = nativeAttributeDiagnostics(frozen);
+        if (!nativeDiagnostics.isEmpty()) throw new IllegalArgumentException("Creature attributes exceed native runtime limits: " + nativeDiagnostics);
         var definitions = new LinkedHashMap<String, CreatureDefinition>();
         frozen.getCreatures().forEach(d -> definitions.put(d.getId(), d));
         biomeBindings.values().forEach(Identifier::parse);
         return new Snapshot(bundleHash, definitions, biomeBindings, items, blocks);
+    }
+
+    /**
+     * Keep versioned Core documents intact, but reject values that this actual game version would silently
+     * sanitize. This deliberately runs before any snapshot is published or native entity is initialized.
+     * Width/height are EntityDimensions, not native attributes, and retain their existing Core validation.
+     */
+    static List<Diagnostic> nativeAttributeDiagnostics(CreatureLibrary library) {
+        var diagnostics = new ArrayList<Diagnostic>();
+        for (int index = 0; index < library.getCreatures().size(); index++) {
+            var definition = library.getCreatures().get(index);
+            String path = "creatures.creatures[" + index + "]";
+            var attributes = definition.getAttributes();
+            checkNativeAttribute(diagnostics, definition.getId(), path + ".attributes.health", Attributes.MAX_HEALTH, attributes.getHealth());
+            checkNativeAttribute(diagnostics, definition.getId(), path + ".attributes.speed", Attributes.MOVEMENT_SPEED, attributes.getSpeed());
+            checkNativeAttribute(diagnostics, definition.getId(), path + ".attributes.followRange", Attributes.FOLLOW_RANGE, attributes.getFollowRange());
+            checkNativeAttribute(diagnostics, definition.getId(), path + ".attributes.attackDamage", Attributes.ATTACK_DAMAGE, attributes.getAttackDamage());
+            checkNativeAttribute(diagnostics, definition.getId(), path + ".attributes.knockbackResistance", Attributes.KNOCKBACK_RESISTANCE, attributes.getKnockbackResistance());
+            var boss = definition.getBoss();
+            if (boss == null) continue;
+            for (int phaseIndex = 0; phaseIndex < boss.getPhases().size(); phaseIndex++) {
+                var phase = boss.getPhases().get(phaseIndex);
+                String phasePath = path + ".boss.phases[" + phaseIndex + "]";
+                checkNativeAttribute(diagnostics, definition.getId(), phasePath + ".speedMultiplier", Attributes.MOVEMENT_SPEED,
+                    attributes.getSpeed() * phase.getSpeedMultiplier());
+                checkNativeAttribute(diagnostics, definition.getId(), phasePath + ".damageMultiplier", Attributes.ATTACK_DAMAGE,
+                    attributes.getAttackDamage() * phase.getDamageMultiplier());
+            }
+        }
+        return List.copyOf(diagnostics);
+    }
+
+    private static void checkNativeAttribute(List<Diagnostic> diagnostics, String creatureId, String path,
+                                            Holder<Attribute> holder, double requested) {
+        Attribute attribute = holder.value();
+        double sanitized = attribute.sanitizeValue(requested);
+        if (Double.isFinite(requested) && Double.compare(requested, sanitized) == 0) return;
+        String bounds = attribute instanceof RangedAttribute ranged
+            ? " (native range " + ranged.getMinValue() + ".." + ranged.getMaxValue() + ")" : "";
+        diagnostics.add(new Diagnostic(path, "creature.native_attribute_out_of_range", DiagnosticSeverity.ERROR,
+            "Creature '" + creatureId + "' requests " + requested + " for " + BuiltInRegistries.ATTRIBUTE.getKey(attribute)
+                + ", but this game version sanitizes it to " + sanitized + bounds + "; correct the authored value before publication"));
     }
 
     public static void bind(ServerLevel level, Snapshot snapshot) {
@@ -104,6 +172,17 @@ public final class CreatureRuntime {
     }
 
     static CreatureCategory category(EntityType<?> type) { return type.getCategory() == MobCategory.MONSTER ? CreatureCategory.HOSTILE : CreatureCategory.PASSIVE; }
+
+    /** Rare, repeatable natural encounters. Only loaded live entities participate; this is not a unique-world ledger. */
+    static boolean allowNaturalBoss(ServerLevel level, Snapshot snapshot, CreatureDefinition definition, BlockPos pos, RandomSource random) {
+        var boss=definition.getBoss();
+        if(boss==null)return true;
+        if(WORLDS.get(level)!=snapshot || random.nextDouble()>=boss.getNaturalSpawnChance())return false;
+        double spacing=boss.getNaturalSpacingBlocks();
+        return level.getEntitiesOfClass(CreatureEntity.class,new AABB(pos).inflate(spacing),other -> other.isAlive()
+            && snapshot.bundleHash().equals(other.bundleHash()) && definition.getId().equals(other.creatureId())
+            && other.distanceToSqr(pos.getX()+.5,pos.getY(),pos.getZ()+.5)<spacing*spacing).isEmpty();
+    }
 
     /** Common host entries have category-level group bounds; selection keeps an actual group one species. */
     public static List<SpawnEntry> perBiomeSpawnEntries(Snapshot snapshot, String nativeBiome) {

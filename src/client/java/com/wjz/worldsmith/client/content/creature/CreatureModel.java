@@ -65,8 +65,10 @@ public final class CreatureModel extends EntityModel<CreatureRenderState> {
 
     @Override public void setupAnim(CreatureRenderState state) {
         super.setupAnim(state);
-        var frame = new CreaturePose.Frame(state.ageInTicks, state.walkAnimationPos, state.walkAnimationSpeed,
-            state.yRot, state.xRot, state.appearanceSeed, state.action);
+        int phase=state.definition==null || state.definition.getBoss()==null ? 0
+            : Math.max(0,Math.min(state.bossPhase,state.definition.getBoss().getPhases().size()-1));
+        var frame = CreaturePose.withBossPhase(new CreaturePose.Frame(state.ageInTicks, state.walkAnimationPos, state.walkAnimationSpeed,
+            state.yRot, state.xRot, state.appearanceSeed, state.action),state.definition,phase);
         for (var entry : animated) {
             var rotation = CreaturePose.rotation(entry.bone(), frame);
             var part = entry.part(); part.xRot = rotation.x(); part.yRot = rotation.y(); part.zRot = rotation.z();

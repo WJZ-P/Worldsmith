@@ -8,4 +8,5 @@ public final class CreatureRenderState extends LivingEntityRenderState {
     public String bundleHash = "";
     public long appearanceSeed;
     public int action;
+    public int bossPhase;
 }

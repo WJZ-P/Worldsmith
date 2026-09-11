@@ -1,8 +1,10 @@
 # Creature authoring foundation
 
-The creature authoring layer compiles data into the existing runtime schema 1.
-It is not a boss encounter designer, a Java execution tool, or a new gameplay schema.
-A creature may look like a boss while still using the existing grounded behavior host.
+The creature authoring layer compiles data into runtime schema 1 or 2. Ordinary
+recipes default to schema 1; explicit schema 2 adds the installed bounded Boss
+profile and 2..3 melee phases. A Boss-looking model alone remains ordinary behavior.
+Recipes are data, not Java tick code or an arbitrary gameplay interpreter. World
+placement is a separate natural habitat or typed structure encounter declaration.
 
 ## Workflow
 
@@ -20,7 +22,9 @@ A creature may look like a boss while still using the existing grounded behavior
    exactly match atlasWidth/atlasHeight. Changing the recipe rebuilds UVs, so recheck the
    skin when sizes, cube IDs, or packing change.
 7. Merge the returned definition into the current `CreatureLibrary` using
-   `worldsmith_put_content_modules` at expectedRevision. Preserve other species.
+   `worldsmith_put_content_modules` at expectedRevision. Preserve other species;
+   if `runtimeSchema=2`, use CreatureLibrary.schemaVersion=2 rather than putting a
+   Boss profile into a schema-1 envelope.
 8. Publish with the normal whole-bundle write/finish flow. A build artifact is not
    an active world or an automatically committed creature draft.
 
@@ -54,10 +58,19 @@ or painted asset is silently overwritten or evicted.
 }
 ```
 
-Optional `attributes`, `behavior`, `spawn`, and `drops` are exactly the fields from the
-creature runtime contract; they do not become new behavior scripts. Defaults are
+Optional `attributes`, `behavior`, `spawn`, `drops`, and `boss` are exactly the fields
+from the creature runtime contract; they do not become new behavior scripts. A
+non-null `boss` requires explicit recipe.schemaVersion=2; keep it and its drops when
+rebuilding a textured model. Defaults are
 provided by the current runtime DTOs. The illustrated model is a field-shape example,
 not a complete art-directed creature.
+
+Read `worldsmith_get_content_contract(module:"creatures")` for the exact
+CreatureBossProfile grammar, health thresholds, native attribute bounds, habitat
+rules and a two-phase example. Authoring validates the profile; it does not invent
+phases from the name or increase the number of supported mechanics. Schema-2 Boss
+publication requires bundle format 5. A landmark can use the drawing contract's
+`boss-encounters` section after the actual Boss definition exists.
 
 - Bone: `id`, optional `parent`, `pivot`, `rotation`, `role`, `gaitPhase`, `cubes`.
 - Cube: `id`, `origin`, integer `size`, optional `materialRole` and `mirror`.
@@ -74,13 +87,21 @@ not a complete art-directed creature.
 
 ## Preview
 
-`worldsmith_preview_creature(sessionId,buildId,mode?,view?,pose?)`
+`worldsmith_preview_creature(sessionId,buildId,mode?,view?,pose?,bossPhase?)`
 
 - `mode=model` (default): one actual textured model image.
 - `mode=sheet`: multiple views and procedural poses for side-by-side inspection.
 - `mode=uv`: the real PNG with UV coverage/debug overlay.
 - Views: `isometric`, `isometric_back`, `front`, `back`, `left`, `right`, `top`.
 - Poses: `idle`, `walk`, `windup`, `strike`, `recovery`.
+- `bossPhase`: zero-based phase index, default 0. A two-phase Boss permits 0/1;
+  a three-phase Boss permits 0/1/2; an ordinary creature permits only 0.
+  Model/sheet views render that phase's poseIntensity through the shared native
+  pose evaluator; UV mode still shows the atlas rather than a combat state.
+
+Example: `worldsmith_preview_creature(sessionId,buildId,mode:"sheet",bossPhase:1)`.
+The field is exactly `bossPhase`, not `previewBossPhase`. Compare every phase and
+use matching views; the camera bounds include all authored phases for stable framing.
 
 Native rendering and offline preview use the same pure pose evaluator. Preview is
 bounded software rasterization with box UVs and visibility, not a native light engine
@@ -90,6 +111,7 @@ or proof that navigation, combat or encounter pacing is good.
 
 `CreatureBuilder.create(id,displayName,category)` creates a mutable authoring builder.
 Use `.atlas(width,height,padding)`, `.bone(...).cube(...).end()`, `.mirrorSubtree(...)`,
-then `.recipe()`, `.guide()` or `.build(textureSha256)`. The result remains ordinary
-runtime data. The optional local CLI/sample is for developers; MCP requires no local
+optional `.boss(CreatureBossProfile)` (automatically selects recipe schema 2), then
+`.recipe()`, `.guide()` or `.build(textureSha256)`. The result remains typed runtime
+data. The optional local CLI/sample is for developers; MCP requires no local
 Java compilation by its caller and never executes a recipe's text as code.

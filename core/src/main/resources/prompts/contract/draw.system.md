@@ -47,10 +47,12 @@ not an agent runner: this reference tool does not execute source code.
   Tiles share the building's fitted transform/datum; roads join authored entrances.
   Oversize output still supports model preview and `worldsmith_export_drawing`
   (native NBT returned as an MCP embedded resource), but deployment reports limits.
-- Format 3 world bundles contain structure-module schema 2 palette/RLE/gzip frozen drawings, source provenance and
+- Current format-5 world bundles contain structure-module schema 2 palette/RLE/gzip frozen drawings, source provenance and
   compiler/SDK/target-data-version metadata; hashes cover these plus structure policy.
   Loaders and chunk generation consume data ONLY. Neither published source nor
-  resumed unfinished source is executed automatically. Format 1 remains readable.
+  resumed unfinished source is executed automatically. Legacy world bundles 3/4
+  remain readable with their older semantics; world bundle formats 1/2 are rejected.
+  Manual structure-module schema 1 remains supported; it is not a world bundle version.
 - `worldsmith_list_sessions` and `worldsmith_resume_session` recover saved plans,
   source/job references and drafts; incomplete jobs become INTERRUPTED. Capacity and
   corrupt-record diagnostics are explicit, with files retained. Old drawing revisions
@@ -68,8 +70,10 @@ All shapes clip to the canvas and the painter's optional clip window.
 
 `BlockStateRef.of("stone_brick_stairs").with("facing","north").with("half","bottom")`
 stores a symbolic state. Core checks syntax; native export checks actual registry values.
-Empty chests/signs can be drawn as blocks, but this SDK release does not author entity or
-block-entity content. Existing typed-interaction tools remain separate.
+Plain DrawStructure stores voxels, not arbitrary entity/block-entity NBT. Use the
+StructureProgram/AuthoringContext helpers below for geometry-linked typed container
+and BossSpawner metadata, or the manual blueprint.interactions route. Do not expect
+an empty spawner block alone to know a world-scoped creature definition.
 
 ## Mistakes that cost whole rebuilds
 
@@ -264,7 +268,10 @@ exposes seed(), parameters(), random(streamName), canvas(bounds), origin(positio
 material(name,state), room(id,interior,floor), indoorPassage(id,interior,floor),
 entrance(id,feet,facing,floor,headroom), lightFixture(id,at,state,level), support(at),
 protect(region), component(id,region), instance(id,authoredComponent,transform),
-container(at,state,items) and snapshot(). Item is AuthoringContext.Item(slot,item,count).
+container(at,state,items), bossSpawner(at,creatureId),
+bossSpawner(at,creatureId,respawnTicks,requiredPlayerRange,spawnRange) and snapshot().
+Item is AuthoringContext.Item(slot,item,count). Read section boss-encounters for the
+spawner's exact bounds, world binding and arena-clearance responsibilities.
 
 room and indoorPassage author AIR throughout the interior and floor below it. Their
 occupied-space declaration is the floor plane of THAT storey, not furniture tops;
@@ -321,3 +328,79 @@ cache hits. It does not estimate model reasoning time. Compilation cache is boun
 Only rebuildable caches are evicted. worldsmith_archive_session archives terminal jobs
 and the session to release capacity, preserving sources and frozen results. Resume
 restores data, not code execution. Finish/cancel active jobs before archiving.
+
+## Boss encounters
+
+For a real repeatable landmark Boss, use `StructureProgram` from
+`com.wjz.worldsmith.authoring`, whose `generate(AuthoringContext a)` returns an
+`AuthoredStructure`. After creating its canvas, either exact Java overload works:
+
+```java
+a.bossSpawner(new Vec3i(0, 2, 0), "observatory_warden");
+// Or, at the same chosen position, use the configurable overload instead:
+a.bossSpawner(new Vec3i(0, 2, 0), "observatory_warden", 2400, 16, 4);
+```
+
+Use ONE call per position, not both example lines. The helper writes the surviving
+`minecraft:spawner` block and typed interaction together; later geometry must not
+erase it. Its arguments are:
+
+| Argument | Meaning | Default | Inclusive range |
+| --- | --- | --- | --- |
+| at | original drawing-space Vec3i | required | inside the canvas |
+| creatureId | this world's logical hostile Boss id | required | valid creature id, not a native entity id |
+| respawnTicks | fixed interval between later spawn cycles | 2400 | 200..30000 ticks |
+| requiredPlayerRange | nearby-player activation distance | 16 | 8..32 blocks |
+| spawnRange | native horizontal spawn-attempt range | 4 | 1..8 blocks |
+
+The corresponding manual blueprint interaction is exactly:
+
+```json
+{"kind":"boss_spawner","at":{"x":0,"y":2,"z":0},"creatureId":"observatory_warden","respawnTicks":2400,"requiredPlayerRange":16,"spawnRange":4}
+```
+
+The last three fields are optional with the defaults above. Manual authors must
+place the actual spawner block at `at`; StructureProgram authors submit the frozen
+`blueprint.authored.variants` result without duplicating its semantic fields.
+Component instances, normalization and storage tiling transform `at` with geometry.
+The logical `creatureId` is preserved, not renamed by a component's id prefix.
+
+This requires bundle format 5, structure library schema 2, and creature library
+schema 2 containing that `category:"HOSTILE"` definition with a valid `boss` profile.
+Read `worldsmith_get_content_contract(module:"creatures")` and
+`worldsmith_get_creature_authoring_contract` for its rig, PNG and 2..3 phases.
+Normal session structure assembly derives schema 2 from typed content; an explicit
+inline library must declare schemaVersion 2. World scope and native host identity
+come from the immutable bundle at native export. Authors supply no entity NBT,
+commands, arbitrary spawn payload or script.
+
+**Arena clearance is authored geometry, not an automatic spawner feature.** Use
+`a.room`/`a.indoorPassage` or explicit AIR and solid floor for the standing/movement
+area, with lighting and a real player route. Size horizontal margins and headroom
+for the Boss's actual attributes.width/height throughout the spawn-attempt area,
+not merely the small spawner cube or default host body. Furniture, walls, ceiling,
+water, the spawner itself, and KEEP can obstruct a large body; room declarations
+alone do not prove a valid Boss navigation route. Inspect floor/cutaway previews
+and leave enough clear space outside the solid spawner block for spawn attempts.
+
+Native export binds and reads back the typed spawner using the target game's codecs.
+It attempts one Boss per cycle, initially after a short 20-tick delay while active,
+then the configured interval. A dedicated encounter host has a local same-class cap
+of one within the vanilla spawner's spawnRange neighborhood. Ordinary guards and
+natural-Boss hosts do not occupy that class cap. A Boss moving outside it allows a
+later spawn: this is repeatable local throttling, not world uniqueness or a one-time
+quest event. It does not apply naturalSpawnChance/naturalSpacingBlocks or natural
+biome/light selection; peaceful mode, loading, nearby players, world bounds and
+actual initialized-body collision/obstruction still govern successful spawning.
+Different spawners can have overlapping local caps; do not promise independent or
+globally exclusive encounters from this setting.
+
+Core checks typed fields, a surviving spawner block, module/creature references and
+compiled-plan coverage. A positive placement/region route is required to count as
+an obtainable encounter in complete-world coverage. Link structure -> creature with
+`contains_encounter`, and an actual quest -> creature with `kill_objective` when
+promised by the design. Read progress after write failures and repair its named path.
+Native bundle export/readback, source-job success, offline Boss phase images and a
+saved pack are separate receipts; none alone proves an in-world spawn or a playable
+fight. `worldsmith_finish_world` reports native activation separately. A standalone
+raw drawing has no world creature snapshot and does not publish this encounter.

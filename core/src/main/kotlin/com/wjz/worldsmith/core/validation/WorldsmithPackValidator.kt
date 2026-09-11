@@ -36,6 +36,8 @@ object WorldsmithPackValidator {
         }
         if (manifest.formatVersion < 5 && pack.quests.quests.isNotEmpty())
             add(error("quests", "QUESTS_REQUIRE_FORMAT5", "Formats 3/4 contain no quest gameplay; freeze the main line as format 5"))
+        if (manifest.formatVersion < 5 && pack.creatures.creatures.any { it.boss != null })
+            add(error("creatures", "BOSS_REQUIRES_FORMAT5", "Boss behavior requires format 5 and explicit creature module schema 2"))
 
         val contentPlan = ExistingWorldContentModules.registry().plan(ExistingWorldContentModules.input(pack))
         addAll(contentPlan.diagnostics)
@@ -92,6 +94,15 @@ object WorldsmithPackValidator {
             val blueprints = listOf(structure.blueprint to "structures.structures[$i].blueprint") +
                 structure.assembly?.pieces.orEmpty().map { (id, blueprint) -> blueprint to "structures.structures[$i].assembly.pieces.$id" }
             blueprints.forEach { (blueprint, path) -> blueprint.interactions.forEachIndexed { j, interaction ->
+                if (interaction is StructureInteraction.BossSpawner) {
+                    val at = "$path.interactions[$j]"
+                    if (manifest.formatVersion < 5) add(error(at, "BOSS_SPAWNER_REQUIRES_FORMAT5", "Boss spawner encounters require bundle format 5"))
+                    if (pack.structures.schemaVersion != 2 || pack.creatures.schemaVersion != 2)
+                        add(error(at, "BOSS_SPAWNER_MODULE_SCHEMAS", "Boss spawners require both structure and creature module schema 2"))
+                    val target = pack.creatures.creatures.find { it.id == interaction.creatureId }
+                    if (target == null || target.boss == null || target.category != CreatureCategory.HOSTILE)
+                        add(error("$at.creatureId", "BOSS_SPAWNER_TARGET_INVALID", "Boss spawner '${interaction.creatureId}' must resolve to an actual hostile Boss definition in this world"))
+                }
                 if (interaction is StructureInteraction.Container) {
                     interaction.items.forEachIndexed { k, item -> checkItemStack(item.item, item.count, "$path.interactions[$j].items[$k].count") }
                     interaction.loot?.entries?.forEachIndexed { k, entry -> checkItemStack(entry.item, entry.maxCount, "$path.interactions[$j].loot.entries[$k].maxCount") }

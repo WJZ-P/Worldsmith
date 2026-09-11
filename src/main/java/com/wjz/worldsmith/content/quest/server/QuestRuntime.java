@@ -189,8 +189,7 @@ public final class QuestRuntime {
         var creatureWorld = CreatureRuntime.snapshot(level);
         var definition = creature.definition();
         if (creatureWorld == null || !world.scope.equals(creatureWorld.bundleHash()) || definition == null) return;
-        if (definition.getCategory() == CreatureCategory.HOSTILE ? creature.getType() != CreatureRuntime.hostileType()
-            : creature.getType() != CreatureRuntime.passiveType()) return;
+        if (!CreatureRuntime.matchesHost(creature.getType(), definition)) return;
         if (!CREDITED_DEATHS.add(entity)) return;
         try {
             requireServerThread(player); world.requireBound(player.level());

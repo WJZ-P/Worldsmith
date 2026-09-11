@@ -15,7 +15,7 @@ import javax.imageio.ImageIO;
 public final class CreaturePreview {
     public static final List<String> VIEWS = List.of("isometric", "isometric_back", "front", "back", "left", "right", "top");
     public static final List<String> POSES = CreaturePose.POSES;
-    public static final String RENDERER_VERSION = "worldsmith-creature-preview-v1";
+    public static final String RENDERER_VERSION = "worldsmith-creature-preview-v2";
     private static final int MAX_SIZE = 1600;
     private static final long MAX_RASTER_WORK = 120_000_000L;
     private static final Color INK = new Color(0x263048);
@@ -24,21 +24,27 @@ public final class CreaturePreview {
     private CreaturePreview() {}
 
     public record Options(String view, String pose, int width, int height, float tick, float headYaw, float headPitch,
-                          long seed, boolean transparent, boolean clay, boolean showBounds, boolean labels) {
+                          long seed, boolean transparent, boolean clay, boolean showBounds, boolean labels, int bossPhase) {
+        public Options(String view, String pose, int width, int height, float tick, float headYaw, float headPitch,
+                       long seed, boolean transparent, boolean clay, boolean showBounds, boolean labels) {
+            this(view,pose,width,height,tick,headYaw,headPitch,seed,transparent,clay,showBounds,labels,0);
+        }
         public Options {
             if (!VIEWS.contains(view) || !POSES.contains(pose)) throw new IllegalArgumentException("Unsupported creature view or pose");
             if (width < 256 || height < 256 || width > MAX_SIZE || height > MAX_SIZE) throw new IllegalArgumentException("Preview dimensions must be 256 through 1600 pixels");
             if (!Float.isFinite(tick) || Math.abs(tick) > 1_000_000 || !Float.isFinite(headYaw) || Math.abs(headYaw) > 180 || !Float.isFinite(headPitch) || Math.abs(headPitch) > 90)
                 throw new IllegalArgumentException("Preview time and head angles must be finite and bounded");
+            if (bossPhase < 0 || bossPhase > 2) throw new IllegalArgumentException("Boss preview phase must be 0..2");
         }
         public static Options defaults(String view, String pose) { return new Options(view, pose, 1280, 1000, 12, 0, 0, 0, false, false, false, true); }
-        public Options withSize(int width, int height) { return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, showBounds, labels); }
-        public Options withPose(String pose) { return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, showBounds, labels); }
-        public Options withView(String view) { return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, showBounds, labels); }
-        public Options withTime(float tick) { return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, showBounds, labels); }
-        public Options withHead(float yaw, float pitch) { return new Options(view, pose, width, height, tick, yaw, pitch, seed, transparent, clay, showBounds, labels); }
+        public Options withSize(int width, int height) { return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, showBounds, labels,bossPhase); }
+        public Options withPose(String pose) { return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, showBounds, labels,bossPhase); }
+        public Options withView(String view) { return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, showBounds, labels,bossPhase); }
+        public Options withTime(float tick) { return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, showBounds, labels,bossPhase); }
+        public Options withHead(float yaw, float pitch) { return new Options(view, pose, width, height, tick, yaw, pitch, seed, transparent, clay, showBounds, labels,bossPhase); }
+        public Options withBossPhase(int phase) { return new Options(view,pose,width,height,tick,headYaw,headPitch,seed,transparent,clay,showBounds,labels,phase); }
         public Options withPresentation(boolean transparent, boolean clay, boolean bounds, boolean labels) {
-            return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, bounds, labels);
+            return new Options(view, pose, width, height, tick, headYaw, headPitch, seed, transparent, clay, bounds, labels,bossPhase);
         }
     }
 
@@ -69,19 +75,32 @@ public final class CreaturePreview {
         metadata.put("frameModelUnits", List.of(frame.min.x, frame.min.y, frame.min.z, frame.max.x, frame.max.y, frame.max.z));
         metadata.put("cameraYawDegrees", scene.camera.yaw); metadata.put("cameraElevationDegrees", scene.camera.elevation);
         metadata.put("pixelsPerModelUnit", scene.camera.scale); metadata.put("sharedPoseEvaluator", "CreaturePose"); metadata.put("uvMapping", "native_box_uv");
+        metadata.put("boss",frozen.getBoss()!=null);
+        if(frozen.getBoss()!=null) {
+            var phase=frozen.getBoss().getPhases().get(options.bossPhase);
+            metadata.put("bossPhase",options.bossPhase);metadata.put("bossPhaseName",phase.getName());
+            metadata.put("declaredPhaseParameters",Map.of("movementSpeed",frozen.getAttributes().getSpeed()*phase.getSpeedMultiplier(),
+                "attackDamage",frozen.getAttributes().getAttackDamage()*phase.getDamageMultiplier(),"windupTicks",phase.getWindupTicks(),
+                "recoveryTicks",phase.getRecoveryTicks(),"poseIntensity",phase.getPoseIntensity()));
+        }
         metadata.put("cutoutAlphaThreshold", 26); metadata.put("limitations", List.of("Simplified studio illumination", "No Minecraft render pipeline", "No server AI or combat simulation"));
         return new Result(encode(scene.image), metadata);
     }
 
     /** Seven fixed views, all five poses and the actual atlas, in one bounded authoring contact sheet. */
     public static byte[] sheet(CreatureDefinition definition, byte[] actualPng) throws IOException {
+        return sheet(definition,actualPng,0);
+    }
+    public static byte[] sheet(CreatureDefinition definition, byte[] actualPng, int bossPhase) throws IOException {
         CreatureDefinition frozen = validate(definition, actualPng);
         BufferedImage texture = ImageIO.read(new ByteArrayInputStream(actualPng));
-        Options base = Options.defaults("isometric", "idle").withSize(374, 290).withPresentation(false, false, false, false);
+        Options base = Options.defaults("isometric", "idle").withSize(374, 290).withPresentation(false, false, false, false).withBossPhase(bossPhase);
+        poseFrame(frozen,base);
         Bounds frame = comparisonFrame(frozen, base);
         BufferedImage sheet = new BufferedImage(1600, 1160, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = sheet.createGraphics(); quality(g); g.setColor(new Color(0xF5F5F7)); g.fillRect(0, 0, 1600, 1160);
-        g.setColor(INK); g.setFont(font(30, true)); g.drawString(frozen.getDisplayName(), 34, 46);
+        g.setColor(INK); g.setFont(font(30, true)); g.drawString(frozen.getDisplayName()
+            +(frozen.getBoss()==null?"":" — "+frozen.getBoss().getPhases().get(bossPhase).getName()), 34, 46);
         g.setColor(MUTED); g.setFont(font(13, false));
         g.drawString("CREATURE AUTHORING  /  FIXED CAMERAS  /  SHARED RUNTIME POSES  /  ACTUAL TEXTURE", 35, 69);
         List<String[]> cells = List.of(new String[]{"isometric", "idle"}, new String[]{"front", "idle"}, new String[]{"back", "idle"}, new String[]{"isometric_back", "idle"},
@@ -169,7 +188,7 @@ public final class CreaturePreview {
 
     private static CreatureDefinition validate(CreatureDefinition definition, byte[] png) {
         Objects.requireNonNull(definition); Objects.requireNonNull(png);
-        var library = new CreatureLibrary(1, List.of(definition)); var diagnostics = CustomCreatureValidator.validate(library);
+        var library = new CreatureLibrary(definition.getBoss()==null?1:2, List.of(definition)); var diagnostics = CustomCreatureValidator.validate(library);
         if (!diagnostics.isEmpty()) throw new IllegalArgumentException("Invalid creature preview input: " + diagnostics.stream().limit(8).toList());
         String hash = definition.getModel().getTexture();
         var size = ContentAssetValidation.INSTANCE.verify(new ContentAsset(hash, hash, "image/png", (long)png.length, "assets/" + hash + ".png"), png);
@@ -195,7 +214,7 @@ public final class CreaturePreview {
         }
         g.dispose();
         int[] pixels = ((DataBufferInt)image.getRaster().getDataBuffer()).getData(); double[] depth = new double[pixels.length]; Arrays.fill(depth, Double.NEGATIVE_INFINITY);
-        List<Face> faces = faces(definition, CreaturePose.preview(options.pose, options.tick, options.headYaw, options.headPitch, options.seed));
+        List<Face> faces = faces(definition, poseFrame(definition,options));
         long[] work = {0, 0}; int visible = 0;
         for (Face face : faces) {
             if (face.normal.dot(camera.near) <= 1e-8) continue;
@@ -211,7 +230,8 @@ public final class CreaturePreview {
         if (options.labels) {
             g.setColor(INK); g.setFont(font(Math.max(18, options.width / 39), true)); g.drawString(definition.getDisplayName(), 34, 47);
             g.setColor(MUTED); g.setFont(font(12, false));
-            g.drawString(options.view.toUpperCase(Locale.ROOT).replace('_', ' ') + "   /   " + options.pose.toUpperCase(Locale.ROOT) + "   /   " + (options.clay ? "CLAY GEOMETRY" : "ACTUAL TEXTURE"), 35, 69);
+            g.drawString(options.view.toUpperCase(Locale.ROOT).replace('_', ' ') + "   /   " + options.pose.toUpperCase(Locale.ROOT) + "   /   " + (options.clay ? "CLAY GEOMETRY" : "ACTUAL TEXTURE")
+                + (definition.getBoss()==null?"":"   /   BOSS PHASE "+(options.bossPhase+1)), 35, 69);
             g.drawLine(34, options.height - 65, options.width - 34, options.height - 65);
             g.drawString(definition.getId() + "  ·  " + definition.getModel().getBones().size() + " bones  /  " + cubeCount(definition) + " cubes  ·  "
                 + texture.getWidth() + " × " + texture.getHeight() + " PNG  ·  " + definition.getModel().getTexture().substring(0, 12), 35, options.height - 39);
@@ -302,14 +322,19 @@ public final class CreaturePreview {
     /** One shared frame across all standard action poses and a sampled complete gait cycle. */
     private static Bounds comparisonFrame(CreatureDefinition definition, Options options) {
         Bounds frame = new Bounds();
-        for (String pose : POSES) for (int sample = 0; sample < 17; sample++) {
+        int phases=definition.getBoss()==null?1:definition.getBoss().getPhases().size();
+        for(int phase=0;phase<phases;phase++)for (String pose : POSES) for (int sample = 0; sample < 17; sample++) {
             float tick = sample == 16 ? options.tick : (float)(sample * Math.PI * 2 / (16 * (pose.equals("walk") ? .6662 : .08)));
-            for (var face : faces(definition, CreaturePose.preview(pose, tick, options.headYaw, options.headPitch, options.seed)))
+            for (var face : faces(definition, poseFrame(definition,options.withPose(pose).withTime(tick).withBossPhase(phase))))
                 for (var vertex : face.vertices) frame.include(vertex.position);
         }
         if (options.showBounds) for (var point : collisionCorners(definition)) frame.include(point);
         if (!frame.valid()) throw new IllegalArgumentException("Creature preview has no finite geometry");
         return frame;
+    }
+
+    private static CreaturePose.Frame poseFrame(CreatureDefinition definition,Options options) {
+        return CreaturePose.withBossPhase(CreaturePose.preview(options.pose,options.tick,options.headYaw,options.headPitch,options.seed),definition,options.bossPhase);
     }
 
     private static void drawCollision(Graphics2D g, CreatureDefinition definition, Camera camera) {

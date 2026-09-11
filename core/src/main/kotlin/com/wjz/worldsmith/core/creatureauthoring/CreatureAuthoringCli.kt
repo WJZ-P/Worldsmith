@@ -40,7 +40,7 @@ object CreatureAuthoringCli {
             guide.definition
         }
         Files.writeString(output.resolve("creature.json"), WorldsmithJson.encode(definition), StandardCharsets.UTF_8)
-        Files.writeString(output.resolve("creatures.json"), WorldsmithJson.encode(CreatureLibrary(creatures = listOf(definition))), StandardCharsets.UTF_8)
+        Files.writeString(output.resolve("creatures.json"), WorldsmithJson.encode(CreatureLibrary(schemaVersion=recipe.schemaVersion,creatures = listOf(definition))), StandardCharsets.UTF_8)
         Files.writeString(output.resolve("authoring-status.json"), """{"guideOnly":${args.size == 2},"atlasWidth":${recipe.atlasWidth},"atlasHeight":${recipe.atlasHeight},"textureAsset":"${definition.model.texture}","boneCount":${definition.model.bones.size},"cubeCount":${definition.model.bones.sumOf { it.cubes.size }}}""", StandardCharsets.UTF_8)
         println("Creature authoring output: $output")
         println("${recipe.atlasWidth}x${recipe.atlasHeight}; ${definition.model.bones.size} bones; ${definition.model.bones.sumOf { it.cubes.size }} cubes; guideOnly=${args.size == 2}")

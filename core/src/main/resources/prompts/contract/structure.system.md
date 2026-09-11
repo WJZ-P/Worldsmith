@@ -7,7 +7,9 @@ The player prompt decides style and world identity. New guided MCP worlds follow
 contract/architecture: multiple groups, independent structures, a monumental LANDMARK
 group and readable occupied interiors. Empty libraries remain valid for legacy or
 standalone pack workflows, not new guided publications.
-Examples teach grammar, not a mandatory architectural style. Blueprint schema remains 1; structure libraries containing SDK frozen data use module schema 2. Every published world uses bundle format 3; these are distinct version numbers.
+Examples teach grammar, not a mandatory architectural style. Blueprint schema remains
+1; structure libraries containing SDK frozen data or typed BossSpawner use module
+schema 2. New worlds use bundle format 5; these are distinct version numbers.
 
 ## SDK geometry and semantic metadata
 
@@ -42,7 +44,11 @@ The existing complete plan envelope [-96,96] X/Z, height 128, 262144 authored ce
 rejection names the exceeded limit; preview/native NBT export remains available for
 larger drawings, without shrinking or scattering them.
 
-The structure module freezes palette/RLE geometry and versioned source provenance in module schema 2 inside a format-3 world bundle. Manual structure libraries may use module schema 1; legacy world bundle formats 1/2 are rejected. Native validation checks real states,
+The structure module freezes palette/RLE geometry and versioned source provenance in
+module schema 2 inside a current format-5 world bundle. Legacy bundles 3/4 remain
+readable under their older rules and reject BossSpawner semantics. Manual structure
+libraries without BossSpawner may use module schema 1; world bundle formats 1/2 are
+rejected. Native validation checks real states,
 mirrors/rotations, door/bed/double-plant pairs, emitter levels and typed block entities
 before publication. No source execution occurs on loading a published pack or in worldgen.
 
@@ -348,7 +354,39 @@ there are no click commands or rich-text actions. Banners have <=16 namespaced
 patterns with dye colors; the live registry checks their existence. Block-entity
 payloads use Minecraft's codecs and are read back before export. Container loot
 seeds are deterministic per piece/chunk. Entities, arbitrary NBT and executable
-scripts are not fields of this grammar.
+scripts are not fields of this grammar; the bounded BossSpawner below is a typed
+reference to a world-defined Boss, not a general entity/NBT editor.
+
+### Typed BossSpawner
+
+Bundle format 5 and structure library schema 2 also accept:
+
+```json
+{"kind":"boss_spawner","at":{"x":0,"y":2,"z":0},"creatureId":"observatory_warden","respawnTicks":2400,"requiredPlayerRange":16,"spawnRange":4}
+```
+
+`at` is required and must target a surviving `minecraft:spawner`. `creatureId` is a
+required logical id resolving to a HOSTILE creature with an actual Boss profile in
+creature module schema 2. The optional integer fields are respawnTicks 200..30000
+(default 2400), requiredPlayerRange 8..32 blocks (default 16), and spawnRange 1..8
+blocks (default 4). No arbitrary NBT, native host id, world scope or entity list is
+accepted. The immutable exporter supplies world/species identity and codec readback.
+
+For StructureProgram use `a.bossSpawner(at,creatureId)` or its five-argument overload;
+read `worldsmith_get_contract(id:"draw",section:"boss-encounters")` for exact Java
+syntax and arena planning. It places geometry and metadata together; original
+drawing coordinates transform through components/normalization/tiling as usual.
+Author explicit floor/AIR and adequate width/height for the initialized Boss body,
+including the attempted spawn area. Core room/lighting checks and an offline image
+do not prove native collision clearance or combat/navigation quality.
+
+The dedicated encounter host tries one Boss per cycle and has a local same-class
+cap of one near the spawner. A Boss leaving that neighborhood permits later spawns;
+this is not global uniqueness, a guaranteed structure instance or a one-time event.
+Natural habitat/light/chance/spacing settings do not select this route; native
+peaceful mode, player proximity, loading and actual-body obstruction still apply.
+Current bundle coverage counts only a positive configured placement route and real
+compiled interaction. Runtime spawning/playtesting remains separate from NBT export.
 
 ## Design quality
 
