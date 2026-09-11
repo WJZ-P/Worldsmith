@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "quests": [
+    {
+      "id": "gather_moonlight",
+      "title": "一 · 收拢散月",
+      "description": "旧巡礼者把第一批月辉碎晶留在圣坛补给箱中；碎晶哨兵也会携带这种材料。寻找圣坛或击败哨兵，主动提交8枚碎晶。仅持有不会自动完成，物品可分次交付。",
+      "prerequisites": [],
+      "objectives": [
+        {
+          "kind": "deliver_item",
+          "item": "worldsmith:item/moon_shard",
+          "count": 8
+        }
+      ],
+      "rewards": [
+        {
+          "item": "worldsmith:item/bronze_seal",
+          "count": 1
+        }
+      ],
+      "themeBeat": "arrival"
+    },
+    {
+      "id": "silence_shards",
+      "title": "二 · 平息石甲回声",
+      "description": "领取上一段奖励后，击败3名碎晶哨兵。它们在琥珀丘陵与碎星山脊游荡。主线只记录任务解锁之后归属于你的击杀。",
+      "prerequisites": [
+        "gather_moonlight"
+      ],
+      "objectives": [
+        {
+          "kind": "kill_creature",
+          "creature": "shardbound_sentinel",
+          "count": 3
+        }
+      ],
+      "rewards": [
+        {
+          "item": "worldsmith:item/moon_shard",
+          "count": 6
+        },
+        {
+          "item": "worldsmith:item/bronze_seal",
+          "count": 1
+        }
+      ],
+      "themeBeat": "old_roads"
+    },
+    {
+      "id": "break_darkstar",
+      "title": "三 · 击碎黯星誓约",
+      "description": "寻找王城大厅的黯星刷怪笼，或在碎星山脊与霜冠高地追踪稀有的守门者。接近刷怪笼后仍需满足净空与附近同类限制；它不是全世界唯一Boss。备足装备，击败一只守门者并领取奖励，固定得到一枚核心，主线不依赖随机掉落。",
+      "prerequisites": [
+        "silence_shards"
+      ],
+      "objectives": [
+        {
+          "kind": "kill_creature",
+          "creature": "darkstar_gatekeeper",
+          "count": 1
+        }
+      ],
+      "rewards": [
+        {
+          "item": "worldsmith:item/eclipse_core",
+          "count": 1
+        }
+      ],
+      "themeBeat": "darkstar"
+    },
+    {
+      "id": "rekindle_crown",
+      "title": "四 · 重燃月冠",
+      "description": "将一枚黯星核心主动提交到日志，然后领取复晓徽记。王城、村落与星术遗迹再次被同一条旅途联系起来。奖励空间不足时不会掉落在地上，可整理主背包后再领取。",
+      "prerequisites": [
+        "break_darkstar"
+      ],
+      "objectives": [
+        {
+          "kind": "deliver_item",
+          "item": "worldsmith:item/eclipse_core",
+          "count": 1
+        }
+      ],
+      "rewards": [
+        {
+          "item": "worldsmith:item/dawn_sigil",
+          "count": 1
+        }
+      ],
+      "themeBeat": "renewal"
+    }
+  ]
+}

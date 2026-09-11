@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "items": [
+    {
+      "id": "moon_shard",
+      "displayName": "月辉碎晶",
+      "textureAsset": "@asset:moon_shard",
+      "kind": "RESOURCE",
+      "maxStackSize": 64,
+      "rarity": "UNCOMMON",
+      "description": "散落的月光结晶。\n来自巡礼圣坛宝箱，也可由碎晶哨兵掉落。\n在任务日志中主动提交，才会计入进度。",
+      "themeRole": "旅途第一段的实际交付材料。"
+    },
+    {
+      "id": "bronze_seal",
+      "displayName": "旧王铜印",
+      "textureAsset": "@asset:bronze_seal",
+      "kind": "RELIC",
+      "maxStackSize": 16,
+      "rarity": "RARE",
+      "description": "银松村与王城曾共用的通行印记。\n这是纪念与奖励物品，不是会自动开门的钥匙。",
+      "themeRole": "连接普通居民与旧王权的文物。"
+    },
+    {
+      "id": "eclipse_core",
+      "displayName": "黯星核心",
+      "textureAsset": "@asset:eclipse_core",
+      "kind": "RELIC",
+      "maxStackSize": 1,
+      "rarity": "EPIC",
+      "description": "守门者胸甲中冷却的紫晶核心。\n击败守门者任务的领奖会保底获得一枚。\n交给最后的主线任务，完成重燃王冠的仪式。",
+      "themeRole": "Boss胜利通向结局的真实交付物。"
+    },
+    {
+      "id": "dawn_sigil",
+      "displayName": "复晓徽记",
+      "textureAsset": "@asset:dawn_sigil",
+      "kind": "RELIC",
+      "maxStackSize": 1,
+      "rarity": "EPIC",
+      "description": "月蚀并非永夜。\n完成主线后获得的纪念徽记；当前没有额外主动技能。",
+      "themeRole": "线性主线的一次性最终奖励。"
+    }
+  ]
+}

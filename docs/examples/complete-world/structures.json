@@ -1,0 +1,435 @@
+{
+  "schemaVersion": 1,
+  "structures": [
+    {
+      "id": "crown_citadel",
+      "blueprint": {
+        "id": "crown_keep",
+        "authored": {
+          "variants": [
+            "@drawing:crown_keep"
+          ]
+        },
+        "portBindings": {
+          "north": {
+            "pool": "gates",
+            "required": true
+          },
+          "east": {
+            "pool": "towers",
+            "required": true
+          },
+          "west": {
+            "pool": "towers",
+            "required": true
+          }
+        }
+      },
+      "placement": {
+        "biomes": [
+          "starfall_ridges",
+          "frost_crown",
+          "amber_highlands"
+        ],
+        "spacingChunks": 24,
+        "separationChunks": 8,
+        "rotations": [
+          "NONE",
+          "CLOCKWISE_90",
+          "CLOCKWISE_180",
+          "COUNTERCLOCKWISE_90"
+        ],
+        "terrainFit": {
+          "surface": "LAND_SURFACE",
+          "maxHeightDifference": 10,
+          "foundation": {
+            "mode": "FILL",
+            "material": "foundation",
+            "maxDepth": 16
+          },
+          "earthwork": {
+            "maxCut": 2,
+            "maxBlocks": 4096
+          }
+        },
+        "anchor": {
+          "id": "crown_spur"
+        }
+      },
+      "assembly": {
+        "pieces": {
+          "crown_gate": {
+            "id": "crown_gate",
+            "authored": {
+              "variants": [
+                "@drawing:crown_gate"
+              ]
+            },
+            "portBindings": {}
+          },
+          "crown_belltower": {
+            "id": "crown_belltower",
+            "authored": {
+              "variants": [
+                "@drawing:crown_belltower"
+              ]
+            },
+            "portBindings": {}
+          }
+        },
+        "pools": {
+          "gates": [
+            {
+              "piece": "crown_gate",
+              "weight": 1
+            }
+          ],
+          "towers": [
+            {
+              "piece": "crown_belltower",
+              "weight": 1
+            }
+          ]
+        },
+        "variants": 1,
+        "maxPieces": 4,
+        "maxDepth": 1,
+        "maxRadius": 96,
+        "terrainFollowing": true,
+        "maxElevationDifference": 6,
+        "roads": {
+          "material": "road",
+          "stairMaterial": "stair",
+          "bridgeMaterial": "road",
+          "gap": 8,
+          "width": 3,
+          "maxSpan": 24,
+          "maxCut": 2
+        }
+      }
+    },
+    {
+      "id": "silverpine_hamlet",
+      "blueprint": {
+        "id": "moon_market",
+        "authored": {
+          "variants": [
+            "@drawing:moon_market"
+          ]
+        },
+        "portBindings": {
+          "east": {
+            "pool": "homes",
+            "required": true
+          },
+          "west": {
+            "pool": "workshops",
+            "required": true
+          }
+        }
+      },
+      "placement": {
+        "biomes": [
+          "moonmeadow",
+          "silverpine_wood"
+        ],
+        "spacingChunks": 24,
+        "separationChunks": 8,
+        "rotations": [
+          "NONE",
+          "CLOCKWISE_90",
+          "CLOCKWISE_180",
+          "COUNTERCLOCKWISE_90"
+        ],
+        "terrainFit": {
+          "surface": "LAND_SURFACE",
+          "maxHeightDifference": 10,
+          "foundation": {
+            "mode": "FILL",
+            "material": "foundation",
+            "maxDepth": 16
+          },
+          "earthwork": {
+            "maxCut": 2,
+            "maxBlocks": 4096
+          }
+        }
+      },
+      "assembly": {
+        "pieces": {
+          "forester_lodge": {
+            "id": "forester_lodge",
+            "authored": {
+              "variants": [
+                "@drawing:forester_lodge"
+              ]
+            },
+            "portBindings": {}
+          },
+          "smithy": {
+            "id": "smithy",
+            "authored": {
+              "variants": [
+                "@drawing:smithy"
+              ]
+            },
+            "portBindings": {}
+          }
+        },
+        "pools": {
+          "homes": [
+            {
+              "piece": "forester_lodge",
+              "weight": 1
+            }
+          ],
+          "workshops": [
+            {
+              "piece": "smithy",
+              "weight": 1
+            }
+          ]
+        },
+        "variants": 1,
+        "maxPieces": 3,
+        "maxDepth": 1,
+        "maxRadius": 96,
+        "terrainFollowing": true,
+        "maxElevationDifference": 6,
+        "roads": {
+          "material": "road",
+          "stairMaterial": "stair",
+          "bridgeMaterial": "road",
+          "gap": 8,
+          "width": 3,
+          "maxSpan": 24,
+          "maxCut": 2
+        }
+      }
+    },
+    {
+      "id": "star_abbey",
+      "blueprint": {
+        "id": "star_cloister",
+        "authored": {
+          "variants": [
+            "@drawing:star_cloister"
+          ]
+        },
+        "portBindings": {
+          "east": {
+            "pool": "archives",
+            "required": true
+          },
+          "west": {
+            "pool": "observatories",
+            "required": true
+          }
+        }
+      },
+      "placement": {
+        "biomes": [
+          "silverpine_wood",
+          "amber_highlands",
+          "starfall_ridges"
+        ],
+        "spacingChunks": 24,
+        "separationChunks": 8,
+        "rotations": [
+          "NONE",
+          "CLOCKWISE_90",
+          "CLOCKWISE_180",
+          "COUNTERCLOCKWISE_90"
+        ],
+        "terrainFit": {
+          "surface": "LAND_SURFACE",
+          "maxHeightDifference": 10,
+          "foundation": {
+            "mode": "FILL",
+            "material": "foundation",
+            "maxDepth": 16
+          },
+          "earthwork": {
+            "maxCut": 2,
+            "maxBlocks": 4096
+          }
+        },
+        "anchor": {
+          "id": "abbey_basin"
+        }
+      },
+      "assembly": {
+        "pieces": {
+          "star_archive": {
+            "id": "star_archive",
+            "authored": {
+              "variants": [
+                "@drawing:star_archive"
+              ]
+            },
+            "portBindings": {}
+          },
+          "moon_observatory": {
+            "id": "moon_observatory",
+            "authored": {
+              "variants": [
+                "@drawing:moon_observatory"
+              ]
+            },
+            "portBindings": {}
+          }
+        },
+        "pools": {
+          "archives": [
+            {
+              "piece": "star_archive",
+              "weight": 1
+            }
+          ],
+          "observatories": [
+            {
+              "piece": "moon_observatory",
+              "weight": 1
+            }
+          ]
+        },
+        "variants": 1,
+        "maxPieces": 3,
+        "maxDepth": 1,
+        "maxRadius": 96,
+        "terrainFollowing": true,
+        "maxElevationDifference": 6,
+        "roads": {
+          "material": "road",
+          "stairMaterial": "stair",
+          "bridgeMaterial": "road",
+          "gap": 8,
+          "width": 3,
+          "maxSpan": 24,
+          "maxCut": 2
+        }
+      }
+    },
+    {
+      "id": "pilgrim_shrine",
+      "blueprint": {
+        "id": "pilgrim_shrine",
+        "authored": {
+          "variants": [
+            "@drawing:pilgrim_shrine"
+          ]
+        },
+        "portBindings": {}
+      },
+      "placement": {
+        "biomes": [
+          "moonmeadow",
+          "silverpine_wood"
+        ],
+        "spacingChunks": 24,
+        "separationChunks": 8,
+        "rotations": [
+          "NONE",
+          "CLOCKWISE_90",
+          "CLOCKWISE_180",
+          "COUNTERCLOCKWISE_90"
+        ],
+        "terrainFit": {
+          "surface": "LAND_SURFACE",
+          "maxHeightDifference": 10,
+          "foundation": {
+            "mode": "FILL",
+            "material": "foundation",
+            "maxDepth": 16
+          },
+          "earthwork": {
+            "maxCut": 2,
+            "maxBlocks": 4096
+          }
+        },
+        "anchor": {
+          "id": "pilgrim_vale"
+        }
+      }
+    },
+    {
+      "id": "crystal_quarry",
+      "blueprint": {
+        "id": "crystal_quarry",
+        "authored": {
+          "variants": [
+            "@drawing:crystal_quarry"
+          ]
+        },
+        "portBindings": {}
+      },
+      "placement": {
+        "biomes": [
+          "amber_highlands",
+          "starfall_ridges"
+        ],
+        "spacingChunks": 18,
+        "separationChunks": 6,
+        "rotations": [
+          "NONE",
+          "CLOCKWISE_90",
+          "CLOCKWISE_180",
+          "COUNTERCLOCKWISE_90"
+        ],
+        "terrainFit": {
+          "surface": "LAND_SURFACE",
+          "maxHeightDifference": 10,
+          "foundation": {
+            "mode": "FILL",
+            "material": "foundation",
+            "maxDepth": 16
+          },
+          "earthwork": {
+            "maxCut": 2,
+            "maxBlocks": 4096
+          }
+        }
+      }
+    },
+    {
+      "id": "fallen_watchtower",
+      "blueprint": {
+        "id": "fallen_watchtower",
+        "authored": {
+          "variants": [
+            "@drawing:fallen_watchtower"
+          ]
+        },
+        "portBindings": {}
+      },
+      "placement": {
+        "biomes": [
+          "moonmeadow",
+          "amber_highlands",
+          "silverpine_wood"
+        ],
+        "spacingChunks": 20,
+        "separationChunks": 6,
+        "rotations": [
+          "NONE",
+          "CLOCKWISE_90",
+          "CLOCKWISE_180",
+          "COUNTERCLOCKWISE_90"
+        ],
+        "terrainFit": {
+          "surface": "LAND_SURFACE",
+          "maxHeightDifference": 10,
+          "foundation": {
+            "mode": "FILL",
+            "material": "foundation",
+            "maxDepth": 16
+          },
+          "earthwork": {
+            "maxCut": 2,
+            "maxBlocks": 4096
+          }
+        }
+      }
+    }
+  ]
+}

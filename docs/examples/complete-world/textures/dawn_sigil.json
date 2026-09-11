@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "width": 16,
+  "height": 16,
+  "palette": [
+    "#00000000",
+    "#3A3443FF",
+    "#6D5B92FF",
+    "#A896CFFF",
+    "#D3BF85FF",
+    "#FFF1C9FF",
+    "#B58B4FFF"
+  ],
+  "seed": 0,
+  "operations": [
+    {
+      "kind": "fill",
+      "color": 0
+    },
+    {
+      "kind": "stamp",
+      "x": 0,
+      "y": 0,
+      "rows": [
+        ".......f........",
+        "..f....f....f...",
+        "...f...f...f....",
+        "....aafffaa.....",
+        "...affddfffa....",
+        "..afddeeedffa...",
+        "..afdeeeeccfa...",
+        "ffafdeecccafff..",
+        "..afddcccbbfa...",
+        "..affcccbbffa...",
+        "...affddfffa....",
+        "....aafffaa.....",
+        "...f...f...f....",
+        "..f....f....f...",
+        ".......f........",
+        "................"
+      ],
+      "glyphs": {
+        "a": 1,
+        "b": 2,
+        "c": 3,
+        "d": 4,
+        "e": 5,
+        "f": 6
+      }
+    }
+  ]
+}

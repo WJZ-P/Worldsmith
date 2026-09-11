@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "projectName": "eclipse-crown-architecture",
+  "sourceDirectory": "structures/sources",
+  "seed": 20260910,
+  "targets": {
+    "crown_keep": {
+      "entrypoint": "CrownCitadel",
+      "sources": [
+        "CrownCitadel.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "crown_keep"
+      }
+    },
+    "crown_gate": {
+      "entrypoint": "CrownCitadel",
+      "sources": [
+        "CrownCitadel.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "crown_gate"
+      }
+    },
+    "crown_belltower": {
+      "entrypoint": "CrownCitadel",
+      "sources": [
+        "CrownCitadel.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "crown_belltower"
+      }
+    },
+    "moon_market": {
+      "entrypoint": "HamletBuildings",
+      "sources": [
+        "HamletBuildings.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "moon_market"
+      }
+    },
+    "forester_lodge": {
+      "entrypoint": "HamletBuildings",
+      "sources": [
+        "HamletBuildings.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "forester_lodge"
+      }
+    },
+    "smithy": {
+      "entrypoint": "HamletBuildings",
+      "sources": [
+        "HamletBuildings.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "smithy"
+      }
+    },
+    "star_cloister": {
+      "entrypoint": "AbbeyBuildings",
+      "sources": [
+        "AbbeyBuildings.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "star_cloister"
+      }
+    },
+    "star_archive": {
+      "entrypoint": "AbbeyBuildings",
+      "sources": [
+        "AbbeyBuildings.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "star_archive"
+      }
+    },
+    "moon_observatory": {
+      "entrypoint": "AbbeyBuildings",
+      "sources": [
+        "AbbeyBuildings.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "moon_observatory"
+      }
+    },
+    "pilgrim_shrine": {
+      "entrypoint": "WaysideBuildings",
+      "sources": [
+        "WaysideBuildings.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "pilgrim_shrine"
+      }
+    },
+    "crystal_quarry": {
+      "entrypoint": "WaysideBuildings",
+      "sources": [
+        "WaysideBuildings.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "crystal_quarry"
+      }
+    },
+    "fallen_watchtower": {
+      "entrypoint": "WaysideBuildings",
+      "sources": [
+        "WaysideBuildings.java",
+        "EclipseCraft.java"
+      ],
+      "parameters": {
+        "kind": "fallen_watchtower"
+      }
+    }
+  }
+}

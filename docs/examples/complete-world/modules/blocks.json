@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "blocks": [
+    {
+      "id": "moonstone",
+      "displayName": "月辉石",
+      "profile": "STONE",
+      "textureAsset": "@asset:moonstone",
+      "light": 0,
+      "themeRole": "银白细纹的王国基石，同时出现在碎星露头与宫殿铺地。"
+    },
+    {
+      "id": "runed_slate",
+      "displayName": "星纹板岩",
+      "profile": "STONE",
+      "textureAsset": "@asset:runed_slate",
+      "light": 0,
+      "themeRole": "深色星术承重石，用在城堡扶壁、修道院拱柱与露天圣坛。"
+    },
+    {
+      "id": "bronze_masonry",
+      "displayName": "古铜砌块",
+      "profile": "METAL",
+      "textureAsset": "@asset:bronze_masonry",
+      "light": 0,
+      "themeRole": "旧王国仪式建筑的金属束带和天文仪框架。"
+    },
+    {
+      "id": "star_glass",
+      "displayName": "凝星玻璃",
+      "profile": "GLASS",
+      "textureAsset": "@asset:star_glass",
+      "light": 10,
+      "themeRole": "微亮的蓝紫玻璃，在夜间标明被遗忘的入口与高处灯冠。"
+    }
+  ]
+}

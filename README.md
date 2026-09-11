@@ -9,6 +9,11 @@ biomes, features, structures, custom blocks and creatures. The first shared
 module adapters, logical references, shared asset storage and lifecycle planning.
 Custom block and ground-creature runtimes are installed with bounded native hosts and a local-world lifecycle; bounded linear quests are installed; achievements remain a future module.
 
+[Complete-world authoring](docs/complete-world-authoring.md) now adds an explicit linked design plan,
+resumable repair progress, phased Bosses and typed landmark encounters. The
+[replayable example kit](docs/examples/complete-world/README.md) uses provider-independent textures
+and can be exported through the real native compiler without opening a player world.
+
 ## Development baseline
 
 - Minecraft Java Edition `26.2`
@@ -87,7 +92,7 @@ Generated datapacks carry the complete bundle and stable block bindings with the
 save; reopening never depends on an AI, authoring drafts or a config pack copy.
 Client resources are prepared before local-server startup and publication.
 Current scope is local integrated-server worlds. Remote content negotiation,
-executable quests/achievements, free-form behavior scripts and arbitrary block
+branching NPC dialogue/achievements, free-form behavior scripts and arbitrary block
 physical shapes are not installed. Formats 3/4 remain read-only; older unreleased world-bundle formats 1/2 must
 be regenerated; existing files are not silently migrated.
 
@@ -99,12 +104,14 @@ The offline and native renderers share the same pose evaluator. A UV guide is cl
 marked and never automatically published as a finished skin.
 
 [World-scoped creative content](docs/creative-content.md) adds a dedicated creative
-tab for the joined world's blocks and creature summoners, with a provider interface
-for a future ordinary-item domain. Undefined/foreign content is not exposed.
+tab for the joined world's blocks, ordinary items and creature summoners.
+Undefined/foreign content is not exposed.
 
 [Darkstar Gatekeeper](docs/assets/creatures/darkstar-gatekeeper/README.md) is a reusable
 appearance example with a real generated UV skin and rendered multi-view images;
 it does not add a special Boss combat system.
+The separate [Boss runtime](docs/creature-bosses.md) supplies explicit schema-2 phases,
+native health bars and repeatable, world-bound landmark spawners.
 
 ## Ordinary items and reward sources
 

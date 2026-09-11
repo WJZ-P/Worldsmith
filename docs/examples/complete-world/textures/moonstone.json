@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "width": 32,
+  "height": 32,
+  "palette": [
+    "#AAB8C7",
+    "#C4CBD1",
+    "#8195AA",
+    "#637389",
+    "#8F79AF"
+  ],
+  "seed": 20260910,
+  "operations": [
+    {
+      "kind": "fill",
+      "color": 0,
+      "x": 0,
+      "y": 0,
+      "width": 32,
+      "height": 32
+    },
+    {
+      "kind": "noise",
+      "colors": [
+        1,
+        2
+      ],
+      "probability": 0.18
+    },
+    {
+      "kind": "line",
+      "x": 0,
+      "y": 0,
+      "x2": 31,
+      "y2": 0,
+      "color": 3
+    },
+    {
+      "kind": "line",
+      "x": 0,
+      "y": 16,
+      "x2": 31,
+      "y2": 16,
+      "color": 3
+    },
+    {
+      "kind": "line",
+      "x": 0,
+      "y": 31,
+      "x2": 31,
+      "y2": 31,
+      "color": 3
+    },
+    {
+      "kind": "line",
+      "x": 0,
+      "y": 0,
+      "x2": 0,
+      "y2": 15,
+      "color": 3
+    },
+    {
+      "kind": "line",
+      "x": 16,
+      "y": 0,
+      "x2": 16,
+      "y2": 15,
+      "color": 3
+    },
+    {
+      "kind": "line",
+      "x": 8,
+      "y": 16,
+      "x2": 8,
+      "y2": 31,
+      "color": 3
+    },
+    {
+      "kind": "line",
+      "x": 24,
+      "y": 16,
+      "x2": 24,
+      "y2": 31,
+      "color": 3
+    },
+    {
+      "kind": "line",
+      "x": 3,
+      "y": 4,
+      "x2": 12,
+      "y2": 4,
+      "color": 1
+    },
+    {
+      "kind": "line",
+      "x": 19,
+      "y": 20,
+      "x2": 28,
+      "y2": 20,
+      "color": 1
+    },
+    {
+      "kind": "line",
+      "x": 19,
+      "y": 7,
+      "x2": 25,
+      "y2": 12,
+      "color": 4
+    },
+    {
+      "kind": "line",
+      "x": 25,
+      "y": 12,
+      "x2": 28,
+      "y2": 8,
+      "color": 4
+    }
+  ]
+}

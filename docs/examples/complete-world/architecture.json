@@ -1,0 +1,134 @@
+{
+  "policyVersion": 1,
+  "worldTheme": "月蚀群山王国的银石、星纹、古铜与夜间蓝光；居民聚落、星术学院、王城地标分别采用生活、学术、王权尺度。",
+  "groups": [
+    {
+      "structure": "crown_citadel",
+      "title": "月冠旧王城",
+      "role": "LANDMARK",
+      "centerpiece": "crown_keep",
+      "themeFit": "可通行大殿与贯穿低屋顶的高石塔把旧王权的誓约具体化。",
+      "layoutIntent": "大殿北接独立门楼，东西各接钟楼；台基与三条短路连接实际入口，四栋组成山脊城堡。",
+      "distinction": "高低体量对比、五格宽拱门、扶壁间深窗、后部keep塔和夜间狭窗，避免巨大屋顶仓库。",
+      "discovery": "crown_spur附近合格地形上的固定候选；建筑群放置仍受场地约束，Boss不保证出现在城堡。",
+      "required": [
+        {
+          "role": "王权核心",
+          "blueprints": [
+            "crown_keep"
+          ],
+          "minCount": 1,
+          "maxCount": 1
+        },
+        {
+          "role": "门禁与前庭",
+          "blueprints": [
+            "crown_gate"
+          ],
+          "minCount": 1,
+          "maxCount": 1
+        },
+        {
+          "role": "两翼高点",
+          "blueprints": [
+            "crown_belltower"
+          ],
+          "minCount": 2,
+          "maxCount": 2
+        }
+      ],
+      "optional": []
+    },
+    {
+      "structure": "silverpine_hamlet",
+      "title": "银松市集村落",
+      "role": "REGULAR",
+      "centerpiece": "moon_market",
+      "themeFit": "温暖木构、市集布棚与铜炉呈现仍在生活的人间，不把每一处都设计成遗迹。",
+      "layoutIntent": "开放四角市集向东连接林户木屋，向西连接带低侧棚的铁匠工坊。",
+      "distinction": "开放市集、带烟囱住宅与非对称工棚各有生活用途、工作方块与补给箱。",
+      "discovery": "草甸与银松林里的适度随机候选；村内短路是组装道路，不宣称跨群连续公路。",
+      "required": [
+        {
+          "role": "公共市集",
+          "blueprints": [
+            "moon_market"
+          ],
+          "minCount": 1,
+          "maxCount": 1
+        },
+        {
+          "role": "居住",
+          "blueprints": [
+            "forester_lodge"
+          ],
+          "minCount": 1,
+          "maxCount": 1
+        },
+        {
+          "role": "工作与修造",
+          "blueprints": [
+            "smithy"
+          ],
+          "minCount": 1,
+          "maxCount": 1
+        }
+      ],
+      "optional": []
+    },
+    {
+      "structure": "star_abbey",
+      "title": "凝星修道院",
+      "role": "REGULAR",
+      "centerpiece": "star_cloister",
+      "themeFit": "星术知识保存在可步入的回廊、书库和观测大厅中，开敞庭院中的浑仪回应月蚀主题。",
+      "layoutIntent": "三边拱廊围绕浑仪庭院；东侧接藏书厅，西侧接八角玻璃穹顶观测室。",
+      "distinction": "开敞回廊、书架内景、八角石鼓与球面穹顶，与居民木屋和王城高塔明确不同。",
+      "discovery": "abbey_basin附近合格地形候选，湿润林缘和丘陵承接旅途的第二段。",
+      "required": [
+        {
+          "role": "院落与回廊",
+          "blueprints": [
+            "star_cloister"
+          ],
+          "minCount": 1,
+          "maxCount": 1
+        },
+        {
+          "role": "学术储藏",
+          "blueprints": [
+            "star_archive"
+          ],
+          "minCount": 1,
+          "maxCount": 1
+        },
+        {
+          "role": "天文观测",
+          "blueprints": [
+            "moon_observatory"
+          ],
+          "minCount": 1,
+          "maxCount": 1
+        }
+      ],
+      "optional": []
+    }
+  ],
+  "standalone": [
+    {
+      "structure": "pilgrim_shrine",
+      "purpose": "早期巡礼补给点，箱内存放8枚任务碎晶、食物与照明，不依赖生物掉落开关。",
+      "themeFit": "开放柱廊、竖直光晶和古铜环以最小尺度重复王国的材料语法。"
+    },
+    {
+      "structure": "crystal_quarry",
+      "purpose": "独立晶矿工作场，露头、石工台和材料补给箱提供探索收益。",
+      "themeFit": "让建筑中的月辉石在地形与人类采掘活动中也有真实出处。"
+    },
+    {
+      "structure": "fallen_watchtower",
+      "purpose": "旧路废弃瞭望点，破裂顶部与补给箱形成短距离可探索目标。",
+      "themeFit": "显示守门誓约衰败之后的小尺度残痕，而不是把王城缩小一份。"
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "verifiedOnUtc": "2026-09-11",
+  "title": "月蚀诸峰",
+  "runKind": "incremental_existing_session",
+  "bundleId": "023c780e477be3d80d52429975c65df98c65baf1731b3629412da7299cf0ae6e",
+  "coreAndClientCompile": "passed",
+  "focusedTests": {
+    "passed": 16,
+    "failed": 0,
+    "classes": [
+      "WorldGenerationPolishTest (8)",
+      "CreatureRuntimeTest (8)"
+    ]
+  },
+  "completeWorldCoverageVerified": true,
+  "nativeExport": {
+    "schemaVersion": 1,
+    "passed": true,
+    "stage": "NATIVE_EXPORT_READBACK",
+    "bundleId": "023c780e477be3d80d52429975c65df98c65baf1731b3629412da7299cf0ae6e",
+    "title": "月蚀诸峰",
+    "minecraftVersion": "26.2",
+    "nativeFiles": 130,
+    "nativeDefaultComponentsInitialized": true,
+    "nativeRegistryCodecReadbacks": 43,
+    "nativeTemplateReadbacks": 24,
+    "nativeBossSpawnerReadbacks": 1,
+    "nativeTemplateCells": 259236,
+    "biomes": 8,
+    "structures": 6,
+    "blocks": 4,
+    "items": 4,
+    "creatures": 3,
+    "bosses": 1,
+    "quests": 4,
+    "clientResourceFiles": 35,
+    "clientContentHash": "79657475c07e288051c1786648ee76787b87485ee350ab5f9ba38ed2433ddfd5",
+    "embeddedBundleReadback": true,
+    "activeBindingsUnchanged": true,
+    "nativeActivationVerified": false,
+    "worldsCreated": 0,
+    "serverTicksExecuted": 0,
+    "clientRenderingExercised": false,
+    "verificationBoundary": [
+      "Real saved bundle exported and read back with native codecs; not a synthetic fixture",
+      "No game world, entity combat, resource reload or activation receipt is claimed"
+    ]
+  },
+  "finish": {
+    "stage": "WAITING_NATIVE_CONTEXT",
+    "complete": false,
+    "completeWorldCoverageVerified": true
+  },
+  "modJar": {
+    "name": "worldsmith-0.1.0.jar",
+    "bytes": 6906899,
+    "sha256": "05c041537872930d23a19680c94bffa1d42f99c833a797a28e7c81492817b356"
+  },
+  "verificationBoundaries": [
+    "No player world was opened; native activation and combat remain unverified",
+    "Core offline previews are not Minecraft screenshots",
+    "COAST and PEAKS each retain one biome and MONOTONE_RELIEF_BAND warnings",
+    "Source provenance differs when replaying every target fresh instead of explicitly retaining unchanged frozen targets"
+  ],
+  "newVisualReviews": [
+    "crown_keep Boss encounter floor and clearance assertions passed in the real worker",
+    "star_cloister revised walls and shallow roof were inspected in its generated preview"
+  ]
+}

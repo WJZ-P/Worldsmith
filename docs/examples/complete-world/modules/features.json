@@ -1,0 +1,220 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "silver_pines",
+      "recipe": "TREE",
+      "materials": {
+        "TRUNK": {
+          "semanticRole": "silver_bark",
+          "preferredIds": [
+            "minecraft:birch_log"
+          ]
+        },
+        "FOLIAGE": {
+          "semanticRole": "silver_needles",
+          "preferredIds": [
+            "minecraft:spruce_leaves"
+          ]
+        }
+      },
+      "density": 0.72,
+      "tree": {
+        "trunk": {
+          "shape": "TAPERED",
+          "height": {
+            "min": 12,
+            "max": 18
+          },
+          "thickness": 2,
+          "taper": 0.45,
+          "flare": 1
+        },
+        "crown": {
+          "shape": "LAYERED",
+          "radius": 5,
+          "height": 9,
+          "density": 0.78,
+          "irregularity": 0.25
+        },
+        "distribution": "FOREST",
+        "substrate": "NATURAL_SOIL",
+        "decorations": [
+          "LEAF_LITTER"
+        ]
+      }
+    },
+    {
+      "id": "meadow_oaks",
+      "recipe": "TREE",
+      "materials": {
+        "TRUNK": {
+          "semanticRole": "bent_oak",
+          "preferredIds": [
+            "minecraft:oak_log"
+          ]
+        },
+        "FOLIAGE": {
+          "semanticRole": "broad_canopy",
+          "preferredIds": [
+            "minecraft:oak_leaves"
+          ]
+        }
+      },
+      "density": 0.1,
+      "tree": {
+        "trunk": {
+          "shape": "BENT",
+          "height": {
+            "min": 6,
+            "max": 9
+          },
+          "thickness": 1,
+          "bend": 0.35
+        },
+        "crown": {
+          "shape": "UMBRELLA",
+          "radius": 4,
+          "height": 3,
+          "density": 0.82,
+          "irregularity": 0.25
+        },
+        "distribution": "GROVE",
+        "substrate": "NATURAL_SOIL",
+        "decorations": []
+      }
+    },
+    {
+      "id": "moon_flowers",
+      "recipe": "GROUND_PATCH",
+      "block": {
+        "semanticRole": "moon_flowers",
+        "preferredIds": [
+          "minecraft:blue_orchid"
+        ]
+      },
+      "density": 0.55,
+      "patch": {
+        "attempts": 2,
+        "horizontalSpread": 4
+      },
+      "placement": {
+        "substrate": "NATURAL_SOIL",
+        "fluid": "DRY"
+      }
+    },
+    {
+      "id": "meadow_grasses",
+      "recipe": "GROUND_PATCH",
+      "block": {
+        "semanticRole": "meadow_grasses",
+        "preferredIds": [
+          "minecraft:short_grass"
+        ]
+      },
+      "density": 0.85,
+      "patch": {
+        "attempts": 1,
+        "horizontalSpread": 5
+      },
+      "placement": {
+        "substrate": "NATURAL_SOIL",
+        "fluid": "DRY"
+      }
+    },
+    {
+      "id": "coast_gravel",
+      "recipe": "BOULDER",
+      "block": {
+        "semanticRole": "coast_gravel",
+        "preferredIds": [
+          "minecraft:andesite"
+        ]
+      },
+      "density": 0.18,
+      "boulder": {
+        "blobs": 1,
+        "spread": 0
+      },
+      "placement": {
+        "substrate": "ANY_SOLID",
+        "fluid": "DRY"
+      }
+    },
+    {
+      "id": "mere_seagrass",
+      "recipe": "AQUATIC_PATCH",
+      "block": {
+        "semanticRole": "mere_seagrass",
+        "preferredIds": [
+          "minecraft:seagrass"
+        ]
+      },
+      "density": 0.65,
+      "patch": {
+        "attempts": 2,
+        "horizontalSpread": 4
+      },
+      "placement": {
+        "fluid": "SUBMERGED"
+      }
+    },
+    {
+      "id": "ridge_boulders",
+      "recipe": "BOULDER",
+      "block": {
+        "semanticRole": "ridge_boulders",
+        "preferredIds": [
+          "minecraft:tuff"
+        ]
+      },
+      "density": 0.4,
+      "boulder": {
+        "blobs": 2,
+        "spread": 3
+      },
+      "placement": {
+        "substrate": "ANY_SOLID",
+        "fluid": "DRY"
+      }
+    },
+    {
+      "id": "crystal_outcrops",
+      "recipe": "BOULDER",
+      "block": {
+        "semanticRole": "crystal_outcrops",
+        "preferredIds": [
+          "worldsmith:content/moonstone"
+        ]
+      },
+      "density": 0.18,
+      "boulder": {
+        "blobs": 1,
+        "spread": 0
+      },
+      "placement": {
+        "substrate": "ANY_SOLID",
+        "fluid": "DRY"
+      }
+    },
+    {
+      "id": "fallen_silverpine",
+      "recipe": "FALLEN_LOG",
+      "block": {
+        "semanticRole": "weathered_trunk",
+        "preferredIds": [
+          "minecraft:stripped_spruce_log"
+        ]
+      },
+      "density": 0.16,
+      "fallenLog": {
+        "minLength": 4,
+        "maxLength": 8
+      },
+      "placement": {
+        "substrate": "ANY_SOLID",
+        "fluid": "DRY"
+      }
+    }
+  ]
+}

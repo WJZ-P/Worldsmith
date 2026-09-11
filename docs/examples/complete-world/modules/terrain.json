@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "seed": 20260910,
+  "minY": -64,
+  "height": 384,
+  "horizontalNoiseSize": 1,
+  "verticalNoiseSize": 2,
+  "seaLevel": 64,
+  "defaultBlock": {
+    "semanticRole": "terrain_base",
+    "preferredIds": [
+      "minecraft:stone"
+    ]
+  },
+  "defaultFluid": {
+    "semanticRole": "terrain_fluid",
+    "preferredIds": [
+      "minecraft:water"
+    ]
+  },
+  "shape": {
+    "kind": "procedural",
+    "landRatio": 0.78,
+    "continentScale": 1.25,
+    "coastRoughness": 0.55,
+    "relief": {
+      "flats": 0.48,
+      "highlands": 0.3,
+      "peaks": 0.22
+    },
+    "verticalScale": 1.2,
+    "caves": {
+      "tunnelDensity": 0.5,
+      "cavernDensity": 0.35,
+      "noodleDensity": 0.18,
+      "entranceDensity": 0.45,
+      "verticalRange": {
+        "minY": -48,
+        "maxY": 160
+      },
+      "floodedChance": 0.28
+    },
+    "hydrology": {
+      "riverCoverage": 0.1,
+      "riverWidth": 1,
+      "riverDepth": 1,
+      "riverMeander": 0.8,
+      "riverFill": "FLUID",
+      "lakeDensity": 0.11,
+      "lakeScale": 0.8,
+      "lakeDepth": 0.75,
+      "oceanDepth": 1.18
+    },
+    "anchors": [
+      {
+        "id": "pilgrim_vale",
+        "placement": {
+          "kind": "fixed",
+          "x": 128,
+          "z": 96
+        },
+        "radius": 128,
+        "amplitude": -5,
+        "falloff": 1.4,
+        "climateBias": {
+          "strength": 0.9,
+          "temperature": 0.2,
+          "humidity": -0.4,
+          "continentalness": 0.8,
+          "erosion": 0.7,
+          "weirdness": 0.1
+        }
+      },
+      {
+        "id": "crown_spur",
+        "placement": {
+          "kind": "fixed",
+          "x": 448,
+          "z": -256
+        },
+        "radius": 192,
+        "amplitude": 24,
+        "falloff": 1.2,
+        "climateBias": {
+          "strength": 0.75,
+          "temperature": -0.55,
+          "humidity": -0.1,
+          "continentalness": 0.7,
+          "erosion": -0.18,
+          "weirdness": 0.25
+        }
+      },
+      {
+        "id": "abbey_basin",
+        "placement": {
+          "kind": "fixed",
+          "x": -384,
+          "z": 128
+        },
+        "radius": 160,
+        "amplitude": -8,
+        "falloff": 1.8,
+        "climateBias": {
+          "strength": 0.5,
+          "temperature": 0.05,
+          "humidity": 0.6,
+          "continentalness": 0.65,
+          "erosion": 0.45
+        }
+      }
+    ]
+  },
+  "aquifersEnabled": true,
+  "oreVeinsEnabled": true,
+  "legacyRandomSource": false,
+  "spawnTargets": [
+    {
+      "temperature": {
+        "min": -0.1,
+        "max": 0.6
+      },
+      "humidity": {
+        "min": -1,
+        "max": -0.2
+      },
+      "continentalness": {
+        "min": 0.15,
+        "max": 1
+      },
+      "erosion": {
+        "min": 0.35,
+        "max": 1
+      },
+      "depth": {
+        "min": 0,
+        "max": 0
+      },
+      "weirdness": {
+        "min": -1,
+        "max": 1
+      },
+      "offset": 0
+    }
+  ]
+}

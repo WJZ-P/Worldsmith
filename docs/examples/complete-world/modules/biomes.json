@@ -1,0 +1,942 @@
+{
+  "schemaVersion": 1,
+  "spatial": {
+    "regionScale": 1.15,
+    "boundaryRoughness": 0.18
+  },
+  "biomes": [
+    {
+      "id": "sunken_mere",
+      "displayName": "沉月深潭",
+      "archetype": "DEEP_OCEAN",
+      "slot": {
+        "relief": "DEEP_WATER"
+      },
+      "behavior": {
+        "temperature": 0.3,
+        "downfall": 0.6,
+        "hasPrecipitation": true,
+        "temperatureVariation": "UNIFORM"
+      },
+      "surface": {
+        "base": {
+          "layers": [
+            {
+              "material": {
+                "semanticRole": "surface_top",
+                "preferredIds": [
+                  "minecraft:gravel"
+                ]
+              },
+              "depth": 1
+            },
+            {
+              "material": {
+                "semanticRole": "surface_under",
+                "preferredIds": [
+                  "minecraft:tuff"
+                ]
+              },
+              "depth": 3
+            }
+          ],
+          "foundation": {
+            "semanticRole": "surface_deep",
+            "preferredIds": [
+              "minecraft:stone"
+            ]
+          }
+        },
+        "rules": []
+      },
+      "environment": {
+        "tint": {
+          "grass": "#7F9D91",
+          "foliage": "#91AEA6",
+          "water": "#354968"
+        },
+        "fog": {
+          "color": "#45617D",
+          "startDistance": 10,
+          "endDistance": 380,
+          "water": {
+            "color": "#354968",
+            "startDistance": 0,
+            "endDistance": 32
+          }
+        },
+        "sky": {
+          "color": "#566B91",
+          "cloudColor": "#E6ABB6D2",
+          "cloudHeight": 208,
+          "sunriseSunsetColor": "#B894668A",
+          "starBrightness": 0.85
+        },
+        "light": {
+          "skyFactor": 0.82,
+          "ambientColor": "#28263D",
+          "blockTint": "#EEDFFB"
+        },
+        "ambientParticles": []
+      },
+      "features": [
+        {
+          "feature": "mere_seagrass",
+          "density": 0.3
+        }
+      ]
+    },
+    {
+      "id": "moon_shallows",
+      "displayName": "镜月浅海",
+      "archetype": "OCEAN",
+      "slot": {
+        "relief": "SHALLOW_WATER"
+      },
+      "behavior": {
+        "temperature": 0.45,
+        "downfall": 0.55,
+        "hasPrecipitation": true,
+        "temperatureVariation": "UNIFORM"
+      },
+      "surface": {
+        "base": {
+          "layers": [
+            {
+              "material": {
+                "semanticRole": "surface_top",
+                "preferredIds": [
+                  "minecraft:sand"
+                ]
+              },
+              "depth": 1
+            },
+            {
+              "material": {
+                "semanticRole": "surface_under",
+                "preferredIds": [
+                  "minecraft:sandstone"
+                ]
+              },
+              "depth": 3
+            }
+          ],
+          "foundation": {
+            "semanticRole": "surface_deep",
+            "preferredIds": [
+              "minecraft:stone"
+            ]
+          }
+        },
+        "rules": []
+      },
+      "environment": {
+        "tint": {
+          "grass": "#7F9D91",
+          "foliage": "#91AEA6",
+          "water": "#4D7C91"
+        },
+        "fog": {
+          "color": "#668496",
+          "startDistance": 10,
+          "endDistance": 320,
+          "water": {
+            "color": "#4D7C91",
+            "startDistance": 0,
+            "endDistance": 60
+          }
+        },
+        "sky": {
+          "color": "#7183AB",
+          "cloudColor": "#E6ABB6D2",
+          "cloudHeight": 208,
+          "sunriseSunsetColor": "#B894668A",
+          "starBrightness": 0.85
+        },
+        "light": {
+          "skyFactor": 0.82,
+          "ambientColor": "#28263D",
+          "blockTint": "#EEDFFB"
+        },
+        "ambientParticles": []
+      },
+      "features": [
+        {
+          "feature": "mere_seagrass"
+        }
+      ]
+    },
+    {
+      "id": "silver_coast",
+      "displayName": "银砂海岸",
+      "archetype": "BEACH",
+      "slot": {
+        "relief": "COAST"
+      },
+      "behavior": {
+        "temperature": 0.55,
+        "downfall": 0.45,
+        "hasPrecipitation": true,
+        "temperatureVariation": "UNIFORM"
+      },
+      "surface": {
+        "base": {
+          "layers": [
+            {
+              "material": {
+                "semanticRole": "surface_top",
+                "preferredIds": [
+                  "minecraft:sand"
+                ]
+              },
+              "depth": 1
+            },
+            {
+              "material": {
+                "semanticRole": "surface_under",
+                "preferredIds": [
+                  "minecraft:sandstone"
+                ]
+              },
+              "depth": 3
+            }
+          ],
+          "foundation": {
+            "semanticRole": "surface_deep",
+            "preferredIds": [
+              "minecraft:stone"
+            ]
+          }
+        },
+        "rules": [
+          {
+            "id": "river_lake_silt",
+            "conditions": {
+              "water": "UNDERWATER"
+            },
+            "stack": {
+              "layers": [
+                {
+                  "material": {
+                    "semanticRole": "surface_top",
+                    "preferredIds": [
+                      "minecraft:gravel"
+                    ]
+                  },
+                  "depth": 1
+                },
+                {
+                  "material": {
+                    "semanticRole": "surface_under",
+                    "preferredIds": [
+                      "minecraft:clay"
+                    ]
+                  },
+                  "depth": 3
+                }
+              ],
+              "foundation": {
+                "semanticRole": "surface_deep",
+                "preferredIds": [
+                  "minecraft:stone"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "environment": {
+        "tint": {
+          "grass": "#7F9D91",
+          "foliage": "#91AEA6",
+          "water": "#68899D"
+        },
+        "fog": {
+          "color": "#7597A9",
+          "startDistance": 10,
+          "endDistance": 300,
+          "water": {
+            "color": "#68899D",
+            "startDistance": 0,
+            "endDistance": 60
+          }
+        },
+        "sky": {
+          "color": "#879DC1",
+          "cloudColor": "#E6ABB6D2",
+          "cloudHeight": 208,
+          "sunriseSunsetColor": "#B894668A",
+          "starBrightness": 0.85
+        },
+        "light": {
+          "skyFactor": 0.82,
+          "ambientColor": "#28263D",
+          "blockTint": "#EEDFFB"
+        },
+        "ambientParticles": []
+      },
+      "features": [
+        {
+          "feature": "coast_gravel"
+        }
+      ]
+    },
+    {
+      "id": "moonmeadow",
+      "displayName": "月光草甸",
+      "archetype": "LOWLAND",
+      "slot": {
+        "relief": "FLATS",
+        "humidity": [
+          "ARID"
+        ]
+      },
+      "behavior": {
+        "temperature": 0.65,
+        "downfall": 0.45,
+        "hasPrecipitation": true,
+        "temperatureVariation": "UNIFORM"
+      },
+      "surface": {
+        "base": {
+          "layers": [
+            {
+              "material": {
+                "semanticRole": "surface_top",
+                "preferredIds": [
+                  "minecraft:grass_block"
+                ]
+              },
+              "depth": 1
+            },
+            {
+              "material": {
+                "semanticRole": "surface_under",
+                "preferredIds": [
+                  "minecraft:dirt"
+                ]
+              },
+              "depth": 3
+            }
+          ],
+          "foundation": {
+            "semanticRole": "surface_deep",
+            "preferredIds": [
+              "minecraft:stone"
+            ]
+          }
+        },
+        "rules": [
+          {
+            "id": "river_lake_silt",
+            "conditions": {
+              "water": "UNDERWATER"
+            },
+            "stack": {
+              "layers": [
+                {
+                  "material": {
+                    "semanticRole": "surface_top",
+                    "preferredIds": [
+                      "minecraft:gravel"
+                    ]
+                  },
+                  "depth": 1
+                },
+                {
+                  "material": {
+                    "semanticRole": "surface_under",
+                    "preferredIds": [
+                      "minecraft:clay"
+                    ]
+                  },
+                  "depth": 3
+                }
+              ],
+              "foundation": {
+                "semanticRole": "surface_deep",
+                "preferredIds": [
+                  "minecraft:stone"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "environment": {
+        "tint": {
+          "grass": "#7F9D91",
+          "foliage": "#91AEA6",
+          "water": "#54768E"
+        },
+        "fog": {
+          "color": "#8DA4AC",
+          "startDistance": 10,
+          "endDistance": 240,
+          "water": {
+            "color": "#54768E",
+            "startDistance": 0,
+            "endDistance": 60
+          }
+        },
+        "sky": {
+          "color": "#8491B7",
+          "cloudColor": "#E6ABB6D2",
+          "cloudHeight": 208,
+          "sunriseSunsetColor": "#B894668A",
+          "starBrightness": 0.85
+        },
+        "light": {
+          "skyFactor": 0.82,
+          "ambientColor": "#28263D",
+          "blockTint": "#EEDFFB"
+        },
+        "ambientParticles": []
+      },
+      "features": [
+        {
+          "feature": "meadow_oaks"
+        },
+        {
+          "feature": "moon_flowers"
+        },
+        {
+          "feature": "meadow_grasses"
+        }
+      ]
+    },
+    {
+      "id": "silverpine_wood",
+      "displayName": "银松密林",
+      "archetype": "LOWLAND",
+      "slot": {
+        "relief": "FLATS",
+        "humidity": [
+          "HUMID"
+        ]
+      },
+      "behavior": {
+        "temperature": 0.35,
+        "downfall": 0.85,
+        "hasPrecipitation": true,
+        "temperatureVariation": "UNIFORM"
+      },
+      "surface": {
+        "base": {
+          "layers": [
+            {
+              "material": {
+                "semanticRole": "surface_top",
+                "preferredIds": [
+                  "minecraft:grass_block"
+                ]
+              },
+              "depth": 1
+            },
+            {
+              "material": {
+                "semanticRole": "surface_under",
+                "preferredIds": [
+                  "minecraft:dirt"
+                ]
+              },
+              "depth": 3
+            }
+          ],
+          "foundation": {
+            "semanticRole": "surface_deep",
+            "preferredIds": [
+              "minecraft:stone"
+            ]
+          }
+        },
+        "rules": [
+          {
+            "id": "river_lake_silt",
+            "conditions": {
+              "water": "UNDERWATER"
+            },
+            "stack": {
+              "layers": [
+                {
+                  "material": {
+                    "semanticRole": "surface_top",
+                    "preferredIds": [
+                      "minecraft:gravel"
+                    ]
+                  },
+                  "depth": 1
+                },
+                {
+                  "material": {
+                    "semanticRole": "surface_under",
+                    "preferredIds": [
+                      "minecraft:clay"
+                    ]
+                  },
+                  "depth": 3
+                }
+              ],
+              "foundation": {
+                "semanticRole": "surface_deep",
+                "preferredIds": [
+                  "minecraft:stone"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "environment": {
+        "tint": {
+          "grass": "#7B9D93",
+          "foliage": "#91AEA6",
+          "water": "#3F6478"
+        },
+        "fog": {
+          "color": "#78989E",
+          "startDistance": 10,
+          "endDistance": 150,
+          "water": {
+            "color": "#3F6478",
+            "startDistance": 0,
+            "endDistance": 60
+          }
+        },
+        "sky": {
+          "color": "#66778B",
+          "cloudColor": "#E6ABB6D2",
+          "cloudHeight": 208,
+          "sunriseSunsetColor": "#B894668A",
+          "starBrightness": 0.85
+        },
+        "light": {
+          "skyFactor": 0.82,
+          "ambientColor": "#28263D",
+          "blockTint": "#EEDFFB"
+        },
+        "ambientParticles": []
+      },
+      "features": [
+        {
+          "feature": "silver_pines"
+        },
+        {
+          "feature": "moon_flowers",
+          "density": 0.25
+        },
+        {
+          "feature": "fallen_silverpine"
+        }
+      ]
+    },
+    {
+      "id": "amber_highlands",
+      "displayName": "琥珀丘陵",
+      "archetype": "HILL",
+      "slot": {
+        "relief": "HIGHLAND",
+        "temperature": [
+          "TEMPERATE",
+          "HOT"
+        ]
+      },
+      "behavior": {
+        "temperature": 0.9,
+        "downfall": 0.28,
+        "hasPrecipitation": true,
+        "temperatureVariation": "UNIFORM"
+      },
+      "surface": {
+        "base": {
+          "layers": [
+            {
+              "material": {
+                "semanticRole": "surface_top",
+                "preferredIds": [
+                  "minecraft:grass_block"
+                ]
+              },
+              "depth": 1
+            },
+            {
+              "material": {
+                "semanticRole": "surface_under",
+                "preferredIds": [
+                  "minecraft:coarse_dirt"
+                ]
+              },
+              "depth": 3
+            }
+          ],
+          "foundation": {
+            "semanticRole": "surface_deep",
+            "preferredIds": [
+              "minecraft:stone"
+            ]
+          }
+        },
+        "rules": [
+          {
+            "id": "river_lake_silt",
+            "conditions": {
+              "water": "UNDERWATER"
+            },
+            "stack": {
+              "layers": [
+                {
+                  "material": {
+                    "semanticRole": "surface_top",
+                    "preferredIds": [
+                      "minecraft:gravel"
+                    ]
+                  },
+                  "depth": 1
+                },
+                {
+                  "material": {
+                    "semanticRole": "surface_under",
+                    "preferredIds": [
+                      "minecraft:clay"
+                    ]
+                  },
+                  "depth": 3
+                }
+              ],
+              "foundation": {
+                "semanticRole": "surface_deep",
+                "preferredIds": [
+                  "minecraft:stone"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "environment": {
+        "tint": {
+          "grass": "#A38A59",
+          "foliage": "#A9A064",
+          "water": "#61758A"
+        },
+        "fog": {
+          "color": "#9A9D96",
+          "startDistance": 10,
+          "endDistance": 280,
+          "water": {
+            "color": "#61758A",
+            "startDistance": 0,
+            "endDistance": 60
+          }
+        },
+        "sky": {
+          "color": "#AC927C",
+          "cloudColor": "#E6ABB6D2",
+          "cloudHeight": 208,
+          "sunriseSunsetColor": "#B894668A",
+          "starBrightness": 0.85
+        },
+        "light": {
+          "skyFactor": 0.82,
+          "ambientColor": "#28263D",
+          "blockTint": "#EEDFFB"
+        },
+        "ambientParticles": []
+      },
+      "features": [
+        {
+          "feature": "meadow_oaks"
+        },
+        {
+          "feature": "ridge_boulders"
+        },
+        {
+          "feature": "meadow_grasses",
+          "density": 0.45
+        }
+      ]
+    },
+    {
+      "id": "starfall_ridges",
+      "displayName": "碎星山脊",
+      "archetype": "HILL",
+      "slot": {
+        "relief": "HIGHLAND",
+        "temperature": [
+          "COLD"
+        ]
+      },
+      "behavior": {
+        "temperature": 0.12,
+        "downfall": 0.3,
+        "hasPrecipitation": true,
+        "temperatureVariation": "UNIFORM"
+      },
+      "surface": {
+        "base": {
+          "layers": [
+            {
+              "material": {
+                "semanticRole": "surface_top",
+                "preferredIds": [
+                  "minecraft:tuff"
+                ]
+              },
+              "depth": 1
+            },
+            {
+              "material": {
+                "semanticRole": "surface_under",
+                "preferredIds": [
+                  "minecraft:andesite"
+                ]
+              },
+              "depth": 3
+            }
+          ],
+          "foundation": {
+            "semanticRole": "surface_deep",
+            "preferredIds": [
+              "minecraft:deepslate"
+            ]
+          }
+        },
+        "rules": [
+          {
+            "id": "river_lake_silt",
+            "conditions": {
+              "water": "UNDERWATER"
+            },
+            "stack": {
+              "layers": [
+                {
+                  "material": {
+                    "semanticRole": "surface_top",
+                    "preferredIds": [
+                      "minecraft:gravel"
+                    ]
+                  },
+                  "depth": 1
+                },
+                {
+                  "material": {
+                    "semanticRole": "surface_under",
+                    "preferredIds": [
+                      "minecraft:clay"
+                    ]
+                  },
+                  "depth": 3
+                }
+              ],
+              "foundation": {
+                "semanticRole": "surface_deep",
+                "preferredIds": [
+                  "minecraft:stone"
+                ]
+              }
+            }
+          },
+          {
+            "id": "moonstone_scars",
+            "conditions": {
+              "noise": {
+                "noise": "CALCITE",
+                "min": 0.55,
+                "max": 1
+              }
+            },
+            "stack": {
+              "layers": [
+                {
+                  "material": {
+                    "semanticRole": "surface_top",
+                    "preferredIds": [
+                      "worldsmith:content/moonstone"
+                    ]
+                  },
+                  "depth": 1
+                },
+                {
+                  "material": {
+                    "semanticRole": "surface_under",
+                    "preferredIds": [
+                      "minecraft:calcite"
+                    ]
+                  },
+                  "depth": 3
+                }
+              ],
+              "foundation": {
+                "semanticRole": "surface_deep",
+                "preferredIds": [
+                  "minecraft:deepslate"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "environment": {
+        "tint": {
+          "grass": "#7F9D91",
+          "foliage": "#91AEA6",
+          "water": "#4B5176"
+        },
+        "fog": {
+          "color": "#81779B",
+          "startDistance": 10,
+          "endDistance": 220,
+          "water": {
+            "color": "#4B5176",
+            "startDistance": 0,
+            "endDistance": 60
+          }
+        },
+        "sky": {
+          "color": "#665A88",
+          "cloudColor": "#E6ABB6D2",
+          "cloudHeight": 208,
+          "sunriseSunsetColor": "#B894668A",
+          "starBrightness": 0.85
+        },
+        "light": {
+          "skyFactor": 0.82,
+          "ambientColor": "#28263D",
+          "blockTint": "#EEDFFB"
+        },
+        "ambientParticles": [
+          {
+            "particle": "minecraft:end_rod",
+            "probability": 0.004
+          }
+        ]
+      },
+      "features": [
+        {
+          "feature": "ridge_boulders"
+        },
+        {
+          "feature": "crystal_outcrops"
+        }
+      ]
+    },
+    {
+      "id": "frost_crown",
+      "displayName": "霜冠诸峰",
+      "archetype": "MOUNTAIN",
+      "slot": {
+        "relief": "PEAKS"
+      },
+      "behavior": {
+        "temperature": -0.65,
+        "downfall": 0.7,
+        "hasPrecipitation": true,
+        "temperatureVariation": "PATCHY"
+      },
+      "surface": {
+        "base": {
+          "layers": [
+            {
+              "material": {
+                "semanticRole": "surface_top",
+                "preferredIds": [
+                  "minecraft:snow_block"
+                ]
+              },
+              "depth": 1
+            },
+            {
+              "material": {
+                "semanticRole": "surface_under",
+                "preferredIds": [
+                  "minecraft:packed_ice"
+                ]
+              },
+              "depth": 3
+            }
+          ],
+          "foundation": {
+            "semanticRole": "surface_deep",
+            "preferredIds": [
+              "minecraft:stone"
+            ]
+          }
+        },
+        "rules": [
+          {
+            "id": "river_lake_silt",
+            "conditions": {
+              "water": "UNDERWATER"
+            },
+            "stack": {
+              "layers": [
+                {
+                  "material": {
+                    "semanticRole": "surface_top",
+                    "preferredIds": [
+                      "minecraft:gravel"
+                    ]
+                  },
+                  "depth": 1
+                },
+                {
+                  "material": {
+                    "semanticRole": "surface_under",
+                    "preferredIds": [
+                      "minecraft:clay"
+                    ]
+                  },
+                  "depth": 3
+                }
+              ],
+              "foundation": {
+                "semanticRole": "surface_deep",
+                "preferredIds": [
+                  "minecraft:stone"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "environment": {
+        "tint": {
+          "grass": "#7F9D91",
+          "foliage": "#91AEA6",
+          "water": "#5B7898"
+        },
+        "fog": {
+          "color": "#B5C4D9",
+          "startDistance": 10,
+          "endDistance": 300,
+          "water": {
+            "color": "#5B7898",
+            "startDistance": 0,
+            "endDistance": 60
+          }
+        },
+        "sky": {
+          "color": "#ADB7D5",
+          "cloudColor": "#E6ABB6D2",
+          "cloudHeight": 208,
+          "sunriseSunsetColor": "#B894668A",
+          "starBrightness": 0.85
+        },
+        "light": {
+          "skyFactor": 0.82,
+          "ambientColor": "#28263D",
+          "blockTint": "#EEDFFB"
+        },
+        "ambientParticles": []
+      },
+      "features": [
+        {
+          "feature": "crystal_outcrops"
+        },
+        {
+          "feature": "fallen_silverpine"
+        }
+      ]
+    }
+  ]
+}

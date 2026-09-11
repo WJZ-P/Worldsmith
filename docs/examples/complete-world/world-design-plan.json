@@ -1,0 +1,1484 @@
+{
+  "schemaVersion": 1,
+  "goal": "从一句月蚀王国prompt生成一个有地形生态、三种建筑尺度、材料来源、三生物与四段可完成主线的真实世界。",
+  "targets": [
+    {
+      "key": {
+        "kind": "biome",
+        "id": "sunken_mere"
+      },
+      "title": "沉月深潭",
+      "purpose": "地形、气候、地表材料与生态共同定义可辨识的旅途区域。"
+    },
+    {
+      "key": {
+        "kind": "biome",
+        "id": "moon_shallows"
+      },
+      "title": "镜月浅海",
+      "purpose": "地形、气候、地表材料与生态共同定义可辨识的旅途区域。"
+    },
+    {
+      "key": {
+        "kind": "biome",
+        "id": "silver_coast"
+      },
+      "title": "银砂海岸",
+      "purpose": "地形、气候、地表材料与生态共同定义可辨识的旅途区域。"
+    },
+    {
+      "key": {
+        "kind": "biome",
+        "id": "moonmeadow"
+      },
+      "title": "月光草甸",
+      "purpose": "地形、气候、地表材料与生态共同定义可辨识的旅途区域。"
+    },
+    {
+      "key": {
+        "kind": "biome",
+        "id": "silverpine_wood"
+      },
+      "title": "银松密林",
+      "purpose": "地形、气候、地表材料与生态共同定义可辨识的旅途区域。"
+    },
+    {
+      "key": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "title": "琥珀丘陵",
+      "purpose": "地形、气候、地表材料与生态共同定义可辨识的旅途区域。"
+    },
+    {
+      "key": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "title": "碎星山脊",
+      "purpose": "地形、气候、地表材料与生态共同定义可辨识的旅途区域。"
+    },
+    {
+      "key": {
+        "kind": "biome",
+        "id": "frost_crown"
+      },
+      "title": "霜冠诸峰",
+      "purpose": "地形、气候、地表材料与生态共同定义可辨识的旅途区域。"
+    },
+    {
+      "key": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "title": "crown_citadel",
+      "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的王城地标；大厅提供黯星守门者的专用刷怪笼遭遇，生成受玩家距离、净空与附近同类限制，不承诺王城放置或全局唯一。"
+    },
+    {
+      "key": {
+        "kind": "structure",
+        "id": "silverpine_hamlet"
+      },
+      "title": "silverpine_hamlet",
+      "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
+    },
+    {
+      "key": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "title": "star_abbey",
+      "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
+    },
+    {
+      "key": {
+        "kind": "structure",
+        "id": "pilgrim_shrine"
+      },
+      "title": "pilgrim_shrine",
+      "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
+    },
+    {
+      "key": {
+        "kind": "structure",
+        "id": "crystal_quarry"
+      },
+      "title": "crystal_quarry",
+      "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
+    },
+    {
+      "key": {
+        "kind": "structure",
+        "id": "fallen_watchtower"
+      },
+      "title": "fallen_watchtower",
+      "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
+    },
+    {
+      "key": {
+        "kind": "block",
+        "id": "moonstone"
+      },
+      "title": "月辉石",
+      "purpose": "银白细纹的王国基石，同时出现在碎星露头与宫殿铺地。"
+    },
+    {
+      "key": {
+        "kind": "block",
+        "id": "runed_slate"
+      },
+      "title": "星纹板岩",
+      "purpose": "深色星术承重石，用在城堡扶壁、修道院拱柱与露天圣坛。"
+    },
+    {
+      "key": {
+        "kind": "block",
+        "id": "bronze_masonry"
+      },
+      "title": "古铜砌块",
+      "purpose": "旧王国仪式建筑的金属束带和天文仪框架。"
+    },
+    {
+      "key": {
+        "kind": "block",
+        "id": "star_glass"
+      },
+      "title": "凝星玻璃",
+      "purpose": "微亮的蓝紫玻璃，在夜间标明被遗忘的入口与高处灯冠。"
+    },
+    {
+      "key": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "title": "月辉碎晶",
+      "purpose": "旅途第一段的实际交付材料。"
+    },
+    {
+      "key": {
+        "kind": "item",
+        "id": "bronze_seal"
+      },
+      "title": "旧王铜印",
+      "purpose": "连接普通居民与旧王权的文物。"
+    },
+    {
+      "key": {
+        "kind": "item",
+        "id": "eclipse_core"
+      },
+      "title": "黯星核心",
+      "purpose": "Boss胜利通向结局的真实交付物。"
+    },
+    {
+      "key": {
+        "kind": "item",
+        "id": "dawn_sigil"
+      },
+      "title": "复晓徽记",
+      "purpose": "线性主线的一次性最终奖励。"
+    },
+    {
+      "key": {
+        "kind": "quest",
+        "id": "gather_moonlight"
+      },
+      "title": "一 · 收拢散月",
+      "purpose": "旧巡礼者把第一批月辉碎晶留在圣坛补给箱中；碎晶哨兵也会携带这种材料。寻找圣坛或击败哨兵，主动提交8枚碎晶。仅持有不会自动完成，物品可分次交付。"
+    },
+    {
+      "key": {
+        "kind": "quest",
+        "id": "silence_shards"
+      },
+      "title": "二 · 平息石甲回声",
+      "purpose": "领取上一段奖励后，击败3名碎晶哨兵。它们在琥珀丘陵与碎星山脊游荡。主线只记录任务解锁之后归属于你的击杀。"
+    },
+    {
+      "key": {
+        "kind": "quest",
+        "id": "break_darkstar"
+      },
+      "title": "三 · 击碎黯星誓约",
+      "purpose": "寻找王城大厅的黯星刷怪笼，或在碎星山脊与霜冠高地追踪稀有的守门者。接近刷怪笼后仍需满足净空与附近同类限制；它不是全世界唯一Boss。备足装备，击败一只守门者并领取奖励，固定得到一枚核心，主线不依赖随机掉落。"
+    },
+    {
+      "key": {
+        "kind": "quest",
+        "id": "rekindle_crown"
+      },
+      "title": "四 · 重燃月冠",
+      "purpose": "将一枚黯星核心主动提交到日志，然后领取复晓徽记。王城、村落与星术遗迹再次被同一条旅途联系起来。奖励空间不足时不会掉落在地上，可整理主背包后再领取。"
+    },
+    {
+      "key": {
+        "kind": "feature",
+        "id": "silver_pines"
+      },
+      "title": "silver_pines",
+      "purpose": "只声明实际被群系采用的装饰生成。"
+    },
+    {
+      "key": {
+        "kind": "feature",
+        "id": "meadow_oaks"
+      },
+      "title": "meadow_oaks",
+      "purpose": "只声明实际被群系采用的装饰生成。"
+    },
+    {
+      "key": {
+        "kind": "feature",
+        "id": "moon_flowers"
+      },
+      "title": "moon_flowers",
+      "purpose": "只声明实际被群系采用的装饰生成。"
+    },
+    {
+      "key": {
+        "kind": "feature",
+        "id": "meadow_grasses"
+      },
+      "title": "meadow_grasses",
+      "purpose": "只声明实际被群系采用的装饰生成。"
+    },
+    {
+      "key": {
+        "kind": "feature",
+        "id": "coast_gravel"
+      },
+      "title": "coast_gravel",
+      "purpose": "只声明实际被群系采用的装饰生成。"
+    },
+    {
+      "key": {
+        "kind": "feature",
+        "id": "mere_seagrass"
+      },
+      "title": "mere_seagrass",
+      "purpose": "只声明实际被群系采用的装饰生成。"
+    },
+    {
+      "key": {
+        "kind": "feature",
+        "id": "ridge_boulders"
+      },
+      "title": "ridge_boulders",
+      "purpose": "只声明实际被群系采用的装饰生成。"
+    },
+    {
+      "key": {
+        "kind": "feature",
+        "id": "crystal_outcrops"
+      },
+      "title": "crystal_outcrops",
+      "purpose": "只声明实际被群系采用的装饰生成。"
+    },
+    {
+      "key": {
+        "kind": "feature",
+        "id": "fallen_silverpine"
+      },
+      "title": "fallen_silverpine",
+      "purpose": "只声明实际被群系采用的装饰生成。"
+    },
+    {
+      "key": {
+        "kind": "creature",
+        "id": "silver_antler"
+      },
+      "title": "银角月鹿",
+      "purpose": "有独立体型与生态/战斗职责的世界生物。"
+    },
+    {
+      "key": {
+        "kind": "creature",
+        "id": "shardbound_sentinel"
+      },
+      "title": "碎晶哨兵",
+      "purpose": "有独立体型与生态/战斗职责的世界生物。"
+    },
+    {
+      "key": {
+        "kind": "creature",
+        "id": "darkstar_gatekeeper"
+      },
+      "title": "黯星守门者",
+      "purpose": "有血条与三阶段节奏的重甲Boss；王城大厅的专用刷怪笼和碎星/霜冠的稀有自然生成提供两条遭遇路径，击杀连到主线第三段。"
+    }
+  ],
+  "links": [
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "creature",
+        "id": "darkstar_gatekeeper"
+      },
+      "relation": "contains_encounter"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "frost_crown"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "silverpine_hamlet"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "moonmeadow"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "silverpine_hamlet"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "silverpine_wood"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "silverpine_wood"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "pilgrim_shrine"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "moonmeadow"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "pilgrim_shrine"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "silverpine_wood"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crystal_quarry"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crystal_quarry"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "fallen_watchtower"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "moonmeadow"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "fallen_watchtower"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "fallen_watchtower"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "silverpine_wood"
+      },
+      "relation": "placed_in_biome"
+    },
+    {
+      "from": {
+        "kind": "creature",
+        "id": "silver_antler"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "moonmeadow"
+      },
+      "relation": "spawns_in_biome"
+    },
+    {
+      "from": {
+        "kind": "creature",
+        "id": "silver_antler"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "silverpine_wood"
+      },
+      "relation": "spawns_in_biome"
+    },
+    {
+      "from": {
+        "kind": "creature",
+        "id": "shardbound_sentinel"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "relation": "spawns_in_biome"
+    },
+    {
+      "from": {
+        "kind": "creature",
+        "id": "shardbound_sentinel"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "relation": "spawns_in_biome"
+    },
+    {
+      "from": {
+        "kind": "creature",
+        "id": "darkstar_gatekeeper"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "relation": "spawns_in_biome"
+    },
+    {
+      "from": {
+        "kind": "creature",
+        "id": "darkstar_gatekeeper"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "frost_crown"
+      },
+      "relation": "spawns_in_biome"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "block",
+        "id": "moonstone"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "block",
+        "id": "runed_slate"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "block",
+        "id": "bronze_masonry"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "block",
+        "id": "star_glass"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "silverpine_hamlet"
+      },
+      "to": {
+        "kind": "block",
+        "id": "moonstone"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "silverpine_hamlet"
+      },
+      "to": {
+        "kind": "block",
+        "id": "bronze_masonry"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "silverpine_hamlet"
+      },
+      "to": {
+        "kind": "block",
+        "id": "star_glass"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "to": {
+        "kind": "block",
+        "id": "moonstone"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "to": {
+        "kind": "block",
+        "id": "runed_slate"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "to": {
+        "kind": "block",
+        "id": "bronze_masonry"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "to": {
+        "kind": "block",
+        "id": "star_glass"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "pilgrim_shrine"
+      },
+      "to": {
+        "kind": "block",
+        "id": "moonstone"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "pilgrim_shrine"
+      },
+      "to": {
+        "kind": "block",
+        "id": "runed_slate"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "pilgrim_shrine"
+      },
+      "to": {
+        "kind": "block",
+        "id": "bronze_masonry"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "pilgrim_shrine"
+      },
+      "to": {
+        "kind": "block",
+        "id": "star_glass"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crystal_quarry"
+      },
+      "to": {
+        "kind": "block",
+        "id": "moonstone"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "fallen_watchtower"
+      },
+      "to": {
+        "kind": "block",
+        "id": "moonstone"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "fallen_watchtower"
+      },
+      "to": {
+        "kind": "block",
+        "id": "runed_slate"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "fallen_watchtower"
+      },
+      "to": {
+        "kind": "block",
+        "id": "star_glass"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "feature",
+        "id": "crystal_outcrops"
+      },
+      "to": {
+        "kind": "block",
+        "id": "moonstone"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "to": {
+        "kind": "block",
+        "id": "moonstone"
+      },
+      "relation": "uses_block"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "sunken_mere"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "mere_seagrass"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "moon_shallows"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "mere_seagrass"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "silver_coast"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "coast_gravel"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "moonmeadow"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "meadow_oaks"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "moonmeadow"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "moon_flowers"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "moonmeadow"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "meadow_grasses"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "silverpine_wood"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "silver_pines"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "silverpine_wood"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "moon_flowers"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "silverpine_wood"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "fallen_silverpine"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "meadow_oaks"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "ridge_boulders"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "meadow_grasses"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "ridge_boulders"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "crystal_outcrops"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "frost_crown"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "crystal_outcrops"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "biome",
+        "id": "frost_crown"
+      },
+      "to": {
+        "kind": "feature",
+        "id": "fallen_silverpine"
+      },
+      "relation": "uses_feature"
+    },
+    {
+      "from": {
+        "kind": "creature",
+        "id": "shardbound_sentinel"
+      },
+      "to": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "relation": "drops_item"
+    },
+    {
+      "from": {
+        "kind": "creature",
+        "id": "shardbound_sentinel"
+      },
+      "to": {
+        "kind": "item",
+        "id": "bronze_seal"
+      },
+      "relation": "drops_item"
+    },
+    {
+      "from": {
+        "kind": "creature",
+        "id": "darkstar_gatekeeper"
+      },
+      "to": {
+        "kind": "item",
+        "id": "eclipse_core"
+      },
+      "relation": "drops_item"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "relation": "contains_reward"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "to": {
+        "kind": "item",
+        "id": "bronze_seal"
+      },
+      "relation": "contains_reward"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "silverpine_hamlet"
+      },
+      "to": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "relation": "contains_reward"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "silverpine_hamlet"
+      },
+      "to": {
+        "kind": "item",
+        "id": "bronze_seal"
+      },
+      "relation": "contains_reward"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "to": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "relation": "contains_reward"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "to": {
+        "kind": "item",
+        "id": "bronze_seal"
+      },
+      "relation": "contains_reward"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "pilgrim_shrine"
+      },
+      "to": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "relation": "contains_reward"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "crystal_quarry"
+      },
+      "to": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "relation": "contains_reward"
+    },
+    {
+      "from": {
+        "kind": "structure",
+        "id": "fallen_watchtower"
+      },
+      "to": {
+        "kind": "item",
+        "id": "bronze_seal"
+      },
+      "relation": "contains_reward"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "gather_moonlight"
+      },
+      "to": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "relation": "delivery_objective"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "gather_moonlight"
+      },
+      "to": {
+        "kind": "item",
+        "id": "bronze_seal"
+      },
+      "relation": "quest_reward"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "silence_shards"
+      },
+      "to": {
+        "kind": "quest",
+        "id": "gather_moonlight"
+      },
+      "relation": "prerequisite"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "silence_shards"
+      },
+      "to": {
+        "kind": "creature",
+        "id": "shardbound_sentinel"
+      },
+      "relation": "kill_objective"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "silence_shards"
+      },
+      "to": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "relation": "quest_reward"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "silence_shards"
+      },
+      "to": {
+        "kind": "item",
+        "id": "bronze_seal"
+      },
+      "relation": "quest_reward"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "break_darkstar"
+      },
+      "to": {
+        "kind": "quest",
+        "id": "silence_shards"
+      },
+      "relation": "prerequisite"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "break_darkstar"
+      },
+      "to": {
+        "kind": "creature",
+        "id": "darkstar_gatekeeper"
+      },
+      "relation": "kill_objective"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "break_darkstar"
+      },
+      "to": {
+        "kind": "item",
+        "id": "eclipse_core"
+      },
+      "relation": "quest_reward"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "rekindle_crown"
+      },
+      "to": {
+        "kind": "quest",
+        "id": "break_darkstar"
+      },
+      "relation": "prerequisite"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "rekindle_crown"
+      },
+      "to": {
+        "kind": "item",
+        "id": "eclipse_core"
+      },
+      "relation": "delivery_objective"
+    },
+    {
+      "from": {
+        "kind": "quest",
+        "id": "rekindle_crown"
+      },
+      "to": {
+        "kind": "item",
+        "id": "dawn_sigil"
+      },
+      "relation": "quest_reward"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "arrival"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "moonmeadow"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "arrival"
+      },
+      "to": {
+        "kind": "structure",
+        "id": "silverpine_hamlet"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "arrival"
+      },
+      "to": {
+        "kind": "structure",
+        "id": "pilgrim_shrine"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "arrival"
+      },
+      "to": {
+        "kind": "item",
+        "id": "moon_shard"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "arrival"
+      },
+      "to": {
+        "kind": "quest",
+        "id": "gather_moonlight"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "arrival"
+      },
+      "to": {
+        "kind": "creature",
+        "id": "silver_antler"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "old_roads"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "amber_highlands"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "old_roads"
+      },
+      "to": {
+        "kind": "structure",
+        "id": "star_abbey"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "old_roads"
+      },
+      "to": {
+        "kind": "structure",
+        "id": "fallen_watchtower"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "old_roads"
+      },
+      "to": {
+        "kind": "creature",
+        "id": "shardbound_sentinel"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "old_roads"
+      },
+      "to": {
+        "kind": "quest",
+        "id": "silence_shards"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "old_roads"
+      },
+      "to": {
+        "kind": "block",
+        "id": "runed_slate"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "old_roads"
+      },
+      "to": {
+        "kind": "item",
+        "id": "bronze_seal"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "darkstar"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "starfall_ridges"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "darkstar"
+      },
+      "to": {
+        "kind": "biome",
+        "id": "frost_crown"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "darkstar"
+      },
+      "to": {
+        "kind": "structure",
+        "id": "crown_citadel"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "darkstar"
+      },
+      "to": {
+        "kind": "creature",
+        "id": "darkstar_gatekeeper"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "darkstar"
+      },
+      "to": {
+        "kind": "quest",
+        "id": "break_darkstar"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "darkstar"
+      },
+      "to": {
+        "kind": "item",
+        "id": "eclipse_core"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "renewal"
+      },
+      "to": {
+        "kind": "quest",
+        "id": "rekindle_crown"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "renewal"
+      },
+      "to": {
+        "kind": "item",
+        "id": "dawn_sigil"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "renewal"
+      },
+      "to": {
+        "kind": "structure",
+        "id": "crystal_quarry"
+      },
+      "relation": "theme_anchor"
+    },
+    {
+      "from": {
+        "kind": "narrative_beat",
+        "id": "renewal"
+      },
+      "to": {
+        "kind": "block",
+        "id": "star_glass"
+      },
+      "relation": "theme_anchor"
+    }
+  ],
+  "bosses": [
+    {
+      "creature": "darkstar_gatekeeper",
+      "quest": "break_darkstar"
+    }
+  ]
+}

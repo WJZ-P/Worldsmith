@@ -1,0 +1,445 @@
+{
+  "schemaVersion": 1,
+  "id": "silver_antler",
+  "displayName": "银角月鹿",
+  "category": "PASSIVE",
+  "atlasWidth": 128,
+  "atlasHeight": 128,
+  "padding": 2,
+  "themeRole": "银松林中与玩家共享月光的四足生物；不是敌对模板换皮。",
+  "attributes": {
+    "health": 18,
+    "speed": 0.29,
+    "followRange": 18,
+    "attackDamage": 0,
+    "knockbackResistance": 0,
+    "width": 0.75,
+    "height": 1.8
+  },
+  "behavior": {
+    "passiveMode": "FLEE_PLAYERS",
+    "territoryRadius": 48,
+    "attackReach": 0.5,
+    "windupTicks": 12,
+    "recoveryTicks": 20
+  },
+  "spawn": {
+    "biomes": [
+      "moonmeadow",
+      "silverpine_wood"
+    ],
+    "weight": 18,
+    "minGroup": 2,
+    "maxGroup": 4,
+    "minLight": 8,
+    "maxLight": 15
+  },
+  "drops": [],
+  "bones": [
+    {
+      "id": "root",
+      "parent": null,
+      "pivot": {
+        "x": 0,
+        "y": 24,
+        "z": 0
+      },
+      "cubes": []
+    },
+    {
+      "id": "body",
+      "parent": "root",
+      "pivot": {
+        "x": 0,
+        "y": -15,
+        "z": 0
+      },
+      "cubes": [
+        {
+          "id": "back",
+          "origin": {
+            "x": -4,
+            "y": -4,
+            "z": -7
+          },
+          "size": {
+            "x": 8,
+            "y": 7,
+            "z": 14
+          },
+          "materialRole": "fur_grey"
+        },
+        {
+          "id": "belly",
+          "origin": {
+            "x": -3,
+            "y": 1,
+            "z": -5
+          },
+          "size": {
+            "x": 6,
+            "y": 3,
+            "z": 10
+          },
+          "materialRole": "fur_white"
+        }
+      ]
+    },
+    {
+      "id": "neck",
+      "parent": "root",
+      "pivot": {
+        "x": 0,
+        "y": -17,
+        "z": -6
+      },
+      "cubes": [
+        {
+          "id": "neck",
+          "origin": {
+            "x": -2,
+            "y": -8,
+            "z": -2
+          },
+          "size": {
+            "x": 4,
+            "y": 9,
+            "z": 4
+          },
+          "materialRole": "fur_white"
+        }
+      ],
+      "rotation": {
+        "x": -12,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "id": "head",
+      "parent": "neck",
+      "pivot": {
+        "x": 0,
+        "y": -7,
+        "z": -1
+      },
+      "cubes": [
+        {
+          "id": "skull",
+          "origin": {
+            "x": -3,
+            "y": -3,
+            "z": -5
+          },
+          "size": {
+            "x": 6,
+            "y": 5,
+            "z": 7
+          },
+          "materialRole": "fur_grey"
+        },
+        {
+          "id": "muzzle",
+          "origin": {
+            "x": -2,
+            "y": 0,
+            "z": -8
+          },
+          "size": {
+            "x": 4,
+            "y": 3,
+            "z": 4
+          },
+          "materialRole": "fur_white"
+        },
+        {
+          "id": "eye_l",
+          "origin": {
+            "x": -3,
+            "y": -1,
+            "z": -6
+          },
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "materialRole": "moon_glow"
+        },
+        {
+          "id": "eye_r",
+          "origin": {
+            "x": 2,
+            "y": -1,
+            "z": -6
+          },
+          "size": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "materialRole": "moon_glow"
+        }
+      ],
+      "role": "HEAD"
+    },
+    {
+      "id": "antler_l",
+      "parent": "head",
+      "pivot": {
+        "x": -2,
+        "y": -3,
+        "z": -1
+      },
+      "cubes": [
+        {
+          "id": "stem",
+          "origin": {
+            "x": -1,
+            "y": -9,
+            "z": -1
+          },
+          "size": {
+            "x": 2,
+            "y": 10,
+            "z": 2
+          },
+          "materialRole": "antler"
+        },
+        {
+          "id": "branch",
+          "origin": {
+            "x": -5,
+            "y": -6,
+            "z": -1
+          },
+          "size": {
+            "x": 6,
+            "y": 2,
+            "z": 2
+          },
+          "materialRole": "antler"
+        },
+        {
+          "id": "tine",
+          "origin": {
+            "x": -5,
+            "y": -9,
+            "z": -1
+          },
+          "size": {
+            "x": 2,
+            "y": 5,
+            "z": 2
+          },
+          "materialRole": "antler"
+        }
+      ],
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": -10
+      }
+    },
+    {
+      "id": "front_l",
+      "parent": "root",
+      "pivot": {
+        "x": -3,
+        "y": -12,
+        "z": -5
+      },
+      "cubes": [
+        {
+          "id": "leg",
+          "origin": {
+            "x": -1,
+            "y": 0,
+            "z": -1
+          },
+          "size": {
+            "x": 2,
+            "y": 12,
+            "z": 2
+          },
+          "materialRole": "fur_white"
+        },
+        {
+          "id": "hoof",
+          "origin": {
+            "x": -1,
+            "y": 10,
+            "z": -2
+          },
+          "size": {
+            "x": 2,
+            "y": 2,
+            "z": 3
+          },
+          "materialRole": "hoof"
+        }
+      ],
+      "role": "LEG_LEFT"
+    },
+    {
+      "id": "front_r",
+      "parent": "root",
+      "pivot": {
+        "x": 3,
+        "y": -12,
+        "z": -5
+      },
+      "cubes": [
+        {
+          "id": "leg",
+          "origin": {
+            "x": -1,
+            "y": 0,
+            "z": -1
+          },
+          "size": {
+            "x": 2,
+            "y": 12,
+            "z": 2
+          },
+          "materialRole": "fur_white"
+        },
+        {
+          "id": "hoof",
+          "origin": {
+            "x": -1,
+            "y": 10,
+            "z": -2
+          },
+          "size": {
+            "x": 2,
+            "y": 2,
+            "z": 3
+          },
+          "materialRole": "hoof"
+        }
+      ],
+      "role": "LEG_RIGHT"
+    },
+    {
+      "id": "hind_l",
+      "parent": "root",
+      "pivot": {
+        "x": -3,
+        "y": -12,
+        "z": 5
+      },
+      "cubes": [
+        {
+          "id": "leg",
+          "origin": {
+            "x": -1,
+            "y": 0,
+            "z": -1
+          },
+          "size": {
+            "x": 2,
+            "y": 12,
+            "z": 2
+          },
+          "materialRole": "fur_white"
+        },
+        {
+          "id": "hoof",
+          "origin": {
+            "x": -1,
+            "y": 10,
+            "z": -2
+          },
+          "size": {
+            "x": 2,
+            "y": 2,
+            "z": 3
+          },
+          "materialRole": "hoof"
+        }
+      ],
+      "role": "LEG_LEFT",
+      "gaitPhase": 180
+    },
+    {
+      "id": "hind_r",
+      "parent": "root",
+      "pivot": {
+        "x": 3,
+        "y": -12,
+        "z": 5
+      },
+      "cubes": [
+        {
+          "id": "leg",
+          "origin": {
+            "x": -1,
+            "y": 0,
+            "z": -1
+          },
+          "size": {
+            "x": 2,
+            "y": 12,
+            "z": 2
+          },
+          "materialRole": "fur_white"
+        },
+        {
+          "id": "hoof",
+          "origin": {
+            "x": -1,
+            "y": 10,
+            "z": -2
+          },
+          "size": {
+            "x": 2,
+            "y": 2,
+            "z": 3
+          },
+          "materialRole": "hoof"
+        }
+      ],
+      "role": "LEG_RIGHT",
+      "gaitPhase": 180
+    },
+    {
+      "id": "tail",
+      "parent": "body",
+      "pivot": {
+        "x": 0,
+        "y": -1,
+        "z": 7
+      },
+      "cubes": [
+        {
+          "id": "tail",
+          "origin": {
+            "x": -1,
+            "y": -1,
+            "z": 0
+          },
+          "size": {
+            "x": 2,
+            "y": 2,
+            "z": 5
+          },
+          "materialRole": "fur_white"
+        }
+      ],
+      "role": "TAIL",
+      "rotation": {
+        "x": 30,
+        "y": 0,
+        "z": 0
+      }
+    }
+  ],
+  "mirrors": [
+    {
+      "sourceRoot": "antler_l",
+      "targetRoot": "antler_r",
+      "shareUv": true
+    }
+  ]
+}

@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "id": "eclipse_crown",
+  "title": "月蚀诸峰",
+  "premise": "月蚀切断了群山王国的星术网络。银松村仍有温暖的木屋与铜炉，修道院保存着旧天文记录，王城的玻璃灯冠却只剩冷光。",
+  "playerRole": "沿着巡礼补给、旧路哨兵与碎星高地，收回失落核心的旅人。",
+  "worldRules": [
+    "建筑材料有共同语法：月辉石作基座、星纹板岩承重、古铜束带标记礼制、凝星玻璃引导夜路。",
+    "气候随地形变化，浅海和银岸通向草甸、银松林、琥珀丘陵、碎星岩脊与霜冠山峰。",
+    "普通居民尺度、学术院落尺度和王城地标尺度不同，不以换色复制大厅。",
+    "Boss可稀有重复自然生成；城堡是主题地标，而非保证刷出Boss的竞技场。",
+    "任务推进与领奖由服务端逐玩家保存；材料要主动提交，最后核心有任务保底奖励。"
+  ],
+  "mainConflict": "王国守卫仍在履行已经失去对象的誓约，玩家要夺回核心，把互相隔绝的地方重新连成一段可以完成的旅途。",
+  "beats": [
+    {
+      "id": "arrival",
+      "title": "散月与炊烟",
+      "description": "从银松村、月光草甸和巡礼补给认识仍在生活的王国。",
+      "content": [
+        {
+          "kind": "biome",
+          "id": "moonmeadow"
+        },
+        {
+          "kind": "structure",
+          "id": "silverpine_hamlet"
+        },
+        {
+          "kind": "structure",
+          "id": "pilgrim_shrine"
+        },
+        {
+          "kind": "item",
+          "id": "moon_shard"
+        },
+        {
+          "kind": "quest",
+          "id": "gather_moonlight"
+        },
+        {
+          "kind": "creature",
+          "id": "silver_antler"
+        }
+      ]
+    },
+    {
+      "id": "old_roads",
+      "title": "哨兵与旧书",
+      "description": "越过丘陵，到星术修道院读懂石甲卫队为何失去目标。",
+      "content": [
+        {
+          "kind": "biome",
+          "id": "amber_highlands"
+        },
+        {
+          "kind": "structure",
+          "id": "star_abbey"
+        },
+        {
+          "kind": "structure",
+          "id": "fallen_watchtower"
+        },
+        {
+          "kind": "creature",
+          "id": "shardbound_sentinel"
+        },
+        {
+          "kind": "quest",
+          "id": "silence_shards"
+        },
+        {
+          "kind": "block",
+          "id": "runed_slate"
+        },
+        {
+          "kind": "item",
+          "id": "bronze_seal"
+        }
+      ]
+    },
+    {
+      "id": "darkstar",
+      "title": "山脊上的誓约",
+      "description": "在碎星与霜冠间迎战守门者，王城高灯冠提供远方的主题坐标。",
+      "content": [
+        {
+          "kind": "biome",
+          "id": "starfall_ridges"
+        },
+        {
+          "kind": "biome",
+          "id": "frost_crown"
+        },
+        {
+          "kind": "structure",
+          "id": "crown_citadel"
+        },
+        {
+          "kind": "creature",
+          "id": "darkstar_gatekeeper"
+        },
+        {
+          "kind": "quest",
+          "id": "break_darkstar"
+        },
+        {
+          "kind": "item",
+          "id": "eclipse_core"
+        }
+      ]
+    },
+    {
+      "id": "renewal",
+      "title": "复晓",
+      "description": "提交核心，以复晓徽记记住整个王国曾经共同守护的光。",
+      "content": [
+        {
+          "kind": "quest",
+          "id": "rekindle_crown"
+        },
+        {
+          "kind": "item",
+          "id": "dawn_sigil"
+        },
+        {
+          "kind": "structure",
+          "id": "crystal_quarry"
+        },
+        {
+          "kind": "block",
+          "id": "star_glass"
+        }
+      ]
+    }
+  ]
+}

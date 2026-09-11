@@ -1,0 +1,278 @@
+{
+  "schemaVersion": 1,
+  "id": "shardbound_sentinel",
+  "displayName": "碎晶哨兵",
+  "category": "HOSTILE",
+  "atlasWidth": 128,
+  "atlasHeight": 128,
+  "padding": 2,
+  "themeRole": "失去命令的旧路守卫，瘦长轮廓和显露的晶体关节区别于重甲Boss。",
+  "attributes": {
+    "health": 28,
+    "speed": 0.25,
+    "followRange": 22,
+    "attackDamage": 4,
+    "knockbackResistance": 0.2,
+    "width": 0.9,
+    "height": 2.2
+  },
+  "behavior": {
+    "passiveMode": "WANDER",
+    "territoryRadius": 40,
+    "attackReach": 1.8,
+    "windupTicks": 16,
+    "recoveryTicks": 24
+  },
+  "spawn": {
+    "biomes": [
+      "amber_highlands",
+      "starfall_ridges"
+    ],
+    "weight": 18,
+    "minGroup": 1,
+    "maxGroup": 2,
+    "minLight": 0,
+    "maxLight": 11
+  },
+  "drops": [
+    {
+      "item": "worldsmith:item/moon_shard",
+      "minCount": 2,
+      "maxCount": 4,
+      "chance": 1,
+      "requirePlayerKill": true
+    },
+    {
+      "item": "worldsmith:item/bronze_seal",
+      "minCount": 1,
+      "maxCount": 1,
+      "chance": 0.12,
+      "requirePlayerKill": true
+    }
+  ],
+  "bones": [
+    {
+      "id": "root",
+      "parent": null,
+      "pivot": {
+        "x": 0,
+        "y": 24,
+        "z": 0
+      },
+      "cubes": []
+    },
+    {
+      "id": "body",
+      "parent": "root",
+      "pivot": {
+        "x": 0,
+        "y": -22,
+        "z": 0
+      },
+      "cubes": [
+        {
+          "id": "torso",
+          "origin": {
+            "x": -5,
+            "y": -8,
+            "z": -3
+          },
+          "size": {
+            "x": 10,
+            "y": 16,
+            "z": 6
+          },
+          "materialRole": "basalt"
+        },
+        {
+          "id": "breast",
+          "origin": {
+            "x": -4,
+            "y": -6,
+            "z": -5
+          },
+          "size": {
+            "x": 8,
+            "y": 10,
+            "z": 3
+          },
+          "materialRole": "old_iron"
+        },
+        {
+          "id": "core",
+          "origin": {
+            "x": -2,
+            "y": -4,
+            "z": -7
+          },
+          "size": {
+            "x": 4,
+            "y": 5,
+            "z": 3
+          },
+          "materialRole": "amethyst"
+        }
+      ]
+    },
+    {
+      "id": "head",
+      "parent": "root",
+      "pivot": {
+        "x": 0,
+        "y": -31,
+        "z": -1
+      },
+      "cubes": [
+        {
+          "id": "mask",
+          "origin": {
+            "x": -3,
+            "y": -5,
+            "z": -3
+          },
+          "size": {
+            "x": 6,
+            "y": 7,
+            "z": 6
+          },
+          "materialRole": "basalt"
+        },
+        {
+          "id": "eye",
+          "origin": {
+            "x": -2,
+            "y": -2,
+            "z": -4
+          },
+          "size": {
+            "x": 4,
+            "y": 1,
+            "z": 1
+          },
+          "materialRole": "moon_glow"
+        },
+        {
+          "id": "crest",
+          "origin": {
+            "x": -1,
+            "y": -8,
+            "z": -1
+          },
+          "size": {
+            "x": 2,
+            "y": 4,
+            "z": 3
+          },
+          "materialRole": "bronze"
+        }
+      ],
+      "role": "HEAD"
+    },
+    {
+      "id": "arm_l",
+      "parent": "body",
+      "pivot": {
+        "x": -7,
+        "y": -5,
+        "z": 0
+      },
+      "cubes": [
+        {
+          "id": "arm",
+          "origin": {
+            "x": -2,
+            "y": 0,
+            "z": -2
+          },
+          "size": {
+            "x": 4,
+            "y": 18,
+            "z": 4
+          },
+          "materialRole": "basalt"
+        },
+        {
+          "id": "pauldron",
+          "origin": {
+            "x": -3,
+            "y": -1,
+            "z": -3
+          },
+          "size": {
+            "x": 6,
+            "y": 5,
+            "z": 6
+          },
+          "materialRole": "old_iron"
+        },
+        {
+          "id": "hand",
+          "origin": {
+            "x": -2,
+            "y": 15,
+            "z": -3
+          },
+          "size": {
+            "x": 4,
+            "y": 5,
+            "z": 5
+          },
+          "materialRole": "bronze"
+        }
+      ],
+      "role": "ARM_LEFT"
+    },
+    {
+      "id": "leg_l",
+      "parent": "root",
+      "pivot": {
+        "x": -3,
+        "y": -14,
+        "z": 0
+      },
+      "cubes": [
+        {
+          "id": "leg",
+          "origin": {
+            "x": -2,
+            "y": 0,
+            "z": -2
+          },
+          "size": {
+            "x": 4,
+            "y": 14,
+            "z": 4
+          },
+          "materialRole": "basalt"
+        },
+        {
+          "id": "boot",
+          "origin": {
+            "x": -2,
+            "y": 11,
+            "z": -4
+          },
+          "size": {
+            "x": 4,
+            "y": 3,
+            "z": 6
+          },
+          "materialRole": "old_iron"
+        }
+      ],
+      "role": "LEG_LEFT"
+    }
+  ],
+  "mirrors": [
+    {
+      "sourceRoot": "arm_l",
+      "targetRoot": "arm_r",
+      "shareUv": true
+    },
+    {
+      "sourceRoot": "leg_l",
+      "targetRoot": "leg_r",
+      "shareUv": true
+    }
+  ]
+}

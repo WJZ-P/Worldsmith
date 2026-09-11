@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "eclipse_crown",
+  "title": "月蚀诸峰",
+  "prompt": "prompt.txt",
+  "worldDesignPlan": "world-design-plan.json",
+  "architecture": "architecture.json",
+  "structureTargets": "structure-targets.json",
+  "structures": "structures.json",
+  "moduleDirectory": "modules",
+  "textureDirectory": "textures",
+  "creatureDirectory": "creatures",
+  "creatureLibrarySchemaVersion": 2,
+  "creatureTextureCompiler": "make-creature-texture.mjs",
+  "creatureTextureExport": "makeCreatureTexture",
+  "staticTextureIds": ["moonstone","runed_slate","bronze_masonry","star_glass","moon_shard","bronze_seal","eclipse_core","dawn_sigil"],
+  "creatureTextureIds": {"silver_antler":"silver_antler_skin","shardbound_sentinel":"shardbound_sentinel_skin","darkstar_gatekeeper":"darkstar_gatekeeper_skin"},
+  "assetReferenceSyntax": "@asset:<texture recipe id>",
+  "drawingReferenceSyntax": "@drawing:<structure target id>",
+  "contentIds": {
+    "biomes": ["sunken_mere","moon_shallows","silver_coast","moonmeadow","silverpine_wood","amber_highlands","starfall_ridges","frost_crown"],
+    "structures": ["crown_citadel","silverpine_hamlet","star_abbey","pilgrim_shrine","crystal_quarry","fallen_watchtower"],
+    "blocks": ["moonstone","runed_slate","bronze_masonry","star_glass"],
+    "items": ["moon_shard","bronze_seal","eclipse_core","dawn_sigil"],
+    "creatures": ["silver_antler","shardbound_sentinel","darkstar_gatekeeper"],
+    "quests": ["gather_moonlight","silence_shards","break_darkstar","rekindle_crown"]
+  },
+  "runtimeBoundary": "Ground mobs and a phased repeatable Boss: rare natural spawning plus a typed crown_keep spawner. Actual encounters require player proximity, entity clearance and nearby-creature limits; neither castle placement nor a unique global Boss is guaranteed."
+}
