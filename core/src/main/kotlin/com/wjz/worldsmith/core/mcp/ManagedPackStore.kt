@@ -1,13 +1,18 @@
 package com.wjz.worldsmith.core.mcp
 
 import com.wjz.worldsmith.core.model.WorldsmithPackManifest
+import com.wjz.worldsmith.core.model.WorldsmithPack
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO
+import com.wjz.worldsmith.core.validation.WorldsmithPackValidator
+import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import java.nio.file.*
 import java.nio.charset.StandardCharsets
 
 /** One owner for portable content-addressed pack persistence. */
-class ManagedPackStore(private val packDirectory:Path) {
+class ManagedPackStore(packDirectory:Path) {
+    private val packDirectory=packDirectory.toAbsolutePath().normalize()
     private val PACK_ID=Regex("[a-f0-9]{64}")
     fun managed(id: String): Path? {
         if (!PACK_ID.matches(id)) {
@@ -22,6 +27,21 @@ class ManagedPackStore(private val packDirectory:Path) {
 
     fun persist(manifest: WorldsmithPackManifest, contents: Map<String, String>, binaries: Map<String,ByteArray> = emptyMap()): Path {
         require(manifest.formatVersion==com.wjz.worldsmith.core.pack.WorldContentBundleIO.FORMAT_VERSION) { "New managed bundles must use the current writer format; legacy formats 3/4 are read-only" }
+        return persistVerified(manifest,contents,binaries)
+    }
+
+    /** Import is preservation, not a legacy writer: retain the validated archive's original version and hash. */
+    fun importValidated(pack:WorldsmithPack):Path {
+        val diagnostics=WorldsmithPackValidator.validate(pack)
+        require(diagnostics.none {it.severity==DiagnosticSeverity.ERROR}) {
+            diagnostics.filter {it.severity==DiagnosticSeverity.ERROR}.take(16).joinToString("; ") {"${it.path}: ${it.message}"}
+        }
+        val bundle=WorldContentBundleIO.encode(pack)
+        require(bundle.manifest.id==pack.manifest.id && pack.computedId==pack.manifest.id) {"Imported bundle identity must remain unchanged"}
+        return persistVerified(pack.manifest,bundle.texts,bundle.binaries)
+    }
+
+    private fun persistVerified(manifest: WorldsmithPackManifest, contents: Map<String, String>, binaries: Map<String,ByteArray>): Path {
         com.wjz.worldsmith.core.pack.WorldContentBundleIO.validateManifest(manifest)
         require(PACK_ID.matches(manifest.id)) { "Invalid content address" }
         require(contents.keys.all { com.wjz.worldsmith.core.content.WorldContentRegistry.validRelativePath(it) && it.endsWith(".json") && it != "worldsmith.json" })
@@ -29,13 +49,17 @@ class ManagedPackStore(private val packDirectory:Path) {
         require(binaries.keys.all { it in pngPaths || it.matches(Regex("drawings/[a-f0-9]{64}\\.wsdraw")) })
         require(com.wjz.worldsmith.core.hash.WorldsmithHashUtil.finalizeManifest(manifest,contents,binaries).id==manifest.id) { "Bundle contents do not match their content address" }
         Files.createDirectories(packDirectory)
-        val target = packDirectory.resolve(manifest.id)
-        if (Files.exists(target)) {
+        val root=packDirectory.toRealPath()
+        // Windows 8.3 aliases and casing canonicalize without being links. Compare canonical paths on both sides.
+        require(Files.isDirectory(packDirectory,LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(packDirectory) &&
+            packDirectory.toRealPath(LinkOption.NOFOLLOW_LINKS)==root) {"Managed pack root must be a regular, unlinked directory"}
+        val target = root.resolve(manifest.id)
+        if (Files.exists(target,LinkOption.NOFOLLOW_LINKS)) {
             verifyExistingTarget(target, manifest.id)
             return target
         }
 
-        val pending = Files.createTempDirectory(packDirectory, ".pending-")
+        val pending = Files.createTempDirectory(root, ".pending-")
         try {
             writeUtf8(pending.resolve("worldsmith.json"), WorldsmithJson.encode(manifest))
             contents.forEach { (name, content) -> writeUtf8(pending.resolve(name), content) }

@@ -44,6 +44,8 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         put("generationModes",McpJson.encode(WorkflowMode.entries.map { it.name }))
         put("completeWorldPlanTool","worldsmith_put_world_design_plan");put("generationProgressTool","worldsmith_get_generation_progress")
         put("completeWorldCoverageRequiresActualContent",true)
+        put("resourcePackWorkflowTool","worldsmith_get_resource_pack_workflow");put("resourcePackExtension",".wspack")
+        put("resourcePackImportsActivateWorld",false);put("savedPackTextureReuseTool","worldsmith_attach_pack_textures")
     }
     fun tools():List<McpTool> {
         val str=McpJson.type("string");val obj=McpJson.type("object");val integer=McpJson.type("integer")
@@ -83,6 +85,27 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
     fun assetBytes(session:WorkflowSession?):Map<String,ByteArray> = session?.contentAssets?.mapValues {(_,asset)->requireNotNull(assets) {"Asset storage is not installed"}.read(asset)}.orEmpty()
     fun textureBytes(session:WorkflowSession,id:String):ByteArray = requireNotNull(assets) {"Asset storage is not installed"}
         .read(requireNotNull(session.contentAssets[id]) {"Texture is not attached to this session"})
+    /** Attach verified saved-pack PNGs in one shared CAS; this never imports module documents or source jobs. */
+    fun attachPackTextures(sessionId:String,expectedRevision:Long,pack:WorldsmithPack,assetIds:List<String>?=null):PackTextureAttachmentReceipt {
+        require(pack.manifest.id==pack.computedId && WorldContentRegistry.SHA256.matches(pack.manifest.id)) {"Saved texture source must retain its verified bundle identity"}
+        val current=requireNotNull(sessions.find(sessionId)) {"Unknown session; begin or resume a world draft"}
+        require(!current.archived) {"Resume the archived draft before attaching textures"}
+        require(current.revision==expectedRevision) {"DRAFT_REVISION_CONFLICT: expected $expectedRevision, current ${current.revision}"}
+        val descriptors=pack.manifest.assets.associateBy {it.id}
+        val selected=assetIds ?: descriptors.keys.sorted()
+        require(selected.size<=ContentAssetValidation.MAX_ASSETS && selected.distinct().size==selected.size && selected.all {it in descriptors}) {"Select distinct PNG asset ids present in the saved bundle"}
+        val combined=(current.contentAssets-selected.toSet())+selected.associateWith {descriptors.getValue(it)}
+        require(combined.size<=ContentAssetValidation.MAX_ASSETS && combined.values.sumOf {requireNotNull(it.byteLength)}<=ContentAssetValidation.MAX_TOTAL_BYTES) {"Attached textures exceed the session asset budget"}
+        val bytes=pack.assets
+        val attached=selected.associateWith {id->
+            val descriptor=descriptors.getValue(id)
+            require(descriptor.id==descriptor.sha256 && descriptor.mediaType=="image/png") {"Only content-addressed PNG assets are reusable"}
+            ContentAssetValidation.verify(descriptor,bytes.getValue(id))
+            requireNotNull(assets) {"Asset storage is not installed"}.put(bytes.getValue(id),"image/png").also {require(it.id==id)}
+        }
+        val saved=requireNotNull(sessions.putContent(sessionId,expectedRevision,assets=attached)) {"Draft is no longer active"}
+        return PackTextureAttachmentReceipt(sessionId,saved.revision,pack.manifest.id,attached.values.map(::portable),selected.count {it in current.contentAssets})
+    }
     fun progress(session:WorkflowSession):GenerationProgress=WorldGenerationProgress.inspect(session,drawingJobs(session.id))
     private fun session(a:JsonObject)=requireNotNull(sessions.find(McpJson.string(a,"sessionId"))) {"Unknown session; begin or resume a world draft"}
     private fun current(a:JsonObject)=session(a).also {

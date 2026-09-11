@@ -123,10 +123,29 @@ An empty library does not fill a named category. Keep the existing guided
 architecture quality contract, inspect the actual visuals, and repair the largest
 visible weakness rather than treating machine checks as a beauty score.
 
-The write records the actual frozen input snapshot back into the same session.
+The write records the actual frozen input snapshot back into the same session and
+automatically exports the final single-file resource pack to
+`resource-packs/exports/<bundleId>.wspack`. Its reply includes `resourcePackReady:true`
+and a `resourcePack` receipt with the actual path, archive SHA/size and bundle identity;
+deliver that file, not only the internal bundle directory. `resourcePackFilename`
+is an optional plain `.wspack` name on both write_pack and finish_world. Follow the
+returned nextArguments so a chosen custom name is reused by finish without adding
+archive state to the draft. Repeating the same export is idempotent.
+
+An archive-name conflict or export I/O failure preserves the existing file and the
+already-frozen Core pack/session. `resourcePackReady:false` plus
+`resourcePackError.code: "RESOURCE_PACK_EXPORT_FAILED"` is not a module/texture failure:
+follow its `worldsmith_export_resource_pack` retry arguments with an unused filename,
+then its continueArguments for finish. Do not rebuild drawings, assets or modules.
+Finish ensures/returns the archive before requesting native publication; an archive
+failure blocks that request and is not hidden by a native completion flag.
+
 If identical content already exists, its stored display metadata is reported
 truthfully instead of claiming a requested rename was written. `finish_world`
-then checks coverage again and asks for the native publication receipt. A saved
+checks coverage again, ensures the same `.wspack`, then asks for the native publication
+receipt. `completeWorldCoverageVerified`, `resourcePackReady`, and native
+`complete`/activation are independent: the resource file can be ready while
+WAITING_NATIVE_CONTEXT still needs a player action. A saved
 pack, model preview, configured habitat, or content plan is not a created/played
 world or a guarantee of particular structure instances.
 

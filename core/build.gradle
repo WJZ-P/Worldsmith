@@ -138,3 +138,11 @@ tasks.register('writeAuthoringClasspath') {
         println target.absolutePath
     }
 }
+
+tasks.register('resourcePack', JavaExec) {
+    group = 'worldsmith'
+    description = 'Inspect, import or export self-contained .wspack archives; pass commands with --args.'
+    dependsOn classes
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.wjz.worldsmith.core.pack.ResourcePackCli'
+}

@@ -180,14 +180,14 @@ object WorldsmithWorkflow {
                 "Read the current shared draft revision and send sessionId plus expectedRevision. Supply theme/terrain/biomes/features inline or use committed content drafts; blocks/creatures/items and verified PNG assets are frozen with the same bundle. Preserve the template's technical terrain envelope, " +
                     "but replace its shape with a procedural intent chosen from the player's prompt; design the " +
                     "biomes and features to match it. Include the planned architecture and all definitions, or omit structures to use the session drafts. " +
-                    "Architecture policy is checked again before any files are saved. A reply carrying " +
-                    "error diagnostics means nothing was saved, so repair those exact problems and call it again.",
+                    "Architecture policy is checked again before files are saved. Validation error diagnostics require content repair. " +
+                    "A successful Core save also exports <id>.wspack and returns resourcePackReady/resourcePack. An archive-only RESOURCE_PACK_EXPORT_FAILED preserves the saved pack/session: follow its export-only retry arguments, never regenerate content.",
         ),
         WorkflowStep(
             order = 12,
             tool = FINISH_TOOL,
             instruction =
-                "Call it with this sessionId. It re-reads the pack from disk and re-validates it. Stop when it " +
+                "Call it with this sessionId and the write reply's optional resourcePackFilename. It re-reads/re-validates the pack and ensures its .wspack file before requesting native activation. Stop when it " +
                     "answers complete=true. Native pending phases need a later check; WAITING_NATIVE_CONTEXT needs the player to open Create World. Native failures require repair, not an automatic retry loop.",
         ),
     )).mapIndexed { index, step -> step.copy(order=index+1) }
@@ -215,16 +215,16 @@ object WorldsmithWorkflow {
                 "worldsmith_get_generation_progress" to "Follow the highest-priority current gap. Read full contracts only for the domain being authored.",
                 "worldsmith_put_content_modules" to "Author theme/worldgen/content/quests coherently. Build real textures and creature rigs through the linked authoring tools; keep returned asset identities.",
                 STRUCTURE_TOOL to "Use the established SDK, preview, architecture and preflight loops for every planned building; preserve current jobs and shared revisions.",
-                WRITE_TOOL to "Freeze the current revision. Publication verifies named targets and actual compiled-material/reward/spawn/objective links, not merely plan declarations.",
-                FINISH_TOOL to "Request the native receipt. WAITING_NATIVE_CONTEXT is a player action, not a reason to rebuild already-frozen content.",
+                WRITE_TOOL to "Freeze the current revision and receive the single-file resourcePack .wspack receipt. Publication verifies real compiled-material/reward/spawn/objective links. Archive-only errors preserve the frozen draft and name an export-only retry.",
+                FINISH_TOOL to "Ensure the same archive and request the separate native receipt. resourcePackReady may be true while WAITING_NATIVE_CONTEXT needs a player action; do not rebuild already-frozen content.",
             )
             WorkflowMode.WORLDGEN_ONLY -> listOf(
                 "worldsmith_get_generation_progress" to "Resume the current missing worldgen or architecture step instead of repeating completed work.",
                 TEMPLATE_TOOL to "Read technical field shapes when needed; derive all design choices from the player's prompt.",
                 "worldsmith_put_content_modules" to "Commit the theme and worldgen drafts at the shared expectedRevision; nonrequested item/creature/quest modules may remain empty.",
                 ARCHITECTURE_TOOL to "Apply the existing guided architecture quality contract and author its real structures.",
-                WRITE_TOOL to "Freeze the exact current draft and fix named diagnostics.",
-                FINISH_TOOL to "Finish only after the native receipt for the saved worldgen pack.",
+                WRITE_TOOL to "Freeze the exact current draft and return its single-file .wspack receipt; repair named content diagnostics or retry only archive export when the Core pack is already saved.",
+                FINISH_TOOL to "Ensure the archive is ready, then finish only after the separate native receipt for the saved worldgen pack.",
             )
         }
         return steps.mapIndexed { index, (tool, instruction) -> WorkflowStep(index + 1, tool, instruction) }

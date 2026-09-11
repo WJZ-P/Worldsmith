@@ -84,12 +84,14 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private val contentService=WorldContentMcpService(packStore,nativeChecks!=null,sessions,this.packDirectory.resolveSibling("content-assets"),drawings::list)
     private val materialPalette=PreviewMaterialPalette(contentService::textureBytes)
     private val creatureAuthoringService=CreatureAuthoringMcpService(sessions,contentService,this.packDirectory.resolveSibling("creature-work"))
+    private val resourcePackExchange=ResourcePackExchange(this.packDirectory)
+    private val resourcePackService=ResourcePackMcpService(resourcePackExchange,contentService)
     init {
         drawings.completionChecks=structureService::completed;drawingService.inspectDrawing=structureService::inspectDrawing
         previewService.paletteForSession = { sid -> materialPalette.resolve(sessions.find(sid)) }
     }
 
-    fun all(): List<McpTool> = contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+listOf(
+    fun all(): List<McpTool> = resourcePackService.tools()+contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+listOf(
         McpTool("worldsmith_list_sessions", "List saved world drafts", "List persistent sessions without executing sources.", objectSchema(mapOf("includeArchived" to buildJsonObject {put("type","boolean")}),emptyList()), true, handler=::listSavedSessions),
         McpTool("worldsmith_resume_session", "Resume a world draft", "Restore the saved scope/plan and current next action without executing code. detail=summary omits full structures and job logs while retaining progress and cross-domain pointers.", objectSchema(mapOf("sessionId" to stringSchema(),"detail" to buildJsonObject {put("type","string");put("enum",encode(listOf("summary","full")))}),listOf("sessionId")), true, handler=::resumeSession),
         McpTool("worldsmith_build_drawing", "Build a drawing with Java", "Build Java 21 StructureProgram or DrawProgram, using a source project target or inline sources. Runs in the MC-side worker, not in worldgen. Returns a job id; use a new requestId for each revision. Develop one representative building and inspect its model before expanding a family.", drawingBuildSchema(), false, handler=drawingService::build),
@@ -289,7 +291,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             name = "worldsmith_write_pack",
             title = "Write Worldsmith pack",
             description =
-                "Validate all nine modules, quest/reward references and attached PNG assets, freeze a format-5 bundle and atomically save it. Inline modules override session drafts for this publication only; omitted modules come from the shared draft. Guided writes require expectedRevision. This is Core validation, not native activation.",
+                "Validate all nine modules, quest/reward references and attached PNG assets, freeze a format-5 bundle, atomically save it and return a ready single-file .wspack resourcePack receipt. resourcePackFilename optionally names the export; default is <id>.wspack. Inline modules override drafts for publication; guided writes require expectedRevision. Core/package readiness is separate from native activation. Export failure preserves the frozen pack and names an export-only retry.",
             inputSchema = writePackSchema(),
             readOnly = false,
             idempotent = true,
@@ -300,9 +302,9 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             title = "Finish a Worldsmith world",
             description =
                 "End the run started by ${WorldsmithWorkflow.BEGIN_TOOL}. Re-reads the session's pack from disk " +
-                    "and re-validates it, then answers complete=true when there is nothing left to do, or " +
+                    "and re-validates it, ensures the single-file .wspack export is ready before native publication, then answers complete=true when there is nothing left to do, or " +
                     "complete=false and the tool to call next. Stop only on true.",
-            inputSchema = sessionSchema(),
+            inputSchema = objectSchema(mapOf("sessionId" to stringSchema(),"resourcePackFilename" to resourcePackFilenameSchema()),listOf("sessionId")),
             readOnly = false,
             idempotent = true,
             handler = ::finishWorld,
@@ -1005,7 +1007,10 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 )
             }
         }
-        return McpToolResult.success(result, "Saved Worldsmith pack '${savedManifest.displayName}' as ${manifest.id}")
+        val coreResult=McpToolResult.success(result, "Saved Worldsmith pack '${savedManifest.displayName}' as ${manifest.id}")
+        val resourcePack=try {resourcePackExchange.exportPack(manifest.id,arguments["resourcePackFilename"]?.jsonPrimitive?.content)}
+            catch(failure:Exception) {return resourcePackFailure(coreResult,manifest.id,arguments,failure)}
+        return withResourcePack(coreResult,resourcePack)
     }
 
     /**
@@ -1019,18 +1024,15 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private fun finishWorld(arguments:JsonObject):McpToolResult {
         val session=sessions.find(requiredString(arguments,"sessionId"))
         var completeWorldCoverageVerified=false
+        var resourcePack:ResourcePackReceipt?=null
         fun receipt(result:McpToolResult)=result.copy(structuredContent=JsonObject(result.structuredContent+buildJsonObject {
             put("mode",session?.mode?.name ?: WorkflowMode.WORLDGEN_ONLY.name)
             put("completeWorldCoverageVerified",completeWorldCoverageVerified)
+            put("resourcePackReady",resourcePack!=null)
+            resourcePack?.let {put("resourcePack",encode(it))}
+            if(resourcePack!=null && result.structuredContent["nextTool"]?.jsonPrimitive?.contentOrNull==WorldsmithWorkflow.FINISH_TOOL && session!=null)
+                put("nextArguments",buildJsonObject {put("sessionId",session.id);put("resourcePackFilename",resourcePack!!.filename)})
         }))
-        if(session?.mode==WorkflowMode.STANDALONE) {
-            val progress=contentService.progress(session)
-            return receipt(McpToolResult.success(buildJsonObject {
-                put("sessionId",session.id);put("mode",session.mode.name);put("complete",false);put("artifactWorkflow",true)
-                put("nextTool",progress.nextTool);put("nextArguments",progress.nextArguments)
-                put("message","This focused session ends with the requested inspected/exported artifact, not a whole-world native activation receipt")
-            }))
-        }
         if(session?.mode==WorkflowMode.COMPLETE_WORLD && session.packId!=null) {
             val plan=session.designPlan
             val path=packStore.managed(session.packId)
@@ -1051,7 +1053,51 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 completeWorldCoverageVerified=true
             }
         }
+        if(session?.packId!=null && packStore.managed(session.packId)!=null) {
+            resourcePack=try {resourcePackExchange.exportPack(session.packId,arguments["resourcePackFilename"]?.jsonPrimitive?.content)}
+                catch(failure:Exception) {return resourcePackFailure(receipt(McpToolResult.success(buildJsonObject {
+                    put("sessionId",session.id);put("packId",session.packId);put("revision",session.revision);put("complete",false)
+                })),session.packId,arguments,failure)}
+        }
+        if(session?.mode==WorkflowMode.STANDALONE) {
+            val progress=contentService.progress(session)
+            return receipt(McpToolResult.success(buildJsonObject {
+                put("sessionId",session.id);put("mode",session.mode.name);put("complete",false);put("artifactWorkflow",true)
+                put("nextTool",progress.nextTool);put("nextArguments",progress.nextArguments)
+                put("message","This focused session ends with the requested inspected/exported artifact, not a whole-world native activation receipt")
+            }))
+        }
         return receipt(publicationService.finish(arguments))
+    }
+
+    private fun withResourcePack(result:McpToolResult,resourcePack:ResourcePackReceipt)=result.copy(
+        text=result.text+" Resource pack: ${resourcePack.path}",
+        structuredContent=JsonObject(result.structuredContent+buildJsonObject {
+            put("resourcePackReady",true);put("resourcePack",encode(resourcePack))
+            result.structuredContent["sessionId"]?.let {sid->put("nextArguments",buildJsonObject {
+                put("sessionId",sid);put("resourcePackFilename",resourcePack.filename)
+            })}
+        }))
+
+    /** Archive I/O is not an authoring failure: keep the valid saved pack/session and retry only its export. */
+    private fun resourcePackFailure(result:McpToolResult,id:String,arguments:JsonObject,failure:Exception):McpToolResult {
+        val filename=arguments["resourcePackFilename"]?.jsonPrimitive?.content ?: "$id.wspack"
+        val retryName=(sequenceOf("$id.wspack")+(1..32).asSequence().map {"$id-$it.wspack"})
+            .firstOrNull {it!=filename && !Files.exists(resourcePackExchange.exportsDirectory().resolve(it),java.nio.file.LinkOption.NOFOLLOW_LINKS)}
+        val message=failure.message?.take(2048) ?: failure.javaClass.simpleName
+        return McpToolResult.error("The frozen pack is preserved; its .wspack export needs repair: $message",
+            JsonObject(result.structuredContent+buildJsonObject {
+                put("id",id);put("complete",false);put("resourcePackReady",false);put("packPreserved",true)
+                put("resourcePackError",buildJsonObject {put("code","RESOURCE_PACK_EXPORT_FAILED");put("filename",filename);put("message",message)})
+                put("nextTool","worldsmith_export_resource_pack")
+                put("nextArguments",buildJsonObject {put("id",id);retryName?.let {put("filename",it)}})
+                if(retryName==null)put("requiredAuthoring",encode(listOf("filename")))
+                put("nextInstruction","Retry only the saved bundle export using the given id and an unused .wspack filename. Preserve the existing file and current session; do not regenerate modules, textures or drawings. Then finish with the exported filename as resourcePackFilename.")
+                result.structuredContent["sessionId"]?.let {sid->
+                    put("continueTool",WorldsmithWorkflow.FINISH_TOOL)
+                    put("continueArguments",buildJsonObject {put("sessionId",sid);retryName?.let {put("resourcePackFilename",it)}})
+                }
+            }))
     }
     private fun incomplete(sessionId:String,nextTool:String,reason:String)=publicationService.incomplete(sessionId,nextTool,reason)
 
@@ -1143,6 +1189,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 put("maxLength", MAX_DESCRIPTION_LENGTH)
             },
             "expectedRevision" to buildJsonObject { put("type","integer");put("description","Required with sessionId; shared revision returned by content or architecture draft tools.") },
+            "resourcePackFilename" to resourcePackFilenameSchema(),
             "theme" to documentSchema("Required WorldTheme inline or in session draft; read worldsmith_get_content_contract module=theme."),
             "blocks" to documentSchema("CustomBlockLibrary; omitted uses draft or an explicit empty library."),
             "creatures" to documentSchema("CreatureLibrary; omitted uses draft or an explicit empty library."),
@@ -1157,6 +1204,11 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         ),
         required = listOf("displayName"),
     )
+
+    private fun resourcePackFilenameSchema():JsonObject=buildJsonObject {
+        put("type","string");put("maxLength",128)
+        put("description","Optional plain .wspack export filename in the dedicated resource-packs/exports directory; default <bundleId>.wspack. Existing different files are preserved. No paths or URLs.")
+    }
 
     private fun documentSchema(description: String): JsonObject = buildJsonObject {
         put("type", "object")
