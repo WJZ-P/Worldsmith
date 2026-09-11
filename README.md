@@ -14,6 +14,10 @@ resumable repair progress, phased Bosses and typed landmark encounters. The
 [replayable example kit](docs/examples/complete-world/README.md) uses provider-independent textures
 and can be exported through the real native compiler without opening a player world.
 
+[Reusable resource packs](docs/resource-packs.md) package the complete authored world and its actual
+assets into one `.wspack` file. The game library, MCP tools and CLI share validated import/export,
+content-addressed reuse and an explicit separation between importing data and activating a world.
+
 ## Development baseline
 
 - Minecraft Java Edition `26.2`

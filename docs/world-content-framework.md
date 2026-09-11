@@ -59,7 +59,7 @@
 
 每个 `WorldNarrativeBeat(id, title, description, content)` 的 `content` 必须链接 1..64 个真实定义，例如 `ContentKey("block", "moonstone")`、`ContentKey("creature", "guardian")`、`ContentKey("structure", "observatory")`。空设定、重名节点、缺失定义、只指向主题自身的节点都会得到明确诊断。
 
-这些节点表达创作意图和内容关联，**不是可执行任务条件、完成状态或奖励**。未来任务系统应在共同身份、资产和存档生命周期上增加真实领域模块，再把节点连接到任务与成就；现在不得提交伪造的 `quest`/`achievement` 定义。
+这些节点表达创作意图和内容关联，**不是可执行任务条件、完成状态或奖励**。已安装的 `quests` 模块通过 `themeBeat` 关联叙事节点，服务端负责真实任务进度；成就模块仍未安装。
 
 ## 身份、引用与执行顺序
 
@@ -73,13 +73,7 @@ worldsmith:content/moonstone
 
 目录会把它解析为 `block / moonstone`，不当作外部 Mod 方块；`minecraft:stone` 等仍是原生引用。生物生成规则通过逻辑群系 ID 链接群系。主题节点通过 `ContentKey` 链接任意已安装内容类型。冻结绘图里的自定义方块同样接受缺失引用检查。
 
-先分配全部符号，再链接引用，因此合法的运行时引用环不等于编译依赖环。只有模块声明的 `compileAfter` 参与拓扑排序。目前完整包的顺序是：
-
-```text
-blocks → terrain → features → biomes → creatures → structures → theme
-```
-
-其中 creatures 与 structures 的先后只是无依赖节点的确定性排序，不表示结构依赖生物。方块先于地形是明确声明的依赖。
+先分配全部符号，再链接引用，因此合法的运行时引用环不等于编译依赖环。只有模块声明的 `compileAfter` 参与拓扑排序，具体顺序由内容检查接口返回。方块先于依赖它的地形与结构；结构也声明在生物之后编译，以校验真实的 BossSpawner 引用。不应维护一份遗漏 items/quests 的手工顺序作为运行时依据。
 
 目录中的蓝图身份限定在所属结构下；现有结构编译器与磁盘布局仍要求不同蓝图具有全包唯一的蓝图 ID。作者应为建筑和组装部件分配独立名字；不同内容共用同一蓝图 ID 会报 `CONFLICTING_BLUEPRINT`，而不是静默覆盖。
 
@@ -126,6 +120,8 @@ val frozen = WorldContentBundleIO.encode(pack)
 
 `WorldsmithPackLoader` 提供目录与 classpath 加载，保留 `computedId`；消费者仍需执行 `WorldsmithPackValidator` 并检查声明 ID，不得把“JSON 成功解析”当成有效或激活回执。
 
+单文件交换由 [`.wspack` 资源包](resource-packs.md) 承载：容器版本与内层世界格式独立，导入先检查整个归档，再保存为同一个不可变内容地址；CLI、MCP 和游戏资源库共用实现。
+
 ## 能力与生命周期
 
 | 生命周期 | 必需工作 |
@@ -153,7 +149,7 @@ GeckoLib 可以作为以后实体关键帧动画的表现后端，但不是世�
 
 原生数据包携带 `worldsmith-content/` 下完整内容包及 `worldsmith-runtime/block-bindings.json`；读回只查看启用的数据包，不依赖 config 中仍保留草稿。运行中的数据重载在 prepare 阶段拒绝更换内容哈希/槽位，让旧资源管理器保持可用。
 
-当前支持范围是本地集成服。远程服务端的资源与绑定协商尚未安装，任务/成就执行器仍属后续模块；生物目前是地面宿主、立方体骨骼模型和预定义行为，不是任意 Java 行为注入、飞行/游泳或 GeckoLib 关键帧导入。
+当前支持范围是本地集成服。远程服务端的资源与绑定协商尚未安装；有界单线任务已安装，成就仍属后续模块。生物目前是地面宿主、立方体骨骼模型、预定义行为与显式 Boss 阶段，不是任意 Java 行为注入、飞行/游泳或 GeckoLib 关键帧导入。
 
 ## 普通物品与旧内容恢复
 

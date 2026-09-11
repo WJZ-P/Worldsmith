@@ -485,5 +485,23 @@ public final class WorldsmithWorldCreationBridge {
         private WorldContentClientRuntime.Prepared content;
         private boolean resourceReloading;
 	}
+
+    /** File IO and validation only; called by the library worker and never changes a selection. */
+    static CreationSelection prepareCreationSelection(String packId) {
+        WorldsmithPack pack = loadManagedPack(packId);
+        return new CreationSelection(packId, pack.getManifest().getDisplayName());
+    }
+
+    /** Render-thread commit for one explicit library action. Imported files alone never reach this hook. */
+    static void selectForCreation(CreationSelection selection, Screen expectedScreen) {
+        var client = Minecraft.getInstance();
+        if (!client.isSameThread() || client.gui.screen() != expectedScreen || client.level != null || client.getSingleplayerServer() != null)
+            throw new IllegalStateException("World creation context changed; select the resource pack again from the main menu");
+        // Deliberately in memory only: no delayed active-pack.txt write can outlive this UI action.
+        activePackId = selection.id();
+        DISPLAY_NAMES.put(selection.id(), selection.displayName());
+    }
+
+    record CreationSelection(String id, String displayName) {}
     private record Exported(CompiledPack compiled,WorldContentRuntime.Prepared content) {}
 }

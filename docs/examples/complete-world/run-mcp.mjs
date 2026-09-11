@@ -109,7 +109,9 @@ async function architecture(){
  await call('worldsmith_validate_architecture',{sessionId:state.sessionId},'architecture-validation');
 }
 async function write(){
- const r=await call('worldsmith_write_pack',{sessionId:state.sessionId,expectedRevision:await revision(),displayName:kit.title,description:state.prompt},'write-pack',{allowError:true});
+ const args={sessionId:state.sessionId,expectedRevision:await revision(),displayName:kit.title,description:state.prompt};
+ if(options['resource-pack-filename'])args.resourcePackFilename=options['resource-pack-filename'];
+ const r=await call('worldsmith_write_pack',args,'write-pack',{allowError:true});
  state.lastWrite=r.structuredContent;persist();
  if(r.isError||r.structuredContent.valid!==true||!r.structuredContent.path){
   const details=(r.structuredContent.diagnostics||[]).filter(d=>d.severity==='ERROR').map(d=>`${d.path}: ${d.code}: ${d.message}`);
@@ -120,7 +122,11 @@ async function write(){
 }
 async function status(){await call(toolNames.has('worldsmith_get_generation_progress')?'worldsmith_get_generation_progress':'worldsmith_get_content_draft',{sessionId:state.sessionId},'generation-progress',{allowError:true});}
 async function inspect(){if(!state.pack?.valid||!state.pack?.id)throw Error('No saved pack receipt; repair the last write first');await call('worldsmith_inspect_world_content',{id:state.pack.id},'saved-content');}
-async function finish(){const r=await call('worldsmith_finish_world',{sessionId:state.sessionId},'finish-world');state.finish=r.structuredContent;persist();}
+async function finish(){
+ const args={sessionId:state.sessionId},filename=options['resource-pack-filename']||state.pack?.resourcePack?.filename;
+ if(filename)args.resourcePackFilename=filename;
+ const r=await call('worldsmith_finish_world',args,'finish-world');state.finish=r.structuredContent;persist();
+}
 async function run(){
  await begin();
  const phases={status,plan,textures,drawings,creatures,previews,modules,architecture,write,inspect,finish};

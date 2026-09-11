@@ -35,6 +35,59 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		addUnboundBlockHosts(builder);
 		addCreativeContent(builder);
 		addQuestJournal(builder);
+		addResourcePackLibrary(builder);
+	}
+
+	private static void addResourcePackLibrary(TranslationBuilder builder) {
+		builder.add("worldsmith.packs.open", "World packs");
+		builder.add("worldsmith.packs.open.hint", "Manage Worldsmith .wspack imports, exports and new-world selection.");
+		builder.add("worldsmith.packs.title", "Worldsmith Resource Packs");
+		builder.add("worldsmith.packs.version", ".wspack ZIP v1 | Minecraft %s | Native activation is separate");
+		builder.add("worldsmith.packs.library", "Library");
+		builder.add("worldsmith.packs.inbox", "Import inbox");
+		builder.add("worldsmith.packs.refresh", "Refresh");
+		builder.add("worldsmith.packs.refresh.hint", "Refresh the managed library and the import-folder file list.");
+		builder.add("worldsmith.packs.previous", "Previous page");
+		builder.add("worldsmith.packs.next", "Next page");
+		builder.add("worldsmith.packs.inspect", "Inspect");
+		builder.add("worldsmith.packs.inspect.hint", "Validate the selected .wspack and show its identity before importing. No source code is executed.");
+		builder.add("worldsmith.packs.import", "Import");
+		builder.add("worldsmith.packs.import.hint", "Validate and copy this archive into the library. Import does not select a world preset or change the current world.");
+		builder.add("worldsmith.packs.export", "Export .wspack");
+		builder.add("worldsmith.packs.export.hint", "Export the selected library bundle as one reusable .wspack in the export folder.");
+		builder.add("worldsmith.packs.create", "Use for new world");
+		builder.add("worldsmith.packs.create.hint", "Explicitly select this pack for a new Create World screen. Selection is in memory, not restored after restarting; the library pack stays saved. Native reload still validates compatibility.");
+		builder.add("worldsmith.packs.copy_path", "Copy path");
+		builder.add("worldsmith.packs.copy_path.hint", "Copy the complete result or selected package path to the clipboard.");
+		builder.add("worldsmith.packs.path_copied", "Path copied.");
+		builder.add("worldsmith.packs.open_inbox", "Import folder");
+		builder.add("worldsmith.packs.open_inbox.hint", "Open the fixed import folder. Put a .wspack file here, then refresh and select it.");
+		builder.add("worldsmith.packs.open_exports", "Export folder");
+		builder.add("worldsmith.packs.open_exports.hint", "Open the fixed folder containing exported .wspack files.");
+		builder.add("worldsmith.packs.loading", "Reading resource pack lists...");
+		builder.add("worldsmith.packs.checking", "Validating archive integrity and content...");
+		builder.add("worldsmith.packs.importing", "Importing the validated resource pack...");
+		builder.add("worldsmith.packs.exporting", "Writing and verifying the .wspack archive...");
+		builder.add("worldsmith.packs.opening_folder", "Opening the exchange folder...");
+		builder.add("worldsmith.packs.preparing_creation", "Validating the selected bundle for a new world...");
+		builder.add("worldsmith.packs.busy_hint", "You can go back when this operation finishes.");
+		builder.add("worldsmith.packs.boundary", "Data-only import: no automatic activation, no current-world changes, no Java source execution.");
+		builder.add("worldsmith.packs.refreshed", "Refreshed: %s library packs, %s import files.");
+		builder.add("worldsmith.packs.inspected", "Validated %s. Import remains a separate action.");
+		builder.add("worldsmith.packs.imported", "Imported %s into the library. Not activated.");
+		builder.add("worldsmith.packs.imported_existing", "%s already exists in the library; existing metadata was retained. Not activated.");
+		builder.add("worldsmith.packs.exported", "Exported and verified %s. The full path is shown below.");
+		builder.add("worldsmith.packs.folder_requested", "Asked the system to open this folder. If no window appears, copy the path below.");
+		builder.add("worldsmith.packs.error", "Action failed: %s");
+		builder.add("worldsmith.packs.small_window", "Enlarge the window or lower GUI scale to at least 320 x 240 to manage resource packs.");
+		builder.add("worldsmith.packs.empty_library", "The library is empty. Open the import folder, add a .wspack, refresh, then import it.");
+		builder.add("worldsmith.packs.empty_inbox", "No importable .wspack files. Open the import folder and copy a resource archive into it.");
+		builder.add("worldsmith.packs.bundle_id", "Bundle ID: %s");
+		builder.add("worldsmith.packs.pack_details", "Bundle format %s | PNG assets: %s");
+		builder.add("worldsmith.packs.archive_version", "Archive v%s | Bundle format %s");
+		builder.add("worldsmith.packs.file_size", "Archive size: %s bytes");
+		builder.add("worldsmith.packs.library_limit", "Catalog: up to 64 bundles. Metadata listing is not a native-validation receipt.");
+		builder.add("worldsmith.packs.inbox_truncated", "This folder has more files than the bounded list displays. Move completed imports out and refresh.");
 	}
 
 	private static void addQuestJournal(TranslationBuilder builder) {

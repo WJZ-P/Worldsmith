@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "verifiedOnUtc": "2026-09-11",
+  "title": "��ʴ���",
+  "archive": {
+    "filename": "eclipse-crown.wspack",
+    "containerVersion": 1,
+    "bytes": 437950,
+    "sha256": "b8dd3559a23d84edd542f0b612dc57134146a139f6b1b6d8086127be9b205a13",
+    "entries": 46
+  },
+  "bundleId": "023c780e477be3d80d52429975c65df98c65baf1731b3629412da7299cf0ae6e",
+  "counts": {
+    "biomes": 8,
+    "features": 9,
+    "structures": 6,
+    "blocks": 4,
+    "items": 4,
+    "creatures": 3,
+    "quests": 4,
+    "pngAssets": 11,
+    "frozenDrawings": 12
+  },
+  "compiled": {
+    "core": true,
+    "common": true,
+    "client": true,
+    "modJar": true
+  },
+  "focusedTests": [
+    {
+      "name": "com.wjz.worldsmith.core.pack.WorldsmithResourceArchiveTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.wjz.worldsmith.core.mcp.ResourcePackExchangeTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.wjz.worldsmith.core.mcp.ResourcePackCompletionTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "verified": {
+    "cliImportExportRoundtripByteIdentical": true,
+    "duplicateImportReusesBundle": true,
+    "sharedPngBlobCount": 11,
+    "standardZipReader": "System.IO.Compression.ZipFile",
+    "standardZipPngHashes": 11,
+    "mcpToolsExercised": 5,
+    "pngAssetsReusedInAnotherDraft": 11,
+    "staleRevisionRejected": true,
+    "repeatTextureAttachChangesRevision": false,
+    "automaticWritePackArchive": true,
+    "finishArchiveReady": true,
+    "nativeExportFromImportedPackage": true,
+    "nativeRegistryReadbacks": 43,
+    "nativeTemplateReadbacks": 24,
+    "nativeBossSpawnerReadbacks": 1,
+    "authoringSourceJobs": 0,
+    "nativeActivation": false,
+    "playerWorldOpened": false,
+    "manualGameLibraryUiAcceptance": false
+  },
+  "modJar": {
+    "filename": "worldsmith-0.1.0.jar",
+    "bytes": 7041141,
+    "sha256": "86fb1df607bff6b6dbdf82e199cc5293986733da09ffc0f7424278a589049360"
+  },
+  "limits": [
+    "The library UI is compiled and its shared backend is exercised; its game buttons were not manually driven",
+    "Import/export does not run source provenance or change a live world",
+    "Whole bundles and PNG assets are reusable; automatic cross-bundle definition merging is not implemented"
+  ]
+}

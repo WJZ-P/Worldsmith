@@ -19,6 +19,7 @@ Worldsmith 提供可复用的 MCP 创作和原生运行时，不内置调用某�
    内容写入共享 `expectedRevision`，不靠重建素材解决 CAS 冲突。
 5. `worldsmith_write_pack` 检查冻结几何和承诺的关系：计划中的方块实际使用、物品有来源、
    生物有配置的遭遇路线、任务绑定叙事、Boss 有真实 profile 和击杀目标。
+   成功时默认导出一份可导入的 [`.wspack` 资源包](resource-packs.md)，返回其路径和摘要。
 6. `worldsmith_finish_world` 在原生创建世界上下文继续验证、激活。
    独立 authoring host 的 `WAITING_NATIVE_CONTEXT` 是真实边界，不应被改写成成功。
 

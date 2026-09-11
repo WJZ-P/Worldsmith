@@ -62,6 +62,11 @@ foreach ($phase in 'plan','textures','creatures','drawings','modules','architect
   当前会话，就复用既有纹理，仅重新构建生物定义，不重复制作皮肤。
 - 写包失败时修复诊断指定的输入，不降低校验要求；响应中的候选 ID 不代表已保存。
 
+当前 `write` 会默认输出可导入的 `.wspack`，回执包含 `resourcePackReady` 与文件路径。
+可传 `--resource-pack-filename eclipse-crown.wspack` 自定名称，`finish` 沿用成功写包的文件名。
+若错误为 `RESOURCE_PACK_EXPORT_FAILED` 且 `packPreserved: true`，Core 内容已保存：
+按该回执的导出重试参数修复文件交付即可，不重复生成素材。
+
 若局部更新源码后有意保留经核对、未受影响的旧绘图，可以给 `architecture` 显式传入
 `--reuse-drawings target_a,target_b`。执行器只为列出的冻结目标设置 `allowPreviousRevision`，
 不会自动放过所有过期图。共享方法变化时仍应重建所有受影响目标。
@@ -132,3 +137,7 @@ x=-6..6、z=-12..0、y=3..9 的净空。配置为间隔 2400 ticks、玩家激�
 原生导出命令见[完整世界创作说明](../../complete-world-authoring.md)。验证记录不是未来运行的
 保证；从头重放会使用当前全部源码，而增量运行可能显式保留旧的冻结来源，所以 bundle ID
 不应被当作所有重放都必须相同的黄金值。
+
+新增单文件交换的[资源包回环记录](resource-pack-verification-2026-09-11.json)包括 `.wspack`
+字节一致性、重复导入去重、跨草稿 PNG 复用、默认生成收尾导出，以及导入后的原生回读。
+这是共享后端与文件验证；游戏资源库按钮尚未做手动界面验收。
