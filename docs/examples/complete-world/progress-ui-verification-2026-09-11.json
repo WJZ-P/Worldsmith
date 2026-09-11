@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "verifiedOnUtc": "2026-09-11",
+  "feature": "Native Create World AI Progress tab",
+  "compile": {
+    "core": true,
+    "common": true,
+    "client": true,
+    "jar": true
+  },
+  "focusedTests": [
+    {
+      "name": "com.wjz.worldsmith.core.mcp.GenerationProgressViewTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.wjz.worldsmith.core.mcp.GenerationProgressGatewayTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "liveGameHostedMcp": {
+    "passed": true,
+    "draftProgress": [
+      "0/38",
+      "17/38",
+      "32/38",
+      "32/38"
+    ],
+    "biomes": {
+      "declared": 8,
+      "planned": 8
+    },
+    "buildingNames": [
+      "月冠旧王城",
+      "银松市集村落",
+      "凝星修道院",
+      "巡礼星坛",
+      "月辉晶矿场",
+      "旧路残破哨塔"
+    ],
+    "missingPngBefore": 11,
+    "missingPngAfter": 0,
+    "readsChangeSelection": false,
+    "readsChangeRevision": false,
+    "authoringJavaJobs": 0,
+    "nativeClientBooted": true
+  },
+  "localizationKeys": 94,
+  "manualVisualAcceptance": false,
+  "foregroundInputPerformed": false,
+  "visualAcceptanceDeferredByUser": true,
+  "isolatedClientStopped": true,
+  "worldsCreated": 0,
+  "modJar": {
+    "filename": "worldsmith-0.1.0.jar",
+    "bytes": 7172104,
+    "sha256": "a98e221ad42b8fa98810d55120d9cffbe7d8630e49e0d6a60b877d4469cf845e"
+  },
+  "boundaries": [
+    "Progress counts submitted named target definitions, not elapsed time or gameplay completion",
+    "The new tab is compiled; actual foreground tab interaction and visual layout acceptance were deferred at user request",
+    "An isolated Minecraft client and its real MCP bridge exercised the exact progress DTO without source execution or a player world"
+  ]
+}

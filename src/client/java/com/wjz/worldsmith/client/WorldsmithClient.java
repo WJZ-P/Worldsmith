@@ -27,6 +27,7 @@ public final class WorldsmithClient implements ClientModInitializer {
 		ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
 			if (screen instanceof CreateWorldScreen createWorldScreen) {
 				WorldsmithWorldCreationBridge.onScreenOpened(createWorldScreen);
+				WorldsmithGenerationProgressTab.attachTo(createWorldScreen);
 			}
 			if (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) {
 				var buttons = Screens.getWidgets(screen);

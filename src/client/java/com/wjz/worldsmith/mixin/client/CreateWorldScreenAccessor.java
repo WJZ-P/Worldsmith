@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.function.Consumer;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
+import net.minecraft.client.gui.components.tabs.TabManager;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.world.level.WorldDataConfiguration;
 import org.jspecify.annotations.Nullable;
@@ -15,6 +16,9 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 /** Narrow access to Minecraft's own temporary data-pack workflow. */
 @Mixin(CreateWorldScreen.class)
 public interface CreateWorldScreenAccessor {
+	@Accessor("tabManager")
+	TabManager worldsmith$getTabManager();
+
 	@Accessor("uiState")
 	WorldCreationUiState worldsmith$getUiState();
 

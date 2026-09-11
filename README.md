@@ -18,6 +18,9 @@ and can be exported through the real native compiler without opening a player wo
 assets into one `.wspack` file. The game library, MCP tools and CLI share validated import/export,
 content-addressed reuse and an explicit separation between importing data and activating a world.
 
+The [Create World progress tab](docs/generation-progress-ui.md) shows the AI's named plan,
+matched draft counts, live drawing stages and current-context native readiness without fake time percentages.
+
 ## Development baseline
 
 - Minecraft Java Edition `26.2`

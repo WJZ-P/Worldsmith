@@ -71,7 +71,7 @@
         "kind": "structure",
         "id": "crown_citadel"
       },
-      "title": "crown_citadel",
+      "title": "月冠旧王城",
       "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的王城地标；大厅提供黯星守门者的专用刷怪笼遭遇，生成受玩家距离、净空与附近同类限制，不承诺王城放置或全局唯一。"
     },
     {
@@ -79,7 +79,7 @@
         "kind": "structure",
         "id": "silverpine_hamlet"
       },
-      "title": "silverpine_hamlet",
+      "title": "银松市集村落",
       "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
     },
     {
@@ -87,7 +87,7 @@
         "kind": "structure",
         "id": "star_abbey"
       },
-      "title": "star_abbey",
+      "title": "凝星修道院",
       "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
     },
     {
@@ -95,7 +95,7 @@
         "kind": "structure",
         "id": "pilgrim_shrine"
       },
-      "title": "pilgrim_shrine",
+      "title": "巡礼星坛",
       "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
     },
     {
@@ -103,7 +103,7 @@
         "kind": "structure",
         "id": "crystal_quarry"
       },
-      "title": "crystal_quarry",
+      "title": "月辉晶矿场",
       "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
     },
     {
@@ -111,7 +111,7 @@
         "kind": "structure",
         "id": "fallen_watchtower"
       },
-      "title": "fallen_watchtower",
+      "title": "旧路残破哨塔",
       "purpose": "由实际SDK体素、可达入口、夜灯与奖励构成的探索地点。"
     },
     {

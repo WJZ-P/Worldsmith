@@ -40,6 +40,9 @@ WorldDesignPlan {
 their titles are 1..160 characters and purposes 1..2048. A complete-world plan
 names at least one of every required kind: `biome`, `structure`, `creature`,
 `block`, `item`, `quest`, plus at least one Boss (at most 16).
+Titles are player-facing names displayed by the Create World progress tab before
+the definitions exist. Use readable names in the player's language rather than
+copying machine IDs; keep IDs stable when improving a display title.
 This is a minimum coverage check, not a suggested catalog size or a fixed style.
 Derive diversity and scale from the prompt. A repeatable test example is not a
 catalog to copy into every world.
