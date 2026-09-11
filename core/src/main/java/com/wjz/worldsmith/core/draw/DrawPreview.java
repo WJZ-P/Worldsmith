@@ -22,6 +22,11 @@ public final class DrawPreview {
         return png(drawing,view,sliceY,frame,markers,"material");
     }
     public static byte[] png(DrawStructure drawing,String view,Integer sliceY,Box frame,List<Marker> markers,String renderMode) throws IOException {
+        return png(drawing,view,sliceY,frame,markers,renderMode,Map.of());
+    }
+    /** RGB overrides are verified average material colours, not texture sampling or a game-rendering claim. */
+    public static byte[] png(DrawStructure drawing,String view,Integer sliceY,Box frame,List<Marker> markers,String renderMode,Map<String,Integer> colours) throws IOException {
+        if(colours.size()>256 || colours.values().stream().anyMatch(c->c==null||c<0||c>0xffffff))throw new IllegalArgumentException("Invalid preview material colours");
 		if(!VIEWS.contains(view))throw new IllegalArgumentException("Unknown preview view");
 		if(!RENDER_MODES.contains(renderMode))throw new IllegalArgumentException("Unknown preview renderMode");
 		if(view.equals("slice")&&(sliceY==null||sliceY<drawing.bounds().min().y()||sliceY>drawing.bounds().max().y()))throw new IllegalArgumentException("sliceY must be inside drawing bounds");
@@ -47,7 +52,7 @@ public final class DrawPreview {
 				int u=(axis+1)%3,v=(axis+2)%3; double[] xs=new double[4],ys=new double[4];double depth=0;
 				int[][] corners={{-1,-1},{1,-1},{1,1},{-1,1}};
 				for(int i=0;i<4;i++) {double[] point=centre.clone();point[axis]+=sign*.5;point[u]+=corners[i][0]*.5;point[v]+=corners[i][1]*.5;xs[i]=dot(point,right);ys[i]=dot(point,down);depth+=dot(point,near)/4;}
-				int baseColour=renderMode.equals("clay")?0xC3C7CC:colour(entry.getValue().state().id());
+				int baseColour=renderMode.equals("clay")?0xC3C7CC:colours.getOrDefault(entry.getValue().state().id(),colour(entry.getValue().state().id()));
                 // A uniformly coloured top projection loses all height discontinuities.
                 // Use the fixed frame as the datum so revision comparisons keep the same scale.
                 if(renderMode.equals("clay")&&view.equals("top")) {

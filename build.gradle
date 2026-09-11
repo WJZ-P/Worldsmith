@@ -36,6 +36,17 @@ loom {
 fabricApi {
 	configureDataGeneration {
 		client = true
+		if (project.hasProperty('authoredPack')) {
+			outputDirectory = layout.buildDirectory.file('authored-native-export').get()
+			addToResources = false
+		}
+	}
+}
+
+// Opt-in native export of an existing authoring bundle; ordinary datagen is unchanged.
+tasks.withType(JavaExec).configureEach {
+	if (name == 'runDatagen' && project.hasProperty('authoredPack')) {
+		systemProperty 'worldsmith.authoredPack', file(project.property('authoredPack')).absolutePath
 	}
 }
 

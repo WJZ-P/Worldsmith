@@ -10,6 +10,10 @@ public final class WorldsmithDataGenerator implements DataGeneratorEntrypoint {
 	@Override
 	public void onInitializeDataGenerator(FabricDataGenerator fabricDataGenerator) {
 		FabricDataGenerator.Pack pack = fabricDataGenerator.createPack();
+		if (System.getProperty(WorldsmithAuthoredPackExportProvider.INPUT_PROPERTY) != null) {
+			pack.addProvider(WorldsmithAuthoredPackExportProvider::new);
+			return;
+		}
 		pack.addProvider(WorldsmithRegistryProvider::new);
 		pack.addProvider(WorldsmithStructureTemplateProvider::new);
 		pack.addProvider(WorldsmithBiomeTagProvider::new);

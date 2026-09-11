@@ -7,6 +7,7 @@ import java.util.Base64
 
 /** Debug views operate on frozen data. Semantic errors never erase the image needed to repair them. */
 class StructurePreviewService {
+    var paletteForSession:(String)->PreviewMaterialPalette.Palette = {PreviewMaterialPalette.Palette()}
     private val frames=object:LinkedHashMap<String,Box>(16,0.75f,true){override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,Box>?)=size>256}
     fun render(key:String,drawing:DrawStructure,args:JsonObject,components:Map<String,BuildBox> = emptyMap(),inspection:StructureInspection?=null):McpToolResult {
         val start=System.nanoTime();val region=args["region"]?.let {box(McpJson.decode(it))}
@@ -37,10 +38,13 @@ class StructurePreviewService {
             }
             if("errors" in overlays)inspection.report.stages.values.flatMap {it.diagnostics}.forEach {d->d.position?.let {mark(it,0xff4e8a,d.code)}}
         }
-        val images=views.map {view->McpImage(Base64.getEncoder().encodeToString(DrawPreview.png(selected,view,slice,frame,markers,renderMode)))}
+        val palette=if(renderMode=="material")paletteForSession(args["sessionId"]?.jsonPrimitive?.content ?: key.substringBefore(':'))else PreviewMaterialPalette.Palette()
+        val images=views.map {view->McpImage(Base64.getEncoder().encodeToString(DrawPreview.png(selected,view,slice,frame,markers,renderMode,palette.colors)))}
         return McpToolResult.success(buildJsonObject {
             put("previewType","voxel-model-not-game-screenshot");put("frame",McpJson.encode(buildBox(frame)));put("views",McpJson.encode(views))
             put("renderMode",renderMode);put("cutaway",cutaway);slice?.let {put("sliceY",it)}
+            put("customMaterialColours",McpJson.encode(palette.colors));put("materialWarnings",McpJson.encode(palette.warnings))
+            put("materialColourSource",if(palette.colors.isEmpty())"generic approximate palette" else "alpha-weighted averages of the session's verified PNG assets; not texture sampling")
             put("imageLabels",McpJson.encode(views.map {"$it / $renderMode"+(if(cutaway)" / cutaway y <= $slice" else "")}))
             put("viewDirections","front: north (-Z); back: south (+Z); left: west (-X); right: east (+X); top/slice: above (+Y); isometric: NE; isometric_back: SW")
             put("visualAssessment","Not scored. Inspect form, proportions, depth, usable spaces and theme; material colours are approximate, not a texture or lighting proof. Clay top view shades height relative to the fixed frame.")

@@ -3,11 +3,15 @@ package com.wjz.worldsmith.core.mcp
 import java.util.UUID
 import com.wjz.worldsmith.core.structure.WorldStructureDefinition
 import com.wjz.worldsmith.core.structure.StructureArchitecture
+import com.wjz.worldsmith.core.structure.StructureLibrary
+import com.wjz.worldsmith.core.structure.StructureInteraction
 import kotlinx.serialization.Serializable
 import java.nio.file.Files
 import java.nio.file.Path
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.drawhost.DrawingHost
+import com.wjz.worldsmith.core.model.WorldsmithPack
+import com.wjz.worldsmith.core.content.ExistingWorldContentModules
 
 /** One ordered step of the guided flow, named by the tool that performs it. */
 data class WorkflowStep(
@@ -28,7 +32,18 @@ data class WorkflowStep(
     val archived:Boolean=false,
     val contentModules: Map<String, kotlinx.serialization.json.JsonObject> = emptyMap(),
     val contentAssets: Map<String, com.wjz.worldsmith.core.content.ContentAsset> = emptyMap(),
+    val mode: WorkflowMode = WorkflowMode.WORLDGEN_ONLY,
+    val designPlan: WorldDesignPlan? = null,
+    val lastWriteFailure: PackValidationReceipt? = null,
 )
+
+/** Sessions store definitions, not a module envelope; derive the minimum module schema when assembling one. */
+internal fun WorkflowSession.structureLibrary(): StructureLibrary {
+    val definitions = structures.values.toList()
+    val hasBossSpawner = definitions.any { structure -> (listOf(structure.blueprint) + structure.assembly?.pieces.orEmpty().values)
+        .any { blueprint -> blueprint.interactions.any { it is StructureInteraction.BossSpawner } } }
+    return StructureLibrary(schemaVersion = if (hasBossSpawner) 2 else 1, structures = definitions, architecture = architecture)
+}
 
 /**
  * The procedure an outside agent follows to build one world.
@@ -176,6 +191,44 @@ object WorldsmithWorkflow {
                     "answers complete=true. Native pending phases need a later check; WAITING_NATIVE_CONTEXT needs the player to open Create World. Native failures require repair, not an automatic retry loop.",
         ),
     )).mapIndexed { index, step -> step.copy(order=index+1) }
+
+    fun overview(mode: WorkflowMode, summary: Boolean): String = when (mode) {
+        WorkflowMode.STANDALONE -> "This is a focused artifact session. Build, inspect and export the requested drawing or creature; do not manufacture terrain, architecture groups, items or quests merely to satisfy a world-publication workflow. Use the current progress and preserve successful jobs. A preview is not a gameplay screenshot."
+        WorkflowMode.COMPLETE_WORLD -> if (summary) "This is an explicit COMPLETE_WORLD promise. First persist a named WorldDesignPlan, then follow worldsmith_get_generation_progress rather than restarting a fixed checklist. All declared biomes, buildings, blocks, items, creatures, main-line quests and actual Boss profiles must exist and have real usage links before publication. Shared expectedRevision protects every edit. The Mod does not call an LLM or provide an image model; any capable MCP client can author its data and PNGs. Frozen-content checks and native activation are separate receipts."
+            else "COMPLETE_WORLD additionally requires a persisted WorldDesignPlan and verified coverage of its named targets, relationships and Boss quests. Empty optional libraries are not completion in this mode. Follow the current generation progress for the next missing action.\n\n$OVERVIEW"
+        WorkflowMode.WORLDGEN_ONLY -> if (summary) "This is a WORLDGEN_ONLY guided run: theme, terrain, biomes, features and the existing architecture quality policy. Other content modules may be empty unless explicitly requested. Use progress for missing work, share expectedRevision across all edits, and preserve existing drawings. For the full biomes/buildings/blocks/items/creatures/quests/Boss promise, begin with mode=COMPLETE_WORLD; for one artifact use STANDALONE. Native finish is distinct from a preview or Core save."
+            else OVERVIEW
+    }
+
+    fun procedure(mode: WorkflowMode, summary: Boolean): List<WorkflowStep> {
+        if (mode == WorkflowMode.WORLDGEN_ONLY && !summary) return PROCEDURE
+        val steps = when (mode) {
+            WorkflowMode.STANDALONE -> listOf(
+                CONTRACT_TOOL to "Read the drawing or creature authoring contract for the requested artifact; no world modules are required.",
+                "worldsmith_build_drawing" to "Continue a source project or submit the requested drawing; creature recipes use worldsmith_build_creature instead.",
+                "worldsmith_get_generation_progress" to "Resume the owned job or artifact indicated by progress; ask for a required host approval instead of replacing it.",
+                "worldsmith_preview_drawing" to "Inspect the actual result, repair its largest visible flaw, and export the artifact when requested.",
+            )
+            WorkflowMode.COMPLETE_WORLD -> listOf(
+                "worldsmith_get_content_contract" to "Read module=world_design and the compact cross-domain contract pointers.",
+                "worldsmith_put_world_design_plan" to "Commit prompt-specific names, roles, real relationship promises and Boss/quest links at expectedRevision.",
+                "worldsmith_get_generation_progress" to "Follow the highest-priority current gap. Read full contracts only for the domain being authored.",
+                "worldsmith_put_content_modules" to "Author theme/worldgen/content/quests coherently. Build real textures and creature rigs through the linked authoring tools; keep returned asset identities.",
+                STRUCTURE_TOOL to "Use the established SDK, preview, architecture and preflight loops for every planned building; preserve current jobs and shared revisions.",
+                WRITE_TOOL to "Freeze the current revision. Publication verifies named targets and actual compiled-material/reward/spawn/objective links, not merely plan declarations.",
+                FINISH_TOOL to "Request the native receipt. WAITING_NATIVE_CONTEXT is a player action, not a reason to rebuild already-frozen content.",
+            )
+            WorkflowMode.WORLDGEN_ONLY -> listOf(
+                "worldsmith_get_generation_progress" to "Resume the current missing worldgen or architecture step instead of repeating completed work.",
+                TEMPLATE_TOOL to "Read technical field shapes when needed; derive all design choices from the player's prompt.",
+                "worldsmith_put_content_modules" to "Commit the theme and worldgen drafts at the shared expectedRevision; nonrequested item/creature/quest modules may remain empty.",
+                ARCHITECTURE_TOOL to "Apply the existing guided architecture quality contract and author its real structures.",
+                WRITE_TOOL to "Freeze the exact current draft and fix named diagnostics.",
+                FINISH_TOOL to "Finish only after the native receipt for the saved worldgen pack.",
+            )
+        }
+        return steps.mapIndexed { index, (tool, instruction) -> WorkflowStep(index + 1, tool, instruction) }
+    }
 }
 
 /** Atomically persisted guided drafts. Completed and unfinished records are retained;
@@ -208,10 +261,10 @@ class WorkflowSessions @JvmOverloads constructor(
         }
     }
 
-    @Synchronized
-    fun begin(prompt: String): WorkflowSession {
+    @Synchronized @JvmOverloads
+    fun begin(prompt: String, mode: WorkflowMode = WorkflowMode.WORLDGEN_ONLY): WorkflowSession {
         require(sessions.values.count { !it.finished } < maxSessions && sessions.size<128) { "Active session capacity reached; resume existing drafts rather than discarding them" }
-        val session = WorkflowSession(idFactory(), prompt)
+        val session = WorkflowSession(idFactory(), prompt, mode = mode)
         save(session)
         sessions[session.id] = session
         return session
@@ -223,7 +276,7 @@ class WorkflowSessions @JvmOverloads constructor(
     /** Returns null when the id is unknown, which the caller reports rather than throws. */
     @Synchronized
     fun recordPack(id: String, packId: String): WorkflowSession? = update(id) {
-        it.copy(packId = packId, finished = it.finished && it.packId == packId, revision=it.revision+if(it.packId==packId)0 else 1)
+        it.copy(packId = packId, finished = it.finished && it.packId == packId, revision=it.revision+if(it.packId==packId)0 else 1, lastWriteFailure = null)
     }
 
     @Synchronized
@@ -244,6 +297,29 @@ class WorkflowSessions @JvmOverloads constructor(
     @Synchronized fun recordPackAtRevision(id:String,packId:String,revision:Long):WorkflowSession? {
         if(sessions[id]?.revision!=revision)return null
         return recordPack(id,packId)
+    }
+    /** Inline publication inputs become the exact durable draft, so resume never calls a saved module "missing". */
+    @Synchronized fun recordPackSnapshotAtRevision(id: String, pack: WorldsmithPack, revision: Long): WorkflowSession? {
+        val current = sessions[id] ?: return null
+        if (current.revision != revision) return null
+        val modules = ExistingWorldContentModules.input(pack).modules - "structures"
+        val structures = pack.structures.structures.associateBy { it.id }
+        val changed = current.packId != pack.manifest.id || current.contentModules != modules || current.structures != structures || current.architecture != pack.structures.architecture
+        val saved = current.copy(packId = pack.manifest.id, finished = current.finished && current.packId == pack.manifest.id,
+            contentModules = modules, structures = structures, architecture = pack.structures.architecture,
+            revision = current.revision + if (changed) 1 else 0, lastWriteFailure = null)
+        save(saved); sessions[id] = saved
+        return saved
+    }
+    /** Validation observations do not mutate authored content or advance its CAS revision. */
+    @Synchronized fun recordWriteFailureAtRevision(id: String, receipt: PackValidationReceipt): WorkflowSession? {
+        val current = sessions[id] ?: return null
+        if (current.archived || current.revision != receipt.revision) return null
+        val bounded = PackValidationReceipt.bounded(receipt.revision, receipt.diagnostics, receipt.displayName, receipt.description, receipt.inlineInputs)
+            .copy(diagnosticCount = receipt.diagnosticCount)
+        val saved = current.copy(lastWriteFailure = bounded)
+        save(saved); sessions[id] = saved
+        return saved
     }
     @Synchronized fun finishAtRevision(id:String,packId:String,revision:Long):WorkflowSession? {
         val current=sessions[id] ?: return null
@@ -280,6 +356,16 @@ class WorkflowSessions @JvmOverloads constructor(
             it.copy(architecture=architecture ?: it.architecture,structures=next,revision=it.revision+1,packId=null,finished=false)
     }
     @Synchronized fun invalidate(id:String):WorkflowSession? = update(id) { it.copy(packId=null,finished=false,revision=it.revision+1) }
+
+    /** A complete-world promise is durable and shares the same revision as every content mutation. */
+    @Synchronized fun putDesignPlan(id: String, expectedRevision: Long, plan: WorldDesignPlan, mode: WorkflowMode): WorkflowSession? = update(id) {
+        require(it.revision == expectedRevision) { "DRAFT_REVISION_CONFLICT: expected $expectedRevision, current ${it.revision}" }
+        require(it.mode != WorkflowMode.COMPLETE_WORLD || mode == WorkflowMode.COMPLETE_WORLD) { "A complete-world run keeps its declared scope; start an explicit focused run instead of silently downgrading it" }
+        val errors = WorldDesignPlans.validate(plan, mode == WorkflowMode.COMPLETE_WORLD)
+        require(errors.isEmpty()) { errors.take(16).joinToString("; ") { d -> "${d.path}: ${d.message}" } }
+        val frozen = WorldDesignPlans.freeze(plan)
+        if (it.designPlan == frozen && it.mode == mode) it else it.copy(designPlan = frozen, mode = mode, revision = it.revision + 1, packId = null, finished = false)
+    }
 
     /** All world modules and asset handles share the architecture/publication revision. */
     @Synchronized fun putContent(id:String, expectedRevision:Long,

@@ -114,3 +114,27 @@ tasks.register('drawSdkJar', Jar) {
 	dependsOn compileDrawApi
 	from(layout.buildDirectory.dir('classes/draw-api'))
 }
+
+tasks.register('authoringHost', JavaExec) {
+    group = 'worldsmith'
+    description = 'Run the same MCP authoring catalog and drawing worker in an isolated developer workspace, without native activation.'
+    dependsOn classes, ':draw-worker:runtimeBundle'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.wjz.worldsmith.core.mcp.StandaloneAuthoringHost'
+    args(rootProject.findProperty('authoringRoot') ?: rootProject.file('build/standalone-authoring').absolutePath,
+         project(':draw-worker').layout.buildDirectory.dir('runtime').get().asFile.absolutePath,
+         rootProject.findProperty('authoringPort') ?: '0', rootProject.findProperty('targetDataVersion') ?: '4903',
+         rootProject.findProperty('authoringLifetime') ?: '10800')
+    if ((rootProject.findProperty('approveAuthoringSources') ?: 'false').toString() == 'true') args '--approve-sources'
+}
+
+tasks.register('writeAuthoringClasspath') {
+    group = 'worldsmith'
+    dependsOn classes, ':draw-worker:runtimeBundle'
+    doLast {
+        def target = rootProject.file(rootProject.findProperty('classpathFile') ?: 'build/authoring-runtime-classpath.txt')
+        target.parentFile.mkdirs()
+        target.text = sourceSets.main.runtimeClasspath.asPath
+        println target.absolutePath
+    }
+}

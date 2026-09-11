@@ -81,13 +81,17 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private val structureService=StructureMcpService(this.packDirectory.resolveSibling("structure-previews"),drawings,sessions,nativeChecks,previewService,drawingService)
     private val packStore=ManagedPackStore(this.packDirectory)
     private val publicationService=PackPublicationService(packStore,sessions,publicationHost,drawingService)
-    private val contentService=WorldContentMcpService(packStore,nativeChecks!=null,sessions,this.packDirectory.resolveSibling("content-assets"))
+    private val contentService=WorldContentMcpService(packStore,nativeChecks!=null,sessions,this.packDirectory.resolveSibling("content-assets"),drawings::list)
+    private val materialPalette=PreviewMaterialPalette(contentService::textureBytes)
     private val creatureAuthoringService=CreatureAuthoringMcpService(sessions,contentService,this.packDirectory.resolveSibling("creature-work"))
-    init {drawings.completionChecks=structureService::completed;drawingService.inspectDrawing=structureService::inspectDrawing}
+    init {
+        drawings.completionChecks=structureService::completed;drawingService.inspectDrawing=structureService::inspectDrawing
+        previewService.paletteForSession = { sid -> materialPalette.resolve(sessions.find(sid)) }
+    }
 
     fun all(): List<McpTool> = contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+listOf(
         McpTool("worldsmith_list_sessions", "List saved world drafts", "List persistent sessions without executing sources.", objectSchema(mapOf("includeArchived" to buildJsonObject {put("type","boolean")}),emptyList()), true, handler=::listSavedSessions),
-        McpTool("worldsmith_resume_session", "Resume a world draft", "Restore plan/drafts and job references without executing code. Source confirmation follows the configured host policy.", sessionSchema(), true, handler=::resumeSession),
+        McpTool("worldsmith_resume_session", "Resume a world draft", "Restore the saved scope/plan and current next action without executing code. detail=summary omits full structures and job logs while retaining progress and cross-domain pointers.", objectSchema(mapOf("sessionId" to stringSchema(),"detail" to buildJsonObject {put("type","string");put("enum",encode(listOf("summary","full")))}),listOf("sessionId")), true, handler=::resumeSession),
         McpTool("worldsmith_build_drawing", "Build a drawing with Java", "Build Java 21 StructureProgram or DrawProgram, using a source project target or inline sources. Runs in the MC-side worker, not in worldgen. Returns a job id; use a new requestId for each revision. Develop one representative building and inspect its model before expanding a family.", drawingBuildSchema(), false, handler=drawingService::build),
         McpTool("worldsmith_get_drawing_job", "Drawing job status", "Read compile/draw/validation progress, diagnostics and frozen drawing ids.", sessionSchema("jobId"), true, handler={ a->
             McpToolResult.success(drawingService.job(drawings.get(requiredString(a,"sessionId"),requiredString(a,"jobId"))))
@@ -319,19 +323,30 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 add(buildJsonObject {
                     put("sessionId",session.id);put("prompt",session.prompt);put("revision",session.revision)
                     put("finished",session.finished);put("archived",session.archived);put("draftCount",session.structures.size)
+                    put("mode",session.mode.name);put("designPlanPresent",session.designPlan!=null)
                 })
             }
         }
     })
     private fun resumeSession(arguments:JsonObject):McpToolResult {
         val session=sessions.resume(requiredString(arguments,"sessionId")) ?: return McpToolResult.error("Unknown session")
+        val detail=optionalString(arguments,"detail").ifBlank {"full"};require(detail in setOf("summary","full"))
+        val progress=contentService.progress(session)
         return McpToolResult.success(buildJsonObject {
             put("sessionId",session.id);put("prompt",session.prompt);put("revision",session.revision)
+            put("mode",session.mode.name);put("designPlanPresent",session.designPlan!=null)
             session.architecture?.let { put("architecture",encode(it)) }
-            put("structures",encode(StructureLibrary(structures=session.structures.values.toList())))
-            putJsonArray("jobs") { drawings.list(session.id).forEach { add(drawingService.job(it)) } }
+            if(detail=="full") {
+                put("structures",encode(session.structureLibrary()))
+                put("designPlan",session.designPlan?.let {encode(it)} ?: JsonNull)
+                putJsonArray("jobs") { drawings.list(session.id).forEach { add(drawingService.job(it)) } }
+            } else {
+                put("structureIds",encode(session.structures.keys.sorted()));put("moduleIds",encode(session.contentModules.keys.sorted()))
+                put("drawingJobCount",drawings.list(session.id).size)
+            }
             put("recoveryDiagnostics",encode(drawings.recoveryDiagnostics));put("sessionRecoveryDiagnostics",encode(sessions.recoveryDiagnostics))
-            put("nextTool",WorldsmithWorkflow.ARCHITECTURE_VALIDATE_TOOL)
+            put("progress",encode(progress));put("contractPointers",generationContractPointers())
+            put("nextTool",progress.nextTool);put("nextArguments",progress.nextArguments);put("nextInstruction",progress.nextInstruction)
         })
     }
     private fun stringSchema() = buildJsonObject { put("type","string") }
@@ -350,16 +365,20 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         require(prompt.isNotBlank()) { "prompt must not be blank" }
         require(prompt.length <= MAX_PROMPT_LENGTH) { "prompt must be at most $MAX_PROMPT_LENGTH characters" }
 
-        val detail=optionalString(arguments,"detail").ifBlank {"full"};require(detail in setOf("summary","full"))
-        val session = sessions.begin(prompt)
+        val mode=optionalString(arguments,"mode").ifBlank {WorkflowMode.WORLDGEN_ONLY.name}.let {WorkflowMode.valueOf(it)}
+        val detail=optionalString(arguments,"detail").ifBlank {if(mode==WorkflowMode.WORLDGEN_ONLY)"full" else "summary"};require(detail in setOf("summary","full"))
+        val session = sessions.begin(prompt,mode)
+        val progress=contentService.progress(session)
+        val overview=WorldsmithWorkflow.overview(mode,detail=="summary")
         val structured = buildJsonObject {
             put("sessionId", session.id)
             put("prompt", prompt)
-            put("complete", false);put("stage","DRAFT")
-            put("overview", WorldsmithWorkflow.OVERVIEW)
-            put("procedure", procedureJson())
+            put("mode",mode.name);put("complete", false);put("stage",progress.stage)
+            put("overview", overview)
+            put("procedure", procedureJson(mode,detail=="summary"))
             putJsonObject("capabilities") { put("javaDrawingWorker",drawings.available);put("structureProgram",true);put("sourceProjects",true);put("spatialPreflight",nativeChecks!=null);put("autoApproveSourceExecution",drawings.automaticSourceExecution);put("drawingSnapshotVersion",DrawSnapshotCodec.VERSION);put("persistentSessions",true);put("nativePublicationRequired",true) }
             putJsonObject("architecturePolicy") {
+                put("requiredForThisScope",mode!=WorkflowMode.STANDALONE)
                 put("version", 1); put("minimumGroups", StructureArchitectureValidator.MIN_GROUPS)
                 put("minimumStandalone", StructureArchitectureValidator.MIN_STANDALONE); put("minimumLandmarkGroups", 1)
                 put("minimumOccupiedBlockLight", 8); put("landmarkInstancesVerified", false)
@@ -376,15 +395,17 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             }
             put("detail",detail)
             put("contentFramework",contentService.capabilities())
+            put("contractPointers",generationContractPointers());put("progress",encode(progress))
             put("styleCount", styles.list().size)
             put("climatePlacement", climatePlacementJson())
-            put("nextTool", WorldsmithWorkflow.TEMPLATE_TOOL)
+            put("nextTool", progress.nextTool);put("nextArguments",progress.nextArguments);put("nextInstruction",progress.nextInstruction)
         }
         val text = buildString {
-            appendLine(WorldsmithWorkflow.OVERVIEW)
+            appendLine(overview)
             appendLine()
             appendLine("sessionId: ${session.id}")
-            append("next: ${WorldsmithWorkflow.TEMPLATE_TOOL}")
+            appendLine("mode: ${mode.name}")
+            append("next: ${progress.nextTool} — ${progress.nextInstruction}")
         }
         return McpToolResult.success(structured, text)
     }
@@ -443,7 +464,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
 
     private fun structureDrafts(arguments: JsonObject, session: WorkflowSession?): StructureLibrary {
         val supplied = arguments["structures"]?.let { decode<StructureLibrary>(it) }
-            ?: StructureLibrary(structures = session?.structures?.values?.toList().orEmpty())
+            ?: session?.structureLibrary() ?: StructureLibrary()
         require(supplied.architecture == null || session?.architecture == null || supplied.architecture == session.architecture) {
             "Inline architecture differs from the session plan; update it with worldsmith_plan_architecture first"
         }
@@ -530,8 +551,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         return McpImage(Base64.getEncoder().encodeToString(DrawPreview.png(drawing,view,slice)))
     }
 
-    private fun procedureJson(): JsonArray = buildJsonArray {
-        WorldsmithWorkflow.PROCEDURE.forEach { step ->
+    private fun procedureJson(mode:WorkflowMode=WorkflowMode.WORLDGEN_ONLY,summary:Boolean=false): JsonArray = buildJsonArray {
+        WorldsmithWorkflow.procedure(mode,summary).forEach { step ->
             add(
                 buildJsonObject {
                     put("order", step.order)
@@ -540,6 +561,18 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 },
             )
         }
+    }
+
+    /** Small, executable contract lookups retained even when the full cross-domain prompts are omitted. */
+    private fun generationContractPointers():JsonObject=buildJsonObject {
+        listOf("world_design","theme","blocks","creatures","items","quests").forEach { module ->
+            putJsonObject(module) { put("tool","worldsmith_get_content_contract");putJsonObject("arguments") {put("module",module)} }
+        }
+        mapOf("terrain" to "terrain","biomes" to "biome","features" to "feature","structures" to "structure","architecture" to "architecture","drawing" to "draw").forEach { (name,id) ->
+            putJsonObject(name) {put("tool",WorldsmithWorkflow.CONTRACT_TOOL);putJsonObject("arguments") {put("id",id)}}
+        }
+        putJsonObject("textures") {put("tool","worldsmith_get_texture_workflow");putJsonObject("arguments") {}}
+        putJsonObject("creatureAuthoring") {put("tool","worldsmith_get_creature_authoring_contract");putJsonObject("arguments") {}}
     }
 
     private fun structureInspectionSchema(preview: Boolean): JsonObject = objectSchema(
@@ -832,6 +865,31 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     }
 
     private fun writePack(arguments: JsonObject): McpToolResult {
+        val result = try { writePackAttempt(arguments) } catch (failure: StructureBuildException) {
+            McpToolResult.error("Structure compilation needs repair", buildJsonObject {
+                put("valid", false); put("diagnostics", diagnosticsJson(listOf(failure.diagnostic)))
+            })
+        }
+        if (!result.isError) return result
+        val id = (arguments["sessionId"] as? JsonPrimitive)?.contentOrNull ?: return result
+        val revision = (arguments["expectedRevision"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ?: return result
+        val diagnostics = result.structuredContent["diagnostics"]?.let { decode<List<Diagnostic>>(it) }.orEmpty()
+        if (diagnostics.none { it.severity == DiagnosticSeverity.ERROR }) return result
+        val receipt = PackValidationReceipt.bounded(revision, diagnostics,
+            (arguments["displayName"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
+            (arguments["description"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
+            listOf("terrain", "biomes", "features", "theme", "blocks", "creatures", "items", "quests", "structures", "architecture").filter { it in arguments })
+        val current = sessions.recordWriteFailureAtRevision(id, receipt)
+        val progress = current?.let(contentService::progress)
+        return result.copy(structuredContent = JsonObject(result.structuredContent + buildJsonObject {
+            put("sessionId", id); put("revision", revision); put("writeFailureRecorded", current != null)
+            progress?.let {
+                put("progress", encode(it)); put("nextTool", it.nextTool); put("nextArguments", it.nextArguments); put("nextInstruction", it.nextInstruction)
+            }
+        }))
+    }
+
+    private fun writePackAttempt(arguments: JsonObject): McpToolResult {
         val displayName = requiredString(arguments, "displayName").trim()
         require(displayName.isNotBlank()) { "displayName must not be blank" }
         require(displayName.length <= MAX_DISPLAY_NAME_LENGTH) {
@@ -845,10 +903,18 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val sessionId = optionalString(arguments, "sessionId").trim()
         val session = sessions.find(sessionId)
         if (sessionId.isNotEmpty() && session == null) return incomplete(sessionId, WorldsmithWorkflow.BEGIN_TOOL, "Unknown or expired sessionId; begin a new run before publishing")
-        val guidedSession = session != null
+        val guidedSession = session != null && session.mode != WorkflowMode.STANDALONE
+        val completeWorld = session?.mode == WorkflowMode.COMPLETE_WORLD
         if(session!=null) {
             require(!session.archived) { "Resume the archived draft before publishing" }
             require(arguments["expectedRevision"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()==session.revision) { "DRAFT_REVISION_CONFLICT: expectedRevision is required; current ${session.revision}" }
+        }
+        if(completeWorld) {
+            val design=session?.designPlan
+            val problems=if(design==null) listOf(Diagnostic("designPlan","DESIGN_PLAN_REQUIRED",DiagnosticSeverity.ERROR,"A COMPLETE_WORLD run must commit its named design plan before publication")) else WorldDesignPlans.validate(design)
+            if(problems.isNotEmpty())return McpToolResult.error("Complete-world plan is missing or invalid",buildJsonObject {
+                put("sessionId",sessionId);put("valid",false);put("diagnostics",diagnosticsJson(problems));put("nextTool","worldsmith_put_world_design_plan")
+            })
         }
         fun document(key:String)=arguments[key]?.jsonObject ?: session?.contentModules?.get(key) ?: error("$key is required inline or in the content draft")
         val terrainDocument = document("terrain")
@@ -898,26 +964,37 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 message = "A guided prompt run must provide a procedural terrain shape derived from its terrain contract",
             )
         }
+        if(completeWorld && diagnostics.none {it.severity==DiagnosticSeverity.ERROR}) {
+            diagnostics += WorldDesignCoverage.validate(pack,requireNotNull(session?.designPlan))
+        }
         val structured = buildJsonObject {
             put("id", manifest.id)
             put("valid", diagnostics.none { it.severity == DiagnosticSeverity.ERROR })
             put("diagnostics", diagnosticsJson(diagnostics))
+            put("mode",session?.mode?.name ?: WorkflowMode.STANDALONE.name)
+            put("completeWorldCoverageVerified",completeWorld && diagnostics.none {it.severity==DiagnosticSeverity.ERROR})
+            if(diagnostics.any {it.severity==DiagnosticSeverity.ERROR})put("nextTool","worldsmith_get_generation_progress")
         }
         if (diagnostics.any { it.severity == DiagnosticSeverity.ERROR }) {
             return McpToolResult.error("Generated pack did not pass Worldsmith validation", structured)
         }
 
         val directory = persistPack(manifest, bundle.texts, bundle.binaries)
+        // Display metadata is not part of the content hash. An existing identical directory retains its actual metadata.
+        val savedManifest=WorldsmithJson.decode<WorldsmithPackManifest>(Files.readString(directory.resolve("worldsmith.json")))
         // Session validity and the complete architecture were checked before writing files.
-        val savedSession = session?.let { sessions.recordPackAtRevision(sessionId, manifest.id,it.revision) }
+        val savedSession = session?.let { sessions.recordPackSnapshotAtRevision(sessionId,pack.copy(manifest=savedManifest),it.revision) }
         val recorded = savedSession != null
         if(session!=null && !recorded)return incomplete(sessionId,WorldsmithWorkflow.WRITE_TOOL,"Draft revision changed during validation; the frozen pack was preserved but not bound to the newer draft")
         val result = buildJsonObject {
             put("id", manifest.id)
-            put("displayName", manifest.displayName)
+            put("displayName", savedManifest.displayName);put("description",savedManifest.description)
+            put("requestedDisplayName",displayName);put("existingMetadataRetained",savedManifest.displayName!=displayName || savedManifest.description!=description)
             put("path", directory.toString())
             put("valid", true);put("stage","CORE_CHECK");put("minecraftCompiled",false)
             put("diagnostics", diagnosticsJson(diagnostics))
+            put("mode",session?.mode?.name ?: WorkflowMode.STANDALONE.name)
+            put("completeWorldCoverageVerified",completeWorld)
             if (sessionId.isNotEmpty()) {
                 put("sessionId", sessionId)
                 put("sessionRecorded", recorded)
@@ -928,7 +1005,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 )
             }
         }
-        return McpToolResult.success(result, "Saved Worldsmith pack '${manifest.displayName}' as ${manifest.id}")
+        return McpToolResult.success(result, "Saved Worldsmith pack '${savedManifest.displayName}' as ${manifest.id}")
     }
 
     /**
@@ -939,7 +1016,43 @@ class WorldsmithMcpTools @JvmOverloads constructor(
      * is what lets complete=true promise that a later reader finds the same
      * valid pack, instead of only that a write call once returned.
      */
-    private fun finishWorld(arguments:JsonObject)=publicationService.finish(arguments)
+    private fun finishWorld(arguments:JsonObject):McpToolResult {
+        val session=sessions.find(requiredString(arguments,"sessionId"))
+        var completeWorldCoverageVerified=false
+        fun receipt(result:McpToolResult)=result.copy(structuredContent=JsonObject(result.structuredContent+buildJsonObject {
+            put("mode",session?.mode?.name ?: WorkflowMode.WORLDGEN_ONLY.name)
+            put("completeWorldCoverageVerified",completeWorldCoverageVerified)
+        }))
+        if(session?.mode==WorkflowMode.STANDALONE) {
+            val progress=contentService.progress(session)
+            return receipt(McpToolResult.success(buildJsonObject {
+                put("sessionId",session.id);put("mode",session.mode.name);put("complete",false);put("artifactWorkflow",true)
+                put("nextTool",progress.nextTool);put("nextArguments",progress.nextArguments)
+                put("message","This focused session ends with the requested inspected/exported artifact, not a whole-world native activation receipt")
+            }))
+        }
+        if(session?.mode==WorkflowMode.COMPLETE_WORLD && session.packId!=null) {
+            val plan=session.designPlan
+            val path=packStore.managed(session.packId)
+            if(plan==null)return receipt(incomplete(session.id,"worldsmith_put_world_design_plan","Complete-world plan is missing; restore the declared scope before native publication"))
+            if(path!=null) {
+                val loaded=try {WorldsmithPackLoader.loadDirectory(path)} catch(failure:Exception) {
+                    return receipt(McpToolResult.error("Saved complete-world pack could not be read",buildJsonObject {
+                        put("sessionId",session.id);put("complete",false);put("id",session.packId)
+                        put("diagnostics",diagnosticsJson(listOf(Diagnostic("pack","COMPLETE_WORLD_PACK_READ_FAILED",DiagnosticSeverity.ERROR,
+                            failure.message?.take(2048) ?: failure.javaClass.simpleName))))
+                        put("nextTool","worldsmith_inspect_world_content");put("nextArguments",buildJsonObject {put("id",session.packId)})
+                    }))
+                }
+                val diagnostics=WorldDesignCoverage.validate(loaded,plan)
+                if(diagnostics.any {it.severity==DiagnosticSeverity.ERROR})return receipt(McpToolResult.error("Frozen complete-world coverage no longer meets its plan",buildJsonObject {
+                    put("sessionId",session.id);put("complete",false);put("diagnostics",diagnosticsJson(diagnostics));put("nextTool","worldsmith_get_generation_progress")
+                }))
+                completeWorldCoverageVerified=true
+            }
+        }
+        return receipt(publicationService.finish(arguments))
+    }
     private fun incomplete(sessionId:String,nextTool:String,reason:String)=publicationService.incomplete(sessionId,nextTool,reason)
 
     /** Resolves a managed pack directory, refusing anything that leaves it. */
@@ -989,6 +1102,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private fun beginWorldSchema(): JsonObject = objectSchema(
         properties = mapOf(
             "detail" to buildJsonObject {put("type","string");put("enum",JsonArray(listOf(JsonPrimitive("summary"),JsonPrimitive("full"))))},
+            "mode" to buildJsonObject {put("type","string");put("enum",encode(WorkflowMode.entries.map {it.name}));put("description","WORLDGEN_ONLY preserves the existing guided worldgen route; COMPLETE_WORLD requires a named linked design plan and all promised modules/Bosses; STANDALONE is one artifact without world-publication obligations.")},
             "prompt" to buildJsonObject {
                 put("type", "string")
                 put("minLength", 1)
