@@ -86,12 +86,22 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private val creatureAuthoringService=CreatureAuthoringMcpService(sessions,contentService,this.packDirectory.resolveSibling("creature-work"))
     private val resourcePackExchange=ResourcePackExchange(this.packDirectory)
     private val resourcePackService=ResourcePackMcpService(resourcePackExchange,contentService)
+    private val progressGateway=GenerationProgressGateway(sessions::all,drawings::liveJobs)
     init {
         drawings.completionChecks=structureService::completed;drawingService.inspectDrawing=structureService::inspectDrawing
         previewService.paletteForSession = { sid -> materialPalette.resolve(sessions.find(sid)) }
     }
 
-    fun all(): List<McpTool> = resourcePackService.tools()+contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+listOf(
+    /** Native UI entry point: immutable, bounded data only; callers perform projection off the render thread. */
+    @JvmOverloads fun progressSnapshot(preferredSessionId: String? = null): GenerationProgressSnapshot = progressGateway.snapshot(preferredSessionId)
+
+    fun all(): List<McpTool> = rawTools().map(progressGateway::observe)
+
+    private fun rawTools(): List<McpTool> = resourcePackService.tools()+contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+listOf(
+        McpTool("worldsmith_get_generation_progress_view", "Read the native progress view", "Read the same bounded in-memory session catalog and progress view shown in Create World. No draft edits, selection changes, source execution or archived-file scan.",
+            objectSchema(mapOf("sessionId" to stringSchema()),emptyList()),true,handler={ a ->
+                McpToolResult.success(encode(progressSnapshot((a["sessionId"] as? JsonPrimitive)?.contentOrNull)).jsonObject)
+            }),
         McpTool("worldsmith_list_sessions", "List saved world drafts", "List persistent sessions without executing sources.", objectSchema(mapOf("includeArchived" to buildJsonObject {put("type","boolean")}),emptyList()), true, handler=::listSavedSessions),
         McpTool("worldsmith_resume_session", "Resume a world draft", "Restore the saved scope/plan and current next action without executing code. detail=summary omits full structures and job logs while retaining progress and cross-domain pointers.", objectSchema(mapOf("sessionId" to stringSchema(),"detail" to buildJsonObject {put("type","string");put("enum",encode(listOf("summary","full")))}),listOf("sessionId")), true, handler=::resumeSession),
         McpTool("worldsmith_build_drawing", "Build a drawing with Java", "Build Java 21 StructureProgram or DrawProgram, using a source project target or inline sources. Runs in the MC-side worker, not in worldgen. Returns a job id; use a new requestId for each revision. Develop one representative building and inspect its model before expanding a family.", drawingBuildSchema(), false, handler=drawingService::build),

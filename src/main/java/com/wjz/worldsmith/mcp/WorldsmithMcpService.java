@@ -6,6 +6,7 @@ import com.wjz.worldsmith.core.mcp.McpHttpServer;
 import com.wjz.worldsmith.core.mcp.WorldsmithMcpTools;
 import com.wjz.worldsmith.core.mcp.PublicationHost;
 import com.wjz.worldsmith.core.mcp.WorkflowSessions;
+import com.wjz.worldsmith.core.mcp.GenerationProgressSnapshot;
 import com.wjz.worldsmith.core.drawhost.DrawingExecutionLimits;
 import com.wjz.worldsmith.core.drawhost.DrawingHost;
 import com.wjz.worldsmith.core.drawhost.DrawingRuntime;
@@ -51,6 +52,10 @@ public final class WorldsmithMcpService {
     private static Consumer<String> sourceApproval = id -> { };
     private static PublicationHost publicationHost = PublicationHost.UNAVAILABLE;
     private static DrawingHost drawingHost;
+    private record ProgressBridge(long epoch, WorldsmithMcpTools tools) {}
+    private static volatile ProgressBridge progressBridge = new ProgressBridge(0, null);
+    public record ProgressConnection(long epoch, boolean connected) {}
+    public record ProgressRead(long epoch, boolean connected, GenerationProgressSnapshot snapshot) {}
 
 	private WorldsmithMcpService() {
 	}
@@ -78,6 +83,8 @@ public final class WorldsmithMcpService {
 	}
 
     public static synchronized void stop() {
+        // Invalidate UI requests before potentially slow worker shutdown/discovery cleanup.
+        progressBridge = new ProgressBridge(progressBridge.epoch() + 1, null);
         if(drawingHost!=null){drawingHost.close();drawingHost=null;}
 		if (server == null) {
 			requestedPort = 0;
@@ -131,6 +138,22 @@ public final class WorldsmithMcpService {
     public static synchronized void setPublicationHost(PublicationHost host) { publicationHost=Objects.requireNonNull(host); }
     public static synchronized DrawingHost drawingHost() { return drawingHost; }
 
+    /** Render-thread-safe metadata read: no service lock, disk access, HTTP call or draft projection. */
+    public static ProgressConnection progressConnection() {
+        var bridge = progressBridge;
+        return new ProgressConnection(bridge.epoch(), bridge.tools() != null);
+    }
+
+    /** Background-only projection directly against this bridge's tool catalog, never loopback HTTP. */
+    public static ProgressRead readGenerationProgress(String preferredSessionId) {
+        var bridge = progressBridge;
+        if (bridge.tools() == null) return new ProgressRead(bridge.epoch(), false, null);
+        var snapshot = bridge.tools().progressSnapshot(preferredSessionId);
+        var current = progressBridge;
+        if (current != bridge) return new ProgressRead(current.epoch(), current.tools() != null, null);
+        return new ProgressRead(bridge.epoch(), true, snapshot);
+    }
+
     private static DrawingRuntime drawingRuntime() throws java.io.IOException {
         Path directory=packDirectory().resolveSibling("runtime").resolve("draw-1-ecj-3.46.0");Files.createDirectories(directory);
         for(String name:java.util.List.of("draw-sdk.jar","authoring-sdk.jar","draw-worker.jar","ecj.jar")) {
@@ -165,8 +188,10 @@ public final class WorldsmithMcpService {
 			server = started;
 			requestedPort = port;
 			McpDiscovery.write(discoveryFile(), endpoint, runtimeInfo().get());
+            progressBridge = new ProgressBridge(progressBridge.epoch() + 1, tools);
 			Worldsmith.LOGGER.info("Worldsmith MCP bridge listening on {}, announced in {}", endpoint, discoveryFile());
         } catch (Exception e) {
+            progressBridge = new ProgressBridge(progressBridge.epoch() + 1, null);
             if(drawingHost!=null){drawingHost.close();drawingHost=null;}
 			// Broad on purpose: binding the port throws IOException, which Kotlin
 			// does not declare, so a narrower catch would not compile and would

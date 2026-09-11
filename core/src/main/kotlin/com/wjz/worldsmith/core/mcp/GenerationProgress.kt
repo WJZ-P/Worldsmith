@@ -72,8 +72,10 @@ object WorldGenerationProgress {
     private val modulePriority = mapOf("theme" to 10, "terrain" to 20, "biomes" to 25, "features" to 30,
         "blocks" to 35, "items" to 36, "creatures" to 45, "quests" to 75)
 
-    fun inspect(session: WorkflowSession, jobs: List<DrawingJob> = emptyList()): GenerationProgress {
-        val inventory = WorldDesignCoverage.draft(session)
+    fun inspect(session: WorkflowSession, jobs: List<DrawingJob> = emptyList()): GenerationProgress =
+        inspectUsingInventory(session, jobs, WorldDesignCoverage.draft(session))
+
+    internal fun inspectUsingInventory(session: WorkflowSession, jobs: List<DrawingJob>, inventory: DesignInventory): GenerationProgress {
         val issues = mutableListOf<GenerationIssue>()
         val sid = buildJsonObject { put("sessionId", session.id) }
         val cas = buildJsonObject { put("sessionId", session.id); put("expectedRevision", session.revision) }

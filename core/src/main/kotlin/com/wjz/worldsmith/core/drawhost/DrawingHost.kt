@@ -113,6 +113,10 @@ class DrawingHost @JvmOverloads constructor(
         return storageFaults[id]?.let {job.copy(stage=DrawingJobStage.FAILED,message=it,persistenceCommitted=false)} ?: job
     }
     @Synchronized fun list(sessionId: String): List<DrawingJob> = (jobs.values.filter { it.sessionId==sessionId }+archived(sessionId)).distinctBy {it.id}.sortedBy {it.createdAtMillis}
+    /** UI polling snapshot: current in-memory jobs only, including observed persistence faults; no archive I/O. */
+    @Synchronized fun liveJobs(sessionId: String): List<DrawingJob> = jobs.values.filter { it.sessionId == sessionId }.map { job ->
+        storageFaults[job.id]?.let { job.copy(stage=DrawingJobStage.FAILED,message=it,persistenceCommitted=false) } ?: job
+    }
     @Synchronized fun cancel(sessionId: String,id: String): DrawingJob {
         val job=get(sessionId,id)
         if(job.stage !in TERMINAL) {
