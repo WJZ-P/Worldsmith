@@ -83,14 +83,20 @@ class WorldsmithWorkflowTest {
 
         assertFalse(brief.bool("complete"))
         assertTrue(brief.text("sessionId").isNotBlank())
-        assertEquals(WorldsmithWorkflow.TEMPLATE_TOOL, brief.text("nextTool"))
+        assertEquals(WorldsmithWorkflow.CONTRACT_TOOL, brief.text("nextTool"))
+        assertEquals(buildJsonObject { put("id", PromptSet.CONTRACT_GRAND_WORLD); put("section", "world-atlas") }, brief.getValue("nextArguments"))
         assertEquals(WorldsmithWorkflow.PROCEDURE.size, brief.getValue("procedure").jsonArray.size)
+        val firstStep = brief.getValue("procedure").jsonArray.first().jsonObject
+        assertEquals(WorldsmithWorkflow.CONTRACT_TOOL, firstStep.text("tool"))
+        assertTrue(PromptSet.CONTRACT_GRAND_WORLD in firstStep.text("instruction"))
 
         // What the entry document is for: the sequencing and the cross-document
         // joins, which belong to no single contract and so would otherwise be
         // stated in all three or in none.
         val howToDesign = brief.text("howToDesign")
-        assertTrue("Terrain first" in howToDesign)
+        assertTrue(howToDesign.contains("**terrain first.**", ignoreCase = true))
+        assertTrue(howToDesign.indexOf("grand_world") in 0 until howToDesign.lowercase().indexOf("terrain first"),
+            "Macro planning precedes terrain-first implementation, rather than replacing physical planning")
         assertTrue("hydrology" in howToDesign)
         assertTrue("anchor" in howToDesign)
 
@@ -141,6 +147,24 @@ class WorldsmithWorkflowTest {
         assertEquals(2, presets.getValue("humidity").jsonArray.size)
         assertTrue("continentalness" in placement.getValue("rawClimateAxes").jsonArray.map { it.jsonPrimitive.content })
         assertFalse("climateGrid" in brief)
+    }
+
+    @Test
+    fun `complete-world summary puts atlas review before plan persistence without replacing actual progress`() {
+        val brief = call(WorldsmithWorkflow.BEGIN_TOOL, buildJsonObject {
+            put("prompt", "A broad world with distinct regions"); put("mode", "COMPLETE_WORLD"); put("detail", "summary")
+        }).structuredContent
+        val overview = brief.text("overview")
+        val atlas = overview.indexOf("grand_world/world-atlas")
+        val plan = overview.indexOf("persist a named WorldDesignPlan")
+        assertTrue(atlas >= 0 && plan > atlas)
+        assertTrue("authoringBudgets" in overview)
+        assertTrue("On resume preserve the existing plan" in overview)
+        assertEquals(WorldsmithWorkflow.CONTRACT_TOOL, brief.text("nextTool"))
+        assertEquals(buildJsonObject { put("id", PromptSet.CONTRACT_GRAND_WORLD); put("section", "world-atlas") }, brief.getValue("nextArguments"))
+        assertEquals("worldsmith_put_world_design_plan", brief.getValue("progress").jsonObject.text("nextTool"),
+            "The macro-reading suggestion must not overwrite the actual missing draft action")
+        assertFalse(brief.bool("complete"))
     }
 
     @Test
@@ -320,11 +344,13 @@ class WorldsmithWorkflowTest {
     }
 
     @Test
-    fun `a pack written outside a run still saves and says the session was not recorded`() {
+    fun `an unknown run is redirected without publishing while sessionless creation remains explicit`() {
         val orphan = writeTemplateAs("not-a-session")
 
         assertFalse(orphan.bool("complete"))
         assertEquals(WorldsmithWorkflow.BEGIN_TOOL, orphan.text("nextTool"))
+        assertNull(orphan["id"], "Unknown sessions must not receive a saved pack identity")
+        assertNull(orphan["resourcePack"], "Unknown sessions must not publish an archive")
 
         val bare = writeTemplateAs(null)
         assertTrue(bare.bool("valid"))

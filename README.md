@@ -1,18 +1,23 @@
-# Worldsmith
+# Worldsmith · 天工开物
 
 Worldsmith is being built as a Fabric mod that turns a prompt into a
 deterministic Minecraft world-generation blueprint.
 
-The longer-term target is a complete world-content platform spanning terrain,
-biomes, features, structures, custom blocks and creatures. The first shared
-[content-framework layer](docs/world-content-framework.md) now provides typed
-module adapters, logical references, shared asset storage and lifecycle planning.
-Custom block and ground-creature runtimes are installed with bounded native hosts and a local-world lifecycle; bounded linear quests are installed; achievements remain a future module.
+The [content framework](docs/world-content-framework.md) provides nine typed
+modules spanning world themes, terrain, biomes, features, structures, blocks,
+creatures, ordinary items and linear quests, with logical references, shared
+assets and a local-world lifecycle. Custom content uses bounded native hosts;
+Independent achievement authoring remains a future module; existing quests also project into world-specific vanilla advancements after reward claims.
 
 [Complete-world authoring](docs/complete-world-authoring.md) now adds an explicit linked design plan,
 resumable repair progress, phased Bosses and typed landmark encounters. The
 [replayable example kit](docs/examples/complete-world/README.md) uses provider-independent textures
 and can be exported through the real native compiler without opening a player world.
+
+[Grand-world planning](docs/grand-world-authoring.md) connects macro geography,
+regional identities, exploration routes, live authoring budgets and staged production
+to the actual MCP entry. Its [planning example](docs/examples/grand-world-planning.md)
+is explicitly an ungenerated design, not a claim that a larger world has been played.
 
 [Reusable resource packs](docs/resource-packs.md) package the complete authored world and its actual
 assets into one `.wspack` file. The game library, MCP tools and CLI share validated import/export,
@@ -33,7 +38,7 @@ matched draft counts, live drawing stages and current-context native readiness w
 
 - `core`: Kotlin, Minecraft-version-independent prompt and blueprint pipeline
 - `com.wjz.worldsmith`: Java common initialization
-- `com.wjz.worldsmith.client`: Java client initialization and future create-world UI
+- `com.wjz.worldsmith.client`: Java client initialization, resource library and Create World progress UI
 - `com.wjz.worldsmith.datagen`: generated data entrypoint
 - `com.wjz.worldsmith.worldgen`: Minecraft 26.2 world-generation integration
 
@@ -63,7 +68,7 @@ NBT export. It remains separate from architecture composition and placement.
 The [Structure Agent](docs/structure-agent.md) connects Java submission, hidden
 worker compilation, model-image preview, composition and native publication through MCP.
 
-The format-5 world bundle freezes Java drawing geometry, structure metadata and source provenance. Structure module schemas 1/2 select bounded JSON or frozen drawing data; they are not backward-compatible world-bundle formats. Both routes compile into native templates with biome placement and terrain fitting.
+The format-6 world bundle freezes Java drawing geometry, structure metadata and source provenance. Structure module schemas 1/2 select bounded JSON or frozen drawing data; they are not backward-compatible world-bundle formats. Both routes compile into native templates with biome placement and terrain fitting.
 
 See [structure building and MCP previews](docs/structure-building.md).
 New guided worlds also follow [the architecture-agent policy](docs/architecture-agent.md):
@@ -99,8 +104,8 @@ Generated datapacks carry the complete bundle and stable block bindings with the
 save; reopening never depends on an AI, authoring drafts or a config pack copy.
 Client resources are prepared before local-server startup and publication.
 Current scope is local integrated-server worlds. Remote content negotiation,
-branching NPC dialogue/achievements, free-form behavior scripts and arbitrary block
-physical shapes are not installed. Formats 3/4 remain read-only; older unreleased world-bundle formats 1/2 must
+branching NPC dialogue, independent achievement authoring, free-form behavior scripts and arbitrary block
+physical shapes are not installed. Formats 3/4/5 remain read-only; older unreleased world-bundle formats 1/2 must
 be regenerated; existing files are not silently migrated.
 
 ## Creature authoring and creative inventory
@@ -120,21 +125,19 @@ it does not add a special Boss combat system.
 The separate [Boss runtime](docs/creature-bosses.md) supplies explicit schema-2 phases,
 native health bars and repeatable, world-bound landmark spawners.
 
-## Ordinary items and reward sources
+## Equipment, abilities and reward sources
 
 [Items and rewards](docs/items-and-rewards.md) adds world-bound resources/relics,
 server-side creature death drops and native structure-container rewards. Canonical
 ItemStacks retain their world identity, model, name, rarity and stack limits through
-loot export, persistence and the creative catalog. New bundles use format 5; formats 3/4
-restores its original content without silently acquiring new item/drop semantics.
-This is an acquisition layer, not crafting, equipment or an executable quest system.
+loot export, persistence and the creative catalog. Items schema 2 adds native weapons, tools, armor, food and server-owned combinations of healing, status, projectiles and short-range blink. New bundles use format 6; formats 3/4/5 restore their original identities without acquiring new behavior or rewriting saves. Independent crafting and arbitrary skill scripts are not part of this layer.
 
 ## Main-line journal and reusable textures
 
 [Main-line quests](docs/mainline-quests.md) adds server-owned kill/delivery progress,
 partial explicit item submission, once-only item rewards and a lightweight journal
 (default J, rebindable in Controls). Client requests never supply progress values.
-It is a linear foundation, not branching NPC dialogue or an achievement system.
+Tasks also appear in a vanilla advancement tree named after the world bundle; nodes complete after claiming rewards. Independent achievement authoring and branching NPC dialogue remain out of scope.
 
 [Texture production](docs/texture-authoring.md) explains the vendor-independent
 pipeline for ordinary icons, shared-face block tiles and creature UV atlases.

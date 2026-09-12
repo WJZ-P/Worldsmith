@@ -32,11 +32,11 @@ class PromptTemplateRepositoryTest {
     }
 
     @Test
-    fun `the contract set is exactly the documents a pack is written from`() {
+    fun `the contract set exposes planning before typed domain authoring`() {
         val contracts = PromptSet.DEFAULT.contracts
 
         assertEquals(
-            listOf(PromptSet.CONTRACT_TERRAIN, PromptSet.CONTRACT_BIOME, PromptSet.CONTRACT_FEATURE, PromptSet.CONTRACT_STRUCTURE,
+            listOf(PromptSet.CONTRACT_GRAND_WORLD, PromptSet.CONTRACT_TERRAIN, PromptSet.CONTRACT_BIOME, PromptSet.CONTRACT_FEATURE, PromptSet.CONTRACT_STRUCTURE,
                 PromptSet.CONTRACT_ARCHITECTURE, PromptSet.CONTRACT_DRAW),
             contracts.keys.toList(),
             "the order is the order the entry document tells an agent to decide them in",

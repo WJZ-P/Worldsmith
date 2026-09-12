@@ -15,6 +15,15 @@ class WorldsmithSettingsStoreTest {
     lateinit var directory: Path
 
     @Test
+    fun `existing settings enable arrival by default and an explicit preference round trips`() {
+        val path=directory.resolve("worldsmith.json")
+        Files.writeString(path,"""{"schemaVersion":1}""")
+        assertTrue(WorldsmithSettingsStore.load(path).client.showWorldArrival)
+        WorldsmithSettingsStore.save(path,WorldsmithSettings(client=WorldsmithClientSettings(showWorldArrival=false)))
+        assertFalse(WorldsmithSettingsStore.load(path).client.showWorldArrival)
+    }
+
+    @Test
     fun `a missing settings file loads defaults without creating it`() {
         val path = directory.resolve("worldsmith.json")
 

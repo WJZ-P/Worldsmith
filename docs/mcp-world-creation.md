@@ -35,14 +35,14 @@ Use Worldsmith to create a silent black-ocean world with salt flats and ruined o
 The guided MCP contract requires this sequence:
 
 1. `worldsmith_begin_world`
-2. `worldsmith_get_content_framework`, then `worldsmith_get_content_contract` for theme, blocks, creatures and items. Establish the shared premise/rules/conflict and linked narrative beats; author actual PNGs and commit typed modules with `worldsmith_put_content_modules` at `expectedRevision`. Read `worldsmith_get_content_draft` after conflicts and retain each returned revision. Then read `worldsmith_get_pack_template` for field shapes.
+2. `worldsmith_get_content_framework`, then `worldsmith_get_content_contract` for theme, blocks, creatures, items and quests as required by the session mode/plan. Establish the shared premise/rules/conflict and linked narrative beats; author actual PNGs and commit typed modules with `worldsmith_put_content_modules` at `expectedRevision`. Read `worldsmith_get_content_draft` after conflicts and retain each returned revision. Then read `worldsmith_get_pack_template` for field shapes.
 3. Read the world style and analyze biome distribution
 4. Read `worldsmith_get_contract` id `architecture`, then `worldsmith_plan_architecture`
 5. Prefer geometry-linked StructureProgram source targets (DrawProgram remains compatible). Build with `worldsmith_build_drawing`, query `worldsmith_get_drawing_job`, inspect actual `worldsmith_preview_drawing` images and revise before expanding a family. Study clay massing, elevations, occupied-floor cutaways and the assembled layout. Source confirmation follows the configured host policy.
 6. Reference frozen drawing ids and submit metadata with `worldsmith_put_structure`
 7. `worldsmith_validate_architecture` checks real variants, required/optional members,
    landmark scale and occupied-space lighting
-8. `worldsmith_write_pack` with `sessionId` and the current `expectedRevision`. It uses inline or committed module documents and freezes all attached PNG assets into format 4 (repair precise diagnostics on errors).
+8. `worldsmith_write_pack` with `sessionId` and the current `expectedRevision`. It uses inline or committed module documents and freezes all attached PNG assets into format 6 (repair precise diagnostics on errors).
 9. `worldsmith_finish_world`
 
 The first tool returns terrain, biome, feature, structure, draw and architecture contracts. The terrain
@@ -94,7 +94,7 @@ JDK, javac or Python. The hidden worker is not an OS filesystem/network sandbox.
 
 ## Shared content framework
 
-The [world content framework](world-content-framework.md) installs eight typed
+The [world content framework](world-content-framework.md) installs nine typed
 modules. `worldsmith_get_content_framework` reports native adapter availability;
 `worldsmith_plan_world_content` reports catalog links, not a game activation.
 `worldsmith_inspect_world_content` revalidates a saved bundle.
@@ -113,8 +113,8 @@ Reload rejects changes to a running world's immutable identity before replacing
 its resource manager. Missing/corrupt assets and conflicting selected bundles
 are errors; they do not silently remap old chunks.
 
-New writes use format 4; existing format 3 is read-only. The current native lifecycle is for one local integrated
+New writes use format 6; existing formats 3/4/5 are read-only for restoration and unchanged re-embedding with their original module sets and hashes. The current native lifecycle is for one local integrated
 world; dedicated/remote content negotiation is not installed. The theme's beats
-are durable narrative intent, not executable quests or achievement criteria.
+are durable narrative intent, not executable quests or achievement criteria. The separate quests module implements one bounded linear main line; achievements are not installed. Explicit Boss profiles provide ground-melee 2–3 health-phase encounters.
 
 See [ordinary items and reward sources](items-and-rewards.md) for the item icon contract, logical references, creature drops and world-bound container loot.

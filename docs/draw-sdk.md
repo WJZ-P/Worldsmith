@@ -3,6 +3,12 @@
 这套 SDK 是一张体素画布和一组画笔，不是预制建筑库。
 每个世界可以由 AI 编写不同的 Java 函数、循环和数学表达式来创作。
 
+普通建筑后续生成默认布置真实灯具，覆盖各楼层、楼梯和可用阁楼；无用途屋顶夹层应填实或打开。
+高层 AuthoringContext 提供 `hangingLightFixture(id,at,anchor)`，从真实屋梁/曲面屋顶坐标连接连续铁链，
+在 snapshot 时复查锚点和链条；`intentionallyDark(reason)` 显式声明墓室等故意幽暗建筑。
+默认发布不执行逐点亮度门禁，可选 `worldsmith_preflight_structure(..., estimateLighting:true)` 或 lighting
+叠加层提供非阻断估算。声明合法性、真实光源等级、支承与通路检查保留，不修改既有世界内容。
+
 ## 分层
 
 - `core/src/main/java/com/wjz/worldsmith/core/draw`：纯 Java 21，只有 JDK 依赖。
@@ -63,11 +69,11 @@ WorldsmithDrawExporter.write(drawing, Path.of("build/draw/my_build.nbt"));
 - 椭球和锥台的 Field 是隐式水平集，不是严格距离场；在它们上面套 shell 不是等厚壳。
 - 默认资源预算可由调用方调整。存储分片不是建筑分栋，SDK 尺寸自由不等于世界生成范围无限。
 - NBT 输出是结构模板，不是完整 MC 存档；原点规范化到绘图最小角。
-- 当前输出方块及状态，不包含实体、箱内物品、牌子文字等 block-entity 内容。
+- 底层 DrawProgram 几何快照输出方块及状态，不内嵌实体或任意 block-entity NBT；StructureProgram 的类型化语义侧车可声明容器、牌子和 Boss 刷怪笼等已实现交互，见创作工作台合约。
 - 世界部署显式引用冻结 drawingId；旧 JSON 是兼容几何入口。建筑语义、编排、选址仍在 SDK 外部。
 - 玩家和 AI 端无需安装 Python/JDK/javac；MC 当前 Java 运行时启动隐藏 worker，编译器随 Mod 附带。
 - 关闭自动执行时，首次源码执行需要 MC 内的会话确认，重启后重新确认；这是故障/资源隔离，不是完整文件或网络沙箱。
-- 新世界包使用格式 3，其结构模块模式 2 保存冻结数据与源码来源。加载只读取数据；旧的未发布世界包格式 1/2 需要重新生成。
+- 新世界包使用格式 5 的九模块，其结构模块模式 2 保存冻结数据与源码来源。格式 3/4 仅按原身份读取恢复或重新封装，不自动升级；旧的未发布世界包格式 1/2 需要重新生成。加载只读取数据，不执行源码出处。
 
 
 新版创作入口与示例：[Structure Authoring Workbench](structure-authoring-workbench.md)。

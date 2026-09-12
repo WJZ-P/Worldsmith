@@ -1,6 +1,7 @@
 # 当前世界的创造模式内容页
 
-`Worldsmith: Current World` 是一个正常注册的创造模式分类。它只枚举已经进入的本地世界、
+创造模式保留一个正常注册的动态分类，标题使用已激活世界包的名称，例如 **奇幻世界**，
+不跟随存档改名，也不为每个世界新增永久注册项。它只枚举已经进入的本地世界、
 已完成资源激活的内容，不读取 MCP 草稿，也不展示没有定义的宿主槽位。空分类按原版规则隐藏。
 
 ## 三类内容
@@ -19,7 +20,8 @@
 ## 刷新与扩展
 
 客户端 tick 和创造模式缓存检查前会核对资源、方块、生物与普通物品快照的 scope；
-离开、切换或失配时清空目录。仅在目录 revision 改变时使原版缓存失效，不每帧重建界面。
+离开、切换或失配时清空目录与标题。标题变化也更新目录 revision 并使原版缓存失效，
+不每帧重建界面。其它原版及模组分类的标题保持不变。
 
 `WorldsmithCreativeContent.registerProvider(id, Provider)` 仍允许后续内容领域加入同一分类。
 Provider 接收 `Context` 的 scope、block resolver、creature snapshot 和 items snapshot，
