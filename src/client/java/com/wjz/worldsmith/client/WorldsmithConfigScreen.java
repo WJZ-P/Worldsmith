@@ -6,6 +6,7 @@ import com.wjz.worldsmith.core.ai.LlmSettings;
 import com.wjz.worldsmith.core.mcp.McpHttpServer;
 import com.wjz.worldsmith.core.settings.McpSettings;
 import com.wjz.worldsmith.core.settings.WorldsmithSettings;
+import com.wjz.worldsmith.core.settings.WorldsmithClientSettings;
 import com.wjz.worldsmith.mcp.WorldsmithMcpService;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
@@ -39,6 +40,7 @@ public final class WorldsmithConfigScreen {
 		addModelCategory(builder, entries, draft);
 		addCredentialCategory(builder, entries, draft);
 		addBridgeCategory(builder, entries, draft);
+		addExperienceCategory(builder, entries, draft);
 		return builder.build();
 	}
 
@@ -52,9 +54,18 @@ public final class WorldsmithConfigScreen {
 		WorldsmithConfig.set(new WorldsmithSettings(
 			WorldsmithSettings.SCHEMA_VERSION,
 			draft.toLlmSettings(),
-			draft.toMcpSettings()
+			draft.toMcpSettings(),
+			new WorldsmithClientSettings(draft.showWorldArrival)
 		));
 		WorldsmithMcpService.apply(WorldsmithConfig.get().getMcp());
+	}
+
+	private static void addExperienceCategory(ConfigBuilder builder, ConfigEntryBuilder entries, Draft draft) {
+		builder.getOrCreateCategory(Component.translatable("worldsmith.config.category.experience"))
+			.addEntry(entries.startBooleanToggle(Component.translatable("worldsmith.config.arrival"), draft.showWorldArrival)
+				.setDefaultValue(true)
+				.setTooltip(Component.translatable("worldsmith.config.arrival.tooltip"))
+				.setSaveConsumer(value -> draft.showWorldArrival = value).build());
 	}
 
 	private static void addModelCategory(ConfigBuilder builder, ConfigEntryBuilder entries, Draft draft) {
@@ -213,6 +224,7 @@ public final class WorldsmithConfigScreen {
 		private boolean mcpEnabled;
 		private int mcpPort;
 		private boolean mcpAutoApprove;
+		private boolean showWorldArrival;
 
 		private static Draft of(WorldsmithSettings settings) {
 			LlmSettings llm = settings.getLlm();
@@ -229,6 +241,7 @@ public final class WorldsmithConfigScreen {
 			draft.mcpEnabled = mcp.getEnabled();
 			draft.mcpPort = mcp.getPort();
 			draft.mcpAutoApprove = mcp.getAutoApproveSourceExecution();
+			draft.showWorldArrival = settings.getClient().getShowWorldArrival();
 			return draft;
 		}
 

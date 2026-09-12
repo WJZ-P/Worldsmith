@@ -11,7 +11,9 @@
 		"MinecraftWorldContentLoadMixin",
 		"CreateWorldContentCancelMixin",
 		"CreateWorldCreationGuardMixin",
-		"CreativeModeTabsContentMixin"
+		"WorldArrivalKeyboardMixin",
+		"CreativeModeTabsContentMixin",
+		"WorldCreativeTabTitleMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

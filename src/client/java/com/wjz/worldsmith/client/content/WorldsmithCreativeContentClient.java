@@ -27,7 +27,8 @@ public final class WorldsmithCreativeContentClient {
         var blocks = WorldBlockBindings.active();
         var creatures = CreatureRuntime.clientSnapshot();
         var items = CustomItemRuntime.clientSnapshot();
-        String scope = WorldContentClientRuntime.activeScope();
+        var world = WorldContentClientRuntime.activeWorld();
+        String scope = world == null ? null : world.scope();
         if (client.level == null || client.player == null || !client.isLocalServer() || blocks == null || creatures == null || items == null
             || scope == null || !scope.equals(blocks.getScope()) || !scope.equals(creatures.bundleHash()) || !scope.equals(items.bundleHash())) {
             WorldsmithCreativeContent.clear();
@@ -37,7 +38,7 @@ public final class WorldsmithCreativeContentClient {
         long providers = WorldsmithCreativeContent.providerRevision();
         if (scope.equals(failedScope) && providers == failedProviderRevision) return;
         try {
-            WorldsmithCreativeContent.publish(blocks, creatures, items);
+            WorldsmithCreativeContent.publish(blocks, creatures, items, world.displayName());
             failedScope = null;
         } catch (RuntimeException failure) {
             WorldsmithCreativeContent.clear();

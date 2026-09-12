@@ -4,6 +4,7 @@ import com.wjz.worldsmith.content.creature.CreatureRuntime;
 import com.wjz.worldsmith.content.item.CustomItemRuntime;
 import com.wjz.worldsmith.content.item.GeneratedItemResources;
 import com.wjz.worldsmith.content.quest.server.QuestRuntime;
+import com.wjz.worldsmith.content.quest.WorldArrivalPresentation;
 import com.wjz.worldsmith.core.content.*;
 import com.wjz.worldsmith.core.draw.DrawSnapshotCodec;
 import com.wjz.worldsmith.core.model.WorldsmithPack;
@@ -68,12 +69,14 @@ public final class WorldContentRuntime {
         // Check the combined (possibly shared/duplicated-at-different-path) resource budget before exporting.
         new GeneratedWorldResourcePack(pack.getManifest().getId(), client);
         Map<String, byte[]> server = new LinkedHashMap<>(GeneratedBlockResources.serverResources(bindings, blocks));
+        com.wjz.worldsmith.content.quest.GeneratedQuestAdvancements.serverResources(pack, quests.worldTitle())
+            .forEach((path, bytes) -> putUnique(server, path, bytes));
         var bundle = WorldContentBundleIO.encode(pack);
         putUnique(server, EMBEDDED_MANIFEST, WorldsmithJson.INSTANCE.getFormat().encodeToString(WorldsmithPackManifest.Companion.serializer(), bundle.getManifest()).getBytes(StandardCharsets.UTF_8));
         bundle.getTexts().forEach((path, text) -> putUnique(server, EMBEDDED_ROOT + path, text.getBytes(StandardCharsets.UTF_8)));
         bundle.getBinaries().forEach((path, bytes) -> putUnique(server, EMBEDDED_ROOT + path, bytes));
         putUnique(server, BINDINGS_PATH, CustomBlockBindings.encode(bindings).getBytes(StandardCharsets.UTF_8));
-        return new Prepared(pack.getManifest().getId(), blocks, bindings, creatures, items, quests, client, server);
+        return new Prepared(pack.getManifest().getId(), blocks, bindings, creatures, items, quests, WorldArrivalPresentation.from(pack), client, server);
     }
 
     public static Prepared prepare(WorldsmithPack pack, Map<String, String> biomeBindings) { return prepare(pack, biomeBindings, null); }
@@ -262,11 +265,13 @@ public final class WorldContentRuntime {
         private final CreatureRuntime.Snapshot creatures;
         private final CustomItemRuntime.Snapshot items;
         private final QuestRuntime.Snapshot quests;
+        private final WorldArrivalPresentation presentation;
         private final Map<String, byte[]> clientResources;
         private final Map<String, byte[]> serverResources;
-        private Prepared(String scope, CustomBlockLibrary blocks, CustomBlockBindingSnapshot bindings, CreatureRuntime.Snapshot creatures, CustomItemRuntime.Snapshot items, QuestRuntime.Snapshot quests,
+        private Prepared(String scope, CustomBlockLibrary blocks, CustomBlockBindingSnapshot bindings, CreatureRuntime.Snapshot creatures, CustomItemRuntime.Snapshot items, QuestRuntime.Snapshot quests, WorldArrivalPresentation presentation,
                          Map<String, byte[]> client, Map<String, byte[]> server) {
             this.scope = scope; this.blocks = blocks; this.blockBindings = bindings; this.creatures = creatures; this.items = items; this.quests = quests;
+            this.presentation = presentation;
             this.clientResources = freezeBytes(client); this.serverResources = freezeBytes(server);
         }
         public String scope() { return scope; }
@@ -275,6 +280,7 @@ public final class WorldContentRuntime {
         public CreatureRuntime.Snapshot creatures() { return creatures; }
         public CustomItemRuntime.Snapshot items() { return items; }
         public QuestRuntime.Snapshot quests() { return quests; }
+        public WorldArrivalPresentation presentation() { return presentation; }
         public Map<String, byte[]> clientResources() { return freezeBytes(clientResources); }
         /** Includes the complete immutable bundle and exact slot mapping for storage inside the save's datapack. */
         public Map<String, byte[]> serverResources() { return freezeBytes(serverResources); }

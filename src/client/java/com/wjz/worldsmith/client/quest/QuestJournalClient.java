@@ -27,6 +27,8 @@ public final class QuestJournalClient {
     private static long requestedAt;
     private static int ticks;
     private static int lastSyncTick;
+    private static boolean syncNeeded;
+    private static int syncAttempts;
     private static Component notice;
     private static int noticeColor = 0xFFBCC5D3;
     private static long noticeUntil;
@@ -55,10 +57,12 @@ public final class QuestJournalClient {
         while (openKey.consumeClick()) if (client.gui.screen() == null) open(client);
         if (pendingRequest != 0 && System.nanoTime() - requestedAt > 10_000_000_000L) {
             pendingRequest = 0; snapshot = null;
+            // Recover state after an uncertain action, never replay the action itself.
+            syncNeeded = syncAttempts < 3;
             setNotice(Component.translatable("worldsmith.quests.timeout"), 0xFFFFCC7A, 12);
             changed(client);
         }
-        if (client.gui.screen() instanceof QuestJournalScreen && current != null && pendingRequest == 0 && ticks - lastSyncTick >= 40) sync();
+        if (syncNeeded && current != null && pendingRequest == 0 && ticks - lastSyncTick >= 20) sync();
     }
 
     public static void open(Minecraft client) {
@@ -69,10 +73,12 @@ public final class QuestJournalClient {
         }
         if (connection != client.getConnection() || !current.equals(scope)) reset(client, client.getConnection(), current);
         client.gui.setScreen(new QuestJournalScreen(current, connection));
+        syncAttempts = 0;
         sync();
     }
 
     static boolean matchesOpenKey(net.minecraft.client.input.KeyEvent event) { return openKey != null && openKey.matches(event); }
+    static Component openKeyLabel() { return openKey.getTranslatedKeyMessage(); }
     static QuestProtocol.Snapshot snapshot(String expectedScope) { return expectedScope.equals(scope) ? snapshot : null; }
     static boolean pending() { return pendingRequest != 0; }
     static boolean current(String expectedScope, ClientPacketListener expectedConnection) {
@@ -88,7 +94,9 @@ public final class QuestJournalClient {
         Minecraft client = Minecraft.getInstance();
         if (scope == null || !current(scope, connection)) return;
         if (pendingRequest != 0) return;
+        if (kind == QuestProtocol.ActionKind.SYNC) { syncNeeded = false; syncAttempts++; }
         if (!ClientPlayNetworking.canSend(QuestProtocol.Action.TYPE)) {
+            syncNeeded = syncAttempts < 3;
             setNotice(Component.translatable("worldsmith.quests.channel_unavailable"), 0xFFFFCC7A, 8); lastSyncTick = ticks; changed(client); return;
         }
         if (kind != QuestProtocol.ActionKind.SYNC && snapshot == null) return;
@@ -104,6 +112,7 @@ public final class QuestJournalClient {
             ClientPlayNetworking.send(new QuestProtocol.Action(scope, questId, kind, request, revision));
         } catch (RuntimeException failure) {
             pendingRequest = 0;
+            syncNeeded = syncAttempts < 3;
             setNotice(Component.translatable("worldsmith.quests.channel_unavailable"), 0xFFFFCC7A, 10);
         }
         changed(client);
@@ -124,6 +133,7 @@ public final class QuestJournalClient {
             changed(client); return;
         }
         snapshot = payload;
+        syncNeeded = false; syncAttempts = 0;
         if (payload.feedback() != QuestProtocol.Feedback.NONE) feedback(payload);
         else if (waitingNotice && pendingRequest == 0) { notice = null; noticeUntil = 0; waitingNotice = false; }
         changed(client);
@@ -138,7 +148,7 @@ public final class QuestJournalClient {
 
     static Component notice() {
         if (notice != null && System.nanoTime() < noticeUntil) return notice;
-        return Component.translatable("worldsmith.quests.server_authority");
+        return Component.empty();
     }
     static int noticeColor() { return notice != null && System.nanoTime() < noticeUntil ? noticeColor : 0xFFBCC5D3; }
     private static void setNotice(Component value, int color, int seconds) { notice = value; noticeColor = color; noticeUntil = System.nanoTime() + seconds * 1_000_000_000L; waitingNotice = false; }
@@ -151,6 +161,7 @@ public final class QuestJournalClient {
     private static void reset(Minecraft client, ClientPacketListener nextConnection, String nextScope) {
         snapshot = null; pendingRequest = 0; latestRequest = 0; notice = null; noticeUntil = 0; waitingNotice = false;
         connection = nextConnection; scope = nextScope; lastSyncTick = ticks;
+        syncNeeded = nextScope != null; syncAttempts = 0;
         if (client.gui.screen() instanceof QuestJournalScreen) client.gui.setScreen(null);
     }
 }

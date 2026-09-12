@@ -24,6 +24,16 @@ public final class WorldContentClientRuntime {
 
     public static synchronized String activeScope() { return active == null ? null : active.content.scope(); }
 
+    /** Name and scope come from the same verified activation, never from a menu draft or save-folder name. */
+    public record WorldIdentity(String scope, String displayName) {}
+    public static synchronized WorldIdentity activeWorld() {
+        return active == null ? null : new WorldIdentity(active.content.scope(), active.content.quests().worldTitle());
+    }
+
+    public static synchronized com.wjz.worldsmith.content.quest.WorldArrivalPresentation presentation(String scope) {
+        return active != null && active.content.scope().equals(scope) ? active.content.presentation() : null;
+    }
+
     /** Shared barrier for creation-screen publication, connection cleanup and saved-world restoration. */
     public static synchronized CompletableFuture<Void> whenIdle() { return inFlight; }
 

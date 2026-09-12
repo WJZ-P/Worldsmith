@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.client.quest;
 
 import com.wjz.worldsmith.content.quest.QuestProtocol;
+import com.wjz.worldsmith.content.quest.QuestJournalLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -33,7 +34,6 @@ public final class QuestJournalScreen extends Screen {
     private boolean tooSmall;
     private Button deliver;
     private Button claim;
-    private Button refresh;
 
     QuestJournalScreen(String scope, ClientPacketListener connection) {
         super(Component.translatable("worldsmith.quests.title")); worldScope = scope; worldConnection = connection;
@@ -45,10 +45,11 @@ public final class QuestJournalScreen extends Screen {
             addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose()).bounds(width / 2 - 50, height - 28, 100, 20).build());
             return;
         }
-        boolean compact = height < 270;
-        bodyTop = compact ? 40 : 50; bodyBottom = height - (compact ? 75 : 94);
-        listWidth = Math.max(110, Math.min(216, width / 3)); detailX = 12 + listWidth + 12; detailWidth = width - detailX - 12;
-        pageSize = Math.max(1, (bodyBottom - bodyTop - 27) / 26);
+        int previousPageSize = pageSize;
+        var layout = QuestJournalLayout.of(width, height);
+        bodyTop = layout.bodyTop(); bodyBottom = layout.bodyBottom();
+        listWidth = layout.listWidth(); detailX = layout.detailX(); detailWidth = layout.detailWidth();
+        pageSize = layout.pageSize();
         var state = QuestJournalClient.snapshot(worldScope);
         displayed = state == null ? List.of() : state.quests();
         if (selectedId == null || displayed.stream().noneMatch(q -> q.id().equals(selectedId))) {
@@ -57,6 +58,8 @@ public final class QuestJournalScreen extends Screen {
             detailScroll = 0;
             for (int i = 0; i < displayed.size(); i++) if (displayed.get(i).id().equals(selectedId)) { page = i / pageSize; break; }
         }
+        if (previousPageSize > 0 && previousPageSize != pageSize)
+            for (int i = 0; i < displayed.size(); i++) if (displayed.get(i).id().equals(selectedId)) { page = i / pageSize; break; }
         int pages = Math.max(1, (displayed.size() + pageSize - 1) / pageSize); page = Math.max(0, Math.min(page, pages - 1));
         for (int row = 0; row < pageSize; row++) {
             int index = page * pageSize + row; if (index >= displayed.size()) break;
@@ -79,10 +82,7 @@ public final class QuestJournalScreen extends Screen {
         claim = addRenderableWidget(Button.builder(Component.translatable("worldsmith.quests.claim"), button -> {
             if (selectedId != null) QuestJournalClient.claim(selectedId);
         }).bounds(detailX + buttonWidth + 6, height - 26, buttonWidth, 20).tooltip(Tooltip.create(Component.translatable("worldsmith.quests.claim_hint"))).build());
-        int leftWidth = (listWidth - 6) / 2;
-        addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose()).bounds(12, height - 26, leftWidth, 20).build());
-        refresh = addRenderableWidget(Button.builder(Component.translatable("worldsmith.quests.refresh"), button -> QuestJournalClient.sync())
-            .bounds(12 + leftWidth + 6, height - 26, leftWidth, 20).build());
+        addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose()).bounds(12, height - 26, listWidth, 20).build());
         updateButtons();
     }
 
@@ -95,12 +95,11 @@ public final class QuestJournalScreen extends Screen {
     private void select(String id) { selectedId = id; detailScroll = 0; rebuildWidgets(); }
     private QuestProtocol.Entry selected() { return displayed.stream().filter(q -> q.id().equals(selectedId)).findFirst().orElse(null); }
     private void updateButtons() {
-        if (tooSmall || deliver == null || claim == null || refresh == null) return;
+        if (tooSmall || deliver == null || claim == null) return;
         boolean connected = QuestJournalClient.current(worldScope, worldConnection), pending = QuestJournalClient.pending();
         var quest = selected(); boolean usable = connected && !pending && quest != null;
         deliver.active = usable && quest.status() == QuestProtocol.Status.ACTIVE && quest.objectives().stream().anyMatch(o -> o.kind().equals("deliver_item"));
         claim.active = usable && quest.status() == QuestProtocol.Status.READY;
-        refresh.active = connected && !pending;
     }
 
     @Override public void tick() {
@@ -126,9 +125,7 @@ public final class QuestJournalScreen extends Screen {
             graphics.textWithWordWrap(font, Component.translatable(QuestJournalClient.pending() ? "worldsmith.quests.loading" : "worldsmith.quests.empty"),
                 detailX + 10, bodyTop + 13, detailWidth - 20, 0xFFCBD3DF);
         } else drawDetails(graphics);
-        int hintY = bodyBottom + 7;
-        drawLimited(graphics, Component.translatable("worldsmith.quests.delivery_hint"), 12, hintY, width - 24, height < 270 ? 1 : 2, 0xFFAEBBCD);
-        int feedbackY = height - (height < 270 ? 51 : 56);
+        int feedbackY = height - 48;
         Component feedback = QuestJournalClient.notice();
         drawLimited(graphics, feedback, 12, feedbackY, width - 24, 2, QuestJournalClient.noticeColor());
         if (mouseY >= feedbackY && mouseY < height - 29 && mouseX >= 12 && mouseX < width - 12)

@@ -26,10 +26,14 @@ import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentTarget;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -38,6 +42,7 @@ import net.minecraft.world.item.ItemStack;
 public final class QuestRuntime {
     private static final Map<ServerLevel, Snapshot> WORLDS = new ConcurrentHashMap<>();
     private static final Set<LivingEntity> CREDITED_DEATHS = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
+    private static final QuestJournalUpdates DIRTY_JOURNALS = new QuestJournalUpdates();
     private static AttachmentType<QuestPlayerState> progressAttachment;
     private static boolean registered;
 
@@ -53,6 +58,14 @@ public final class QuestRuntime {
             throw new IllegalStateException("The Worldsmith quest action channel is already registered");
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> afterDeath(entity));
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> sendJournal(handler.player, 0, QuestProtocol.Feedback.NONE, ""));
+        ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer, newPlayer, alive) -> requestJournal(newPlayer));
+        ServerTickEvents.END_SERVER_TICK.register(QuestRuntime::flushJournals);
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> DIRTY_JOURNALS.remove(handler.player.getUUID()));
+        ServerLifecycleEvents.SERVER_STOPPED.register(DIRTY_JOURNALS::clear);
+        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resources, success) -> {
+            if (success) server.execute(() -> server.getPlayerList().getPlayers().forEach(QuestRuntime::requestJournal));
+        });
+        QuestAdvancementBridge.initialize();
         registered = true;
     }
 
@@ -102,7 +115,7 @@ public final class QuestRuntime {
         Snapshot world = WORLDS.get(player.level());
         if (world == null || world.quests.isEmpty()) { sendJournal(player, action.requestId(), QuestProtocol.Feedback.UNAVAILABLE, "当前世界没有主线任务。"); return; }
         if (action.kind() == QuestProtocol.ActionKind.SYNC) { sendJournal(player, action.requestId(), QuestProtocol.Feedback.NONE, ""); return; }
-        if (!world.scope.equals(action.scope())) { sendJournal(player, action.requestId(), QuestProtocol.Feedback.SCOPE_MISMATCH, "这条操作属于另一个世界；物品和进度保持原样。"); return; }
+        if (!world.scope.equals(action.scope())) { sendJournal(player, action.requestId(), QuestProtocol.Feedback.SCOPE_MISMATCH, "请翻开这片天地的旅程日志。"); return; }
         try {
             if (!player.isAlive() || player.isSpectator()) { sendJournal(player, action.requestId(), QuestProtocol.Feedback.UNAVAILABLE, "请在存活且非旁观模式时操作任务。"); return; }
             world.requireBound(player.level());
@@ -117,10 +130,11 @@ public final class QuestRuntime {
             if (action.kind() == QuestProtocol.ActionKind.DELIVER) deliver(player, action.requestId(), world, quest, stored, state, progress);
             else if (action.kind() == QuestProtocol.ActionKind.CLAIM) claim(player, action.requestId(), world, quest, stored, state, progress);
         } catch (ScopeMismatch failure) {
-            sendJournal(player, action.requestId(), QuestProtocol.Feedback.SCOPE_MISMATCH, failure.getMessage());
+            Worldsmith.LOGGER.warn("Quest history scope mismatch for {}", player.getUUID(), failure);
+            sendJournal(player, action.requestId(), QuestProtocol.Feedback.SCOPE_MISMATCH, "请翻开这片天地的旅程日志。");
         } catch (RuntimeException failure) {
             Worldsmith.LOGGER.error("Quest action failed for {}", player.getUUID(), failure);
-            sendJournal(player, action.requestId(), QuestProtocol.Feedback.ERROR, "任务操作未完成，请检查游戏日志；没有把奖励丢到地面。");
+            sendJournal(player, action.requestId(), QuestProtocol.Feedback.ERROR, "旅程记录暂未落定，请稍后再试。");
         }
     }
 
@@ -135,7 +149,7 @@ public final class QuestRuntime {
             int taken = transaction.consume(objective::matches, objective.required - counts.get(index));
             counts.set(index, counts.get(index) + taken); delivered += taken;
         }
-        if (delivered == 0) { sendJournal(player, requestId, QuestProtocol.Feedback.NO_MATERIALS, "主背包里没有可继续交付的所需物品；没有扣除物品。"); return; }
+        if (delivered == 0) { sendJournal(player, requestId, QuestProtocol.Feedback.NO_MATERIALS, "收集所需物品后，再来交付吧。"); return; }
         QuestPlayerState next = state.withProgress(quest.definition.getId(), new QuestPlayerState.Progress(counts, false));
         commit(player, stored, next, transaction);
         sendJournal(player, requestId, QuestProtocol.Feedback.DELIVERED, "已交付 " + delivered + " 件物品，任务进度已更新。");
@@ -147,7 +161,7 @@ public final class QuestRuntime {
         var transaction = new QuestInventoryTransaction(player);
         for (Reward reward : quest.rewards) {
             if (!transaction.insert(WorldRewardItems.stack(reward.reference, reward.count, world.blocks, world.items))) {
-                sendJournal(player, requestId, QuestProtocol.Feedback.NO_SPACE, "主背包放不下全部奖励；本次没有发放、掉落或标记已领奖。"); return;
+                sendJournal(player, requestId, QuestProtocol.Feedback.NO_SPACE, "请在主背包中为这份馈赠腾出位置。"); return;
             }
         }
         QuestPlayerState next = state.withProgress(quest.definition.getId(), new QuestPlayerState.Progress(progress.counts(), true));
@@ -177,6 +191,7 @@ public final class QuestRuntime {
             // The server transaction is already committed; a transport/UI failure must not replay the reward.
             Worldsmith.LOGGER.error("Quest inventory synchronization failed after commit for {}", player.getUUID(), syncFailure);
         }
+        QuestAdvancementBridge.request(player);
     }
 
     private static void afterDeath(LivingEntity entity) {
@@ -207,7 +222,8 @@ public final class QuestRuntime {
                 }
                 if (changed) {
                     ((AttachmentTarget)player).setAttached(progressAttachment, state.withProgress(quest.definition.getId(), new QuestPlayerState.Progress(counts, false)));
-                    // The open journal polls every 40 client ticks; do not send a full 2 MiB journal for every AOE kill.
+                    QuestAdvancementBridge.request(player);
+                    requestJournal(player);
                 }
                 break; // The validated graph is one line; the next quest unlocks only after this one is claimed.
             }
@@ -221,15 +237,34 @@ public final class QuestRuntime {
         QuestProtocol.Snapshot journal;
         if (world == null) journal = new QuestProtocol.Snapshot("", "", requestId, 0, List.of(), QuestProtocol.Feedback.UNAVAILABLE, "当前世界没有主线任务。");
         else {
-            try { journal = world.journal(world.state(attached(player)), requestId, feedback, cleanMultiline(message, 512)); }
+            try {
+                journal = world.journal(world.state(attached(player)), requestId, feedback, cleanMultiline(message, 512));
+                QuestAdvancementBridge.request(player);
+            }
             catch (RuntimeException failure) {
                 QuestPlayerState old = attached(player);
                 journal = new QuestProtocol.Snapshot(world.scope, world.worldTitle, requestId, old == null ? 0 : old.revision(), List.of(),
                     failure instanceof ScopeMismatch ? QuestProtocol.Feedback.SCOPE_MISMATCH : QuestProtocol.Feedback.ERROR,
-                    "玩家任务记录与当前世界不一致；原记录和物品未被重置。");
+                    "这份旅程记录暂未对上，请稍后重新打开日志。");
             }
         }
         ServerPlayNetworking.send(player, journal);
+        // An action response already includes every change up to this server-thread turn.
+        DIRTY_JOURNALS.remove(player.getUUID());
+    }
+
+    /** Coalesce AOE/multi-kill changes; no idle client polling and no packet per individual kill. */
+    private static void requestJournal(ServerPlayer player) {
+        requireServerThread(player);
+        MinecraftServer server = player.level().getServer();
+        DIRTY_JOURNALS.mark(player.getUUID(), server, server.getTickCount());
+    }
+
+    private static void flushJournals(MinecraftServer server) {
+        for (var id : DIRTY_JOURNALS.drain(server, server.getTickCount())) {
+            ServerPlayer player = server.getPlayerList().getPlayer(id);
+            if (player != null) sendJournal(player, 0, QuestProtocol.Feedback.NONE, "");
+        }
     }
 
     private static QuestPlayerState attached(ServerPlayer player) {
@@ -253,6 +288,23 @@ public final class QuestRuntime {
         return true;
     }
 
+    record TaskMilestones(boolean objectivesMet, boolean claimed) {}
+    record AdvancementProjection(String scope, Map<String, TaskMilestones> tasks) {}
+    /** Reuses the same scope, prerequisite and persisted-state checks as delivery and reward claims. */
+    static AdvancementProjection advancementProjection(ServerPlayer player) {
+        requireServerThread(player);
+        Snapshot world = WORLDS.get(player.level());
+        if (world == null || world.quests.isEmpty()) return null;
+        world.requireBound(player.level());
+        QuestPlayerState state = world.state(attached(player));
+        Map<String, TaskMilestones> tasks = new LinkedHashMap<>();
+        for (var quest : world.quests.values()) {
+            var progress = progress(state, quest);
+            tasks.put(quest.definition.getId(), new TaskMilestones(ready(quest, progress), progress.claimed()));
+        }
+        return new AdvancementProjection(world.scope, Collections.unmodifiableMap(tasks));
+    }
+
     public static final class Snapshot {
         private final String scope;
         private final String worldTitle;
@@ -263,6 +315,7 @@ public final class QuestRuntime {
             this.scope = scope; this.worldTitle = worldTitle; this.quests = Collections.unmodifiableMap(new LinkedHashMap<>(quests)); this.items = items; this.blocks = blocks;
         }
         public String scope() { return scope; }
+        public String worldTitle() { return worldTitle; }
         public int questCount() { return quests.size(); }
         public Map<String, Quest> definitions() {
             Map<String, Quest> values = new LinkedHashMap<>(); quests.forEach((id, quest) -> values.put(id, quest.definition)); return Collections.unmodifiableMap(values);

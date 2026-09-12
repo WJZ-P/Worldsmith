@@ -40,7 +40,44 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 	}
 
 	private static void addGenerationProgress(TranslationBuilder builder) {
-		builder.add("worldsmith.progress.tab", "AI Progress");
+		builder.add("worldsmith.progress.kind.anchor", "Landmarks");
+		builder.add("worldsmith.progress.kind.blueprint", "Blueprints");
+		builder.add("worldsmith.progress.world_waiting", "A world waiting to take shape");
+		builder.add("worldsmith.progress.world_previous", "Previous world");
+		builder.add("worldsmith.progress.world_next", "Next world");
+		builder.add("worldsmith.progress.world_picker_hint", "Choose a world to follow");
+		builder.add("worldsmith.progress.overview_waiting", "World blueprint");
+		builder.add("worldsmith.progress.overview_count", "World content %s / %s");
+		builder.add("worldsmith.progress.phase.waiting", "Waiting to begin");
+		builder.add("worldsmith.progress.phase.planning", "Planning");
+		builder.add("worldsmith.progress.phase.creating", "Taking shape");
+		builder.add("worldsmith.progress.phase.refining", "Needs refinement");
+		builder.add("worldsmith.progress.phase.saved", "Content saved");
+		builder.add("worldsmith.progress.phase.finishing", "Ready to finalize");
+		builder.add("worldsmith.progress.phase.confirm", "Needs confirmation");
+		builder.add("worldsmith.progress.phase.ready", "Ready to create");
+		builder.add("worldsmith.progress.phase.select_world", "Choose this world");
+		builder.add("worldsmith.progress.phase.loading_world", "Preparing the world");
+		builder.add("worldsmith.progress.card.prompt", "Prompt");
+		builder.add("worldsmith.progress.card.world_prompt", "World prompt");
+		builder.add("worldsmith.progress.card.no_prompt", "The design for this part will appear as the world takes shape.");
+		builder.add("worldsmith.progress.card.generating", "Generating: %s");
+		builder.add("worldsmith.progress.card.generated", "Created: %s");
+		builder.add("worldsmith.progress.card.saved", "Saved: %s");
+		builder.add("worldsmith.progress.card.pending", "Up next: %s");
+		builder.add("worldsmith.progress.card.repair", "Needs refinement: %s");
+		builder.add("worldsmith.progress.card.needs_asset", "Needs textures: %s");
+		builder.add("worldsmith.progress.card.confirm", "Confirm to continue: %s");
+		builder.add("worldsmith.progress.card.queued", "Queued: %s");
+		builder.add("worldsmith.progress.card.existing", "%s entries available");
+		builder.add("worldsmith.progress.card.waiting", "Waiting for its design");
+		builder.add("worldsmith.progress.card.waiting_plan", "Awaiting a target count");
+		builder.add("worldsmith.progress.card.not_planned", "Not planned for this world");
+		builder.add("worldsmith.progress.card.written", "%s entries created");
+		builder.add("worldsmith.progress.card.remaining", "%s entries remaining");
+		builder.add("worldsmith.progress.feed_delayed", "No new progress has arrived yet.");
+		builder.add("worldsmith.progress.attention_needed", "Some content needs a little refinement before continuing.");
+		builder.add("worldsmith.progress.tab", "Worldsmith");
 		builder.add("worldsmith.progress.auto", "Auto");
 		builder.add("worldsmith.progress.auto.hint", "Follow a world session explicitly started, resumed or edited on this bridge. No historical session is guessed after restart.");
 		builder.add("worldsmith.progress.session_previous", "Select the previous session manually");
@@ -89,7 +126,7 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		builder.add("worldsmith.progress.card_declared", "Declared: %s");
 		builder.add("worldsmith.progress.card_progress", "%s / %s drafts");
 		builder.add("worldsmith.progress.card_hint", "Counts are declared plan targets / planned targets. %s extra definitions are not counted as planned progress.");
-		builder.add("worldsmith.progress.scroll_hint", "Scroll or use Page Up / Page Down to read the plan, job states and next steps. Vanilla Create and Cancel remain below this tab.");
+		builder.add("worldsmith.progress.scroll_hint", "Scroll through content categories and their prompts.");
 		builder.add("worldsmith.progress.kind.all", "All categories");
 		builder.add("worldsmith.progress.kind.biome", "Biomes");
 		builder.add("worldsmith.progress.kind.structure", "Structures");
@@ -137,8 +174,24 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 	}
 
 	private static void addResourcePackLibrary(TranslationBuilder builder) {
+		builder.add("worldsmith.packs.directory", "World-pack folder");
+		builder.add("worldsmith.packs.directory.hint", "Add .wspack files here; the list updates automatically.");
+		builder.add("worldsmith.packs.select_pack", "Select a world pack");
+		builder.add("worldsmith.packs.empty_details", "Place a .wspack in the world-pack folder to see it in the list.");
+		builder.add("worldsmith.packs.no_description", "No description.");
+		builder.add("worldsmith.packs.contents", "World contents");
+		builder.add("worldsmith.packs.loading_details", "Reading world configuration...");
+		builder.add("worldsmith.packs.unreadable", "%s world packs could not be read yet.");
+		builder.add("worldsmith.packs.count.biomes", "Biomes");
+		builder.add("worldsmith.packs.count.structures", "Structures");
+		builder.add("worldsmith.packs.count.features", "Features");
+		builder.add("worldsmith.packs.count.blocks", "Blocks");
+		builder.add("worldsmith.packs.count.creatures", "Creatures");
+		builder.add("worldsmith.packs.count.items", "Items");
+		builder.add("worldsmith.packs.count.quests", "Quests");
+		builder.add("worldsmith.packs.count.pngAssets", "Textures");
 		builder.add("worldsmith.packs.open", "World packs");
-		builder.add("worldsmith.packs.open.hint", "Manage Worldsmith .wspack imports, exports and new-world selection.");
+		builder.add("worldsmith.packs.open.hint", "Browse world packs and choose one for a new world.");
 		builder.add("worldsmith.packs.title", "Worldsmith Resource Packs");
 		builder.add("worldsmith.packs.version", ".wspack ZIP v1 | Minecraft %s | Native activation is separate");
 		builder.add("worldsmith.packs.library", "Library");
@@ -154,7 +207,7 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		builder.add("worldsmith.packs.export", "Export .wspack");
 		builder.add("worldsmith.packs.export.hint", "Export the selected library bundle as one reusable .wspack in the export folder.");
 		builder.add("worldsmith.packs.create", "Use for new world");
-		builder.add("worldsmith.packs.create.hint", "Explicitly select this pack for a new Create World screen. Selection is in memory, not restored after restarting; the library pack stays saved. Native reload still validates compatibility.");
+		builder.add("worldsmith.packs.create.hint", "Begin a new adventure in this world.");
 		builder.add("worldsmith.packs.copy_path", "Copy path");
 		builder.add("worldsmith.packs.copy_path.hint", "Copy the complete result or selected package path to the clipboard.");
 		builder.add("worldsmith.packs.path_copied", "Path copied.");
@@ -162,7 +215,7 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		builder.add("worldsmith.packs.open_inbox.hint", "Open the fixed import folder. Put a .wspack file here, then refresh and select it.");
 		builder.add("worldsmith.packs.open_exports", "Export folder");
 		builder.add("worldsmith.packs.open_exports.hint", "Open the fixed folder containing exported .wspack files.");
-		builder.add("worldsmith.packs.loading", "Reading resource pack lists...");
+		builder.add("worldsmith.packs.loading", "Reading world packs...");
 		builder.add("worldsmith.packs.checking", "Validating archive integrity and content...");
 		builder.add("worldsmith.packs.importing", "Importing the validated resource pack...");
 		builder.add("worldsmith.packs.exporting", "Writing and verifying the .wspack archive...");
@@ -177,8 +230,8 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		builder.add("worldsmith.packs.exported", "Exported and verified %s. The full path is shown below.");
 		builder.add("worldsmith.packs.folder_requested", "Asked the system to open this folder. If no window appears, copy the path below.");
 		builder.add("worldsmith.packs.error", "Action failed: %s");
-		builder.add("worldsmith.packs.small_window", "Enlarge the window or lower GUI scale to at least 320 x 240 to manage resource packs.");
-		builder.add("worldsmith.packs.empty_library", "The library is empty. Open the import folder, add a .wspack, refresh, then import it.");
+		builder.add("worldsmith.packs.small_window", "Enlarge the window or lower GUI scale to at least 320 x 200.");
+		builder.add("worldsmith.packs.empty_library", "No world packs yet");
 		builder.add("worldsmith.packs.empty_inbox", "No importable .wspack files. Open the import folder and copy a resource archive into it.");
 		builder.add("worldsmith.packs.bundle_id", "Bundle ID: %s");
 		builder.add("worldsmith.packs.pack_details", "Bundle format %s | PNG assets: %s");
@@ -189,23 +242,33 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 	}
 
 	private static void addQuestJournal(TranslationBuilder builder) {
+		builder.add("worldsmith.creation.title", "A world awaits");
+		builder.add("worldsmith.creation.preparing", "This world is still taking shape. Please wait a moment.");
+		builder.add("worldsmith.arrival.current", "Your next chapter · %s");
+		builder.add("worldsmith.arrival.complete", "The main journey is complete. More stories await beyond the horizon.");
+		builder.add("worldsmith.arrival.explore", "Follow the stories of this land and begin your journey.");
+		builder.add("worldsmith.arrival.claim", "Your journey has borne fruit. Press %s to claim your gifts.");
+		builder.add("worldsmith.arrival.journal", "Press %s to open your journey journal.");
+		builder.add("worldsmith.arrival.skip", "Esc · Continue your journey");
+		builder.add("worldsmith.config.category.experience", "Journey experience");
+		builder.add("worldsmith.config.arrival", "Arrival story and objectives");
+		builder.add("worldsmith.config.arrival.tooltip", "Show the world's story and your current objectives for about eight seconds when you enter. Press Esc to skip.");
+		builder.add("worldsmith.advancements.claim_hint", "Complete the objectives, then claim the reward in the quest journal to complete this advancement.");
 		builder.add("key.category.worldsmith.quests", "Worldsmith");
 		builder.add("key.worldsmith.quest_journal", "Open quest journal");
 		builder.add("worldsmith.quests.title", "World Quest Journal");
-		builder.add("worldsmith.quests.local_only", "The quest journal is available in local Worldsmith integrated worlds.");
-		builder.add("worldsmith.quests.channel_unavailable", "The quest service is not ready. Refresh in a moment.");
-		builder.add("worldsmith.quests.world_changed", "World context changed. Reopen the journal for the current world.");
-		builder.add("worldsmith.quests.loading", "Loading the server quest journal...");
-		builder.add("worldsmith.quests.processing", "Waiting for the server to confirm this action...");
-		builder.add("worldsmith.quests.timeout", "No server response yet. Refresh to confirm the saved state before retrying.");
-		builder.add("worldsmith.quests.server_authority", "Progress and rewards are confirmed by the server. The world keeps running while this journal is open.");
+		builder.add("worldsmith.quests.local_only", "The journey journal unfolds in your local worlds.");
+		builder.add("worldsmith.quests.channel_unavailable", "The journey journal is not ready yet. Please wait a moment.");
+		builder.add("worldsmith.quests.world_changed", "You have entered another land. Open its journey journal again.");
+		builder.add("worldsmith.quests.loading", "Opening your journey journal...");
+		builder.add("worldsmith.quests.processing", "Recording this part of your journey...");
+		builder.add("worldsmith.quests.timeout", "Your journal is taking a moment. Checking its latest progress...");
 		builder.add("worldsmith.quests.previous", "Previous quest page");
 		builder.add("worldsmith.quests.next", "Next quest page");
 		builder.add("worldsmith.quests.deliver", "Deliver items");
 		builder.add("worldsmith.quests.claim", "Claim rewards");
-		builder.add("worldsmith.quests.delivery_hint", "Delivery consumes matching items from your main inventory. Partial deliveries count; merely holding items does not.");
-		builder.add("worldsmith.quests.claim_hint", "Complete every objective to claim once. If inventory space is insufficient, rewards stay unclaimed and are not dropped.");
-		builder.add("worldsmith.quests.refresh", "Refresh");
+		builder.add("worldsmith.quests.delivery_hint", "Contribute the required items from your main inventory. You may deliver them in parts.");
+		builder.add("worldsmith.quests.claim_hint", "Complete your objectives to claim your gifts. Leave room in your main inventory.");
 		builder.add("worldsmith.quests.small_window", "Reduce GUI scale or enlarge the window to view the quest journal.");
 		builder.add("worldsmith.quests.empty", "This world has no available main-line quests.");
 		builder.add("worldsmith.quests.locked_hint", "Claim the prerequisite quest's rewards to unlock this quest.");
@@ -219,18 +282,18 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		builder.add("worldsmith.quests.status.active", "Active");
 		builder.add("worldsmith.quests.status.ready", "Ready");
 		builder.add("worldsmith.quests.status.claimed", "Claimed");
-		builder.add("worldsmith.quests.feedback.none", "Journal refreshed.");
+		builder.add("worldsmith.quests.feedback.none", "Your journey journal is up to date.");
 		builder.add("worldsmith.quests.feedback.delivered", "Items delivered; progress updated.");
 		builder.add("worldsmith.quests.feedback.claimed", "Rewards claimed.");
-		builder.add("worldsmith.quests.feedback.no_materials", "No matching items to deliver. Inventory and progress are unchanged.");
+		builder.add("worldsmith.quests.feedback.no_materials", "There are no more required items in your main inventory.");
 		builder.add("worldsmith.quests.feedback.no_space", "Not enough inventory space. Rewards remain unclaimed.");
 		builder.add("worldsmith.quests.feedback.locked", "This quest is not unlocked yet.");
 		builder.add("worldsmith.quests.feedback.not_ready", "Complete every objective before claiming rewards.");
 		builder.add("worldsmith.quests.feedback.already_claimed", "These rewards have already been claimed.");
-		builder.add("worldsmith.quests.feedback.stale_revision", "Progress changed since the last view. Review the refreshed state before acting again.");
-		builder.add("worldsmith.quests.feedback.scope_mismatch", "This request belongs to a different world. Reopen the current journal.");
+		builder.add("worldsmith.quests.feedback.stale_revision", "Your journey has advanced. Continue from the latest objectives.");
+		builder.add("worldsmith.quests.feedback.scope_mismatch", "This journal belongs to another land. Open the current journal again.");
 		builder.add("worldsmith.quests.feedback.unavailable", "No quest journal is available in this world.");
-		builder.add("worldsmith.quests.feedback.error", "The server rejected this action. See its message and refresh before retrying.");
+		builder.add("worldsmith.quests.feedback.error", "This action is not complete yet. Try again in a moment.");
 	}
 
 	private static void addCreativeContent(TranslationBuilder builder) {

@@ -6,21 +6,14 @@ import com.wjz.worldsmith.core.mcp.GenerationProgressSnapshot;
 import com.wjz.worldsmith.core.mcp.GenerationProgressView;
 import com.wjz.worldsmith.core.mcp.GenerationSessionSummary;
 import com.wjz.worldsmith.core.mcp.GenerationTargetProgress;
-import com.wjz.worldsmith.core.mcp.PublicationStatus;
 import com.wjz.worldsmith.mixin.client.CreateWorldScreenAccessor;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
-import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractScrollArea;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.tabs.GridLayoutTab;
 import net.minecraft.client.gui.narration.NarratedElementType;
@@ -28,67 +21,44 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import org.lwjgl.glfw.GLFW;
 
-/** A genuine Create World tab. It reads bounded cached DTOs; it neither starts authoring nor changes worlds. */
+/** The native Worldsmith tab: fixed-layout category cards, fed only by actual cached authoring state. */
 public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
-    private static final int TARGET_PAGE_SIZE = 8;
     private static final List<String> MAIN_KINDS = List.of("biome", "structure", "creature", "block", "item", "quest");
     private final CreateWorldScreen screen;
     private final Dashboard dashboard;
-    private final Button auto;
-    private final Button sessionPrevious;
-    private final Button sessionPicker;
-    private final Button sessionNext;
-    private final Button pause;
-    private final Button category;
-    private final Button previous;
-    private final Button next;
-    private final StringWidget pageLabel;
+    private final Button sessionPrevious, sessionPicker, sessionNext;
     private WorldsmithGenerationProgressPoller poller;
     private WorldsmithGenerationProgressPoller.Snapshot cached;
     private List<GenerationSessionSummary> sessions = List.of();
     private boolean following = true;
-    private String preferredSession;
-    private boolean paused;
-    private String filter = "all";
-    private int page;
-    private String restorePageForSession;
+    private String preferredSession, restoreSession;
+    private double restoreScroll;
+    private int rowLeft, rowTop, rowWidth;
 
-    /** Only user choices cross native reinitialization; widgets and publication receipts never do. */
-    public record UiState(boolean following, String preferredSession, boolean paused, String filter, int page, String visibleSession) {}
-
+    public record UiState(boolean following, String preferredSession, double scroll, String visibleSession) {}
     public UiState uiState() {
-        String visibleSession = selectedId(cached);
-        return new UiState(following, preferredSession, paused, filter, page,
-            visibleSession == null ? restorePageForSession : visibleSession);
+        String id = selectedId(cached);
+        return new UiState(following, preferredSession, dashboard.scrollAmount(), id == null ? restoreSession : id);
     }
-
-    public WorldsmithGenerationProgressTab(CreateWorldScreen screen) {
-        this(screen, null);
-    }
-
+    public WorldsmithGenerationProgressTab(CreateWorldScreen screen) { this(screen, null); }
     public WorldsmithGenerationProgressTab(CreateWorldScreen screen, UiState previousState) {
         super(tr("tab")); this.screen = screen;
         if (previousState != null) {
             following = previousState.following(); preferredSession = previousState.preferredSession();
-            paused = previousState.paused(); filter = previousState.filter(); page = previousState.page();
-            restorePageForSession = previousState.visibleSession();
+            restoreSession = previousState.visibleSession(); restoreScroll = previousState.scroll();
         }
-        dashboard = layout.addChild(new Dashboard(), 0, 0);
-        auto = layout.addChild(button("auto", () -> { following = true; preferredSession = null; ensurePoller(); poller.followActiveSession(); cached = poller.snapshot(); paused = false; resetView(); }), 1, 0);
-        sessionPrevious = layout.addChild(Button.builder(Component.literal("<"), ignored -> chooseSession(-1)).tooltip(Tooltip.create(tr("session_previous"))).build(), 2, 0);
-        sessionPicker = layout.addChild(Button.builder(tr("choose_session"), ignored -> chooseSession(1)).build(), 3, 0);
-        sessionNext = layout.addChild(Button.builder(Component.literal(">"), ignored -> chooseSession(1)).tooltip(Tooltip.create(tr("session_next"))).build(), 4, 0);
-        pause = layout.addChild(button("pause", () -> { paused = !paused; updateControls(); updateDashboard(); }), 5, 0);
-        category = layout.addChild(button("category", this::nextCategory), 6, 0);
-        previous = layout.addChild(Button.builder(Component.literal("<"), ignored -> { page--; updateControls(); updateDashboard(); dashboard.setScrollAmount(0); })
-            .tooltip(Tooltip.create(tr("targets_previous"))).build(), 7, 0);
-        next = layout.addChild(Button.builder(Component.literal(">"), ignored -> { page++; updateControls(); updateDashboard(); dashboard.setScrollAmount(0); })
-            .tooltip(Tooltip.create(tr("targets_next"))).build(), 8, 0);
-        pageLabel = layout.addChild(new StringWidget(Component.empty(), Minecraft.getInstance().font), 9, 0);
+        sessionPrevious = layout.addChild(Button.builder(Component.literal("<"), ignored -> chooseSession(-1))
+                .tooltip(Tooltip.create(tr("world_previous"))).build(), 0, 0);
+        sessionPicker = layout.addChild(Button.builder(tr("world_waiting"), ignored -> chooseSession(1)).build(), 1, 0);
+        sessionNext = layout.addChild(Button.builder(Component.literal(">"), ignored -> chooseSession(1))
+                .tooltip(Tooltip.create(tr("world_next"))).build(), 2, 0);
+        dashboard = layout.addChild(new Dashboard(), 3, 0);
         updateControls();
     }
 
@@ -96,295 +66,275 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
         var tab = ((WorldsmithProgressTabAccess)screen).worldsmith$getGenerationProgressTab();
         if (tab == null) return;
         tab.ensurePoller();
-        // Fabric resets these per-screen events during both initialization and resize.
         ScreenEvents.afterTick(screen).register(ignored -> tab.tick());
         ScreenEvents.remove(screen).register(ignored -> tab.removed());
     }
-
     private void ensurePoller() {
         if (poller != null) return;
         poller = new WorldsmithGenerationProgressPoller();
         if (following) poller.followActiveSession(); else if (preferredSession != null) poller.selectSession(preferredSession);
     }
-
     public void removed() {
-        String visibleSession = selectedId(cached);
-        if (visibleSession != null) restorePageForSession = visibleSession;
+        String id = selectedId(cached);
+        if (id != null) { restoreSession = id; restoreScroll = dashboard.scrollAmount(); }
         if (poller != null) { poller.close(); poller = null; }
-        cached = null; updateDashboard();
+        cached = null;
     }
-
     private void tick() {
         if (((CreateWorldScreenAccessor)screen).worldsmith$getTabManager().getCurrentTab() != this) return;
-        ensurePoller();
-        if (!paused) {
-            poller.tick(screen);
-            var snapshot = poller.snapshot();
-            String before = selectedId(cached), after = selectedId(snapshot);
-            cached = snapshot;
-            GenerationProgressSnapshot progress = cached == null ? null : cached.progress();
-            sessions = progress == null ? List.of() : List.copyOf(progress.getSessions());
-            if (!Objects.equals(before, after) && after != null) {
-                if (!after.equals(restorePageForSession)) page = 0;
-                restorePageForSession = null; dashboard.setScrollAmount(0);
-            }
-            updateControls();
+        ensurePoller(); poller.tick(screen);
+        var snapshot = poller.snapshot();
+        String before = selectedId(cached), after = selectedId(snapshot);
+        cached = snapshot;
+        var progress = snapshot == null ? null : snapshot.progress();
+        sessions = progress == null ? List.of() : List.copyOf(progress.getSessions());
+        updateControls(); dashboard.update(cached);
+        if (after != null && !Objects.equals(before, after)) {
+            dashboard.setScrollAmount(after.equals(restoreSession) ? restoreScroll : 0);
+            restoreSession = null; restoreScroll = 0;
         }
-        updateDashboard();
     }
-
     private static String selectedId(WorldsmithGenerationProgressPoller.Snapshot snapshot) {
         return snapshot == null || snapshot.progress() == null ? null : snapshot.progress().getSelectedSessionId();
     }
-    private GenerationProgressView view() { return cached == null || cached.progress() == null ? null : cached.progress().getView(); }
-    private void resetView() { page = 0; restorePageForSession = null; dashboard.setScrollAmount(0); updateControls(); updateDashboard(); }
-
     private void chooseSession(int step) {
         if (sessions.isEmpty()) return;
         String selected = following ? selectedId(cached) : preferredSession;
         int index = -1;
         for (int i = 0; i < sessions.size(); i++) if (sessions.get(i).getSessionId().equals(selected)) { index = i; break; }
-        if (index < 0) index = step > 0 ? 0 : sessions.size() - 1;
-        else index = Math.floorMod(index + step, sessions.size());
-        following = false; preferredSession = sessions.get(index).getSessionId();
-        ensurePoller(); poller.selectSession(preferredSession); cached = poller.snapshot(); paused = false; resetView();
+        index = index < 0 ? (step > 0 ? 0 : sessions.size() - 1) : Math.floorMod(index + step, sessions.size());
+        String id = sessions.get(index).getSessionId();
+        String active = cached == null || cached.progress() == null ? null : cached.progress().getDefaultSessionId();
+        following = id.equals(active); preferredSession = following ? null : id;
+        ensurePoller();
+        if (following) poller.followActiveSession(); else poller.selectSession(id);
+        cached = poller.snapshot(); restoreSession = null; restoreScroll = 0;
+        dashboard.setScrollAmount(0); updateControls(); dashboard.update(cached);
     }
-
-    private List<String> filters() {
-        List<String> result = new ArrayList<>(); result.add("all"); result.addAll(MAIN_KINDS);
-        var view = view(); if (view != null) for (var entry : view.getCategories()) if (!result.contains(entry.getKind())) result.add(entry.getKind());
-        return result;
-    }
-    private void nextCategory() {
-        var filters = filters(); filter = filters.get(Math.floorMod(filters.indexOf(filter) + 1, filters.size()));
-        resetView(); updateDashboard();
-    }
-    private int targetCount() {
-        var view = view(); if (view == null) return 0;
-        return (int)view.getTargets().stream().filter(target -> filter.equals("all") || filter.equals(target.getKind())).count();
-    }
-    private int pages() { return Math.max(1, (targetCount() + TARGET_PAGE_SIZE - 1) / TARGET_PAGE_SIZE); }
-
     private void updateControls() {
-        auto.active = !following;
-        sessionPrevious.active = !sessions.isEmpty(); sessionPicker.active = !sessions.isEmpty(); sessionNext.active = !sessions.isEmpty();
         String selected = following ? selectedId(cached) : preferredSession;
         var entry = sessions.stream().filter(session -> session.getSessionId().equals(selected)).findFirst().orElse(null);
-        Component label = entry == null ? tr(preferredSession == null ? "choose_session" : "session_unavailable")
-            : Component.literal(bound(entry.getTitle(), 160) + " · " + shortId(entry.getSessionId()));
-        sessionPicker.setMessage(label);
-        Component tip = tr("session_hint").copy().append("\n").append(following ? tr("following_auto") : tr("following_manual"));
-        for (var session : sessions.stream().limit(8).toList()) tip = tip.copy().append("\n" + shortId(session.getSessionId()) + " · " + bound(session.getTitle(), 100));
-        sessionPicker.setTooltip(Tooltip.create(tip));
-        pause.setMessage(tr(paused ? "resume" : "pause")); pause.setTooltip(Tooltip.create(tr(paused ? "resume.hint" : "pause.hint")));
-        category.setMessage(tr("category_value", kind(filter)));
-        boolean hasView = view() != null;
-        if (hasView) page = Math.max(0, Math.min(page, pages() - 1));
-        previous.active = hasView && page > 0; next.active = hasView && page + 1 < pages();
-        pageLabel.setMessage(Component.literal(hasView ? (page + 1) + " / " + pages() : "\u2014"));
+        sessionPicker.setMessage(entry == null ? tr("world_waiting") : Component.literal(bound(entry.getTitle(), 160)));
+        sessionPicker.active = !sessions.isEmpty();
+        Component tooltip = entry == null ? tr("world_picker_hint") : Component.literal(bound(entry.getPrompt(), 384));
+        sessionPicker.setTooltip(Tooltip.create(tooltip));
+        layoutSessionControls();
     }
-
-    private void updateDashboard() { dashboard.update(cached, paused, following, filter, page); }
-
+    private void layoutSessionControls() {
+        boolean multiple = sessions.size() > 1 && rowWidth >= 230;
+        sessionPrevious.visible = sessionNext.visible = multiple;
+        sessionPrevious.active = sessionNext.active = multiple;
+        sessionPrevious.setRectangle(20, 20, rowLeft, rowTop);
+        sessionNext.setRectangle(20, 20, rowLeft + Math.max(0, rowWidth - 20), rowTop);
+        sessionPicker.setRectangle(Math.max(1, rowWidth - (multiple ? 48 : 0)), 20, rowLeft + (multiple ? 24 : 0), rowTop);
+    }
     @Override public void doLayout(ScreenRectangle area) {
         int margin = area.width() < 360 ? 8 : 12;
-        int width = Math.max(1, Math.min(900, area.width() - margin * 2));
-        int left = area.left() + (area.width() - width) / 2, top = area.top() + 7;
-        boolean narrow = width < 230;
-        int autoWidth = narrow ? 36 : 44, pauseWidth = narrow ? 44 : 64;
-        auto.setRectangle(autoWidth, 20, left, top);
-        sessionPrevious.visible = sessionNext.visible = !narrow;
-        int pickerX = left + autoWidth + 4;
-        if (!narrow) { sessionPrevious.setRectangle(20, 20, pickerX, top); pickerX += 24; }
-        int pickerWidth = Math.max(1, width - (pickerX - left) - pauseWidth - (narrow ? 4 : 28));
-        sessionPicker.setRectangle(pickerWidth, 20, pickerX, top);
-        if (!narrow) sessionNext.setRectangle(20, 20, pickerX + pickerWidth + 4, top);
-        pause.setRectangle(pauseWidth, 20, left + width - pauseWidth, top);
-        int footerY = Math.max(top + 27, area.bottom() - 25);
-        int categoryWidth = Math.max(1, Math.min(200, width - 106));
-        category.setRectangle(categoryWidth, 20, left, footerY);
-        previous.setRectangle(22, 20, left + width - 94, footerY);
-        pageLabel.setRectangle(44, 20, left + width - 70, footerY);
-        next.setRectangle(22, 20, left + width - 22, footerY);
-        dashboard.setRectangle(width, Math.max(1, footerY - top - 33), left, top + 27);
-        dashboard.invalidate(); updateDashboard();
-    }
-
-    private static Button button(String key, Runnable action) {
-        return Button.builder(tr(key), ignored -> action.run()).tooltip(Tooltip.create(tr(key + ".hint"))).build();
+        rowWidth = Math.max(1, Math.min(960, area.width() - margin * 2));
+        rowLeft = area.left() + (area.width() - rowWidth) / 2; rowTop = area.top() + 7;
+        layoutSessionControls();
+        dashboard.setRectangle(rowWidth, Math.max(1, area.bottom() - rowTop - 33), rowLeft, rowTop + 27);
+        dashboard.invalidate(); dashboard.update(cached);
     }
     private static Component tr(String key, Object... args) { return Component.translatable("worldsmith.progress." + key, args); }
-    private static String bound(String text, int limit) { if (text == null) return ""; return text.length() <= limit ? text : text.substring(0, limit) + "\u2026"; }
-    private static String shortId(String id) { return id == null ? "" : id.substring(0, Math.min(8, id.length())); }
-    private static Component kind(String value) {
-        return switch (value) {
-            case "all", "biome", "structure", "creature", "block", "item", "quest", "feature", "theme", "terrain", "narrative_beat" -> tr("kind." + value);
-            default -> Component.literal(bound(value, 64));
-        };
-    }
-    private static Component stage(String value) {
-        if (value == null || value.isBlank()) return tr("stage.UNKNOWN");
-        return switch (value) {
-            case "ARCHIVED", "WAITING_USER", "DESIGN_PLAN", "FROZEN_REPAIR", "AUTHORING", "STANDALONE_ARTIFACT", "NATIVE_COMPLETE", "CORE_SAVED", "READY_FOR_FROZEN_CHECK",
-                "RUNNING_TOOL", "HISTORICAL_NATIVE_RECEIPT", "DRAFT", "WAITING_APPROVAL", "QUEUED", "COMPILING", "DRAWING", "VALIDATING", "SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED",
-                "PUBLISHED", "WAITING_NATIVE_CONTEXT", "NATIVE_CHECK", "RELOADING", "CLIENT_RESOURCES", "NOT_SELECTED" -> tr("stage." + value);
-            default -> Component.literal(bound(value, 64));
+    private static String bound(String text, int limit) { if (text == null) return ""; return text.length() <= limit ? text : text.substring(0, limit) + "…"; }
+    private static Component kind(String key) {
+        return switch (key) {
+            case "biome", "structure", "creature", "block", "item", "quest", "feature", "theme", "terrain", "narrative_beat", "anchor", "blueprint" -> tr("kind." + key);
+            default -> Component.literal(bound(key, 48));
         };
     }
 
-    /** Layout is prepared on cache/width changes. Render only draws these bounded primitives. */
     private static final class Dashboard extends AbstractScrollArea {
-        private static final int INK = 0xFFE4EDF7, MUTED = 0xFF9BAFC5, CYAN = 0xFF77D5DC, GOLD = 0xFFF0CE87, RED = 0xFFFFA8A0, GREEN = 0xFF9DD8B1;
+        private static final int INK=0xFFF0EBDD, MUTED=0xFFAEB8C2, DIM=0xFF81909A, GREEN=0xFFA4C49B, GOLD=0xFFE0C18C, RED=0xFFEBA89B;
+        private static final int CARD_HEIGHT=152, GAP=8;
+        private static final Set<String> LIVE_JOBS=Set.of("WAITING_APPROVAL", "QUEUED", "COMPILING", "DRAWING", "VALIDATING");
         private final Font font = Minecraft.getInstance().font;
         private final List<Fill> fills = new ArrayList<>();
         private final List<Text> texts = new ArrayList<>();
         private final List<Hint> hints = new ArrayList<>();
+        private final List<Icon> icons = new ArrayList<>();
+        private final Map<String, String> targetStates = new HashMap<>(), recentTarget = new HashMap<>();
         private WorldsmithGenerationProgressPoller.Snapshot oldSnapshot;
-        private boolean oldPaused, oldFollowing;
-        private String oldFilter;
-        private int oldPage = -1;
+        private String contentSession;
+        private boolean invalid = true;
         private int contentHeight;
-        private int textWidth;
-        private int cursor;
 
-        Dashboard() { super(0, 0, 100, 100, tr("tab"), AbstractScrollArea.defaultSettings(22)); }
-        void invalidate() { oldFilter = null; }
-        void update(WorldsmithGenerationProgressPoller.Snapshot snapshot, boolean paused, boolean following, String filter, int page) {
-            if (sameDisplay(snapshot, oldSnapshot) && paused == oldPaused && following == oldFollowing && filter.equals(oldFilter) && page == oldPage) {
-                // Keep the latest inner DTO references, so unchanged full views are not deep-compared every tick.
-                oldSnapshot = snapshot; return;
-            }
-            oldSnapshot = snapshot; oldPaused = paused; oldFollowing = following; oldFilter = filter; oldPage = page;
-            fills.clear(); texts.clear(); hints.clear(); cursor = 12; textWidth = Math.max(24, width - 32);
+        Dashboard() { super(0, 0, 100, 100, tr("tab"), AbstractScrollArea.defaultSettings(24)); }
+        void invalidate() { invalid = true; }
+        void update(WorldsmithGenerationProgressPoller.Snapshot snapshot) {
+            if (!invalid && sameDisplay(snapshot, oldSnapshot)) { oldSnapshot = snapshot; return; }
+            oldSnapshot = snapshot; invalid = false;
+            fills.clear(); texts.clear(); hints.clear(); icons.clear();
             var progress = snapshot == null ? null : snapshot.progress();
             var view = progress == null ? null : progress.getView();
-            if (paused) banner(tr("paused"), GOLD);
-            else if (snapshot == null || !snapshot.connected()) banner(tr("disconnected"), RED);
-            else if (snapshot.refreshing()) banner(tr("refreshing"), CYAN);
-            else banner(tr(following ? "following_auto" : "following_manual"), MUTED);
-            if (snapshot != null && snapshot.error() != null && !snapshot.error().isBlank()) paragraph(Component.literal(bound(snapshot.error(), 512)), RED, 3);
-            if (view == null) {
-                paragraph(tr("empty_title").copy().withStyle(ChatFormatting.BOLD), INK, 2);
-                paragraph(tr(following ? "empty_auto" : "empty_manual"), MUTED, 5);
-                paragraph(tr("not_an_ai_runner"), GOLD, 4);
-                finish(); return;
+            updateRecentTargets(view);
+            int inner = Math.max(24, width - 28);
+            Component overall = view == null || view.getTotalPlannedTargets() == null ? tr("overview_waiting")
+                    : tr("overview_count", view.getDeclaredTargets(), view.getTotalPlannedTargets());
+            text(12, 12, overall, INK, Math.max(30, inner - 102));
+            text(Math.max(12, width - 108), 12, phase(snapshot, view), MUTED, 92);
+            int columns = inner >= 570 ? 3 : inner >= 330 ? 2 : 1;
+            int cardWidth = Math.max(28, (inner - GAP * (columns - 1)) / columns);
+            var kinds = new ArrayList<>(MAIN_KINDS);
+            if (view != null) for (var category : view.getCategories()) {
+                if (!kinds.contains(category.getKind()) && ((category.getPlanned() != null && category.getPlanned() > 0) || category.getDeclaredTotal() > 0)) kinds.add(category.getKind());
             }
-            paragraph(Component.literal(bound(view.getTitle(), 160)).withStyle(ChatFormatting.BOLD), INK, 2);
-            paragraph(tr("session_line", shortId(view.getSessionId()), view.getRevision(), stage(view.getStage())), CYAN, 2);
-            if (progress.getToolRunning()) paragraph(tr("running_tool", bound(progress.getLastTool(), 96)), GOLD, 2);
-            else if (progress.getLastToolError() != null && !progress.getLastToolError().isBlank()) paragraph(tr("tool_failed", bound(progress.getLastToolError(), 384)), RED, 3);
-            if (!view.getPrompt().isBlank()) paragraph(Component.literal(bound(view.getPrompt(), 256)), MUTED, 2);
-            int total = view.getTotalPlannedTargets() == null ? 0 : view.getTotalPlannedTargets();
-            Component overall = view.getPlanPresent() && view.getTotalPlannedTargets() != null
-                ? tr("draft_progress", view.getDeclaredTargets(), total) : tr("no_plan_progress");
-            paragraph(overall, INK, 2);
-            bar(12, cursor, textWidth, 7, total > 0 ? (double)view.getDeclaredTargets() / total : 0.0, total > 0 ? CYAN : 0xFF40536A);
-            cursor += 13;
-            paragraph(tr(total > 0 ? "progress_boundary" : "no_plan_boundary"), MUTED, 2);
-            PublicationStatus nativeStatus = snapshot.nativeStatus();
-            String nativeStage = nativeStatus == null ? "WAITING_NATIVE_CONTEXT" : nativeStatus.getStage();
-            paragraph(tr("native_line", stage(nativeStage)), nativeStage.equals("PUBLISHED") ? GREEN : GOLD, 2);
-            if (nativeStatus != null && !nativeStatus.getMessage().isBlank()) paragraph(Component.literal(bound(nativeStatus.getMessage(), 256)), MUTED, 2);
-            else paragraph(tr("native_boundary"), MUTED, 2);
-            cards(view);
-            section(tr("targets_heading", kind(filter)));
-            List<GenerationTargetProgress> targets = view.getTargets().stream().filter(target -> filter.equals("all") || filter.equals(target.getKind())).toList();
-            int from = Math.min(targets.size(), page * TARGET_PAGE_SIZE), to = Math.min(targets.size(), from + TARGET_PAGE_SIZE);
-            if (targets.isEmpty()) paragraph(tr(view.getPlanPresent() ? "no_targets" : "targets_need_plan"), MUTED, 3);
-            for (int i = from; i < to; i++) target(targets.get(i));
-            if (view.getTargetsTruncated()) paragraph(tr("targets_truncated"), GOLD, 2);
-            section(tr("jobs_heading", view.getJobs().size()));
-            List<GenerationDrawingProgress> jobs = view.getJobs().stream().sorted(Comparator.comparingInt(job -> job.getStage().equals("SUCCEEDED") ? 1 : 0)).toList();
-            if (jobs.isEmpty()) paragraph(tr("no_jobs"), MUTED, 2);
-            for (var job : jobs.stream().limit(6).toList()) {
-                int color = job.getNeedsApproval() ? GOLD : job.getStage().equals("FAILED") || job.getStage().equals("INTERRUPTED") ? RED : job.getStage().equals("SUCCEEDED") ? GREEN : CYAN;
-                paragraph(Component.literal(bound(job.getName(), 100)).append(" · ").append(stage(job.getStage())), color, 2);
-                if (job.getNeedsApproval()) paragraph(tr("approval_hint"), GOLD, 2);
-                else if (job.getDetail() != null && !job.getDetail().isBlank()) paragraph(Component.literal(bound(job.getDetail(), 256)), MUTED, 2);
+            for (int i = 0; i < kinds.size(); i++) card(view, kinds.get(i), 12 + (i % columns) * (cardWidth + GAP), 34 + (i / columns) * (CARD_HEIGHT + GAP), cardWidth);
+            int bottom = 34 + ((kinds.size() + columns - 1) / columns) * (CARD_HEIGHT + GAP);
+            if (snapshot != null && snapshot.error() != null && !snapshot.error().isBlank()) {
+                wrapped(12, bottom + 2, tr("feed_delayed"), RED, inner, 2);
+                hints.add(new Hint(12, bottom, inner, 28, Component.literal(bound(snapshot.error(), 256)))); bottom += 32;
+            } else if (progress != null && progress.getLastToolError() != null && !progress.getLastToolError().isBlank()) {
+                wrapped(12, bottom + 2, tr("attention_needed"), RED, inner, 2);
+                hints.add(new Hint(12, bottom, inner, 28, Component.literal(bound(progress.getLastToolError(), 256)))); bottom += 32;
             }
-            if (jobs.size() > 6 || view.getJobsTruncated()) paragraph(tr("jobs_more"), MUTED, 2);
-            section(tr("next_heading"));
-            paragraph(Component.literal(bound(view.getNextInstruction(), 768)), view.getRequiresUserAction() ? GOLD : INK, 4);
-            paragraph(Component.literal(bound(view.getNextTool(), 128)), CYAN, 2);
-            for (var issue : view.getIssues().stream().limit(4).toList()) {
-                paragraph(Component.literal(bound(issue.getCode(), 80)).append(" · ").append(Component.literal(bound(issue.getMessage(), 512))),
-                    issue.getPriority() < 0 ? RED : issue.getRequiresUserAction() ? GOLD : MUTED, 3);
+            contentHeight = bottom + 4; refreshScrollAmount();
+        }
+        private void updateRecentTargets(GenerationProgressView view) {
+            String id = view == null ? null : view.getSessionId();
+            if (!Objects.equals(id, contentSession)) { targetStates.clear(); recentTarget.clear(); contentSession = id; }
+            if (view == null) return;
+            var live = new HashSet<String>();
+            for (var target : view.getTargets()) {
+                String key = target.getKind() + "/" + target.getId(), state = target.getState().name(); live.add(key);
+                String before = targetStates.put(key, state);
+                if (!state.equals(before) && (before != null || !state.equals("MISSING"))) recentTarget.put(target.getKind(), target.getId());
             }
-            if (view.getIssues().size() > 4 || view.getIssuesTruncated()) paragraph(tr("issues_more"), MUTED, 2);
-            paragraph(tr("verification_boundary"), MUTED, 3);
-            finish();
+            targetStates.keySet().retainAll(live);
         }
-
-        private static boolean sameDisplay(WorldsmithGenerationProgressPoller.Snapshot left, WorldsmithGenerationProgressPoller.Snapshot right) {
-            if (left == right) return true; if (left == null || right == null) return false;
-            return left.epoch() == right.epoch() && left.connected() == right.connected() && left.refreshing() == right.refreshing()
-                && Objects.equals(left.error(), right.error()) && Objects.equals(left.progress(), right.progress()) && Objects.equals(left.nativeStatus(), right.nativeStatus());
-        }
-        private void finish() { contentHeight = cursor + 12; refreshScrollAmount(); }
-        private void section(Component label) { cursor += 8; fill(12, cursor, textWidth, 1, 0xFF34465C); cursor += 10; paragraph(label.copy().withStyle(ChatFormatting.BOLD), INK, 2); }
-        private void banner(Component label, int color) { paragraph(label, color, 2); cursor += 2; }
-        private void paragraph(Component component, int color, int maxLines) {
-            int start = cursor; var lines = font.split(component, textWidth); int count = Math.min(lines.size(), maxLines);
-            for (int i = 0; i < count; i++) { texts.add(new Text(12, cursor, lines.get(i), color)); cursor += 12; }
-            if (lines.size() > maxLines) { hints.add(new Hint(12, start, textWidth, Math.max(12, cursor - start), component)); texts.add(new Text(width - 29, cursor - 12, Component.literal("\u2026").getVisualOrderText(), color)); }
-            cursor += 4;
-        }
-        private void cards(GenerationProgressView view) {
-            int columns = textWidth >= 450 ? 3 : 2, gap = 6, cardWidth = (textWidth - gap * (columns - 1)) / columns;
-            int start = cursor + 4, cardHeight = 49;
-            for (int i = 0; i < MAIN_KINDS.size(); i++) {
-                String kind = MAIN_KINDS.get(i);
-                GenerationCategoryProgress value = view.getCategories().stream().filter(entry -> entry.getKind().equals(kind)).findFirst().orElse(null);
-                int x = 12 + (i % columns) * (cardWidth + gap), y = start + (i / columns) * (cardHeight + gap);
-                fill(x, y, cardWidth, cardHeight, 0xFF233348); fill(x, y, 2, cardHeight, CYAN);
-                text(x + 8, y + 7, kind(kind), MUTED, cardWidth - 16);
-                int declared = value == null ? 0 : value.getMatchedDeclared(); Integer planned = value == null ? null : value.getPlanned();
-                Component label = planned == null ? tr("card_declared", value == null ? 0 : value.getDeclaredTotal()) : tr("card_progress", declared, planned);
-                text(x + 8, y + 22, label, INK, cardWidth - 16);
-                bar(x + 8, y + 39, cardWidth - 16, 3, planned == null || planned <= 0 ? 0.0 : (double)declared / planned, CYAN);
-                Component hint = kind(kind).copy().append("\n").append(label).append("\n").append(tr("card_hint", value == null ? 0 : value.getExtraDefinitions()));
-                hints.add(new Hint(x, y, cardWidth, cardHeight, hint));
+        private static Component phase(WorldsmithGenerationProgressPoller.Snapshot snapshot, GenerationProgressView view) {
+            if (view == null) return tr("phase.waiting");
+            if (snapshot.nativeStatus() != null && snapshot.nativeStatus().getStage().equals("PUBLISHED")) return tr("phase.ready");
+            if (snapshot.nativeStatus() != null) {
+                String nativeStage = snapshot.nativeStatus().getStage();
+                if (nativeStage.equals("WAITING_ACTIVATION") || nativeStage.equals("NOT_SELECTED")) return tr("phase.select_world");
+                if (nativeStage.equals("NATIVE_DATA_RELOAD") || nativeStage.equals("CLIENT_RESOURCES") || nativeStage.equals("RELOADING")) return tr("phase.loading_world");
             }
-            cursor = start + ((MAIN_KINDS.size() + columns - 1) / columns) * (cardHeight + gap);
+            if (view.getJobs().stream().anyMatch(GenerationDrawingProgress::getNeedsApproval)) return tr("phase.confirm");
+            return switch (view.getStage()) {
+                case "DESIGN_PLAN" -> tr("phase.planning");
+                case "FROZEN_REPAIR" -> tr("phase.refining");
+                case "CORE_SAVED", "NATIVE_COMPLETE" -> tr("phase.saved");
+                case "READY_FOR_FROZEN_CHECK" -> tr("phase.finishing");
+                default -> tr("phase.creating");
+            };
         }
-        private void target(GenerationTargetProgress target) {
-            int y = cursor; String state = target.getState().name();
-            int color = switch (state) { case "FROZEN" -> GREEN; case "DECLARED" -> CYAN; case "REPAIR" -> RED; case "NEEDS_ASSET" -> GOLD; default -> MUTED; };
-            fill(12, y, textWidth, 35, 0xFF1E2C3D);
-            icon(20, y + 10, state, color);
-            int statusWidth = Math.min(76, textWidth / 3);
-            text(35, y + 6, Component.literal(bound(target.getName(), 160)), INK, textWidth - statusWidth - 35);
-            text(35, y + 20, Component.literal(bound(target.getId(), 96)), MUTED, textWidth - statusWidth - 35);
-            text(12 + textWidth - statusWidth, y + 12, tr("target." + state.toLowerCase(Locale.ROOT)), color, statusWidth - 6);
-            Component detail = kind(target.getKind()).copy().append(" · ").append(Component.literal(bound(target.getName(), 160)))
-                .append("\n").append(Component.literal(bound(target.getPurpose(), 768)));
-            if (target.getDetail() != null) detail = detail.copy().append("\n").append(Component.literal(bound(target.getDetail(), 384)));
-            if (!target.getDiagnosticCodes().isEmpty()) detail = detail.copy().append("\n").append(Component.literal(bound(String.join(", ", target.getDiagnosticCodes()), 256)));
-            hints.add(new Hint(12, y, textWidth, 35, detail)); cursor += 40;
+        private void card(GenerationProgressView view, String category, int x, int y, int w) {
+            GenerationCategoryProgress counts = view == null ? null : view.getCategories().stream().filter(c -> c.getKind().equals(category)).findFirst().orElse(null);
+            var targets = view == null ? List.<GenerationTargetProgress>of() : view.getTargets().stream().filter(t -> t.getKind().equals(category)).toList();
+            var job = liveJob(view, category);
+            GenerationTargetProgress focus = null;
+            if (job != null) focus = targets.stream().filter(t -> t.getJobIds().contains(job.getJobId()) || job.getStructureIds().contains(t.getId())
+                    || t.getId().equals(job.getName()) || t.getName().equals(job.getName())).findFirst().orElse(null);
+            else {
+                focus = targets.stream().filter(t -> t.getState().name().equals("REPAIR")).findFirst().orElse(null);
+                if (focus == null) focus = targets.stream().filter(t -> t.getState().name().equals("NEEDS_ASSET")).findFirst().orElse(null);
+                if (focus == null) focus = targets.stream().filter(t -> t.getId().equals(recentTarget.get(category))).findFirst().orElse(null);
+                if (focus == null) focus = targets.stream().filter(t -> t.getState().name().equals("NEEDS_ASSET") || t.getState().name().equals("MISSING")).findFirst().orElse(targets.isEmpty() ? null : targets.getLast());
+            }
+            Integer planned = counts == null ? null : counts.getPlanned();
+            int done = counts == null ? 0 : planned == null ? counts.getDeclaredTotal() : counts.getMatchedDeclared();
+            String count = counts == null ? "— / —" : done + " / " + (planned == null ? "—" : planned);
+            int color = job != null ? GOLD : focus != null && focus.getState().name().equals("REPAIR") ? RED
+                    : focus != null && focus.getState().name().equals("NEEDS_ASSET") ? GOLD : planned != null && planned > 0 && done >= planned ? GREEN : 0xFF8EB9B5;
+            fill(x, y, w, CARD_HEIGHT, 0xE9283036); outline(x, y, w, CARD_HEIGHT, 0xFF46535B); fill(x + 1, y + 1, 2, CARD_HEIGHT - 2, color);
+            icons.add(new Icon(x + 10, y + 10, categoryIcon(category)));
+            int countWidth = font.width(count);
+            text(x + 32, y + 13, kind(category), INK, Math.max(18, w - countWidth - 51));
+            text(x + w - countWidth - 10, y + 13, Component.literal(count), color, countWidth + 1);
+            fill(x + 10, y + 34, Math.max(1, w - 20), 4, 0xFF1D2429);
+            if (planned != null && planned > 0 && done > 0) fill(x + 10, y + 34, (int)Math.round((w - 20) * Math.min(1.0, (double)done / planned)), 4, color);
+            Component activity = activity(job, focus, counts);
+            wrapped(x + 10, y + 47, activity, color, w - 20, 2);
+            String prompt = focus == null ? "" : bound(focus.getPurpose(), 2048);
+            boolean worldPrompt = prompt.isBlank() && view != null && !view.getPrompt().isBlank();
+            if (worldPrompt) prompt = bound(view.getPrompt(), 2048);
+            text(x + 10, y + 77, tr(worldPrompt ? "card.world_prompt" : "card.prompt"), DIM, w - 20);
+            Component brief = prompt.isBlank() ? tr("card.no_prompt") : Component.literal(prompt);
+            wrapped(x + 10, y + 91, brief, MUTED, w - 20, 3);
+            Component remaining = planned == null ? tr("card.waiting_plan") : planned == 0 ? tr("card.not_planned")
+                    : done >= planned ? tr("card.written", done) : tr("card.remaining", Math.max(0, planned - done));
+            text(x + 10, y + CARD_HEIGHT - 14, remaining, DIM, w - 20);
+            Component hint = kind(category).copy().append("  " + count).append("\n").append(activity);
+            if (!prompt.isBlank()) hint = hint.copy().append("\n\n").append(tr(worldPrompt ? "card.world_prompt" : "card.prompt")).append("\n").append(bound(prompt, 256));
+            hints.add(new Hint(x, y, w, CARD_HEIGHT, hint));
         }
-        private void icon(int x, int y, String state, int color) {
-            if (state.equals("FROZEN")) { fill(x, y + 4, 3, 3, color); fill(x + 3, y + 2, 3, 3, color); fill(x + 6, y, 2, 3, color); }
-            else if (state.equals("REPAIR")) { fill(x + 2, y, 3, 5, color); fill(x + 2, y + 7, 3, 2, color); }
-            else if (state.equals("DECLARED")) fill(x, y, 8, 8, color);
-            else { fill(x, y, 8, 1, color); fill(x, y + 7, 8, 1, color); fill(x, y, 1, 8, color); fill(x + 7, y, 1, 8, color); }
+        private static GenerationDrawingProgress liveJob(GenerationProgressView view, String category) {
+            if (view == null || !(category.equals("structure") || category.equals("blueprint"))) return null;
+            return view.getJobs().stream().filter(job -> LIVE_JOBS.contains(job.getStage())).findFirst().orElse(null);
         }
-        private void text(int x, int y, Component component, int color, int availableWidth) {
-            String value = font.plainSubstrByWidth(component.getString(), Math.max(8, availableWidth));
-            texts.add(new Text(x, y, Component.literal(value).getVisualOrderText(), color));
+        private static Component activity(GenerationDrawingProgress job, GenerationTargetProgress focus, GenerationCategoryProgress counts) {
+            if (job != null) {
+                String name = bound(focus == null ? job.getName() : focus.getName(), 160);
+                return tr(job.getNeedsApproval() ? "card.confirm" : job.getStage().equals("QUEUED") ? "card.queued" : "card.generating", name);
+            }
+            if (focus != null) return tr(switch (focus.getState().name()) {
+                case "REPAIR" -> "card.repair";
+                case "NEEDS_ASSET" -> "card.needs_asset";
+                case "FROZEN" -> "card.saved";
+                case "DECLARED" -> "card.generated";
+                default -> "card.pending";
+            }, bound(focus.getName(), 160));
+            if (counts != null && counts.getDeclaredTotal() > 0) return tr("card.existing", counts.getDeclaredTotal());
+            return tr(counts != null && counts.getPlanned() != null && counts.getPlanned() == 0 ? "card.not_planned" : "card.waiting");
         }
-        private void bar(int x, int y, int width, int height, double ratio, int color) {
-            fill(x, y, width, height, 0xFF394B61); int done = (int)Math.round(Math.max(0.0, Math.min(1.0, ratio)) * width);
-            if (done > 0) fill(x, y, done, height, color);
+        private static IconArt categoryIcon(String category) {
+            // UI pictograms use flat vanilla textures, not the off-screen 3D item-atlas renderer.
+            String texture = switch (category) {
+                case "biome" -> "block/grass_block_side";
+                case "structure" -> "block/bricks";
+                case "creature" -> "item/sheep_spawn_egg";
+                case "block" -> "block/oak_log";
+                case "item" -> "item/amethyst_shard";
+                case "quest", "narrative_beat" -> "item/writable_book";
+                case "feature" -> "block/oak_sapling";
+                case "terrain" -> "block/stone";
+                case "anchor" -> "item/compass_00";
+                default -> "item/map";
+            };
+            return new IconArt(Identifier.withDefaultNamespace("textures/" + texture + ".png"),
+                    category.equals("biome") ? Identifier.withDefaultNamespace("textures/block/grass_block_side_overlay.png") : null);
         }
-        private void fill(int x, int y, int width, int height, int color) { fills.add(new Fill(x, y, width, height, color)); }
+        /** Refresh-in-flight is deliberately not presentation state. It must not replace headers or move cards. */
+        private static boolean sameDisplay(WorldsmithGenerationProgressPoller.Snapshot a, WorldsmithGenerationProgressPoller.Snapshot b) {
+            if (a == b) return true; if (a == null || b == null) return false;
+            var av = a.progress() == null ? null : a.progress().getView();
+            var bv = b.progress() == null ? null : b.progress().getView();
+            var ae = a.progress() == null ? null : a.progress().getLastToolError();
+            var be = b.progress() == null ? null : b.progress().getLastToolError();
+            return a.epoch() == b.epoch() && a.connected() == b.connected() && Objects.equals(av, bv)
+                    && Objects.equals(a.error(), b.error()) && Objects.equals(ae, be) && Objects.equals(a.nativeStatus(), b.nativeStatus());
+        }
+        private void text(int x, int y, Component value, int color, int available) {
+            texts.add(new Text(x, y, Component.literal(font.plainSubstrByWidth(value.getString(), Math.max(8, available))).getVisualOrderText(), color));
+        }
+        private void wrapped(int x, int y, Component value, int color, int available, int maximumLines) {
+            var lines = font.split(value, Math.max(20, available));
+            for (int i = 0; i < Math.min(maximumLines, lines.size()); i++) texts.add(new Text(x, y + i * 11, lines.get(i), color));
+            if (lines.size() > maximumLines) text(x + Math.max(0, available - 9), y + (maximumLines - 1) * 11, Component.literal("…"), color, 9);
+        }
+        private void fill(int x, int y, int w, int h, int color) { fills.add(new Fill(x, y, w, h, color)); }
+        private void outline(int x, int y, int w, int h, int color) {
+            fill(x, y, w, 1, color); fill(x, y + h - 1, w, 1, color); fill(x, y, 1, h, color); fill(x + w - 1, y, 1, h, color);
+        }
         @Override protected int contentHeight() { return contentHeight; }
         @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-            graphics.fill(getX(), getY(), getRight(), getBottom(), 0xF1162130);
-            graphics.outline(getX(), getY(), width, height, 0xFF344B64);
+            graphics.fill(getX(), getY(), getRight(), getBottom(), 0xC51B2126);
+            graphics.outline(getX(), getY(), width, height, 0xFF414D55);
             graphics.enableScissor(getX() + 1, getY() + 1, getRight() - 7, getBottom() - 1);
             int offset = getY() - (int)scrollAmount();
             for (var rect : fills) if (offset + rect.y + rect.height >= getY() && offset + rect.y < getBottom())
                 graphics.fill(getX() + rect.x, offset + rect.y, getX() + rect.x + rect.width, offset + rect.y + rect.height, rect.color);
+            // Explicit strata keep the icon quads above card fills, with text and scroll chrome above them.
+            graphics.nextStratum();
+            for (var icon : icons) if (offset + icon.y + 16 >= getY() && offset + icon.y < getBottom()) {
+                int x = getX() + icon.x, y = offset + icon.y;
+                graphics.blit(icon.art.texture, x, y, x + 16, y + 16, 0, 1, 0, 1);
+                if (icon.art.overlay != null) graphics.blit(RenderPipelines.GUI_TEXTURED, icon.art.overlay,
+                        x, y, 0, 0, 16, 16, 16, 16, 0xFF8BBE62);
+            }
+            graphics.nextStratum();
             for (var text : texts) if (offset + text.y + 11 >= getY() && offset + text.y < getBottom()) graphics.text(font, text.value, getX() + text.x, offset + text.y, text.color);
             graphics.disableScissor(); extractScrollbar(graphics, mouseX, mouseY);
             if (mouseX >= getX() && mouseX < getRight() - 7 && mouseY >= getY() && mouseY < getBottom()) {
@@ -397,14 +347,18 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
             if (event.key() == GLFW.GLFW_KEY_PAGE_DOWN || event.key() == GLFW.GLFW_KEY_PAGE_UP) {
                 setScrollAmount(scrollAmount() + (event.key() == GLFW.GLFW_KEY_PAGE_DOWN ? 1 : -1) * Math.max(24, height - 20)); return true;
             }
+            if (event.key() == GLFW.GLFW_KEY_HOME || event.key() == GLFW.GLFW_KEY_END) {
+                setScrollAmount(event.key() == GLFW.GLFW_KEY_HOME ? 0 : contentHeight); return true;
+            }
             return super.keyPressed(event);
         }
         @Override protected void updateWidgetNarration(NarrationElementOutput output) {
-            output.add(NarratedElementType.TITLE, tr("tab"));
-            output.add(NarratedElementType.USAGE, tr("scroll_hint"));
+            output.add(NarratedElementType.TITLE, tr("tab")); output.add(NarratedElementType.USAGE, tr("scroll_hint"));
         }
         private record Fill(int x, int y, int width, int height, int color) {}
         private record Text(int x, int y, FormattedCharSequence value, int color) {}
         private record Hint(int x, int y, int width, int height, Component value) {}
+        private record IconArt(Identifier texture, Identifier overlay) {}
+        private record Icon(int x, int y, IconArt art) {}
     }
 }

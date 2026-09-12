@@ -39,6 +39,8 @@ public final class WorldsmithCreativeContent {
     private static long publishedProviderRevision = -1;
     private static Context publishedContext;
     private static List<Entry> entries = List.of();
+    private static CreativeModeTab worldTab;
+    private static String publishedTitle = "";
 
     private WorldsmithCreativeContent() {}
 
@@ -91,7 +93,7 @@ public final class WorldsmithCreativeContent {
             .map(definition -> new Entry(definition.getId(), Kind.CREATURE, summonStack(context.scope, definition.getId()))).toList());
         registerProvider("items", context -> context.items.definitions().values().stream()
             .map(definition -> new Entry(definition.getId(), Kind.ITEM, context.items.stack(CustomItemRuntime.LOGICAL_PREFIX + definition.getId(), 1))).toList());
-        Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, TAB_KEY, FabricCreativeModeTab.builder()
+        worldTab = Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, TAB_KEY, FabricCreativeModeTab.builder()
             .title(Component.translatable("itemGroup.worldsmith.world_content"))
             .icon(() -> new ItemStack(Items.MAP))
             .displayItems((parameters, output) -> entries().forEach(entry -> output.accept(entry.stack())))
@@ -107,10 +109,16 @@ public final class WorldsmithCreativeContent {
 
     /** Client publication uses only active, resource-verified runtime snapshots, never authoring drafts. */
     public static synchronized void publish(CustomBlockBindingSnapshot blocks, CreatureRuntime.Snapshot creatures, CustomItemRuntime.Snapshot items) {
+        publish(blocks, creatures, items, "");
+    }
+
+    public static synchronized void publish(CustomBlockBindingSnapshot blocks, CreatureRuntime.Snapshot creatures,
+                                             CustomItemRuntime.Snapshot items, String worldTitle) {
         if (!registered) return;
+        Objects.requireNonNull(worldTitle);
         if (publishedContext != null && publishedProviderRevision == providerRevision
             && publishedContext.scope.equals(creatures.bundleHash()) && publishedContext.blocks.snapshot().equals(blocks)
-            && publishedContext.items.definitions().equals(items.definitions())) return;
+            && publishedContext.items.definitions().equals(items.definitions()) && publishedTitle.equals(worldTitle)) return;
         Context context = new Context(creatures.bundleHash(), WorldBlockBindings.resolver(blocks), creatures, items);
         Map<String, Entry> unique = new LinkedHashMap<>();
         Set<ItemStack> uniqueStacks = ItemStackLinkedSet.createTypeAndComponentsSet();
@@ -144,13 +152,18 @@ public final class WorldsmithCreativeContent {
         }
         entries = List.copyOf(unique.values());
         publishedContext = context;
+        publishedTitle = worldTitle;
         publishedProviderRevision = providerRevision;
         revision++;
     }
 
     public static synchronized void clear() {
-        if (publishedContext == null && entries.isEmpty()) return;
-        publishedContext = null; entries = List.of(); revision++;
+        if (publishedContext == null && entries.isEmpty() && publishedTitle.isEmpty()) return;
+        publishedContext = null; entries = List.of(); publishedTitle = ""; revision++;
+    }
+    /** Null leaves every other native/mod tab and the inactive fallback title untouched. */
+    public static synchronized Component displayTitle(CreativeModeTab tab) {
+        return tab == worldTab && publishedContext != null && !publishedTitle.isBlank() ? Component.literal(publishedTitle) : null;
     }
     public static synchronized String scope() { return publishedContext == null ? null : publishedContext.scope; }
     public static synchronized long revision() { return revision; }

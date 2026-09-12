@@ -3,6 +3,7 @@
 	"id": "worldsmith",
 	"version": "${version}",
 	"name": "Worldsmith",
+	"icon": "assets/worldsmith/textures/gui/sprites/icon/world_pack.png",
 	"description": "Forge deterministic Minecraft worlds from natural-language prompts.",
 	"authors": [
 		"wjz"
