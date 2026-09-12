@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.client.content;
 
 import com.wjz.worldsmith.Worldsmith;
+import com.wjz.worldsmith.client.WorldsmithWorldCreationBridge;
 import com.wjz.worldsmith.content.WorldContentRuntime;
 import com.wjz.worldsmith.content.WorldLoadResourceOwnership;
 import net.minecraft.CrashReport;
@@ -30,9 +31,9 @@ public final class WorldContentStartupBarrier {
     /** Creation-cancellation callbacks must not clear a newer save while this barrier owns its activation. */
     public static boolean isLoading() { return current != null; }
 
-    public static void start(Minecraft client, LevelStorageAccess storage, WorldStem stem, Runnable resumeVanilla) {
+    public static void start(Minecraft client, LevelStorageAccess storage, WorldStem stem, boolean newWorld, Runnable resumeVanilla) {
         if (!client.isSameThread()) {
-            client.execute(() -> start(client, storage, stem, resumeVanilla));
+            client.execute(() -> start(client, storage, stem, newWorld, resumeVanilla));
             return;
         }
         Request existing = current;
@@ -49,7 +50,8 @@ public final class WorldContentStartupBarrier {
             return;
         }
 
-        Request request = new Request(storage, stem, resumeVanilla);
+        Request request = new Request(storage, stem, resumeVanilla,
+            WorldsmithWorldCreationBridge.consumeStartupExpectation(storage.getLevelId(),newWorld));
         current = request;
         try {
             // This is vanilla doWorldLoad's first operation. Run it once BEFORE activating the new mapping.
@@ -69,6 +71,8 @@ public final class WorldContentStartupBarrier {
 
     private static CompletableFuture<Void> activate(Request request, Optional<WorldContentRuntime.Prepared> content) {
         if (current != request) return CompletableFuture.failedFuture(new IllegalStateException("This world load no longer owns the startup barrier"));
+        if(request.expectedScope!=null && (content.isEmpty() || !request.expectedScope.equals(content.get().scope())))
+            return CompletableFuture.failedFuture(new IllegalStateException("The embedded world bundle differs from the player's committed creation selection"));
         if (content.isEmpty()) {
             request.targetScope = null;
             String previous = WorldContentClientRuntime.activeScope();
@@ -134,11 +138,13 @@ public final class WorldContentStartupBarrier {
         final LevelStorageAccess storage;
         final WorldStem stem;
         final Runnable resumeVanilla;
+        final String expectedScope;
         final WorldLoadResourceOwnership ownership;
         WorldContentClientRuntime.Prepared activation;
         String targetScope;
-        Request(LevelStorageAccess storage, WorldStem stem, Runnable resumeVanilla) {
+        Request(LevelStorageAccess storage, WorldStem stem, Runnable resumeVanilla, String expectedScope) {
             this.storage = storage; this.stem = stem; this.resumeVanilla = resumeVanilla;
+            this.expectedScope=expectedScope;
             ownership = new WorldLoadResourceOwnership(stem, storage);
         }
     }

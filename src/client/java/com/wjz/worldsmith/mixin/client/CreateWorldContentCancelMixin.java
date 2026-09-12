@@ -10,8 +10,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /** popScreen means cancellation, unlike removed(), which also occurs for vanilla reload progress screens. */
 @Mixin(CreateWorldScreen.class)
 public abstract class CreateWorldContentCancelMixin {
-    @Inject(method="popScreen",at=@At("HEAD"))
+    @Inject(method="popScreen",at=@At("HEAD"),cancellable=true)
     private void worldsmith$cancelContent(CallbackInfo ci) {
-        WorldsmithWorldCreationBridge.onCancelled((CreateWorldScreen)(Object)this);
+        if(!WorldsmithWorldCreationBridge.onCancelRequested((CreateWorldScreen)(Object)this))ci.cancel();
     }
 }

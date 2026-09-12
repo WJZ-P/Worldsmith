@@ -10,6 +10,7 @@
 		"PackRepositorySourcesAccessor",
 		"MinecraftWorldContentLoadMixin",
 		"CreateWorldContentCancelMixin",
+		"CreateWorldCreationGuardMixin",
 		"CreativeModeTabsContentMixin"
 	],
 	"injectors": {

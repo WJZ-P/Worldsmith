@@ -32,7 +32,7 @@ public abstract class MinecraftWorldContentLoadMixin {
             && worldsmith$resumingRules == gameRules && worldsmith$resumingNewWorld == newWorld) return;
         ci.cancel();
         Minecraft client = (Minecraft) (Object) this;
-        WorldContentStartupBarrier.start(client, storage, stem, () -> {
+        WorldContentStartupBarrier.start(client, storage, stem, newWorld, () -> {
             worldsmith$resumingStem = stem;
             worldsmith$resumingStorage = storage;
             worldsmith$resumingPacks = packs;

@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.client.content;
 
 import com.wjz.worldsmith.content.GeneratedWorldResourcePack;
+import com.wjz.worldsmith.content.WorldResourceIdentity;
 import com.wjz.worldsmith.mixin.client.PackRepositorySourcesAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -51,6 +52,18 @@ public final class WorldContentResources {
 
     public static String activeScope() { var snapshot = active; return snapshot == null ? null : snapshot.scope(); }
 
+    /** Read-only final creation guard; matching declarations alone are not evidence of loaded assets. */
+    public static boolean isLoaded(String scope,String contentHash) {
+        GeneratedWorldResourcePack snapshot;
+        synchronized (WorldContentResources.class) {
+            if(changing)return false;
+            snapshot=active;
+        }
+        if(snapshot==null || !snapshot.scope().equals(scope) || !snapshot.contentHash().equals(contentHash))return false;
+        try { verifyLoaded(Minecraft.getInstance(),snapshot);return true; }
+        catch(IOException | RuntimeException failure){return false;}
+    }
+
     public static CompletableFuture<Void> clear(String expectedScope) {
         CompletableFuture<Void> result = new CompletableFuture<>();
         Minecraft client = Minecraft.getInstance();
@@ -79,6 +92,23 @@ public final class WorldContentResources {
             previous = active;
             active = target;
             committed = ++revision;
+        }
+        // Creation has already loaded these exact assets; entering that world still receives
+        // a fresh transaction/lease, but neither atlas rebuild nor a full-window overlay is needed.
+        try {
+            var sentinel=client.getResourceManager().getResource(GeneratedWorldResourcePack.SENTINEL);
+            byte[] loaded=null;
+            if(sentinel.isPresent())try(var stream=sentinel.get().open()){loaded=stream.readNBytes(4097);}
+            if(WorldResourceIdentity.matchesLoaded(previous,target,client.getResourcePackRepository().getSelectedIds().contains(PACK_ID),loaded)) {
+                synchronized (WorldContentResources.class) {
+                    changing=false;
+                    if(owner!=null){owner.previous=previous;owner.committedRevision=committed;}
+                }
+                result.complete(committed);
+                return result;
+            }
+        } catch(IOException | RuntimeException staleSentinel) {
+            // A missing/unreadable sentinel requires a real reload, never a speculative success.
         }
         PackRepository repository = client.getResourcePackRepository();
         List<String> selectionBefore = new ArrayList<>(repository.getSelectedIds());

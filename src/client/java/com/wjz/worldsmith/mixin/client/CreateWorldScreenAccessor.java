@@ -16,6 +16,12 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 /** Narrow access to Minecraft's own temporary data-pack workflow. */
 @Mixin(CreateWorldScreen.class)
 public interface CreateWorldScreenAccessor {
+	@Accessor("onClose")
+	Runnable worldsmith$getOnClose();
+
+	@Invoker("removeTempDataPackDir")
+	void worldsmith$removeTempDataPackDir();
+
 	@Accessor("tabManager")
 	TabManager worldsmith$getTabManager();
 
