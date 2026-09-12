@@ -21,6 +21,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.LivingEntity;
+import com.wjz.worldsmith.core.content.ItemActionTrigger;
+import net.minecraft.world.item.component.UseCooldown;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Rarity;
@@ -47,6 +50,7 @@ public final class CustomItemRuntime {
                 .networkSynchronized(WorldItemIdentity.STREAM_CODEC).build());
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, Identifier.parse(HOST_ID));
         host = Registry.register(BuiltInRegistries.ITEM, key, new ResourceItem(new Item.Properties().setId(key).stacksTo(64)));
+        ItemAbilityProjectile.register();
     }
 
     public static Item host() { return Objects.requireNonNull(host, "CustomItemRuntime.register must run during bootstrap"); }
@@ -60,7 +64,10 @@ public final class CustomItemRuntime {
         if (!diagnostics.isEmpty()) throw new IllegalArgumentException("Invalid custom item library: " + diagnostics);
         var frozen = CustomItemValidation.freeze(library);
         Map<String, CustomItemDefinition> definitions = new LinkedHashMap<>();
-        frozen.getItems().stream().sorted(java.util.Comparator.comparing(CustomItemDefinition::getId)).forEach(item -> definitions.put(item.getId(), item));
+        frozen.getItems().stream().sorted(java.util.Comparator.comparing(CustomItemDefinition::getId)).forEach(item -> {
+            CustomItemComponents.validateNative(item);
+            definitions.put(item.getId(), item);
+        });
         return new Snapshot(bundleHash, definitions);
     }
 
@@ -81,7 +88,8 @@ public final class CustomItemRuntime {
         if (host == null || stack.getItem() != host) return null;
         WorldItemIdentity key = stack.get(identity);
         Snapshot current = snapshot(level);
-        return key != null && current != null && current.bundleHash.equals(key.bundleHash()) ? current.definitions.get(key.itemId()) : null;
+        return key != null && current != null && current.bundleHash.equals(key.bundleHash()) && current.isValidWorldStack(stack)
+            ? current.definitions.get(key.itemId()) : null;
     }
 
     public static final class Snapshot {
@@ -120,7 +128,33 @@ public final class CustomItemRuntime {
             // A 2048-character description may contain more newlines than the native lore component accepts.
             if (lines.size() > ItemLore.MAX_LINES) throw new IllegalArgumentException("Item description exceeds the native lore line limit: " + logicalId);
             stack.set(DataComponents.LORE, new ItemLore(lines));
+            CustomItemComponents.apply(stack, bundleHash, definition);
+            if (!definition.getActions().isEmpty()) {
+                var use = ItemActions.action(definition, ItemActionTrigger.USE);
+                int ticks = (use == null ? definition.getActions().getFirst() : use).getCooldownTicks();
+                stack.set(DataComponents.USE_COOLDOWN, new UseCooldown(ticks / 20.0F,
+                    java.util.Optional.of(ItemActions.cooldownGroup(bundleHash, definition.getId()))));
+            }
             return stack;
+        }
+
+        /** Legitimate vanilla wear, repair, enchantment and naming are mutable; authored properties remain fixed. */
+        public boolean isValidWorldStack(ItemStack stack) {
+            if (host == null || stack.getItem() != host || stack.isEmpty()) return false;
+            WorldItemIdentity key = stack.get(identity);
+            if (key == null || !bundleHash.equals(key.bundleHash()) || !definitions.containsKey(key.itemId())) return false;
+            var definition = definitions.get(key.itemId());
+            if (stack.getCount() > definition.getMaxStackSize()) return false;
+            ItemStack canonical = stack(key.logicalId(), stack.getCount());
+            if (stack.getDamageValue() < 0 || stack.getDamageValue() > canonical.getMaxDamage()) return false;
+            copyMutable(stack, canonical, DataComponents.DAMAGE);
+            copyMutable(stack, canonical, DataComponents.REPAIR_COST);
+            copyMutable(stack, canonical, DataComponents.CUSTOM_NAME);
+            copyMutable(stack, canonical, DataComponents.ENCHANTMENTS);
+            return ItemStack.isSameItemSameComponents(stack, canonical);
+        }
+        private static <T> void copyMutable(ItemStack source, ItemStack target, DataComponentType<T> type) {
+            T value = source.get(type); if (value == null) target.remove(type); else target.set(type, value);
         }
 
         public boolean isCanonical(ItemStack stack) {
@@ -132,12 +166,31 @@ public final class CustomItemRuntime {
         }
     }
 
-    /** Resource/relic v1 is inert: no food, equipment, tools or client-controlled consumable behavior. */
+    /** One generic host; definitions select native components and the fixed server-owned action vocabulary. */
     private static final class ResourceItem extends Item {
         ResourceItem(Properties properties) { super(properties); }
-        @Override public InteractionResult useOn(UseOnContext context) { return InteractionResult.PASS; }
-        @Override public InteractionResult use(Level level, Player player, InteractionHand hand) { return InteractionResult.PASS; }
-        @Override public float getDestroySpeed(ItemStack stack, BlockState state) { return 1.0F; }
-        @Override public boolean isCorrectToolForDrops(ItemStack stack, BlockState state) { return false; }
+        @Override public InteractionResult useOn(UseOnContext context) {
+            var definition = definition(context.getLevel(), context.getItemInHand());
+            if (definition == null) return InteractionResult.PASS;
+            return definition.getEquipment() == null ? super.useOn(context) : CustomItemComponents.useToolOn(context, definition.getEquipment());
+        }
+        @Override public InteractionResult use(Level level, Player player, InteractionHand hand) {
+            var definition = definition(level, player.getItemInHand(hand));
+            if (definition == null) return InteractionResult.PASS;
+            if (definition.getConsumable() != null) return super.use(level, player, hand);
+            // Ordinary right-click equips armor; crouch-right-click invokes an optional active ability.
+            if (definition.getEquipment() != null && definition.getEquipment().isArmor() && !player.isShiftKeyDown()) return super.use(level, player, hand);
+            if (ItemActions.action(definition, ItemActionTrigger.USE) != null) return ItemActions.use(level, player, hand, definition);
+            return super.use(level, player, hand);
+        }
+        @Override public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity user) {
+            var definition = definition(level, stack);
+            if (definition == null || !ItemActions.consumed(level, user, stack, definition)) return stack;
+            return super.finishUsingItem(stack, level, user);
+        }
+        @Override public void postHurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+            super.postHurtEnemy(stack, target, attacker);
+            ItemActions.melee(stack, target, attacker);
+        }
     }
 }
