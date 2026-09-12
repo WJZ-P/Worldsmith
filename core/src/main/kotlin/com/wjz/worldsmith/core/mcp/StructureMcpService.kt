@@ -37,7 +37,7 @@ class StructureMcpService(private val directory:Path,private val host:DrawingHos
     fun tools():List<McpTool> {
         val string=McpJson.type("string");val obj=McpJson.type("object");val integer=McpJson.type("integer")
         return listOf(
-            McpTool("worldsmith_preflight_structure","Preflight a drawing or structure","Inspect geometry, semantic, native, assembly and deployment stages separately. Errors retain usable model geometry. Accept structure, blueprint, or drawingId.",McpJson.schema(mapOf("sessionId" to string,"structure" to obj,"blueprint" to obj,"drawingId" to string),listOf("sessionId")),true,handler=::preflight),
+            McpTool("worldsmith_preflight_structure","Preflight a drawing or structure","Inspect geometry, semantic, native, assembly and deployment stages separately. Errors retain usable model geometry. Accept structure, blueprint, or drawingId. estimateLighting optionally adds non-blocking authored-voxel lighting diagnostics; default false.",McpJson.schema(mapOf("sessionId" to string,"structure" to obj,"blueprint" to obj,"drawingId" to string,"estimateLighting" to buildJsonObject {put("type","boolean");put("default",false)}),listOf("sessionId")),true,handler=::preflight),
             McpTool("worldsmith_query_block_states","Query native block vocabulary","Query block/state strings or search registered ids. Optional sessionId also resolves that draft's logical custom blocks. Return legal properties and actual emission, without exporting NBT.",McpJson.schema(mapOf("sessionId" to string,"ids" to McpJson.array(),"search" to string,"limit" to integer),emptyList()),true,handler={a->
                 val scoped=nativeFor(a["sessionId"]?.jsonPrimitive?.content)
                 if(scoped==null)McpToolResult.success(buildJsonObject {put("stage","NOT_RUN");put("message","A bootstrapped native host is required")})
@@ -72,18 +72,19 @@ class StructureMcpService(private val directory:Path,private val host:DrawingHos
         }
         return WorldStructureDefinition(blueprint.getValue("id").jsonPrimitive.content,McpJson.decode(authored.blueprint(sid,blueprint,true)),StructurePlacement(emptyList()))
     }
-    fun inspect(sid:String,d:WorldStructureDefinition,assemblyContext:Boolean=true):StructureInspection {
+    fun inspect(sid:String,d:WorldStructureDefinition,assemblyContext:Boolean=true,estimateLighting:Boolean=false):StructureInspection {
         val library=attach(sid,StructureLibrary(structures=listOf(d)),true);val components=authored.components(sid,d.blueprint)
-        val result=checksFor(sid).inspect(d,library.drawingAssets,components,sid,assemblyContext)
+        val result=checksFor(sid).inspect(d,library.drawingAssets,components,sid,assemblyContext,estimateLighting)
         for((stage,data)in result.report.stages)metrics.record(sid,stage,data.elapsedMillis)
         return result
     }
     private fun preflight(a:JsonObject):McpToolResult {
         val sid=McpJson.string(a,"sessionId");require(sessions.find(sid)!=null)
-        val d=definition(sid,a);var result=inspect(sid,d,"structure" in a)
+        val d=definition(sid,a);val estimate=a["estimateLighting"]?.jsonPrimitive?.boolean ?: false
+        var result=inspect(sid,d,"structure" in a,estimate)
         if(a["drawingId"]!=null&&host.artifact(sid,McpJson.string(a,"drawingId"),true).semanticsHash==null)
             result=result.copy(report=result.report.copy(stages=result.report.stages+("semantics" to StructureCheckStage("NOT_RUN"))+("assembly" to StructureCheckStage("NOT_RUN"))))
-        return McpToolResult.success(buildJsonObject {put("checks",McpJson.encode(result.report));put("valid",result.report.valid);put("readyForPublication",false);put("lighting",McpJson.encode(result.lighting));put("nextTool",if(result.report.valid)"worldsmith_put_structure" else "worldsmith_preview_structure")})
+        return McpToolResult.success(buildJsonObject {put("checks",McpJson.encode(result.report));put("valid",result.report.valid);put("readyForPublication",false);put("lightingEstimated",estimate);put("lighting",McpJson.encode(result.lighting));put("nextTool",if(result.report.valid)"worldsmith_put_structure" else "worldsmith_preview_structure")})
     }
     fun completed(job:DrawingJob):List<StructureCheckReport> = job.drawingIds.map {id->
         try {inspect(job.sessionId,definition(job.sessionId,buildJsonObject {put("drawingId",id)}),false).report}
@@ -99,7 +100,8 @@ class StructureMcpService(private val directory:Path,private val host:DrawingHos
     }
     fun preview(a:JsonObject):McpToolResult {
         val sid=a["sessionId"]?.jsonPrimitive?.content.orEmpty();val d=definition(sid,a)
-        val inspected=inspect(sid,d,"structure" in a);val variant=a["variant"]?.jsonPrimitive?.int ?: 0
+        val estimate=a["overlays"]?.jsonArray?.any {it.jsonPrimitive.content=="lighting"}==true
+        val inspected=inspect(sid,d,"structure" in a,estimate);val variant=a["variant"]?.jsonPrimitive?.int ?: 0
         val g=inspected.geometries[d.blueprint.id]?.getOrNull(variant)
         if(g==null)return McpToolResult.error("No usable geometry for this preview",buildJsonObject {put("checks",McpJson.encode(inspected.report))})
         val raw=StructurePreviewService.drawing(g);val cutaway=a["cutaway"]?.jsonPrimitive?.boolean ?: false
@@ -113,8 +115,8 @@ class StructureMcpService(private val directory:Path,private val host:DrawingHos
             put("valid",inspected.report.valid);put("id",d.blueprint.id);put("minecraftCompiled",false);put("previewPath",file.toString());put("cutaway",cutaway);put("sliceY",localSlice);put("floorPlan",StructurePreview.floorPlan(g,localSlice));put("diagnostics",McpJson.encode(inspected.report.stages.values.flatMap {it.diagnostics}));put("variant",variant);put("variantCount",inspected.geometries.getValue(d.blueprint.id).size)
         }))
     }
-    fun inspectDrawing(session:String,id:String):StructureInspection {
-        val result=inspect(session,definition(session,buildJsonObject {put("drawingId",id)}),false)
+    fun inspectDrawing(session:String,id:String,estimateLighting:Boolean=false):StructureInspection {
+        val result=inspect(session,definition(session,buildJsonObject {put("drawingId",id)}),false,estimateLighting)
         return if(host.artifact(session,id,true).semanticsHash==null)result.copy(report=result.report.copy(stages=result.report.stages+("semantics" to StructureCheckStage("NOT_RUN"))))else result
     }
     fun previewAssembly(a:JsonObject):McpToolResult {

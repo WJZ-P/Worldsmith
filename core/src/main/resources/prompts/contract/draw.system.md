@@ -273,6 +273,19 @@ bossSpawner(at,creatureId,respawnTicks,requiredPlayerRange,spawnRange) and snaps
 Item is AuthoringContext.Item(slot,item,count). Read section boss-encounters for the
 spawner's exact bounds, world binding and arena-clearance responsibilities.
 
+For hanging lamps, prefer hangingLightFixture(id,at,anchor), which defaults to a
+level-15 hanging lantern and vertical iron_chain. Its full overload is
+hangingLightFixture(id,at,anchor,lightState,chainState,level); use a real hanging
+lantern/soul_lantern and a vertical axis=y chain, then native-check its emission.
+The anchor must be an existing roof/beam block directly above the lamp, with a clear
+shaft inside the canvas. The helper never overwrites obstructing geometry. It fills
+only the intervening chain cells and rechecks lamp, chain and anchor at snapshot,
+including transformed components. Author curved roofs first and derive each anchor
+from its actual underside; a guessed uniform beam height creates floating chains.
+intentionallyDark(reason) explicitly marks a deliberately dark logical building;
+reason is printable, nonblank and <=512 characters, and stays authoring-only.
+Ordinary interiors instead receive theme-appropriate distributed fixtures by default.
+
 room and indoorPassage author AIR throughout the interior and floor below it. Their
 occupied-space declaration is the floor plane of THAT storey, not furniture tops;
 upper floors need their own room declarations. entrance connects a physical doorway
@@ -282,6 +295,9 @@ invent fixture placement, a style or a building layout. Snapshot data and semant
 immutable. instance transforms/prefixes geometry, rooms, entrances, supports, fixtures
 and protected regions together. Named components are declared spatial regions used
 for debug filtering, not independent worldgen pieces.
+Cover every real floor, stair platform and usable roof void. An unused roof cavity
+should be filled or opened into the room rather than left as a dark spawning shelf.
+Lighting defaults do not mean placing lamps during chunk loading or rewriting old saves.
 
 Submit an authored blueprint as {"id":"hall","authored":{"variants":["drawingId"]},
 "portBindings":{"north":{"pool":"halls","required":true}}}. Do not also submit hand-
@@ -296,6 +312,9 @@ or NOT_RUN with bounded spatial diagnostics. Execution SUCCEEDED is separate fro
 these checks. Missing assembly context is NOT_RUN, not a failed connection. Preflight
 never certifies full data-pack reload or a placed world instance. Valid frozen geometry
 remains previewable when rooms/ports/lighting need repair. Publishing stays strict.
+Default preflight checks legal declarations/source blocks, not per-point brightness.
+Optional estimateLighting:true requests a bounded advisory estimate; dark samples do
+not fail publication. Explicit overlays:["lighting"] also request that estimate.
 
 worldsmith_preview_structure supports region/frame (BuildBox), components/hideComponents,
 views (up to four), renderMode:material|clay, cutaway and overlays:[ports,access,clearance,lighting,errors]. Its sliceY is

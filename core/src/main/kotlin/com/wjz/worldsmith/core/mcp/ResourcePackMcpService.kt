@@ -36,7 +36,7 @@ class ResourcePackMcpService(private val exchange:ResourcePackExchange,private v
     }
 
     fun workflow():JsonObject=buildJsonObject {
-        put("extension",".wspack");put("archiveVersion",1);put("currentBundleFormat",5);put("legacyReadOnlyFormats",McpJson.encode(listOf(3,4)))
+        put("extension",".wspack");put("archiveVersion",1);put("currentBundleFormat",6);put("legacyReadOnlyFormats",McpJson.encode(listOf(3,4,5)))
         put("inboxDirectory",exchange.inboxDirectory().toString());put("exportsDirectory",exchange.exportsDirectory().toString())
         put("inbox",McpJson.encode(exchange.listInbox()));put("arbitraryImportPathsAccepted",false);put("urlsAccepted",false)
         put("installedPacksTool","worldsmith_list_packs");put("installedPackInspectionTool","worldsmith_inspect_world_content")

@@ -55,9 +55,13 @@ asked, a band or an anchor makes the world noisier, not richer.
 Not from the adjectives. Walk the regions your own terrain actually produces -
 deep water, shallow water, shore, low inland, high inland, peaks, plus whatever
 the bands and anchors added - and for each one ask what it looks like in this
-world. That list is your biomes, typically six to twelve of them. A biome
-invented per adjective produces overlapping climate boxes and one of them ends
-up invisible.
+world. Typically six to twelve is a starting-size suggestion, not a maximum or a
+completion quota. A broader prompt may need more genuinely different regions;
+keep their distribution, asset and content budgets valid rather than treating this
+example range as an engine limit. A biome invented per adjective produces overlapping
+climate boxes and one of them ends up invisible.
+For a large multi-region brief, read contract/grand_world for staged planning and
+reuse within the same implemented limits; a broader brief does not raise those limits.
 
 ## 5. Spend the aesthetic claims on the palette
 

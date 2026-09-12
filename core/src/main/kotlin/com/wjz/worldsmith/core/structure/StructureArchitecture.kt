@@ -39,7 +39,7 @@ data class StructureMemberRule(
 @Serializable
 data class StandaloneStructureDesign(val structure: String, val purpose: String, val themeFit: String)
 
-@Serializable enum class StructureLightingMode { READABLE, EXTERIOR_ONLY }
+@Serializable enum class StructureLightingMode { READABLE, EXTERIOR_ONLY, INTENTIONALLY_DARK }
 @Serializable data class StructureLightSource(val at: BuildPos, val level: Int)
 
 /** Author-declared light sources are verified against native block states at MC export. */

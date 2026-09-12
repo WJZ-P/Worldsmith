@@ -20,7 +20,7 @@ object StructureCatalogCompiler {
     const val MAX_PLAN_VOXELS=262144
 
     @JvmStatic fun compile(library:StructureLibrary):CompiledStructureCatalog {
-        need(library.schemaVersion in 1..2 && library.structures.size<=48,"structures","STRUCTURE_CATALOG_LIMIT","Use schema 1/2 and at most 48 definitions")
+        need(library.schemaVersion in 1..2 && library.structures.size<=StructureValidator.MAX_STRUCTURES,"structures","STRUCTURE_CATALOG_LIMIT","Use schema 1/2 and at most ${StructureValidator.MAX_STRUCTURES} definitions")
         val sources=linkedMapOf<String,StructureBlueprint>();val templates=linkedMapOf<String,List<CompiledStructure>>()
         var voxels=0;var work=0
         fun add(b:StructureBlueprint) {

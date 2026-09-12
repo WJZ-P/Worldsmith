@@ -25,6 +25,8 @@ data class WorldsmithPackManifest @JvmOverloads constructor(
     @Transient val files: WorldsmithPackFiles = WorldsmithPackFiles(),
     val modules: Map<String, WorldsmithModuleFile> = emptyMap(),
     val assets: List<ContentAsset> = emptyList(),
+    /** Display metadata only; resolves to an existing item/block icon without activating its world. */
+    val representativeContent: ContentKey? = null,
 ) {
     fun modulePath(id: String): String = requireNotNull(modules[id]) { "Missing module '$id'" }.path
 }

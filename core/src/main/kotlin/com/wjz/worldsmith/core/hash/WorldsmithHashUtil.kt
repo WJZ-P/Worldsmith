@@ -30,12 +30,14 @@ import com.wjz.worldsmith.core.content.CreatureLibrary
 import com.wjz.worldsmith.core.content.CustomItemLibrary
 import com.wjz.worldsmith.core.content.QuestLibrary
 import com.wjz.worldsmith.core.pack.LegacyCreaturesV3
+import com.wjz.worldsmith.core.pack.LegacyItemsV1
 
 /** Computes the immutable id of the files that affect world generation. */
 object WorldsmithHashUtil {
     private const val HASH_DOMAIN_V3 = "worldsmith-world-content-bundle-v3"
     private const val HASH_DOMAIN_V4 = "worldsmith-world-content-bundle-v4"
     private const val HASH_DOMAIN_V5 = "worldsmith-world-content-bundle-v5"
+    private const val HASH_DOMAIN_V6 = "worldsmith-world-content-bundle-v6"
 
     @JvmStatic @JvmOverloads
     fun computeGenerationId(manifest: WorldsmithPackManifest, contents: Map<String, String>,binaries:Map<String,ByteArray> = emptyMap()): String {
@@ -46,7 +48,8 @@ object WorldsmithHashUtil {
         updateField(digest, "domain", when (manifest.formatVersion) {
             WorldContentBundleIO.LEGACY_FORMAT_VERSION -> HASH_DOMAIN_V3
             WorldContentBundleIO.PREVIOUS_FORMAT_VERSION -> HASH_DOMAIN_V4
-            else -> HASH_DOMAIN_V5
+            5 -> HASH_DOMAIN_V5
+            else -> HASH_DOMAIN_V6
         })
         updateField(digest, "formatVersion", manifest.formatVersion.toString())
 
@@ -59,7 +62,8 @@ object WorldsmithHashUtil {
                 require(WorldsmithJson.decode<CreatureLibrary>(raw).creatures.none {it.boss!=null}) {"Format 4 has no Boss behavior; publish Boss profiles in format 5 with creature schema 2"}
             updateField(digest, "module:$role", file.schemaVersion.toString())
             val normalized = if (manifest.formatVersion == WorldContentBundleIO.LEGACY_FORMAT_VERSION && role == "creatures")
-                LegacyCreaturesV3.normalize(raw) else normalizeTyped(role, raw)
+                LegacyCreaturesV3.normalize(raw) else if (role == "items" && manifest.formatVersion < 6)
+                LegacyItemsV1.normalize(raw) else normalizeTyped(role, raw)
             updateField(digest, "$role:$path", canonicalJson(normalized))
         }
 

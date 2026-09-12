@@ -9,6 +9,9 @@ import com.wjz.worldsmith.core.content.CustomBlockLibrary
 
 @Serializable data class PublicationStatus(val stage: String, val message: String = "", val diagnostics: List<Diagnostic> = emptyList()) {
     val complete: Boolean get() = stage == "PUBLISHED"
+    val nativeValidated: Boolean get() = stage == "CLIENT_RESOURCES" || complete
+    val activated: Boolean get() = complete
+    val selectedForCreation: Boolean get() = complete
 }
 
 /** Native platform callback, injected by MC. Core alone never claims a native publication succeeded. */

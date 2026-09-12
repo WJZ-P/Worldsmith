@@ -6,7 +6,7 @@ import kotlinx.serialization.json.*
 
 /** Source editing/build orchestration is separate from world pack publication. */
 class DrawingMcpService(private val host:DrawingHost,private val sessions:WorkflowSessions,private val preview:StructurePreviewService) {
-    var inspectDrawing:((String,String)->StructureInspection)?=null
+    var inspectDrawing:((String,String,Boolean)->StructureInspection)?=null
     private val counters=java.util.concurrent.ConcurrentHashMap<String,Map<String,Long>>()
     private val metricFailures=java.util.concurrent.ConcurrentHashMap<String,String>()
     fun tools():List<McpTool> {
@@ -55,7 +55,8 @@ class DrawingMcpService(private val host:DrawingHost,private val sessions:Workfl
     fun preview(a:JsonObject):McpToolResult {
         val sid=McpJson.string(a,"sessionId");val artifact=host.artifact(sid,McpJson.string(a,"drawingId"),true)
         val components=host.semantics(artifact)?.get("components")?.jsonObject?.mapValues {McpJson.decode<BuildBox>(it.value)}.orEmpty()
-        val inspection=if(McpJson.strings(a,"overlays").isEmpty())null else inspectDrawing?.invoke(sid,artifact.id)
+        val overlays=McpJson.strings(a,"overlays")
+        val inspection=if(overlays.isEmpty())null else inspectDrawing?.invoke(sid,artifact.id,"lighting" in overlays)
         val drawing=host.drawing(artifact);val result=preview.render("$sid:${artifact.name}",drawing,a,components,inspection)
         record(sid,"preview",result.structuredContent.getValue("previewMillis").jsonPrimitive.long)
         return result.copy(structuredContent=JsonObject(result.structuredContent+buildJsonObject {put("drawingId",artifact.id);put("dataHash",artifact.dataHash);put("width",drawing.bounds().width());put("height",drawing.bounds().height());put("depth",drawing.bounds().depth());put("authoredCells",drawing.voxels().size);put("nonAirCells",drawing.nonAirCells());put("view",result.structuredContent.getValue("views").jsonArray.first());put("anchors",McpJson.encode(drawing.anchors().mapValues {(_,v)->BuildPos(v.x(),v.y(),v.z())}))}))

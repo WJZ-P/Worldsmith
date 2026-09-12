@@ -38,6 +38,12 @@ object WorldsmithPackValidator {
             add(error("quests", "QUESTS_REQUIRE_FORMAT5", "Formats 3/4 contain no quest gameplay; freeze the main line as format 5"))
         if (manifest.formatVersion < 5 && pack.creatures.creatures.any { it.boss != null })
             add(error("creatures", "BOSS_REQUIRES_FORMAT5", "Boss behavior requires format 5 and explicit creature module schema 2"))
+        if (manifest.formatVersion < 6 && pack.items.schemaVersion != 1)
+            add(error("items", "ITEM_ABILITIES_REQUIRE_FORMAT6", "Items schema 2 requires bundle format 6"))
+        manifest.representativeContent?.let { key ->
+            val exists = when (key.kind) { "item" -> pack.items.items.any { it.id == key.id }; "block" -> pack.blocks.blocks.any { it.id == key.id }; else -> false }
+            if (!exists) add(error("manifest.representativeContent", "REPRESENTATIVE_CONTENT_MISSING", "Representative icon must refer to an existing local item or block"))
+        }
 
         val contentPlan = ExistingWorldContentModules.registry().plan(ExistingWorldContentModules.input(pack))
         addAll(contentPlan.diagnostics)
@@ -67,6 +73,15 @@ object WorldsmithPackValidator {
             assets[item.textureAsset]?.let { size ->
                 if (size.width != size.height || size.width !in 16..256 || size.width and (size.width - 1) != 0)
                     add(error("items.items[$i].textureAsset", "ITEM_TEXTURE_DIMENSIONS", "Item icons must be square power-of-two PNGs, 16..256 pixels"))
+            }
+            item.equipment?.textureAsset?.let { hash ->
+                checkTextureAddress(hash, "items.items[$i].equipment.textureAsset")
+                if ((descriptors[hash]?.byteLength ?: 0) > CustomItemValidation.MAX_TEXTURE_BYTES)
+                    add(error("items.items[$i].equipment.textureAsset", "ARMOR_TEXTURE_BYTE_BUDGET", "Armor PNGs must be at most 1 MiB"))
+                assets[hash]?.let { size ->
+                    if (size.width !in 64..512 || size.height * 2 != size.width || size.width and (size.width - 1) != 0)
+                        add(error("items.items[$i].equipment.textureAsset", "ARMOR_TEXTURE_DIMENSIONS", "Armor uses a 64x32 humanoid UV atlas or a power-of-two integer enlargement"))
+                }
             }
         }
         val itemDefinitions = pack.items.items.associateBy { it.id }

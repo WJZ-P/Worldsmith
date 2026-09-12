@@ -30,7 +30,8 @@ Requirements:
   ids in contract/structure metadata. Prefer StructureProgram so rooms, entrances
   and fixtures share coordinates with geometry; with DrawProgram, maintain the
   matching declarations explicitly. Rooms and indoorPassages both require complete
-  READABLE lighting coverage.
+  distributed, theme-appropriate lighting by default (or explicit INTENTIONALLY_DARK
+  atmosphere); numeric brightness estimates are optional advisory feedback.
 - In guided MCP, follow architecture's visual-quality-loop: clay massing, all
   elevations, occupied-floor cutaways and assembly context. Compare the same frame
   after a specific repair. A JSON-only legacy run must not claim it viewed images

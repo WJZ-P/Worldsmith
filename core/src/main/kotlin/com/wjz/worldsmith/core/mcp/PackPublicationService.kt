@@ -62,6 +62,8 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
                 put("sessionId",sessionId);put("complete",false);put("packId",packId);put("stage",native.stage)
                 put("message",native.message);put("diagnostics",diagnosticsJson(native.diagnostics));put("nextTool",WorldsmithWorkflow.FINISH_TOOL)
                 put("minecraftCompiled",false);put("landmarkInstancesVerified",false)
+                put("coreValidated",true);put("nativeValidated",native.nativeValidated)
+                put("activated",native.activated);put("selectedForCreation",native.selectedForCreation)
             }
             return if(native.stage=="FAILED")McpToolResult.error("Native publication needs repair",result) else McpToolResult.success(result)
         }
@@ -91,8 +93,9 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
             put("landmarkGroupCount", pack.structures.architecture?.groups?.count { it.role == StructureGroupRole.LANDMARK } ?: 0)
             put("standaloneCount", pack.structures.architecture?.standalone?.size ?: 0)
             put("landmarkInstancesVerified", false)
-            put("lightingAssessment", "conservative_authored_voxel_estimate; native_emission_checks_at_export")
+            put("lightingAssessment", "declarations_checked; voxel_estimate_opt_in_non_blocking; native_emission_checks_at_export")
             put("minecraftCompiled", true);put("stage","PUBLISHED")
+            put("coreValidated",true);put("nativeValidated",true);put("activated",true);put("selectedForCreation",true)
             putJsonObject("climatePlacement") {
                 put("semanticSlots", pack.biomes.biomes.count { it.slot != null })
                 put("rawClimateBoxes", pack.biomes.biomes.count { it.climate != null })

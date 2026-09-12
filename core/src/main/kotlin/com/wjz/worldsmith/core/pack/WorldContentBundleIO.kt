@@ -14,9 +14,9 @@ data class WorldContentBundleFiles(
     val binaries: Map<String, ByteArray>,
 )
 
-/** Format-5 authoring boundary; formats 3/4 retain their exact old domains for reading and save re-embedding. */
+/** Format-6 authoring boundary; formats 3/4/5 retain their exact hash domains and schema-1 item shape. */
 object WorldContentBundleIO {
-    const val FORMAT_VERSION = 5
+    const val FORMAT_VERSION = 6
     const val LEGACY_FORMAT_VERSION = 3
     const val PREVIOUS_FORMAT_VERSION = 4
     val LEGACY_MODULES = setOf("theme", "terrain", "features", "biomes", "structures", "blocks", "creatures")
@@ -29,17 +29,18 @@ object WorldContentBundleIO {
     fun create(displayName: String, description: String, terrain: TerrainPlan, biomes: BiomePlan,
         features: FeatureLibrary, structures: StructureLibrary = StructureLibrary(), theme: WorldTheme,
         blocks: CustomBlockLibrary = CustomBlockLibrary(), creatures: CreatureLibrary = CreatureLibrary(),
-        assets: Map<String, ByteArray> = emptyMap(), items: CustomItemLibrary = CustomItemLibrary(), quests: QuestLibrary = QuestLibrary()): WorldsmithPack {
+        assets: Map<String, ByteArray> = emptyMap(), items: CustomItemLibrary = CustomItemLibrary(), quests: QuestLibrary = QuestLibrary(),
+        representativeContent: ContentKey? = null): WorldsmithPack {
         val descriptors = assets.toSortedMap().map { (id, bytes) ->
             val hash = ContentAssetValidation.hash(bytes)
             ContentAsset(id, hash, "image/png", bytes.size.toLong(), ContentAssetValidation.path(hash))
         }
         ContentAssetValidation.verifyAll(descriptors, assets)
         val modules = REQUIRED_MODULES.sorted().associateWith { id ->
-            WorldsmithModuleFile(when(id) {"structures"->structures.schemaVersion;"creatures"->creatures.schemaVersion;else->1}, "$id.json")
+            WorldsmithModuleFile(when(id) {"structures"->structures.schemaVersion;"creatures"->creatures.schemaVersion;"items"->items.schemaVersion;else->1}, "$id.json")
         }
         val manifest = WorldsmithPackManifest(FORMAT_VERSION, "0".repeat(64), displayName, description,
-            modules = modules, assets = descriptors)
+            modules = modules, assets = descriptors, representativeContent = representativeContent)
         val draft = WorldsmithPack(manifest, terrain, biomes, features, manifest.id, structures, theme, blocks, creatures, assets, items, quests)
         val files = encode(draft)
         return draft.copy(manifest = files.manifest, computedId = files.manifest.id)
@@ -66,7 +67,7 @@ object WorldContentBundleIO {
         } else {
             if(pack.manifest.formatVersion<5)require(pack.creatures.creatures.none {it.boss!=null}) {"Boss profiles require format 5 and creature module schema 2"}
             put("creatures", WorldsmithJson.encode(pack.creatures))
-            put("items", WorldsmithJson.encode(pack.items))
+            put("items", if (pack.manifest.formatVersion < 6) LegacyItemsV1.encode(pack.items) else WorldsmithJson.encode(pack.items))
         }
         if ("quests" in pack.manifest.modules) put("quests", WorldsmithJson.encode(pack.quests))
         else require(pack.quests.quests.isEmpty()) { "Formats 3/4 contain no quest runtime; create a format-5 bundle for a main line" }
@@ -84,17 +85,17 @@ object WorldContentBundleIO {
 
     @JvmStatic
     fun validateManifest(manifest: WorldsmithPackManifest) {
-        require(manifest.formatVersion in LEGACY_FORMAT_VERSION..FORMAT_VERSION) { "Worldsmith reads bundle formats 3/4/5 and creates format 5; unreleased formats 1/2 are not supported" }
+        require(manifest.formatVersion in LEGACY_FORMAT_VERSION..FORMAT_VERSION) { "Worldsmith reads bundle formats 3/4/5/6 and creates format 6; unreleased formats 1/2 are not supported" }
         val expected = when (manifest.formatVersion) {
             LEGACY_FORMAT_VERSION -> LEGACY_MODULES
             PREVIOUS_FORMAT_VERSION -> FORMAT4_MODULES
             else -> REQUIRED_MODULES
         }
-        require(manifest.modules.keys == expected) { "Format ${manifest.formatVersion} requires exactly ${expected.sorted()}; achievements are not installed" }
+        require(manifest.modules.keys == expected) { "Format ${manifest.formatVersion} requires exactly ${expected.sorted()}; independent achievement modules are not installed" }
         require(manifest.displayName.isNotBlank() && manifest.displayName.length <= 160 && manifest.description.length <= 8192) { "Invalid bundle display metadata" }
         require(manifest.modules.values.map { it.path }.distinct().size == manifest.modules.size) { "Module documents must have distinct paths" }
         manifest.modules.forEach { (id, file) ->
-            val versions=if(id=="structures" || id=="creatures" && manifest.formatVersion>=5)1..2 else 1..1
+            val versions=if(id=="structures" || id=="creatures" && manifest.formatVersion>=5 || id=="items" && manifest.formatVersion>=6)1..2 else 1..1
             require(file.schemaVersion in versions) { "Unsupported schema for module '$id' in bundle format ${manifest.formatVersion}" }
             require(WorldContentRegistry.validRelativePath(file.path) && file.path.endsWith(".json") &&
                 file.path != "worldsmith.json" && !file.path.startsWith("structures/") && !file.path.startsWith("assets/") && !file.path.startsWith("drawings/")) { "Invalid or reserved module document path" }
@@ -103,5 +104,8 @@ object WorldContentBundleIO {
         require(manifest.assets.all { it.byteLength != null && it.byteLength in 1..ContentAssetValidation.MAX_ASSET_BYTES.toLong() &&
             WorldContentRegistry.SHA256.matches(it.sha256) && it.path == ContentAssetValidation.path(it.sha256) && it.mediaType == "image/png" }) { "Invalid PNG asset descriptors" }
         require(manifest.assets.sumOf { requireNotNull(it.byteLength) } <= ContentAssetValidation.MAX_TOTAL_BYTES) { "Bundle asset budget exceeded" }
+        manifest.representativeContent?.let {
+            require(it.kind in setOf("item", "block") && CustomItemValidation.validId(it.id)) { "Representative content names a local item or block" }
+        }
     }
 }

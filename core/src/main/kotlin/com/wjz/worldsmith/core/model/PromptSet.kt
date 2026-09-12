@@ -11,12 +11,10 @@ data class PromptTemplateRef(
 /**
  * The prompt documents one generation run reads.
  *
- * The pack contracts are split one file per document rather than kept in one
- * page, so that adding a field to a model changes exactly one prompt. They are
- * not split for context: measured against the built-in pack the agent is also
- * handed, all of them together are a small fraction of the run, and an agent
- * has to hold the complete world context because it submits the documents
- * in a single call.
+ * Domain contracts own their field grammar; the grand-world guide coordinates
+ * intent across them. MCP exposes full text, indexes and stable sections so a
+ * resumable run can keep a compact world plan and retrieve only the current
+ * domain's details. Domain documents still have to agree at publication.
  */
 @Serializable
 data class PromptSet(
@@ -30,9 +28,10 @@ data class PromptSet(
     val featurePlan: PromptTemplateRef,
     val structurePlan: PromptTemplateRef,
 ) {
-    /** The pack contracts, in the order the entry document tells an agent to decide them. */
+    /** Planning and worldgen/architecture contracts; typed content modules have their own MCP lookup. */
     val contracts: Map<String, PromptTemplateRef>
         get() = linkedMapOf(
+            CONTRACT_GRAND_WORLD to PromptTemplateRef("contract/grand_world"),
             CONTRACT_TERRAIN to terrainPlan,
             CONTRACT_BIOME to biomePlan,
             CONTRACT_FEATURE to featurePlan,
@@ -42,6 +41,7 @@ data class PromptSet(
         )
 
     companion object {
+        const val CONTRACT_GRAND_WORLD: String = "grand_world"
         const val CONTRACT_TERRAIN: String = "terrain"
         const val CONTRACT_BIOME: String = "biome"
         const val CONTRACT_FEATURE: String = "feature"

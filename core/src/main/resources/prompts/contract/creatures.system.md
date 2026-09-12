@@ -1,5 +1,7 @@
 # Worldsmith custom creature contract — module schemas 1 and 2
 
+New publications use bundle format 6. Formats 3/4/5 retain their original read-only content identities; minimum-version notes below describe when an existing feature first became available.
+
 Create ground creatures whose silhouette, material and behavior belong to the
 same world theme. The installed runtime supports data-driven cuboid rigs,
 procedural role-based motion, passive wandering/fleeing, hostile melee, bounded
@@ -12,7 +14,7 @@ and multipart bosses have no schema fields in this module.
 
 `CreatureLibrary` has `schemaVersion` (1 by default, or 2) and `creatures`.
 Schema 1 preserves ordinary creature definitions and omits `boss`. A non-null
-`boss` requires schema 2 and current bundle format 5; formats 3/4 reject Boss
+`boss` requires schema 2 and current bundle format 6; formats 3/4 reject Boss
 semantics rather than silently dropping them. An empty library is valid outside
 a complete-world plan's named coverage promises; the maximum is 128 definitions.
 Each definition has exactly:
@@ -64,6 +66,13 @@ must fit within 256 model units of the model origin, including parent pivots.
 Plan the rig and UV islands first, then paint their intended atlas areas. A nice
 standalone picture does not establish coherent UVs. Match collision dimensions
 and foot placement to the visible model; inspect motion as well as a still pose.
+
+Default skins follow Minecraft vanilla mob pixel art: clean large color blocks,
+limited coherent shades, recognizable eyes/muzzle and purposeful species markings.
+Avoid all-over random spots, dither or checkerboard noise on otherwise plain fur,
+hide or cloth. Use clustered shading; reserve stripes/spots/scales for species that
+actually need them. Apply this to both external painting prompts and pixel recipes,
+then inspect the real atlas on front/back/side and moving model views.
 
 ### Attributes, defaults and inclusive bounds
 

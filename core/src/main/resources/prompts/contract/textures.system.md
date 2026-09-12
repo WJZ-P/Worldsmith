@@ -1,5 +1,7 @@
 # Portable texture production: item / block / creature
 
+New publications use bundle format 6. Formats 3/4/5 retain their original read-only content identities; minimum-version notes below describe when an existing feature first became available.
+
 Worldsmith provides PNG authoring/import, validation, content addressing and model
 preview. It does NOT contain or promise access to a hosted text-to-image model.
 An MCP client may use any image provider it has access to, or the model-independent
@@ -16,6 +18,14 @@ pixel recipe compiler. A different AI does not need Codex or its image tool.
   (powers of two 16..512). Generate the bones/cubes/UV guide first. A concept image
   is not a valid replacement for the unwrapped atlas. Paint the same face rectangles,
   bind the final PNG hash and inspect the actual model and poses.
+
+For creature skins, reference Minecraft vanilla mob art rather than photorealistic
+detail: a small palette, broad clean regions, coherent pixel-cluster shading and
+distinctive face/species markings. Do not seed every UV face with independent
+random dark/light speckles. Plain fur, hide and cloth stay mostly clean; spots,
+stripes, scales and weathering are localized design choices. This applies to both
+pixel recipes and prompts given to an external image model. Review at in-game size,
+not only an enlarged atlas, while preserving exact face rectangles and orientation.
 
 ## Route A: no image model needed
 

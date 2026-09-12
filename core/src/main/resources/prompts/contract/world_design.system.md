@@ -4,6 +4,15 @@ The Mod provides deterministic authoring, persistence and checks; the connected
 AI develops the world from the player's prompt. It does not call a hidden LLM.
 Use stable names and an explicit plan so a long run can resume without replacing
 finished work or quietly dropping a requested category.
+Current publication is bundle format 6 with the same nine typed modules; items
+schema 2 supplies equipment, consumables and fixed actions. Formats 3/4/5 remain
+read-only for restoration and unchanged re-embedding, not implicit migrations.
+
+For a new world-sized request, first use `worldsmith_get_contract` with
+`id: "grand_world", section: "world-atlas"` and read the current `authoringBudgets`.
+Translate macro geography, regional identity and travel intent into the named
+targets below; these are planning decisions, not additional runtime module types.
+For an existing session, preserve its plan and continue from actual gaps.
 
 ## Choose the scope honestly
 
@@ -43,6 +52,12 @@ names at least one of every required kind: `biome`, `structure`, `creature`,
 Titles are player-facing names displayed by the Create World progress tab before
 the definitions exist. Use readable names in the player's language rather than
 copying machine IDs; keep IDs stable when improving a display title.
+Keep these titles and any player-visible goal/purpose text rooted in the world
+and its gameplay. New manifest/theme/item/quest prose also follows PlayerTextPolicy:
+engineering notes about save records, native validation, terrain checks or missing
+features belong only in authoring diagnostics/receipts. Repair
+PLAYER_TEXT_ENGINEERING_LEAK findings at new publication; do not install a new
+loading gate or a display filter on old immutable packs or their saved prose.
 This is a minimum coverage check, not a suggested catalog size or a fixed style.
 Derive diversity and scale from the prompt. A repeatable test example is not a
 catalog to copy into every world.
@@ -52,6 +67,13 @@ Targets may also name `terrain`, `anchor`, `feature`, `blueprint`, `theme`, and
 `structureId/blueprintId`. Items use logical `item/id` ContentKeys, not native
 host addresses. A block's pickup form is a `block_item/id` endpoint referring
 to the same planned `block/id`.
+
+Proactively choose useful item roles rather than a catalog made only of delivery
+tokens. Add weapons, mining tools, wearable armor, consumables and/or composed
+fixed abilities when they serve the world's exploration and combat. These are
+items schema 2 capabilities under contract/items, not new WorldDesignPlan fields
+or a new capability relation. Give each planned item a real producer and a theme
+or quest role; tell the player its actual controls in world-appropriate language.
 
 At most 2048 distinct links are allowed. Each substantive endpoint must be a
 declared target; existing theme, terrain, anchor, feature and blueprint endpoints
@@ -81,8 +103,9 @@ palette entry does not satisfy a compiled structure's uses_block promise.
 Every Boss entry names a planned creature and a planned quest, with the matching
 `kill_objective` link. Actual completion requires creature module schema 2, a real
 nonempty Boss profile, and a positive natural habitat or typed BossSpawner in an
-enabled structure placed in a defined biome. BossSpawner needs format 5 and
-structure/creature module schema 2; it references a hostile Boss definition.
+enabled structure placed in a defined biome. BossSpawner was introduced in format
+5 and remains supported in new format-6 bundles with structure/creature module
+schema 2; it references a hostile Boss definition.
 High health,
 a Boss-looking model, or a word in its name is not a Boss profile. This version
 does not promise that natural spawning places the Boss inside a named building.
@@ -125,6 +148,12 @@ creatures need a valid habitat; main-line quests bind real narrative beats.
 An empty library does not fill a named category. Keep the existing guided
 architecture quality contract, inspect the actual visuals, and repair the largest
 visible weakness rather than treating machine checks as a beauty score.
+
+Choose the signature item/block for the browser through the write request's
+optional `representativeContent: {"kind":"item","id":"existing_local_id"}`
+(kind may be block). It is manifest.representativeContent, not a design-plan
+field. Reuse that content's actual PNG rather than producing another generic
+world thumbnail; browsing the preview does not activate or reload its world.
 
 The write records the actual frozen input snapshot back into the same session and
 automatically exports the final single-file resource pack to

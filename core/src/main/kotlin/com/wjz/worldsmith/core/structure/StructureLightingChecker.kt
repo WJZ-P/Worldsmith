@@ -4,20 +4,26 @@ import com.wjz.worldsmith.core.validation.Diagnostic
 import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 import java.util.ArrayDeque
 
-/** Conservative authored-voxel estimate, ignoring skylight. This is not Minecraft's light engine. */
+/** Declaration checks are mandatory; the bounded, non-blocking voxel estimate is explicitly opt-in. */
 object StructureLightingChecker {
     private const val MAX_WORK = 1_000_000
     @JvmStatic
     fun inspect(blueprint: StructureBlueprint, voxels: Collection<StructureVoxel>): StructureLightingReport {
-        val report=analyze(blueprint,voxels)
+        val report=validate(blueprint,voxels)
         report.diagnostics.firstOrNull {it.severity==DiagnosticSeverity.ERROR}?.let {throw StructureBuildException(it)}
         return report
     }
-    @JvmStatic fun analyze(blueprint:StructureBlueprint,voxels:Collection<StructureVoxel>):StructureLightingReport = try {compute(blueprint,voxels)}catch(e:StructureBuildException){StructureLightingReport(0,null,listOf(e.diagnostic))}
-    private fun compute(blueprint:StructureBlueprint,voxels:Collection<StructureVoxel>):StructureLightingReport {
+    @JvmStatic fun validate(blueprint:StructureBlueprint,voxels:Collection<StructureVoxel>):StructureLightingReport = try {compute(blueprint,voxels,false)}catch(e:StructureBuildException){StructureLightingReport(0,null,listOf(e.diagnostic))}
+    /** Optional authoring feedback, never a publication brightness gate. No native light-engine claim. */
+    @JvmStatic fun analyze(blueprint:StructureBlueprint,voxels:Collection<StructureVoxel>):StructureLightingReport {
+        val declarations=validate(blueprint,voxels)
+        if(declarations.diagnostics.isNotEmpty())return declarations
+        return try {compute(blueprint,voxels,true)}catch(e:StructureBuildException){StructureLightingReport(0,null,listOf(e.diagnostic.copy(severity=DiagnosticSeverity.WARNING)))}
+    }
+    private fun compute(blueprint:StructureBlueprint,voxels:Collection<StructureVoxel>,estimate:Boolean):StructureLightingReport {
         val occupied=blueprint.rooms+blueprint.indoorPassages
         val policy = blueprint.lighting ?: if(occupied.isEmpty())return StructureLightingReport(0, null) else
-            throw StructureBuildException(Diagnostic("lighting","ROOMS_REQUIRE_LIGHTING",DiagnosticSeverity.ERROR,"Declared indoor rooms require READABLE lighting"))
+            throw StructureBuildException(Diagnostic("lighting","ROOMS_REQUIRE_LIGHTING",DiagnosticSeverity.ERROR,"Declare READABLE lighting, or explicit INTENTIONALLY_DARK intent for a deliberately dark interior"))
         fun need(ok: Boolean, path: String, code: String, message: String) {
             if (!ok) throw StructureBuildException(Diagnostic("lighting.$path", code, DiagnosticSeverity.ERROR, message))
         }
@@ -33,11 +39,15 @@ object StructureLightingChecker {
             need(cells[source.at]?.material?.isAir() == false, "sources[$i]", "LIGHT_SOURCE_MISSING_BLOCK", "Place an actual light-emitting block at the source position; MC export verifies its emission")
         }
         if (policy.mode == StructureLightingMode.EXTERIOR_ONLY) {
-            need(occupied.isEmpty(),"rooms","INTERIOR_LIGHTING_REQUIRED","Declared indoor rooms/passages require READABLE")
+            need(occupied.isEmpty(),"rooms","INTERIOR_LIGHTING_REQUIRED","Declared indoor rooms/passages require READABLE or INTENTIONALLY_DARK")
             need(policy.spaces.isEmpty(), "spaces", "EXTERIOR_LIGHTING_SPACES", "Use READABLE when declaring occupied spaces")
             return StructureLightingReport(0, null)
         }
+        for((i,box)in policy.spaces.withIndex())need(inside(box.from)&&inside(box.to)&&box.from.x<=box.to.x&&box.from.y<=box.to.y&&box.from.z<=box.to.z,
+            "spaces[$i]","INVALID_LIGHTING_SPACE","Space bounds must be ordered and inside the blueprint")
+        if(policy.mode==StructureLightingMode.INTENTIONALLY_DARK)return StructureLightingReport(0,null)
         need(policy.spaces.isNotEmpty() && policy.sources.isNotEmpty(), "", "ROOM_LIGHTING_REQUIRED", "Readable interiors need occupied space bounds and authored light sources")
+        if(!estimate)return StructureLightingReport(0,null)
         val samples = linkedSetOf<BuildPos>()
         fun clear(p: BuildPos) = cells[p]?.let { it.material.isAir() || it.passable } == true
         need(occupied.sumOf { (it.to.x-it.from.x+1L)*(it.to.y-it.from.y+1L)*(it.to.z-it.from.z+1L) }<=MAX_WORK,"rooms","LIGHTING_WORK_BUDGET","Declared room volume exceeds the bounded check budget")
@@ -78,7 +88,7 @@ object StructureLightingChecker {
         val sampled = samples.map { p -> p to minOf(levels[p] ?: 0, levels[p.copy(y = p.y + 1)] ?: 0) }
         val dark = sampled.filter { it.second < policy.minimum }
         val bounds=if(dark.isEmpty())null else BuildBox(BuildPos(dark.minOf {it.first.x},dark.minOf {it.first.y},dark.minOf {it.first.z}),BuildPos(dark.maxOf {it.first.x},dark.maxOf {it.first.y},dark.maxOf {it.first.z}))
-        val diagnostics=if(dark.isEmpty())emptyList()else listOf(Diagnostic("lighting.spaces","ROOM_TOO_DARK",DiagnosticSeverity.ERROR,
+        val diagnostics=if(dark.isEmpty())emptyList()else listOf(Diagnostic("lighting.spaces","ROOM_TOO_DARK",DiagnosticSeverity.WARNING,
             "${dark.size}/${samples.size} walking samples fall below block-light ${policy.minimum}",position=dark.first().first,region=bounds,
             expected="feet/head block light >= ${policy.minimum}",actual="minimum=${sampled.minOf {it.second}}",hint="Add distributed fixtures near the dark region or repair blocked light paths; skylight is not counted",metrics=mapOf("darkSamples" to dark.size,"walkingSamples" to samples.size)))
         val stride=maxOf(1,(sampled.size+2047)/2048)

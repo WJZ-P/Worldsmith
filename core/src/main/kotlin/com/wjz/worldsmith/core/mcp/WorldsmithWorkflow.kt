@@ -5,6 +5,7 @@ import com.wjz.worldsmith.core.structure.WorldStructureDefinition
 import com.wjz.worldsmith.core.structure.StructureArchitecture
 import com.wjz.worldsmith.core.structure.StructureLibrary
 import com.wjz.worldsmith.core.structure.StructureInteraction
+import com.wjz.worldsmith.core.structure.StructureValidator
 import kotlinx.serialization.Serializable
 import java.nio.file.Files
 import java.nio.file.Path
@@ -83,7 +84,7 @@ object WorldsmithWorkflow {
             "Use worldsmith_get_content_contract for theme/blocks/creatures, then author real PNG textures and typed content modules. " +
             "worldsmith_put_content_modules and texture tools use expectedRevision from worldsmith_get_content_draft; all edits share architecture's revision. " +
             "Custom blocks use worldsmith:content/<id>, fixed native profiles and immutable world slots. Creatures use grounded native hosts, cuboid rigs and bounded server behaviors. " +
-            "A bounded linear quests module can link narrative beats to kill and item-delivery objectives; narrative beats alone are not executable quests. Achievements remain a future module. New bundles use format 5; formats 3 and 4 remain read-only. " +
+            "A bounded linear quests module can link narrative beats to kill and item-delivery objectives; narrative beats alone are not executable quests. Existing quests project into native world-specific advancements after reward claims; independent achievement authoring remains a future module. New bundles use format 6; formats 3, 4 and 5 remain read-only. Items schema 2 supports native equipment, consumables and server-owned ability combinations. " +
             "Design terrain, biomes, features and world-specific architecture yourself. New guided worlds require at least two distinct building groups, " +
             "one independent structure, and at least one monumental theme-defining group. Read contract/architecture, plan required/optional members, " +
             "and light occupied interiors explicitly. Use designGuide to translate the theme into form and playable spaces; numerical gates are not design targets. " +
@@ -102,12 +103,13 @@ object WorldsmithWorkflow {
             "SDK geometry, architecture composition and world deployment remain separate modules.\n\n" +
             "complete=true means the content-addressed pack reads back and passes Core checks, native structure export/readback, " +
             "Minecraft's full data-pack reload and preset activation in the current Create World context. WAITING_NATIVE_CONTEXT " +
-            "requires the player to open Create World; report that action and pause rather than polling indefinitely. " +
+            "requires the player to open Create World; WAITING_ACTIVATION means another explicit selection owns the page. Report that action and pause rather than polling indefinitely. Pure validation never activates a pack; unchanged verified assets are reused without another resource reload. " +
             "A model preview is not a gameplay screenshot. A published plan is not a created/played world and landmarkInstancesVerified stays false. " +
             "Report the pack name, biome count and saved location only after the final native receipt."
 
 
     val PROCEDURE: List<WorkflowStep> = (listOf(
+        WorkflowStep(0,CONTRACT_TOOL,"Read id=grand_world (world-atlas first) and the returned authoringBudgets. Plan macro regions, route intent, content families and staged production using existing goal/purpose/theme/architecture fields; these planning labels are not new runtime regions or quest types."),
         WorkflowStep(0,"worldsmith_get_content_framework","Read installed modules and capacity/lifecycle boundaries; no planned module may be silently treated as implemented."),
         WorkflowStep(0,"worldsmith_get_content_contract","Read theme, blocks, creatures, items and quests contracts. Establish one shared premise/player role/rules/conflict and linked narrative beats before designing content."),
         WorkflowStep(0,"worldsmith_put_content_modules","Commit complete theme and initial content drafts at expectedRevision. Use create_pixel_texture or put_texture_asset for actual PNGs, inspect their previews and bind the returned hash to custom blocks/creature rigs. Record each returned revision. Draft links may be repaired incrementally; all links must resolve at publication."),
@@ -166,7 +168,7 @@ object WorldsmithWorkflow {
         WorkflowStep(
             order = 9,
             tool = STRUCTURE_TOOL,
-            instruction = "Run worldsmith_preflight_structure and repair spatial diagnostics; model images remain available on semantic failure. Reference authored.variants to import geometry-linked semantic data, or drawing.variants for legacy manual metadata. Use worldsmith_put_architecture_draft for atomic related plan/member changes. Declare lighting for every root and child blueprint: READABLE occupied spaces with actual light fixtures, or EXTERIOR_ONLY for open designs. Submit complete definitions one at a time. Required ports must produce the member counts promised by the plan.",
+            instruction = "Run worldsmith_preflight_structure and repair spatial diagnostics; model images remain available on semantic failure. Reference authored.variants to import geometry-linked semantic data, or drawing.variants for legacy manual metadata. Use worldsmith_put_architecture_draft for atomic related plan/member changes. Place actual default light fixtures in every occupied floor, passage and usable attic; choose INTENTIONALLY_DARK for deliberate darkness or EXTERIOR_ONLY for open designs. Attach hanging fixtures to real anchors. Numeric lighting estimates are opt-in diagnostics, not publication gates. Submit complete definitions one at a time. Required ports must produce the member counts promised by the plan.",
         ),
         WorkflowStep(
             order = 10,
@@ -194,7 +196,7 @@ object WorldsmithWorkflow {
 
     fun overview(mode: WorkflowMode, summary: Boolean): String = when (mode) {
         WorkflowMode.STANDALONE -> "This is a focused artifact session. Build, inspect and export the requested drawing or creature; do not manufacture terrain, architecture groups, items or quests merely to satisfy a world-publication workflow. Use the current progress and preserve successful jobs. A preview is not a gameplay screenshot."
-        WorkflowMode.COMPLETE_WORLD -> if (summary) "This is an explicit COMPLETE_WORLD promise. First persist a named WorldDesignPlan, then follow worldsmith_get_generation_progress rather than restarting a fixed checklist. All declared biomes, buildings, blocks, items, creatures, main-line quests and actual Boss profiles must exist and have real usage links before publication. Shared expectedRevision protects every edit. The Mod does not call an LLM or provide an image model; any capable MCP client can author its data and PNGs. Frozen-content checks and native activation are separate receipts."
+        WorkflowMode.COMPLETE_WORLD -> if (summary) "This is an explicit COMPLETE_WORLD promise. First read grand_world/world-atlas and the returned authoringBudgets, then persist a named WorldDesignPlan and follow worldsmith_get_generation_progress rather than restarting a fixed checklist. On resume preserve the existing plan and accepted content, continuing from the actual gap. All declared biomes, buildings, blocks, items, creatures, main-line quests and actual Boss profiles must exist and have real usage links before publication. Shared expectedRevision protects every edit. The Mod does not call an LLM or provide an image model; any capable MCP client can author its data and PNGs. Frozen-content checks and native activation are separate receipts."
             else "COMPLETE_WORLD additionally requires a persisted WorldDesignPlan and verified coverage of its named targets, relationships and Boss quests. Empty optional libraries are not completion in this mode. Follow the current generation progress for the next missing action.\n\n$OVERVIEW"
         WorkflowMode.WORLDGEN_ONLY -> if (summary) "This is a WORLDGEN_ONLY guided run: theme, terrain, biomes, features and the existing architecture quality policy. Other content modules may be empty unless explicitly requested. Use progress for missing work, share expectedRevision across all edits, and preserve existing drawings. For the full biomes/buildings/blocks/items/creatures/quests/Boss promise, begin with mode=COMPLETE_WORLD; for one artifact use STANDALONE. Native finish is distinct from a preview or Core save."
             else OVERVIEW
@@ -210,6 +212,7 @@ object WorldsmithWorkflow {
                 "worldsmith_preview_drawing" to "Inspect the actual result, repair its largest visible flaw, and export the artifact when requested.",
             )
             WorkflowMode.COMPLETE_WORLD -> listOf(
+                CONTRACT_TOOL to "Read id=grand_world section=world-atlas before committing the named world design plan. Allocate the shared authoringBudgets, regional identities, route intent and production batches using existing fields, not invented runtime region/faction/branching-quest fields.",
                 "worldsmith_get_content_contract" to "Read module=world_design and the compact cross-domain contract pointers.",
                 "worldsmith_put_world_design_plan" to "Commit prompt-specific names, roles, real relationship promises and Boss/quest links at expectedRevision.",
                 "worldsmith_get_generation_progress" to "Follow the highest-priority current gap. Read full contracts only for the domain being authored.",
@@ -219,6 +222,7 @@ object WorldsmithWorkflow {
                 FINISH_TOOL to "Ensure the same archive and request the separate native receipt. resourcePackReady may be true while WAITING_NATIVE_CONTEXT needs a player action; do not rebuild already-frozen content.",
             )
             WorkflowMode.WORLDGEN_ONLY -> listOf(
+                CONTRACT_TOOL to "Read id=grand_world section=world-atlas before committing worldgen content. Derive broad geography, places and production batches from the prompt within the shared authoringBudgets; planning regions are intent, not extra runtime schema.",
                 "worldsmith_get_generation_progress" to "Resume the current missing worldgen or architecture step instead of repeating completed work.",
                 TEMPLATE_TOOL to "Read technical field shapes when needed; derive all design choices from the player's prompt.",
                 "worldsmith_put_content_modules" to "Commit the theme and worldgen drafts at the shared expectedRevision; nonrequested item/creature/quest modules may remain empty.",
@@ -281,7 +285,7 @@ class WorkflowSessions @JvmOverloads constructor(
 
     @Synchronized
     fun putStructure(id: String, structure: WorldStructureDefinition): WorkflowSession? = update(id) {
-        require(it.structures.size < 48 || structure.id in it.structures) { "Structure draft limit reached" }
+        require(it.structures.size < StructureValidator.MAX_STRUCTURES || structure.id in it.structures) { "Structure draft limit reached" }
         if(it.structures[structure.id]==structure)it else it.copy(structures = it.structures + (structure.id to structure), packId = null, finished = false, revision=it.revision+1)
     }
 
@@ -351,7 +355,7 @@ class WorkflowSessions @JvmOverloads constructor(
     @Synchronized fun putArchitectureDraft(id:String,expectedRevision:Long,architecture:StructureArchitecture?,structures:List<WorldStructureDefinition>,remove:List<String> = emptyList()):WorkflowSession? = update(id) {
         require(it.revision==expectedRevision) {"DRAFT_REVISION_CONFLICT: expected $expectedRevision, current ${it.revision}"}
         val next=it.structures-remove.toSet()+structures.associateBy {s->s.id}
-        require(next.size<=48 && structures.map {s->s.id}.distinct().size==structures.size)
+        require(next.size<=StructureValidator.MAX_STRUCTURES && structures.map {s->s.id}.distinct().size==structures.size)
         if(next==it.structures && (architecture ?: it.architecture)==it.architecture)it else
             it.copy(architecture=architecture ?: it.architecture,structures=next,revision=it.revision+1,packId=null,finished=false)
     }

@@ -102,7 +102,7 @@ object StructureArchitectureValidator {
                     add(error("architecture", "ARCHITECTURE_DISABLED_STRUCTURE", "Planned structure '$id' needs nonzero candidate probability and a nonempty influence interval"))
             }
             for ((id, blueprint) in catalog.blueprints) if (blueprint.lighting == null)
-                add(error("blueprints.$id.lighting", "ARCHITECTURE_LIGHTING_REQUIRED", "Declare READABLE spaces with lights for interiors, or EXTERIOR_ONLY for genuinely open structures"))
+                add(error("blueprints.$id.lighting", "ARCHITECTURE_LIGHTING_REQUIRED", "Declare READABLE spaces with lights, EXTERIOR_ONLY for open structures, or INTENTIONALLY_DARK for deliberate dark designs"))
         }
     }
 

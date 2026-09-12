@@ -242,7 +242,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             name = WorldsmithWorkflow.CONTRACT_TOOL,
             title = "Get a Worldsmith document contract",
             description =
-                "Read terrain, biome, feature, structure, architecture or draw. Omit detail for full text, " +
+                "Read grand_world planning, terrain, biome, feature, structure, architecture or draw. Omit detail for full text, " +
                     "use detail=index for section ids, or section=<id> for one section. Summary begin returns indexes, " +
                     "not full contracts. For content quality read architecture sections creative-brief and visual-quality-loop.",
             inputSchema = objectSchema(
@@ -301,7 +301,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             name = "worldsmith_write_pack",
             title = "Write Worldsmith pack",
             description =
-                "Validate all nine modules, quest/reward references and attached PNG assets, freeze a format-5 bundle, atomically save it and return a ready single-file .wspack resourcePack receipt. resourcePackFilename optionally names the export; default is <id>.wspack. Inline modules override drafts for publication; guided writes require expectedRevision. Core/package readiness is separate from native activation. Export failure preserves the frozen pack and names an export-only retry.",
+                "Validate all nine modules, quest/reward references and attached PNG assets, freeze a format-6 bundle, atomically save it and return a ready single-file .wspack resourcePack receipt. resourcePackFilename optionally names the export; default is <id>.wspack. Inline modules override drafts for publication; guided writes require expectedRevision. Core/package readiness is separate from native activation. Export failure preserves the frozen pack and names an export-only retry.",
             inputSchema = writePackSchema(),
             readOnly = false,
             idempotent = true,
@@ -382,11 +382,24 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val session = sessions.begin(prompt,mode)
         val progress=contentService.progress(session)
         val overview=WorldsmithWorkflow.overview(mode,detail=="summary")
+        val planningText=if(mode!=WorkflowMode.STANDALONE)templates.load(PromptSet.DEFAULT.contracts.getValue(PromptSet.CONTRACT_GRAND_WORLD)).systemPrompt else null
+        val planningOverview=planningText?.let {ContractSections.split(it).getValue("overview")}
+        val nextTool=if(planningText!=null)WorldsmithWorkflow.CONTRACT_TOOL else progress.nextTool
+        val nextArguments=if(planningText!=null)buildJsonObject {put("id",PromptSet.CONTRACT_GRAND_WORLD);put("section","world-atlas")} else progress.nextArguments
+        val nextInstruction=if(planningText!=null)"Read grand_world/world-atlas, plan broad geography, places and production batches within authoringBudgets, then commit intent through the existing world-design/theme/content fields. The progress object retains the actual missing draft action." else progress.nextInstruction
         val structured = buildJsonObject {
             put("sessionId", session.id)
             put("prompt", prompt)
             put("mode",mode.name);put("complete", false);put("stage",progress.stage)
             put("overview", overview)
+            put("authoringBudgets",WorldsmithAuthoringBudgets.snapshot())
+            planningOverview?.let {
+                put("worldPlanningGuide",it.take(MAX_WORLD_PLANNING_GUIDE_CHARS))
+                put("worldPlanningGuideTruncated",it.length>MAX_WORLD_PLANNING_GUIDE_CHARS)
+                putJsonObject("worldPlanningReference") {
+                    put("tool",WorldsmithWorkflow.CONTRACT_TOOL);put("id",PromptSet.CONTRACT_GRAND_WORLD);put("section","world-atlas")
+                }
+            }
             put("procedure", procedureJson(mode,detail=="summary"))
             putJsonObject("capabilities") { put("javaDrawingWorker",drawings.available);put("structureProgram",true);put("sourceProjects",true);put("spatialPreflight",nativeChecks!=null);put("autoApproveSourceExecution",drawings.automaticSourceExecution);put("drawingSnapshotVersion",DrawSnapshotCodec.VERSION);put("persistentSessions",true);put("nativePublicationRequired",true) }
             putJsonObject("architecturePolicy") {
@@ -402,7 +415,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             putJsonObject("designReference") {put("id","architecture");put("section","visual-quality-loop");put("tool",WorldsmithWorkflow.CONTRACT_TOOL)}
             if(detail=="full")put("howToDesign", templates.load(PromptSet.DEFAULT.worldEntry).systemPrompt)
             putJsonObject("contracts") {
-                PromptSet.DEFAULT.contracts.forEach { (name, ref) -> val text=templates.load(ref).systemPrompt
+                PromptSet.DEFAULT.contracts.forEach { (name, ref) -> val text=if(name==PromptSet.CONTRACT_GRAND_WORLD && planningText!=null)planningText else templates.load(ref).systemPrompt
                     put(name,if(detail=="full")JsonPrimitive(text)else ContractSections.index(text)) }
             }
             put("detail",detail)
@@ -410,14 +423,14 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             put("contractPointers",generationContractPointers());put("progress",encode(progress))
             put("styleCount", styles.list().size)
             put("climatePlacement", climatePlacementJson())
-            put("nextTool", progress.nextTool);put("nextArguments",progress.nextArguments);put("nextInstruction",progress.nextInstruction)
+            put("nextTool", nextTool);put("nextArguments",nextArguments);put("nextInstruction",nextInstruction)
         }
         val text = buildString {
             appendLine(overview)
             appendLine()
             appendLine("sessionId: ${session.id}")
             appendLine("mode: ${mode.name}")
-            append("next: ${progress.nextTool} — ${progress.nextInstruction}")
+            append("next: $nextTool — $nextInstruction")
         }
         return McpToolResult.success(structured, text)
     }
@@ -498,7 +511,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val result = buildJsonObject {
             put("sessionId", sessionId); put("valid", valid); put("diagnostics", diagnosticsJson(diagnostics))
             put("placementValidated", false); put("minecraftCompiled", false); put("landmarkInstancesVerified", false)
-            put("lightingAssessment", "conservative_authored_voxel_estimate_without_skylight")
+            put("lightingAssessment", "declarations_checked; voxel_estimate_opt_in_non_blocking; native_emission_checks_separate")
             put("nextTool", if (valid) WorldsmithWorkflow.WRITE_TOOL else if (library.architecture == null) WorldsmithWorkflow.ARCHITECTURE_TOOL else WorldsmithWorkflow.STRUCTURE_TOOL)
         }
         return if (valid) McpToolResult.success(result, "Architecture drafts satisfy Core policy; worldgen placement and native light-source checks remain separate.")
@@ -535,6 +548,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                 putJsonObject("lighting") {
                     put("mode", policy.mode.name); put("sampledFeet", report.sampledFeet)
                     put("minimumEstimatedLevel", report.minimumEstimatedLevel?.let(::JsonPrimitive) ?: JsonNull)
+                    put("estimated", false); put("brightnessGate", false)
                     put("skylightIncluded", false); put("nativeSourcesVerified", false)
                 }
             }
@@ -577,6 +591,10 @@ class WorldsmithMcpTools @JvmOverloads constructor(
 
     /** Small, executable contract lookups retained even when the full cross-domain prompts are omitted. */
     private fun generationContractPointers():JsonObject=buildJsonObject {
+        putJsonObject(PromptSet.CONTRACT_GRAND_WORLD) {
+            put("tool",WorldsmithWorkflow.CONTRACT_TOOL)
+            putJsonObject("arguments") {put("id",PromptSet.CONTRACT_GRAND_WORLD);put("detail","index")}
+        }
         listOf("world_design","theme","blocks","creatures","items","quests").forEach { module ->
             putJsonObject(module) { put("tool","worldsmith_get_content_contract");putJsonObject("arguments") {put("module",module)} }
         }
@@ -812,7 +830,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             put("service", "Worldsmith MCP Bridge")
             put("mcpProtocolVersion", McpHttpServer.PROTOCOL_VERSION)
             put("blueprintSchemaVersion", WorldsmithCore.BLUEPRINT_SCHEMA_VERSION)
-            put("packFormatVersion", PACK_FORMAT_VERSION);put("supportedPackFormats",JsonArray(listOf(JsonPrimitive(3),JsonPrimitive(4),JsonPrimitive(5))));put("readOnlyPackFormats",JsonArray(listOf(JsonPrimitive(3),JsonPrimitive(4))));put("sourceProjects",true);put("structureProgram",true);put("autoApproveSourceExecution",drawings.automaticSourceExecution)
+            put("packFormatVersion", PACK_FORMAT_VERSION);put("supportedPackFormats",JsonArray(listOf(JsonPrimitive(3),JsonPrimitive(4),JsonPrimitive(5),JsonPrimitive(6))));put("readOnlyPackFormats",JsonArray(listOf(JsonPrimitive(3),JsonPrimitive(4),JsonPrimitive(5))));put("sourceProjects",true);put("structureProgram",true);put("autoApproveSourceExecution",drawings.automaticSourceExecution)
             put("packDirectory", packDirectory.toString())
             putJsonObject("runtime") {
                 runtimeInfo.get().toSortedMap().forEach { (key, value) -> put(key, value) }
@@ -871,6 +889,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val structured = buildJsonObject {
             put("id", id)
             put("valid", valid)
+            put("coreValidated",valid);put("nativeValidated",false);put("activated",false);put("selectedForCreation",false)
+            put("resourceReloadRequested",false)
             put("diagnostics", diagnosticsJson(diagnostics))
         }
         return if (valid) McpToolResult.success(structured) else McpToolResult.error("Pack '$id' is invalid", structured)
@@ -964,7 +984,12 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         if (structureDiagnostics.any { it.severity == DiagnosticSeverity.ERROR }) return McpToolResult.error(
             "Structure documents need repair", buildJsonObject { put("valid", false); put("diagnostics", diagnosticsJson(structureDiagnostics)) },
         )
-        val pack = WorldContentBundleIO.create(displayName,description,terrain,biomes,features,structures,theme,blocks,creatures,contentService.assetBytes(session),items,quests)
+        val proseDiagnostics = PlayerTextPolicy.validate(displayName, description, theme, items, quests)
+        if (proseDiagnostics.isNotEmpty()) return McpToolResult.error("Player-facing writing needs revision", buildJsonObject {
+            put("valid", false); put("diagnostics", diagnosticsJson(proseDiagnostics)); put("nextTool", "worldsmith_put_content_modules")
+        })
+        val representativeContent = arguments["representativeContent"]?.takeUnless { it is JsonNull }?.let { decode<ContentKey>(it) }
+        val pack = WorldContentBundleIO.create(displayName,description,terrain,biomes,features,structures,theme,blocks,creatures,contentService.assetBytes(session),items,quests,representativeContent)
         val bundle=WorldContentBundleIO.encode(pack)
         val manifest=bundle.manifest
         val diagnostics = WorldsmithPackValidator.validate(pack).toMutableList()
@@ -1001,7 +1026,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val result = buildJsonObject {
             put("id", manifest.id)
             put("displayName", savedManifest.displayName);put("description",savedManifest.description)
-            put("requestedDisplayName",displayName);put("existingMetadataRetained",savedManifest.displayName!=displayName || savedManifest.description!=description)
+            put("requestedDisplayName",displayName);put("existingMetadataRetained",savedManifest.displayName!=displayName || savedManifest.description!=description || savedManifest.representativeContent!=representativeContent)
+            savedManifest.representativeContent?.let { put("representativeContent",encode(it)) }
             put("path", directory.toString())
             put("valid", true);put("stage","CORE_CHECK");put("minecraftCompiled",false)
             put("diagnostics", diagnosticsJson(diagnostics))
@@ -1203,7 +1229,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             "theme" to documentSchema("Required WorldTheme inline or in session draft; read worldsmith_get_content_contract module=theme."),
             "blocks" to documentSchema("CustomBlockLibrary; omitted uses draft or an explicit empty library."),
             "creatures" to documentSchema("CreatureLibrary; omitted uses draft or an explicit empty library."),
-            "items" to documentSchema("CustomItemLibrary for world-bound resources/relics; omitted uses draft or an explicit empty library. Read items contract for textures and reward references."),
+            "items" to documentSchema("CustomItemLibrary schema 1 ordinary items or schema 2 equipment/consumables/actions; omitted uses draft. Schema 2 requires format 6."),
+            "representativeContent" to documentSchema("Optional player-facing icon reference: {kind:item|block,id:<existing local id>}. Uses that content's existing PNG without activating the world."),
             "quests" to documentSchema("QuestLibrary for one linear main quest chain, kill_creature/deliver_item objectives and ordinary item rewards; omitted uses draft or an explicit empty library."),
             "terrain" to documentSchema(
                 "A TerrainPlan matching the template, with procedural terrain and hydrology controls derived from the player's prompt.",
@@ -1227,7 +1254,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     }
 
     companion object {
-        private const val PACK_FORMAT_VERSION = 5
+        private const val PACK_FORMAT_VERSION = 6
         private const val BUILTIN_PACK = "worldsmith/packs/ashlands"
         private const val MANIFEST_FILE = "worldsmith.json"
         private const val TERRAIN_FILE = "terrain.json"
@@ -1236,6 +1263,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         private const val MAX_PROMPT_LENGTH = 4000
         private const val MAX_DISPLAY_NAME_LENGTH = 128
         private const val MAX_DESCRIPTION_LENGTH = 2048
+        private const val MAX_WORLD_PLANNING_GUIDE_CHARS = 2048
         private val PACK_ID = Regex("^[0-9a-f]{64}$")
     }
 }

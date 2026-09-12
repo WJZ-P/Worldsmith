@@ -1,5 +1,7 @@
 # Worldsmith world-generation agent: architecture policy 1
 
+New publications use bundle format 6. Formats 3/4/5 retain their original read-only content identities; minimum-version notes below describe when an existing feature first became available.
+
 This is an ACTIVE DESIGN TASK. After terrain and biome planning, independently
 develop architecture for THIS player's world. Infer plausible functions, inhabitants,
 infrastructure, ritual places and ruins from the theme. Extend it thoughtfully;
@@ -21,7 +23,7 @@ Develop one representative main building before multiplying variants. Review its
 clay massing, elevations, material views and occupied interior; repair the largest
 visible weakness first. Shared components should preserve a design language, not
 turn every function into the same resized hall. A validator proves constraints,
-not beauty. Minimum size/count/light checks are floors, never design targets.
+not beauty. Minimum size/count checks are floors, never design targets. Default lighting is authored, not a numeric publication gate.
 
 ## Form, function and family
 
@@ -100,7 +102,8 @@ lighting or an eye-level game experience. Report those limits honestly.
 
 ## New guided world requirements
 
-- Design at least TWO distinct building groups, normally 2..4. Vary purpose,
+- Design at least TWO distinct building groups; 2..4 is a starting suggestion, not a maximum.
+  The policy accepts 2..12 groups within the real structure/assembly budgets. Vary purpose,
   centerpiece, silhouette, spatial organisation and encounters, not just names/colours.
 - Include at least ONE independently distributed structure outside the group ids.
   A compatible design may also occur as a group member; groups and independent
@@ -224,7 +227,11 @@ as `REQUIRED_PORT_UNCONNECTED`.
 
 ## Lighting policy
 
-Every blueprint needs lighting. For occupied spaces, for example:
+Every blueprint declares lighting intent. Ordinary buildings include real,
+theme-appropriate light fixtures by default, including enclosed upper floors,
+stairs and roof voids large enough for creatures to stand in. Deliberately dark
+tombs, crypts or ambush chambers explicitly use INTENTIONALLY_DARK; darkness is a
+world-design choice, not an accidental omission. For ordinary occupied spaces:
 
 ```json
 "lighting": {
@@ -244,23 +251,40 @@ attached to suitable ceiling geometry. Declare all occupied rooms, connecting
 corridors, stairs and mezzanines; large rooms need distributed lights, not one lamp
 at the entrance. Choose theme-appropriate lanterns, sconces, braziers, luminous
 crystals or inlaid light bands. Verify lit/powered states. Roof openings supplement
-night lighting; use colour and shielding for atmosphere rather than unreadable rooms.
+night lighting. Keep the atmosphere, but do not leave ordinary buildings as unlit shells.
+For unused roof voids, remove a redundant flat ceiling to make a tall room, fill
+the void, or furnish and light it as a real attic. Do not hide an unlit area by
+omitting its room declaration.
+
+Suspended lamps attach to an actual beam or roof block. Curved roofs have different
+underside heights at different X/Z positions: never terminate every chain at a
+single guessed beam height. Prefer AuthoringContext.hangingLightFixture with the
+actual anchor coordinate; it authors a continuous chain and rechecks it at snapshot.
+Do not replace correct cross-chunk template placement with neighbor-physics repairs.
 
 - Declare `rooms` and `indoorPassages` as inclusive occupied volumes (<=32 combined).
-  All walkable points in those volumes must be covered by lighting.spaces; either
-  declaration requires READABLE, never EXTERIOR_ONLY.
+  Represent all intended interiors with lighting.spaces. Either declaration uses
+  READABLE or explicit INTENTIONALLY_DARK, never EXTERIOR_ONLY.
 - spaces has <=32 ordered boxes inside the blueprint. Each needs authored walking
-  floor/feet/headroom samples. Cover ALL intended occupied interiors, not a tiny lit
+  floor/feet/headroom. Cover ALL intended occupied interiors, not a tiny lit
   patch while leaving most of the room undeclared.
 - sources has <=128 unique authored positions with level 1..15; minimum is 8..15.
-- Core estimates light at feet AND head, decreasing one per face-adjacent step
-  through explicit air/passable cells. KEEP and solid cells block propagation;
-  skylight is ignored. This is conservative, not Minecraft's full light engine.
+- Default compilation/publication checks declaration bounds and actual source
+  presence, not a per-point minimum-brightness threshold. READABLE still needs
+  actual fixtures; INTENTIONALLY_DARK may omit them. Declared emitter levels remain
+  truthful in every mode. The existing minimum field (8..15) is a diagnostic target.
+- Optional worldsmith_preflight_structure(..., estimateLighting:true), or an explicit
+  lighting preview overlay, estimates feet/head light through authored air/passable
+  cells. It ignores skylight; dark samples are advisory warnings, never a publication
+  blocker. It is not Minecraft's full light engine or an automatic lamp placer.
 - Native export verifies that actual block-state emission meets each declared level.
   A level=15 declaration on stone fails export. Source existence alone is not enough.
 - Precompiled decay protects light positions; instance patches that dim them fail export.
 - Genuinely open designs may use `{"mode":"EXTERIOR_ONLY"}`. This is not an exemption
   for enclosed rooms. Lighting outdoor approaches remains good design.
+- StructureProgram uses a.intentionallyDark("world-specific atmosphere reason") for
+  the dark exception. Keep dark and normally lit places in separate logical buildings
+  when they need different policies; a dark child must not silently exempt its parent.
 
 Numeric estimates do not prove shader appearance, spawn safety, physical accessibility
 or visual quality. Report actual in-game evidence separately.
@@ -302,8 +326,14 @@ Engineering gates prove deployability and readability estimates, not aesthetic q
 
 ## World bundle version boundary
 
-Published worlds use bundle format 3 with seven typed modules and verified assets.
+Published worlds use bundle format 6 with nine typed modules and verified assets:
+`theme`, `terrain`, `features`, `biomes`, `structures`, `blocks`, `creatures`,
+`items`, and `quests`. Formats 3/4/5 remain read-only for restoration and unchanged
+re-embedding; preserve their original module sets and content identities.
 Architecture policyVersion remains 1. Blueprint schema remains 1; structure
-libraries use module schema 1 or module schema 2 when freezing SDK artifacts.
+libraries use module schema 1 or module schema 2 when freezing SDK artifacts or
+declaring typed Boss spawners. Quests implement one bounded linear main line;
+those quests project into native advancements after reward claims, while independent achievements are not installed. Bosses use explicit creature schema 2 and the
+installed ground-melee 2..3 health-phase mechanics, not arbitrary encounter scripts.
 These domain versions do not select the world bundle format. Legacy world bundle
 formats 1/2 are rejected; do not advertise their previous load path.

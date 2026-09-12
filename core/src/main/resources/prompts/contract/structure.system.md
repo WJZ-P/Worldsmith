@@ -31,8 +31,10 @@ Origin must be within the drawing and at its minimum Y support datum. Named anch
 are retained as model metadata; entrances still need explicit structure ports/access.
 
 Explicit `rooms` and `indoorPassages` are arrays of inclusive BuildBox volumes, at
-most 32 combined. Every authored walkable point in them must be covered by READABLE
-lighting.spaces and pass its minimum. EXTERIOR_ONLY is invalid with either declaration.
+most 32 combined. Describe intended interiors with READABLE lighting.spaces and real
+distributed fixtures, or use INTENTIONALLY_DARK for a deliberate dark design.
+EXTERIOR_ONLY is invalid with either declaration. Minimum brightness is optional
+authoring feedback, not a publication gate.
 Declare every occupied room/corridor; unmodeled intent is not inferred by the validator.
 
 A logical building is not a storage tile. SDK output uses <=32^3 nonempty fragments,
@@ -402,9 +404,11 @@ a deliberate repair; adding details or passing validation is not itself progress
 
 Every root and child in a guided world declares lighting per contract/architecture.
 READABLE interiors need occupied-space boxes and actual distributed light fixtures
-with declared source positions/levels. Minimum estimated night block-light is 8 at
-sampled feet and heads; skylight alone does not satisfy it. EXTERIOR_ONLY is for
-genuinely open structures, not an exemption for rooms.
+with declared source positions/levels. Ordinary buildings receive lamps by default;
+include every floor, stairs and usable attic, not only the ground floor. Fill unused
+roof cavities or remove their redundant floor to open them to the room below.
+INTENTIONALLY_DARK explicitly preserves a dark tomb/ambush-room atmosphere.
+EXTERIOR_ONLY is for genuinely open structures, not an exemption for rooms.
 
 ### Lighting a tall hall
 
@@ -413,9 +417,12 @@ Core's conservative estimate decreases one level per face-adjacent step; a level
 solid obstacles. Do not rely on distant high-ceiling lamps to light the walking plane.
 Choose theme-appropriate mid-height sconces, suspended fixtures, column lights or
 inlaid bands and place them with the bay rhythm and actual occupied routes. Use
-preflight samples to repair specific dark areas, accounting for furniture, stairs
+optional preflight estimateLighting:true samples to review dark areas, accounting for furniture, stairs
 and blocked propagation. Preserve clear paths and focal contrast; a universal
 floor-lamp grid is not a lighting design. Readability and atmosphere should coexist.
+Per-point estimates are advisory and off by default; malformed declarations and false
+emitter levels still fail. Prefer hangingLightFixture with a real roof/beam anchor,
+never a chain ending at an assumed uniform height beneath a curved roof.
 
 At most 32 spaces and 128 declared sources are accepted. Design the layout within
 those limits and cover each occupied storey. Rework fixture placement or separate

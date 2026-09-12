@@ -86,12 +86,14 @@ object ExistingWorldContentModules {
                     ContentEntry(ContentKey("block_item", block.id), "blocks", path, references = listOf(ContentReference(ContentKey("block", block.id), "$path.id"))))
             }, diagnostics = CustomBlockValidation.validate(library).map { it.copy(path = "blocks.${it.path}") })
         },
-        TypedModule(ContentModuleDescriptor("items", listOf("item"), listOf(1), requirements = listOf(
+        TypedModule(ContentModuleDescriptor("items", listOf("item"), listOf(1, 2), requirements = listOf(
             ContentRequirement("custom_items.native_host", 1, ContentLifecycle.BOOTSTRAP),
             ContentRequirement("world_content.client_resources", 1, ContentLifecycle.CLIENT_RESOURCES),
             ContentRequirement("custom_items.world_stacks", 1, ContentLifecycle.WORLD_BINDING),
-        ), description = "Ordinary resource/relic item stacks with immutable icons and world-scoped identity; no tool or food actions"), CustomItemLibrary.serializer()) { library, _ ->
-            ContentContribution(library.items.mapIndexed { i, item -> ContentEntry(ContentKey("item", item.id), "items", "items.items[$i]", assets = listOf(item.textureAsset)) },
+            ContentRequirement("custom_items.equipment", 1, ContentLifecycle.WORLD_BINDING),
+            ContentRequirement("custom_items.actions", 1, ContentLifecycle.WORLD_BINDING),
+        ), description = "World-scoped item stacks; schema 2 adds equipment, consumption and server-owned ability combinations"), CustomItemLibrary.serializer()) { library, _ ->
+            ContentContribution(library.items.mapIndexed { i, item -> ContentEntry(ContentKey("item", item.id), "items", "items.items[$i]", assets = listOfNotNull(item.textureAsset, item.equipment?.textureAsset)) },
                 diagnostics = CustomItemValidation.validate(library).map { it.copy(path = "items.${it.path}") })
         },
         TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1, 2), compileAfter = listOf("biomes"), requirements = listOf(
@@ -118,7 +120,7 @@ object ExistingWorldContentModules {
         TypedModule(ContentModuleDescriptor("quests", listOf("quest"), listOf(1), compileAfter = listOf("theme"), requirements = listOf(
             ContentRequirement("quests.server_progress", 1, ContentLifecycle.WORLD_BINDING),
             ContentRequirement("quests.client_journal", 1, ContentLifecycle.CLIENT_RESOURCES),
-        ), description = "A single linear main line: verified creature kills, explicit item delivery and once-only item rewards"), QuestLibrary.serializer()) { library, raw ->
+        ), description = "A single linear main line: verified creature kills, explicit item delivery, once-only rewards and native advancement projection after claiming"), QuestLibrary.serializer()) { library, raw ->
             ContentContribution(library.quests.mapIndexed { i, quest ->
                 val path = "quests.quests[$i]"
                 val document = raw.getValue("quests").jsonArray[i]
@@ -151,11 +153,12 @@ object ExistingWorldContentModules {
         "custom_blocks.native_hosts" to 1, "world_content.client_resources" to 1, "world_content.world_binding" to 1,
         "creatures.native_hosts" to 1, "assets.entity_models" to 1, "creatures.world_behaviors" to 1,
         "custom_items.native_host" to 1, "custom_items.world_stacks" to 1,
-        "quests.server_progress" to 1, "quests.client_journal" to 1,
+        "custom_items.equipment" to 1, "custom_items.actions" to 1,
+        "quests.server_progress" to 1, "quests.client_journal" to 1, "quests.native_advancements" to 1,
     )
 
     val plannedModules = listOf(
-        ContentModuleDescriptor("achievements", listOf("achievement"), emptyList(), description = "Future world-specific achievement criteria and rewards; not installed or accepted"),
+        ContentModuleDescriptor("achievements", listOf("achievement"), emptyList(), description = "Independent achievement authoring is not installed or accepted; existing quests already project into native world-specific advancements"),
     )
 
     private fun nativeReferences(value: JsonElement): List<NativeContentReference> {

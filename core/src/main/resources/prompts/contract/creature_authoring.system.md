@@ -1,5 +1,7 @@
 # Creature authoring foundation
 
+New publications use bundle format 6. Formats 3/4/5 retain their original read-only content identities; minimum-version notes below describe when an existing feature first became available.
+
 The creature authoring layer compiles data into runtime schema 1 or 2. Ordinary
 recipes default to schema 1; explicit schema 2 adds the installed bounded Boss
 profile and 2..3 melee phases. A Boss-looking model alone remains ordinary behavior.
@@ -32,6 +34,20 @@ Builds are immutable and scoped to the authoring session, including their verifi
 texture bytes. `worldsmith_get_creature_build` restores recipe, definition and UV map
 without executing source. At most 128 builds are retained per session; no old build
 or painted asset is silently overwritten or evicted.
+
+## Vanilla-inspired skin direction
+
+Reference Minecraft's vanilla mob pixel-art language: readable silhouette, clean
+large color regions, a limited palette and deliberate facial/species landmarks.
+Default fur, hide and cloth are mostly calm surfaces, not a full-body layer of
+random speckles, checkerboards or dithering. Shade with coherent pixel clusters
+and a few purposeful value steps instead of independent bright/dark dots on every
+face. Use spots, stripes, scales and weathering only when the species or world
+identity calls for them, confined to meaningful regions. Do not copy one noisy
+material function across every species. This direction applies equally to image
+providers and deterministic pixel recipes; no hosted image model is required.
+Keep the compiled UV faces and orientation exact, then inspect front/back/side and
+pose views for matching markings, a clear face and readability at game distance.
 
 ## Recipe fields
 

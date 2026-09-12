@@ -50,6 +50,18 @@ class ResourcePackExchange(packDirectory:Path) {
 
     fun inboxDirectory():Path=inbox
     fun exportsDirectory():Path=exports
+    fun libraryDirectory():Path=packDirectory
+
+    /** UI metadata only. Actual import/creation still performs full archive and content validation. */
+    fun describePack(id:String):ResourcePackDetails {
+        requireDirectory(packDirectory)
+        val directory=requireNotNull(store.managed(id)) {"Unknown managed bundle"}
+        val manifest=readManifest(directory)
+        require(manifest.id==id) {"Manifest address differs from its directory"}
+        return ResourcePackMetadata.directory(directory,manifest)
+    }
+
+    fun describeInbox(filename:String):ResourcePackDetails=ResourcePackMetadata.archive(inboxFile(filename))
 
     /** Filename listing only; selecting Inspect performs full archive validation. */
     @JvmOverloads fun listInbox(limit:Int=64):ResourcePackInboxListing {

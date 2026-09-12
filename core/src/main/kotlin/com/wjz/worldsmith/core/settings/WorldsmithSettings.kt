@@ -13,11 +13,15 @@ data class WorldsmithSettings(
     val schemaVersion: Int = SCHEMA_VERSION,
     val llm: LlmSettings = LlmSettings(),
     val mcp: McpSettings = McpSettings(),
+    val client: WorldsmithClientSettings = WorldsmithClientSettings(),
 ) {
     companion object {
         const val SCHEMA_VERSION: Int = 1
     }
 }
+
+@Serializable
+data class WorldsmithClientSettings(val showWorldArrival: Boolean = true)
 
 /**
  * Reads and writes the settings file.

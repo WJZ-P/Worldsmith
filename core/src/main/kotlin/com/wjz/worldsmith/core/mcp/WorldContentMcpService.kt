@@ -23,13 +23,14 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         Files.createDirectories(it);require(!Files.isSymbolicLink(it)) {"Texture inbox must be a regular directory"};it.toRealPath()
     }
     fun capabilities():JsonObject=buildJsonObject {
-        put("frameworkVersion",4);put("packFormat",5)
+        put("frameworkVersion",5);put("packFormat",6)
+        put("authoringBudgets",WorldsmithAuthoringBudgets.snapshot())
         put("implementedLayer","typed nine-module bundles, linear quest progress, world-bound items and portable texture authoring")
         put("installedModules",McpJson.encode(registry.descriptors));put("plannedModules",McpJson.encode(ExistingWorldContentModules.plannedModules))
         put("customBlockRuntime",nativeAdapterPresent);put("customCreatureRuntime",nativeAdapterPresent)
         put("customItemRuntime",nativeAdapterPresent);put("creatureDrops",nativeAdapterPresent)
         put("geckoLibIntegration",false);put("nativeAdapterPresent",nativeAdapterPresent)
-        put("newPackFormatEnabled",true);put("legacyPackFormats",McpJson.encode(listOf(3,4)));put("legacyFormatsReadOnly",true);put("activationVerified",false)
+        put("newPackFormatEnabled",true);put("legacyPackFormats",McpJson.encode(listOf(3,4,5)));put("legacyFormatsReadOnly",true);put("activationVerified",false)
         put("linearQuestRuntime",nativeAdapterPresent)
         put("runtimeScope","one local integrated-server world; remote multiplayer content negotiation is not installed")
         put("assetAuthoring","actual PNG upload or indexed-pixel texture authoring; not a hosted image-generation service")
@@ -74,7 +75,7 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
                 McpToolResult.success(buildJsonObject {put("asset",McpJson.encode(portable(handle)));put("verified",true)},images=listOf(McpImage(Base64.getEncoder().encodeToString(bytes))))
             }),
             McpTool("worldsmith_plan_world_content","Plan a modular world draft","Read-only symbols, links and capabilities. Accept scope/modules/assets or sessionId for durable drafts. Not full semantic validation or activation.",McpJson.schema(mapOf("sessionId" to str,"scope" to str,"modules" to obj,"assets" to buildJsonObject {put("type","array");put("items",obj)}),emptyList()),true,handler={a->result(registry.plan(if("sessionId" in a) input(session(a)) else McpJson.decode<WorldContentInput>(a),availableCapabilities()))}),
-            McpTool("worldsmith_inspect_world_content","Inspect a saved content bundle","Re-read and validate a format-3, format-4 or format-5 bundle, then report its catalog and compile order. Does not assert successful game resource reload.",McpJson.schema(mapOf("id" to str),listOf("id")),true,handler={a->
+            McpTool("worldsmith_inspect_world_content","Inspect a saved content bundle","Re-read and validate a format-3, format-4, format-5 or format-6 bundle, then report its catalog and compile order. Does not assert successful game resource reload.",McpJson.schema(mapOf("id" to str),listOf("id")),true,handler={a->
                 val path=store.managed(McpJson.string(a,"id")) ?: return@McpTool McpToolResult.error("Unknown managed pack")
                 val pack=WorldsmithPackLoader.loadDirectory(path);val diagnostics=WorldsmithPackValidator.validate(pack)
                 if(diagnostics.any {it.severity==DiagnosticSeverity.ERROR}) McpToolResult.error("Saved bundle needs repair",buildJsonObject {put("diagnostics",McpJson.encode(diagnostics))})
@@ -119,7 +120,7 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         modules.forEach {(id,document)->when(id) {
             "theme"->McpJson.decode<WorldTheme>(document);"blocks"->McpJson.decode<CustomBlockLibrary>(document);"creatures"->McpJson.decode<CreatureLibrary>(document);"items"->McpJson.decode<CustomItemLibrary>(document);"quests"->McpJson.decode<QuestLibrary>(document)
             "terrain"->McpJson.decode<TerrainPlan>(document);"biomes"->McpJson.decode<BiomePlan>(document);"features"->McpJson.decode<FeatureLibrary>(document)
-            else->error("Unknown authorable module '$id'; structure tools own architecture; achievements are not installed")
+            else->error("Unknown authorable module '$id'; structure tools own architecture; independent achievement modules are not installed; existing quests have a native advancement projection")
         }}
         return draft(requireNotNull(sessions.putContent(s.id,s.revision,modules,removeAssets=remove)) {"Draft is not active"})
     }

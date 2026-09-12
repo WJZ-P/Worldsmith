@@ -10,6 +10,8 @@ public final class AuthoringContext {
     private Vec3i origin;
     private final List<Map<String,Object>> rooms=new ArrayList<>(),passages=new ArrayList<>(),lights=new ArrayList<>(),ports=new ArrayList<>(),interactions=new ArrayList<>();
     private final List<Map<String,Object>> entrances=new ArrayList<>(),destinations=new ArrayList<>(),supports=new ArrayList<>(),protectedAreas=new ArrayList<>(),clearance=new ArrayList<>();
+    private final List<Map<String,Object>> hangingFixtures=new ArrayList<>();
+    private String lightingIntent;
     private final Map<String,Object> palette=new TreeMap<>();
     private final Map<String,Box> components=new TreeMap<>();
     private final Set<String> names=new HashSet<>();
@@ -41,6 +43,42 @@ public final class AuthoringContext {
         ports.add(Map.of("id",id,"at",AuthoredStructure.point(edge),"facing",facing,"type","walk","passage",true));entrances.add(AuthoredStructure.point(feet));clearance.add(AuthoredStructure.box(corridor));return this;
     }
     public AuthoringContext lightFixture(String id,Vec3i at,BlockStateRef state,int level){named(id);canvas().pen(Brush.solid(state)).set(at.x(),at.y(),at.z());lights.add(Map.of("at",AuthoredStructure.point(at),"level",level));return this;}
+    /** Deliberate building-wide atmosphere; ordinary rooms still default to authored READABLE fixtures. */
+    public AuthoringContext intentionallyDark(String reason){
+        if(reason==null||reason.isBlank()||reason.length()>512||reason.chars().anyMatch(Character::isISOControl))throw new IllegalArgumentException("A printable dark-atmosphere design reason of 1..512 characters is required");
+        lightingIntent=reason;return this;
+    }
+    /** Place a lantern from a real authored roof/beam anchor, not a guessed ceiling height. */
+    public AuthoringContext hangingLightFixture(String id,Vec3i at,Vec3i anchor){
+        return hangingLightFixture(id,at,anchor,BlockStateRef.parse("minecraft:lantern[hanging=true]"),BlockStateRef.parse("minecraft:iron_chain[axis=y]"),15);
+    }
+    public AuthoringContext hangingLightFixture(String id,Vec3i at,Vec3i anchor,BlockStateRef light,BlockStateRef chain,int level){
+        Objects.requireNonNull(at);Objects.requireNonNull(anchor);Objects.requireNonNull(light);Objects.requireNonNull(chain);
+        if(!canvas().bounds().contains(at)||!canvas().bounds().contains(anchor)||at.x()!=anchor.x()||at.z()!=anchor.z()||anchor.y()<=at.y())throw new IllegalArgumentException("A hanging fixture needs an in-bounds anchor directly above the lantern");
+        if(!Set.of("minecraft:lantern","minecraft:soul_lantern").contains(light.id())||!"true".equals(light.properties().get("hanging"))||level<1||level>15)throw new IllegalArgumentException("Use a hanging lantern state and level 1..15; native export verifies actual emission");
+        if((!chain.id().endsWith("_chain")&&!chain.id().equals("minecraft:chain"))||!"y".equals(chain.properties().get("axis")))throw new IllegalArgumentException("Use a vertical chain state with axis=y");
+        requireFixtureAnchor(anchor);
+        for(int y=at.y();y<anchor.y();y++)if(canvas().get(new Vec3i(at.x(),y,at.z())).map(b->!b.state().isAir()).orElse(false))throw new IllegalArgumentException("Hanging fixture would overwrite geometry at "+new Vec3i(at.x(),y,at.z()));
+        named(id);
+        if(anchor.y()>at.y()+1)canvas().pen(Brush.solid(chain)).fill(Box.of(at.x(),at.y()+1,at.z(),at.x(),anchor.y()-1,at.z()));
+        canvas().pen(Brush.solid(light)).set(at.x(),at.y(),at.z());lights.add(Map.of("at",AuthoredStructure.point(at),"level",level));
+        hangingFixtures.add(Map.of("id",id,"at",AuthoredStructure.point(at),"anchor",AuthoredStructure.point(anchor),"light",light.id(),"chain",chain.id()));return this;
+    }
+    private void requireFixtureAnchor(Vec3i anchor){
+        var state=canvas().get(anchor).map(DrawBlock::state).orElseThrow(()->new IllegalArgumentException("Hanging fixture anchor is KEEP at "+anchor));
+        if(state.isAir()||Set.of("minecraft:water","minecraft:lava","minecraft:bubble_column","minecraft:powder_snow","minecraft:lantern","minecraft:soul_lantern","minecraft:chain").contains(state.id())||state.id().endsWith("_chain"))throw new IllegalArgumentException("Hanging fixture needs a real roof/beam block at "+anchor);
+    }
+    private void validateHangingFixtures(){
+        for(var fixture:hangingFixtures){
+            var at=point((Map<?,?>)fixture.get("at"));var anchor=point((Map<?,?>)fixture.get("anchor"));requireFixtureAnchor(anchor);
+            var light=canvas().get(at).map(DrawBlock::state).orElse(null);
+            if(light==null||!light.id().equals(fixture.get("light"))||!"true".equals(light.properties().get("hanging")))throw new IllegalArgumentException("Hanging fixture was overwritten at "+at);
+            for(int y=at.y()+1;y<anchor.y();y++){
+                var chain=canvas().get(new Vec3i(at.x(),y,at.z())).map(DrawBlock::state).orElse(null);
+                if(chain==null||!chain.id().equals(fixture.get("chain"))||!"y".equals(chain.properties().get("axis")))throw new IllegalArgumentException("Hanging fixture has a broken vertical chain at "+new Vec3i(at.x(),y,at.z()));
+            }
+        }
+    }
     public AuthoringContext support(Vec3i at){supports.add(AuthoredStructure.point(at));return this;}
     public AuthoringContext protect(Box region){protectedAreas.add(AuthoredStructure.box(region));return this;}
     public AuthoringContext component(String id,Box region){named(id);components.put(id,region);return this;}
@@ -56,16 +94,20 @@ public final class AuthoringContext {
     }
     /** Paste a reusable component, prefix identifiers and transform every semantic marker with it. */
     public AuthoringContext instance(String id,AuthoredStructure child,GridTransform transform){
+        if(child.semantics().containsKey("lightingIntent")&&lightingIntent==null)throw new IllegalArgumentException("A deliberately dark component requires explicit parent intentionallyDark intent; keep mixed atmospheres in separate logical buildings");
         named(id);canvas().pen("air").paste(child.drawing(),transform,true);
         for(var entry:child.components().entrySet())components.put(id+"/"+entry.getKey(),transform.apply(entry.getValue()));
         components.put(id,transform.apply(child.drawing().bounds()));
-        var m=child.semantics();append(rooms,m,"rooms",transform,id);append(passages,m,"indoorPassages",transform,id);append(lights,m,"sources",transform,id);append(ports,m,"ports",transform,id);
+        var m=child.semantics();append(rooms,m,"rooms",transform,id);append(passages,m,"indoorPassages",transform,id);append(lights,m,"sources",transform,id);append(ports,m,"ports",transform,id);append(hangingFixtures,m,"hangingFixtures",transform,id);
         append(entrances,m,"entrances",transform,id);append(destinations,m,"destinations",transform,id);append(supports,m,"supports",transform,id);append(protectedAreas,m,"protectedAreas",transform,id);append(clearance,m,"keepClear",transform,id);append(interactions,m,"interactions",transform,id);
         if(m.get("palette") instanceof Map<?,?> p)p.forEach((k,v)->{Object previous=palette.putIfAbsent((String)k,v);if(previous!=null&&!previous.equals(v))throw new IllegalArgumentException("Conflicting component material "+k);});
         return this;
     }
     public AuthoredStructure snapshot(){
+        validateHangingFixtures();
         var m=new TreeMap<String,Object>();m.put("origin",AuthoredStructure.point(origin));m.put("rooms",rooms);m.put("indoorPassages",passages);m.put("sources",lights);m.put("ports",ports);m.put("entrances",entrances);m.put("destinations",destinations);m.put("supports",supports);m.put("protectedAreas",protectedAreas);m.put("keepClear",clearance);m.put("interactions",interactions);m.put("palette",palette);
+        if(lightingIntent!=null)m.put("lightingIntent",lightingIntent);
+        if(!hangingFixtures.isEmpty())m.put("hangingFixtures",hangingFixtures);
         return new AuthoredStructure(canvas().snapshot(),m,components);
     }
     private void named(String id){if(!id.matches("[a-zA-Z0-9_./-]{1,96}")||!names.add(id))throw new IllegalArgumentException("Invalid/duplicate authoring id "+id);}

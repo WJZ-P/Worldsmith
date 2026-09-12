@@ -25,7 +25,7 @@ data class StructureInspection(val report:StructureCheckReport,val geometries:Ma
 class StructureCheckService(private val native:StructureNativeHost?=null) {
     private data class Repetition(val fingerprint:String,val revision:String,val count:Int)
     private val repetitions=java.util.concurrent.ConcurrentHashMap<String,Repetition>()
-    fun inspect(definition:WorldStructureDefinition,drawings:Map<String,DrawStructure>,components:Map<String,BuildBox> = emptyMap(),session:String="",assemblyContext:Boolean=true):StructureInspection {
+    fun inspect(definition:WorldStructureDefinition,drawings:Map<String,DrawStructure>,components:Map<String,BuildBox> = emptyMap(),session:String="",assemblyContext:Boolean=true,estimateLighting:Boolean=false):StructureInspection {
         val stages=linkedMapOf<String,StructureCheckStage>();val geometries=linkedMapOf<String,List<CompiledStructure>>();val light=linkedMapOf<String,StructureLightingReport>()
         fun stage(name:String,action:()->List<Diagnostic>) {
             val start=System.nanoTime()
@@ -54,7 +54,8 @@ class StructureCheckService(private val native:StructureNativeHost?=null) {
                 fun validBox(v:BuildBox)=v.from.x>=0&&v.from.y>=0&&v.from.z>=0&&v.to.x<g.size.x&&v.to.y<g.size.y&&v.to.z<g.size.z&&v.from.x<=v.to.x&&v.from.y<=v.to.y&&v.from.z<=v.to.z
                 if(g.keepClear.size>32||g.keepClear.any {!validBox(it)})problems+=original(Diagnostic("keepClear","DRAWING_CLEARANCE_BOUNDS",DiagnosticSeverity.ERROR,"Invalid clearance volume"))
                 if(g.protectedAreas.size>32||g.protectedAreas.any {!validBox(it)})problems+=original(Diagnostic("protectedAreas","DRAWING_PROTECTED_BOUNDS",DiagnosticSeverity.ERROR,"Invalid protected volume"))
-                val report=StructureLightingChecker.analyze(metadata,g.voxels);light["$id:$variant"]=report;problems+=report.diagnostics.map(::original)
+                val report=if(estimateLighting)StructureLightingChecker.analyze(metadata,g.voxels)else StructureLightingChecker.validate(metadata,g.voxels)
+                light["$id:$variant"]=report;problems+=report.diagnostics.map(::original)
             }
             problems
         }

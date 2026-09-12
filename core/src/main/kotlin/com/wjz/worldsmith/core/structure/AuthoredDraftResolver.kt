@@ -34,9 +34,11 @@ class AuthoredDraftResolver(private val drawings:DrawingHost) {
         val ids=authored.getValue("variants").jsonArray.map {it.jsonPrimitive.content};require(ids.size in 1..8)
         val previous=authored["allowPreviousRevision"]?.jsonPrimitive?.boolean ?: false
         val semantics=ids.map {semantic(session,it,previous||inspection)};require(semantics.distinct().size==1) {"AUTHORED_VARIANT_LAYOUT: variants need identical semantic layouts; use separate definitions for different layouts"}
-        val m=semantics.first();val allowed=setOf("origin","rooms","indoorPassages","sources","ports","entrances","destinations","supports","protectedAreas","keepClear","interactions","palette")
+        val m=semantics.first();val allowed=setOf("origin","rooms","indoorPassages","sources","ports","entrances","destinations","supports","protectedAreas","keepClear","interactions","palette","lightingIntent","hangingFixtures")
         require(m.keys.all {it in allowed}) {"Unknown authored semantic field"}
         fun array(name:String)=m[name]?.jsonArray ?: JsonArray(emptyList())
+        val darkIntent=m["lightingIntent"]?.jsonPrimitive?.content
+        require(darkIntent==null || darkIntent.isNotBlank()&&darkIntent.length<=512&&darkIntent.none {it.isISOControl()}) {"Dark lighting intent needs a printable design reason of 1..512 characters"}
         val occupied=JsonArray(array("rooms")+array("indoorPassages"));val entries=array("entrances");val destinations=array("destinations")
         val bindings=raw["portBindings"]?.jsonObject.orEmpty();val ports=array("ports").map {p->
             val value=p.jsonObject;val id=value.getValue("id").jsonPrimitive.content;val binding=bindings[id]?.jsonObject.orEmpty()
@@ -48,7 +50,7 @@ class AuthoredDraftResolver(private val drawings:DrawingHost) {
             put("id",raw.getValue("id"));put("schemaVersion",1);put("origin",m.getValue("origin"));put("drawing",buildJsonObject {put("variants",JsonArray(ids.map(::JsonPrimitive)));put("allowPreviousRevision",previous)})
             put("palette",m["palette"] ?: JsonObject(emptyMap()));put("rooms",array("rooms"));put("indoorPassages",array("indoorPassages"));put("keepClear",array("keepClear"));put("ports",JsonArray(ports));put("interactions",array("interactions"))
             putJsonObject("variation"){put("protectedAreas",array("protectedAreas"));raw["instancePatches"]?.let {put("instancePatches",it)}}
-            putJsonObject("lighting"){put("mode",if(occupied.isEmpty())"EXTERIOR_ONLY" else "READABLE");put("spaces",occupied);put("sources",array("sources"));put("minimum",8)}
+            putJsonObject("lighting"){put("mode",if(darkIntent!=null)"INTENTIONALLY_DARK" else if(occupied.isEmpty())"EXTERIOR_ONLY" else "READABLE");put("spaces",occupied);put("sources",array("sources"));put("minimum",8)}
             if(entries.isNotEmpty())putJsonObject("access"){put("entrances",entries);put("destinations",if(destinations.isEmpty())entries else destinations);put("requiredClear",array("keepClear"))}
         }
         // Decode shape now; semantic correctness is intentionally a separate preflight stage.
