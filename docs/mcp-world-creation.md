@@ -55,7 +55,7 @@ technical envelope; it is not a fixed terrain design.
 
 `complete=true` requires Core checks, native structure export/readback, the full Minecraft
 data-pack reload, verified client asset reload, stable world bindings and preset activation in the current Create World context.
-Missing context returns `WAITING_NATIVE_CONTEXT`; open Create World, then check again.
+A selected but unprepared pack returns `WAITING_CREATION` with `requiresUserAction=true`: choose it and press Create New World. Browsing and selection never trigger client resource activation.
 Native failures never fall back to Core-only completion. World instance placement remains unverified. The final pack remains in:
 
 ```text
@@ -64,14 +64,11 @@ Native failures never fall back to Core-only completion. World instance placemen
 
 ## Select it in Minecraft
 
-If **Create New World** is already open when publication is requested, Worldsmith
-exports the pack to Minecraft's temporary data-pack repository and starts the
-normal reload immediately. Otherwise this happens the next time the screen is
-opened.
+The **World Type** cycle lists vanilla presets plus every installed managed world pack, even when its native preset has not been loaded. The **Tiangong** header uses the same per-screen choice; an imported pack without a live MCP session uses its saved configuration counts. The legacy built-in Wasteland is no longer a menu option.
 
-After reload, the pack's display name appears under **More World Options** and
-is selected automatically. A fixed pack seed is copied into the seed field;
-when the pack seed is empty, Minecraft keeps random-seed behavior.
+Library **Use for world creation**, world-type cycling, progress browsing and MCP finish suggestions select metadata only. They neither export a temporary datapack nor mount client assets. Pressing **Create New World** starts native export/validation and the final pack's required asset load, then resumes the original creation action once. The native confirmation dialog, if any, remains in control. A fixed pack seed is applied during this preparation; otherwise the current seed controls are preserved.
+
+Cancelling before this gesture has no world resources to unload. After an attempted creation, switching back to a vanilla preset defers removal of the temporary Worldsmith datapack and assets until the next create gesture. Unprepared menu entries have no serializable dimensions and never substitute for a validated preset.
 
 The generated registry ids are scoped by the pack's full content hash. This
 keeps a generated biome named `abyss` distinct from the built-in

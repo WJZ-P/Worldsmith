@@ -14,7 +14,8 @@ public abstract class WorldTypeEntryMixin {
 	@Inject(method = "describePreset", at = @At("HEAD"), cancellable = true)
 	private void worldsmith$describeGeneratedPreset(CallbackInfoReturnable<Component> callback) {
 		WorldCreationUiState.WorldTypeEntry self = (WorldCreationUiState.WorldTypeEntry) (Object) this;
-		Component name = WorldsmithWorldCreationBridge.displayName(self.preset());
+		Component name = com.wjz.worldsmith.client.WorldsmithWorldTypeMenu.name(self.preset());
+        if (name == null) name = WorldsmithWorldCreationBridge.displayName(self.preset());
 		if (name != null) {
 			callback.setReturnValue(name);
 		}

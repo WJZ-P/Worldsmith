@@ -13,7 +13,9 @@
 		"CreateWorldCreationGuardMixin",
 		"WorldArrivalKeyboardMixin",
 		"CreativeModeTabsContentMixin",
-		"WorldCreativeTabTitleMixin"
+		"WorldCreativeTabTitleMixin",
+		"WorldCreationUiStateAccessor",
+		"WorldCreationUiStateMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

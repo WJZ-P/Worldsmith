@@ -43,8 +43,8 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		builder.add("worldsmith.progress.kind.anchor", "Landmarks");
 		builder.add("worldsmith.progress.kind.blueprint", "Blueprints");
 		builder.add("worldsmith.progress.world_waiting", "A world waiting to take shape");
-		builder.add("worldsmith.progress.world_previous", "Previous world");
-		builder.add("worldsmith.progress.world_next", "Next world");
+		builder.add("worldsmith.progress.world_previous", "Choose the previous world pack");
+		builder.add("worldsmith.progress.world_next", "Choose the next world pack");
 		builder.add("worldsmith.progress.world_picker_hint", "Choose a world to follow");
 		builder.add("worldsmith.progress.overview_waiting", "World blueprint");
 		builder.add("worldsmith.progress.overview_count", "World content %s / %s");
@@ -56,6 +56,9 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		builder.add("worldsmith.progress.phase.finishing", "Ready to finalize");
 		builder.add("worldsmith.progress.phase.confirm", "Needs confirmation");
 		builder.add("worldsmith.progress.phase.ready", "Ready to create");
+		builder.add("worldsmith.progress.world_selection_hint", "Choose the world to create. The World tab uses the same selection.");
+		builder.add("worldsmith.progress.overview_library", "World contents: %s");
+		builder.add("worldsmith.progress.phase.selected", "Selected; load on create");
 		builder.add("worldsmith.progress.phase.select_world", "Choose this world");
 		builder.add("worldsmith.progress.phase.loading_world", "Preparing the world");
 		builder.add("worldsmith.progress.card.prompt", "Prompt");
@@ -220,7 +223,7 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 		builder.add("worldsmith.packs.importing", "Importing the validated resource pack...");
 		builder.add("worldsmith.packs.exporting", "Writing and verifying the .wspack archive...");
 		builder.add("worldsmith.packs.opening_folder", "Opening the exchange folder...");
-		builder.add("worldsmith.packs.preparing_creation", "Validating the selected bundle for a new world...");
+		builder.add("worldsmith.packs.preparing_creation", "Opening world settings…");
 		builder.add("worldsmith.packs.busy_hint", "You can go back when this operation finishes.");
 		builder.add("worldsmith.packs.boundary", "Data-only import: no automatic activation, no current-world changes, no Java source execution.");
 		builder.add("worldsmith.packs.refreshed", "Refreshed: %s library packs, %s import files.");
@@ -243,6 +246,7 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 
 	private static void addQuestJournal(TranslationBuilder builder) {
 		builder.add("worldsmith.creation.title", "A world awaits");
+		builder.add("worldsmith.creation.failed", "This world is not ready yet. Retry or choose another world.");
 		builder.add("worldsmith.creation.preparing", "This world is still taking shape. Please wait a moment.");
 		builder.add("worldsmith.arrival.current", "Your next chapter · %s");
 		builder.add("worldsmith.arrival.complete", "The main journey is complete. More stories await beyond the horizon.");

@@ -254,7 +254,7 @@
 	"worldsmith.packs.importing": "正在导入并校验资源包……",
 	"worldsmith.packs.exporting": "正在写入并验证 .wspack 归档……",
 	"worldsmith.packs.opening_folder": "正在打开交换目录……",
-	"worldsmith.packs.preparing_creation": "正在验证选中资源包，准备创建新世界……",
+	"worldsmith.packs.preparing_creation": "正在打开世界设置……",
 	"worldsmith.packs.busy_hint": "本次操作完成后即可返回。",
 	"worldsmith.packs.boundary": "仅导入数据：不自动激活、不改变当前世界、不执行 Java 源码。",
 	"worldsmith.packs.refreshed": "已刷新：资源库 %s 个包，导入目录 %s 个文件。",
@@ -386,8 +386,8 @@
 	"worldsmith.progress.kind.anchor": "地标",
 	"worldsmith.progress.kind.blueprint": "蓝图",
 	"worldsmith.progress.world_waiting": "新的世界，等你构想",
-	"worldsmith.progress.world_previous": "上一个世界",
-	"worldsmith.progress.world_next": "下一个世界",
+	"worldsmith.progress.world_previous": "选择上一个世界包",
+	"worldsmith.progress.world_next": "选择下一个世界包",
 	"worldsmith.progress.world_picker_hint": "切换要查看的世界",
 	"worldsmith.progress.overview_waiting": "世界蓝图",
 	"worldsmith.progress.overview_count": "世界内容 %s / %s",
@@ -420,5 +420,9 @@
 	"worldsmith.progress.attention_needed": "有些内容需要调整，稍后继续。",
 	"worldsmith.advancements.claim_hint": "完成目标后，在任务日志中领取奖励，即可点亮这项进度。",
 	"worldsmith.progress.phase.select_world": "等待选择此世界",
-	"worldsmith.progress.phase.loading_world": "铺展山河"
+	"worldsmith.progress.phase.loading_world": "铺展山河",
+	"worldsmith.progress.phase.selected": "已选择，创建时载入",
+	"worldsmith.progress.overview_library": "世界内容 %s 项",
+	"worldsmith.progress.world_selection_hint": "选择用于创建的世界；也可在“世界”页切换。",
+	"worldsmith.creation.failed": "这片世界尚未准备好，请重试或选择其他世界。"
 }

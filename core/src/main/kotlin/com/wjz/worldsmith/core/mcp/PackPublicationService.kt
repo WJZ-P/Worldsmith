@@ -64,6 +64,7 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
                 put("minecraftCompiled",false);put("landmarkInstancesVerified",false)
                 put("coreValidated",true);put("nativeValidated",native.nativeValidated)
                 put("activated",native.activated);put("selectedForCreation",native.selectedForCreation)
+                put("requiresUserAction",native.stage in setOf("WAITING_CREATION","WAITING_ACTIVATION","WAITING_NATIVE_CONTEXT"))
             }
             return if(native.stage=="FAILED")McpToolResult.error("Native publication needs repair",result) else McpToolResult.success(result)
         }

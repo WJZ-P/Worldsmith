@@ -271,7 +271,7 @@
   "worldsmith.packs.importing": "Importing the validated resource pack...",
   "worldsmith.packs.exporting": "Writing and verifying the .wspack archive...",
   "worldsmith.packs.opening_folder": "Opening the exchange folder...",
-  "worldsmith.packs.preparing_creation": "Validating the selected bundle for a new world...",
+  "worldsmith.packs.preparing_creation": "Opening world settings…",
   "worldsmith.packs.busy_hint": "You can go back when this operation finishes.",
   "worldsmith.packs.boundary": "Data-only import: no automatic activation, no current-world changes, no Java source execution.",
   "worldsmith.packs.refreshed": "Refreshed: %s library packs, %s import files.",
@@ -403,8 +403,8 @@
   "worldsmith.progress.kind.anchor": "Landmarks",
   "worldsmith.progress.kind.blueprint": "Blueprints",
   "worldsmith.progress.world_waiting": "A world waiting to take shape",
-  "worldsmith.progress.world_previous": "Previous world",
-  "worldsmith.progress.world_next": "Next world",
+  "worldsmith.progress.world_previous": "Choose the previous world pack",
+  "worldsmith.progress.world_next": "Choose the next world pack",
   "worldsmith.progress.world_picker_hint": "Choose a world to follow",
   "worldsmith.progress.overview_waiting": "World blueprint",
   "worldsmith.progress.overview_count": "World content %s / %s",
@@ -437,5 +437,9 @@
   "worldsmith.progress.attention_needed": "Some content needs a little refinement before continuing.",
   "worldsmith.advancements.claim_hint": "Complete the objectives, then claim the reward in the quest journal to complete this advancement.",
   "worldsmith.progress.phase.select_world": "Choose this world",
-  "worldsmith.progress.phase.loading_world": "Preparing the world"
+  "worldsmith.progress.phase.loading_world": "Preparing the world",
+  "worldsmith.progress.phase.selected": "Selected; load on create",
+  "worldsmith.progress.overview_library": "World contents: %s",
+  "worldsmith.progress.world_selection_hint": "Choose the world to create. The World tab uses the same selection.",
+  "worldsmith.creation.failed": "This world is not ready yet. Retry or choose another world."
 }

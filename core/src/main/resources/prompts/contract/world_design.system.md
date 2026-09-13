@@ -189,3 +189,7 @@ Earlier quest rewards and fixed/line-anchor structure supplies are finite and
 delivery consumes them. Mutually exclusive structure variants contribute their
 maximum individual supply, not their sum. This static bound rejects impossible
 deliveries; it does not guarantee a random loot roll or an actual generated site.
+
+## Deferred player choice and native preparation
+
+All installed packs are menu choices without native resource activation. The native World Type control and Tiangong header share one creation intent. Browsing, choosing a pack, and finish-world suggestions do not trigger client resource reloads. `WAITING_CREATION` / `requiresUserAction:true` means the player must choose that pack and press Create New World; report this action and pause instead of rebuilding or polling. Native preparation then resumes the original guarded creation action. Core/archive readiness remains distinct from actual native activation and from a played world.

@@ -39,6 +39,8 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
     private boolean following = true;
     private String preferredSession, restoreSession;
     private double restoreScroll;
+    private String displayedPackId;
+    private com.wjz.worldsmith.core.mcp.ResourcePackDetails installedDetails;
     private int rowLeft, rowTop, rowWidth;
 
     public record UiState(boolean following, String preferredSession, double scroll, String visibleSession) {}
@@ -83,21 +85,37 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
     private void tick() {
         if (((CreateWorldScreenAccessor)screen).worldsmith$getTabManager().getCurrentTab() != this) return;
         ensurePoller(); poller.tick(screen);
-        var snapshot = poller.snapshot();
-        String before = selectedId(cached), after = selectedId(snapshot);
-        cached = snapshot;
-        var progress = snapshot == null ? null : snapshot.progress();
-        sessions = progress == null ? List.of() : List.copyOf(progress.getSessions());
-        updateControls(); dashboard.update(cached);
-        if (after != null && !Objects.equals(before, after)) {
-            dashboard.setScrollAmount(after.equals(restoreSession) ? restoreScroll : 0);
-            restoreSession = null; restoreScroll = 0;
+        var raw=poller.snapshot();var progress=raw==null ? null : raw.progress();
+        sessions=progress==null ? sessions : List.copyOf(progress.getSessions());
+        String packId=WorldsmithWorldCreationBridge.selectedPackId(screen);
+        if(packId!=null) {
+            var matching=sessions.stream().filter(s->packId.equals(s.getPackId())).findFirst().orElse(null);
+            if(matching!=null && !matching.getSessionId().equals(preferredSession)) {
+                following=false;preferredSession=matching.getSessionId();poller.selectSession(preferredSession);
+            }
         }
+        var view=progress==null ? null : progress.getView();
+        boolean samePack=view!=null && (packId!=null ? packId.equals(view.getPackId()) : view.getPackId()==null);
+        installedDetails=WorldsmithWorldTypeMenu.details(screen);
+        cached=raw==null ? null : new WorldsmithGenerationProgressPoller.Snapshot(raw.epoch(),raw.connected(),raw.refreshing(),samePack ? raw.error() : null,
+            samePack ? progress : null,WorldsmithWorldCreationBridge.progressPublicationStatus(screen,packId));
+        if(!Objects.equals(displayedPackId,packId)) {dashboard.setScrollAmount(0);displayedPackId=packId;restoreSession=null;restoreScroll=0;}
+        updateControls();dashboard.update(cached,installedDetails);
     }
     private static String selectedId(WorldsmithGenerationProgressPoller.Snapshot snapshot) {
         return snapshot == null || snapshot.progress() == null ? null : snapshot.progress().getSelectedSessionId();
     }
     private void chooseSession(int step) {
+        if(WorldsmithWorldCreationBridge.creationInProgress(screen))return;
+        var packs=WorldsmithWorldTypeMenu.packs(screen);
+        if(!packs.isEmpty()) {
+            String current=WorldsmithWorldCreationBridge.selectedPackId(screen);int index=-1;
+            for(int i=0;i<packs.size();i++)if(packs.get(i).getBundleId().equals(current)){index=i;break;}
+            index=index<0 ? (step>0?0:packs.size()-1) : Math.floorMod(index+step,packs.size());
+            var chosen=packs.get(index);
+            WorldsmithWorldCreationBridge.selectPack(screen,chosen.getBundleId(),chosen.getDisplayName(),true);
+            return;
+        }
         if (sessions.isEmpty()) return;
         String selected = following ? selectedId(cached) : preferredSession;
         int index = -1;
@@ -112,18 +130,27 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
         dashboard.setScrollAmount(0); updateControls(); dashboard.update(cached);
     }
     private void updateControls() {
-        String selected = following ? selectedId(cached) : preferredSession;
-        var entry = sessions.stream().filter(session -> session.getSessionId().equals(selected)).findFirst().orElse(null);
-        sessionPicker.setMessage(entry == null ? tr("world_waiting") : Component.literal(bound(entry.getTitle(), 160)));
-        sessionPicker.active = !sessions.isEmpty();
-        Component tooltip = entry == null ? tr("world_picker_hint") : Component.literal(bound(entry.getPrompt(), 384));
-        sessionPicker.setTooltip(Tooltip.create(tooltip));
+        var packs=WorldsmithWorldTypeMenu.packs(screen);String id=WorldsmithWorldCreationBridge.selectedPackId(screen);
+        if(!packs.isEmpty() || id!=null) {
+            var pack=packs.stream().filter(p->p.getBundleId().equals(id)).findFirst().orElse(null);
+            sessionPicker.setMessage(id==null ? ((CreateWorldScreenAccessor)screen).worldsmith$getUiState().getWorldType().describePreset()
+                : Component.literal(bound(WorldsmithWorldCreationBridge.selectedPackTitle(screen),160)));
+            sessionPicker.active=!packs.isEmpty() && !WorldsmithWorldCreationBridge.creationInProgress(screen);
+            sessionPicker.setTooltip(Tooltip.create(pack==null ? tr("world_selection_hint") : Component.literal(bound(pack.getDescription(),384))));
+        } else {
+            String selected=following ? selectedId(cached) : preferredSession;
+            var entry=sessions.stream().filter(s->s.getSessionId().equals(selected)).findFirst().orElse(null);
+            sessionPicker.setMessage(entry==null ? tr("world_waiting") : Component.literal(bound(entry.getTitle(),160)));
+            sessionPicker.active=!sessions.isEmpty() && !WorldsmithWorldCreationBridge.creationInProgress(screen);
+            sessionPicker.setTooltip(Tooltip.create(entry==null ? tr("world_picker_hint") : Component.literal(bound(entry.getPrompt(),384))));
+        }
         layoutSessionControls();
     }
     private void layoutSessionControls() {
-        boolean multiple = sessions.size() > 1 && rowWidth >= 230;
+        int choiceCount=WorldsmithWorldTypeMenu.packs(screen).isEmpty() ? sessions.size() : WorldsmithWorldTypeMenu.packs(screen).size();
+        boolean multiple = choiceCount > 1 && rowWidth >= 230;
         sessionPrevious.visible = sessionNext.visible = multiple;
-        sessionPrevious.active = sessionNext.active = multiple;
+        sessionPrevious.active = sessionNext.active = multiple && !WorldsmithWorldCreationBridge.creationInProgress(screen);
         sessionPrevious.setRectangle(20, 20, rowLeft, rowTop);
         sessionNext.setRectangle(20, 20, rowLeft + Math.max(0, rowWidth - 20), rowTop);
         sessionPicker.setRectangle(Math.max(1, rowWidth - (multiple ? 48 : 0)), 20, rowLeft + (multiple ? 24 : 0), rowTop);
@@ -157,12 +184,15 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
         private final Map<String, String> targetStates = new HashMap<>(), recentTarget = new HashMap<>();
         private WorldsmithGenerationProgressPoller.Snapshot oldSnapshot;
         private String contentSession;
+        private com.wjz.worldsmith.core.mcp.ResourcePackDetails installed;
         private boolean invalid = true;
         private int contentHeight;
 
         Dashboard() { super(0, 0, 100, 100, tr("tab"), AbstractScrollArea.defaultSettings(24)); }
         void invalidate() { invalid = true; }
-        void update(WorldsmithGenerationProgressPoller.Snapshot snapshot) {
+        void update(WorldsmithGenerationProgressPoller.Snapshot snapshot) { update(snapshot,installed); }
+        void update(WorldsmithGenerationProgressPoller.Snapshot snapshot,com.wjz.worldsmith.core.mcp.ResourcePackDetails detail) {
+            if(!Objects.equals(installed,detail))invalid=true;installed=detail;
             if (!invalid && sameDisplay(snapshot, oldSnapshot)) { oldSnapshot = snapshot; return; }
             oldSnapshot = snapshot; invalid = false;
             fills.clear(); texts.clear(); hints.clear(); icons.clear();
@@ -170,7 +200,8 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
             var view = progress == null ? null : progress.getView();
             updateRecentTargets(view);
             int inner = Math.max(24, width - 28);
-            Component overall = view == null || view.getTotalPlannedTargets() == null ? tr("overview_waiting")
+            Component overall = view == null && installed!=null ? tr("overview_library", MAIN_KINDS.stream().mapToInt(this::savedCount).sum())
+                    : view == null || view.getTotalPlannedTargets() == null ? tr("overview_waiting")
                     : tr("overview_count", view.getDeclaredTargets(), view.getTotalPlannedTargets());
             text(12, 12, overall, INK, Math.max(30, inner - 102));
             text(Math.max(12, width - 108), 12, phase(snapshot, view), MUTED, 92);
@@ -180,6 +211,7 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
             if (view != null) for (var category : view.getCategories()) {
                 if (!kinds.contains(category.getKind()) && ((category.getPlanned() != null && category.getPlanned() > 0) || category.getDeclaredTotal() > 0)) kinds.add(category.getKind());
             }
+            if(view==null && installed!=null && savedCount("feature")>0)kinds.add("feature");
             for (int i = 0; i < kinds.size(); i++) card(view, kinds.get(i), 12 + (i % columns) * (cardWidth + GAP), 34 + (i / columns) * (CARD_HEIGHT + GAP), cardWidth);
             int bottom = 34 + ((kinds.size() + columns - 1) / columns) * (CARD_HEIGHT + GAP);
             if (snapshot != null && snapshot.error() != null && !snapshot.error().isBlank()) {
@@ -204,15 +236,20 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
             targetStates.keySet().retainAll(live);
         }
         private static Component phase(WorldsmithGenerationProgressPoller.Snapshot snapshot, GenerationProgressView view) {
-            if (view == null) return tr("phase.waiting");
-            if (snapshot.nativeStatus() != null && snapshot.nativeStatus().getStage().equals("PUBLISHED")) return tr("phase.ready");
-            if (snapshot.nativeStatus() != null) {
-                String nativeStage = snapshot.nativeStatus().getStage();
-                if (nativeStage.equals("WAITING_ACTIVATION") || nativeStage.equals("NOT_SELECTED")) return tr("phase.select_world");
-                if (nativeStage.equals("NATIVE_DATA_RELOAD") || nativeStage.equals("CLIENT_RESOURCES") || nativeStage.equals("RELOADING")) return tr("phase.loading_world");
+            if(snapshot!=null && snapshot.nativeStatus()!=null) {
+                Component status=switch(snapshot.nativeStatus().getStage()) {
+                    case "WAITING_CREATION" -> tr("phase.selected");
+                    case "PUBLISHED" -> tr("phase.ready");
+                    case "NATIVE_CHECK", "NATIVE_DATA_RELOAD", "CLIENT_RESOURCES", "RELOADING" -> tr("phase.loading_world");
+                    case "FAILED" -> tr("phase.refining");
+                    case "WAITING_ACTIVATION", "NOT_SELECTED" -> tr("phase.select_world");
+                    default -> null;
+                };
+                if(status!=null)return status;
             }
-            if (view.getJobs().stream().anyMatch(GenerationDrawingProgress::getNeedsApproval)) return tr("phase.confirm");
-            return switch (view.getStage()) {
+            if(view==null)return tr("phase.waiting");
+            if(view.getJobs().stream().anyMatch(GenerationDrawingProgress::getNeedsApproval))return tr("phase.confirm");
+            return switch(view.getStage()) {
                 case "DESIGN_PLAN" -> tr("phase.planning");
                 case "FROZEN_REPAIR" -> tr("phase.refining");
                 case "CORE_SAVED", "NATIVE_COMPLETE" -> tr("phase.saved");
@@ -221,7 +258,7 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
             };
         }
         private void card(GenerationProgressView view, String category, int x, int y, int w) {
-            GenerationCategoryProgress counts = view == null ? null : view.getCategories().stream().filter(c -> c.getKind().equals(category)).findFirst().orElse(null);
+            GenerationCategoryProgress counts = view == null ? installed==null ? null : new GenerationCategoryProgress(category,null,savedCount(category),0,savedCount(category)) : view.getCategories().stream().filter(c -> c.getKind().equals(category)).findFirst().orElse(null);
             var targets = view == null ? List.<GenerationTargetProgress>of() : view.getTargets().stream().filter(t -> t.getKind().equals(category)).toList();
             var job = liveJob(view, category);
             GenerationTargetProgress focus = null;
@@ -235,7 +272,7 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
             }
             Integer planned = counts == null ? null : counts.getPlanned();
             int done = counts == null ? 0 : planned == null ? counts.getDeclaredTotal() : counts.getMatchedDeclared();
-            String count = counts == null ? "— / —" : done + " / " + (planned == null ? "—" : planned);
+            String count = view==null && installed!=null ? Integer.toString(done) : counts == null ? "— / —" : done + " / " + (planned == null ? "—" : planned);
             int color = job != null ? GOLD : focus != null && focus.getState().name().equals("REPAIR") ? RED
                     : focus != null && focus.getState().name().equals("NEEDS_ASSET") ? GOLD : planned != null && planned > 0 && done >= planned ? GREEN : 0xFF8EB9B5;
             fill(x, y, w, CARD_HEIGHT, 0xE9283036); outline(x, y, w, CARD_HEIGHT, 0xFF46535B); fill(x + 1, y + 1, 2, CARD_HEIGHT - 2, color);
@@ -248,17 +285,23 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
             Component activity = activity(job, focus, counts);
             wrapped(x + 10, y + 47, activity, color, w - 20, 2);
             String prompt = focus == null ? "" : bound(focus.getPurpose(), 2048);
-            boolean worldPrompt = prompt.isBlank() && view != null && !view.getPrompt().isBlank();
-            if (worldPrompt) prompt = bound(view.getPrompt(), 2048);
+            if(view==null && installed!=null)prompt=bound(installed.getSummary().getDescription(),2048);
+            boolean worldPrompt = view==null && installed!=null || prompt.isBlank() && view != null && !view.getPrompt().isBlank();
+            if (worldPrompt && view!=null) prompt = bound(view.getPrompt(), 2048);
             text(x + 10, y + 77, tr(worldPrompt ? "card.world_prompt" : "card.prompt"), DIM, w - 20);
             Component brief = prompt.isBlank() ? tr("card.no_prompt") : Component.literal(prompt);
             wrapped(x + 10, y + 91, brief, MUTED, w - 20, 3);
-            Component remaining = planned == null ? tr("card.waiting_plan") : planned == 0 ? tr("card.not_planned")
+            Component remaining = view==null && installed!=null ? tr("card.written",done) : planned == null ? tr("card.waiting_plan") : planned == 0 ? tr("card.not_planned")
                     : done >= planned ? tr("card.written", done) : tr("card.remaining", Math.max(0, planned - done));
             text(x + 10, y + CARD_HEIGHT - 14, remaining, DIM, w - 20);
             Component hint = kind(category).copy().append("  " + count).append("\n").append(activity);
             if (!prompt.isBlank()) hint = hint.copy().append("\n\n").append(tr(worldPrompt ? "card.world_prompt" : "card.prompt")).append("\n").append(bound(prompt, 256));
             hints.add(new Hint(x, y, w, CARD_HEIGHT, hint));
+        }
+        private int savedCount(String kind) {
+            if(installed==null)return 0;
+            String module=switch(kind){case "biome"->"biomes";case "structure"->"structures";case "creature"->"creatures";case "block"->"blocks";case "item"->"items";case "quest"->"quests";case "feature"->"features";default->kind;};
+            return installed.getCounts().getOrDefault(module,0);
         }
         private static GenerationDrawingProgress liveJob(GenerationProgressView view, String category) {
             if (view == null || !(category.equals("structure") || category.equals("blueprint"))) return null;

@@ -51,6 +51,10 @@ public final class WorldContentResources {
     }
 
     public static String activeScope() { var snapshot = active; return snapshot == null ? null : snapshot.scope(); }
+    public static boolean isLoaded(String scope) {
+        var snapshot=active;
+        return snapshot!=null && snapshot.scope().equals(scope) && isLoaded(scope,snapshot.contentHash());
+    }
 
     /** Read-only final creation guard; matching declarations alone are not evidence of loaded assets. */
     public static boolean isLoaded(String scope,String contentHash) {

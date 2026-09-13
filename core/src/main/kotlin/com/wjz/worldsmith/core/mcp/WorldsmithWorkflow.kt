@@ -103,7 +103,7 @@ object WorldsmithWorkflow {
             "SDK geometry, architecture composition and world deployment remain separate modules.\n\n" +
             "complete=true means the content-addressed pack reads back and passes Core checks, native structure export/readback, " +
             "Minecraft's full data-pack reload and preset activation in the current Create World context. WAITING_NATIVE_CONTEXT " +
-            "requires the player to open Create World; WAITING_ACTIVATION means another explicit selection owns the page. Report that action and pause rather than polling indefinitely. Pure validation never activates a pack; unchanged verified assets are reused without another resource reload. " +
+            "requires the player to open Create World. WAITING_CREATION requires choosing the pack and pressing Create New World; selection/browsing alone never activates resources. WAITING_ACTIVATION means another explicit selection owns the page. Report that action and pause rather than polling indefinitely. Pure validation never activates a pack; unchanged verified assets are reused without another resource reload. " +
             "A model preview is not a gameplay screenshot. A published plan is not a created/played world and landmarkInstancesVerified stays false. " +
             "Report the pack name, biome count and saved location only after the final native receipt."
 
@@ -219,7 +219,7 @@ object WorldsmithWorkflow {
                 "worldsmith_put_content_modules" to "Author theme/worldgen/content/quests coherently. Build real textures and creature rigs through the linked authoring tools; keep returned asset identities.",
                 STRUCTURE_TOOL to "Use the established SDK, preview, architecture and preflight loops for every planned building; preserve current jobs and shared revisions.",
                 WRITE_TOOL to "Freeze the current revision and receive the single-file resourcePack .wspack receipt. Publication verifies real compiled-material/reward/spawn/objective links. Archive-only errors preserve the frozen draft and name an export-only retry.",
-                FINISH_TOOL to "Ensure the same archive and request the separate native receipt. resourcePackReady may be true while WAITING_NATIVE_CONTEXT needs a player action; do not rebuild already-frozen content.",
+                FINISH_TOOL to "Ensure the same archive and request the separate native receipt. resourcePackReady may be true while WAITING_CREATION needs the player to choose the pack and press Create New World, or WAITING_NATIVE_CONTEXT needs the creation page. Do not rebuild frozen content or poll indefinitely while awaiting that gesture.",
             )
             WorkflowMode.WORLDGEN_ONLY -> listOf(
                 CONTRACT_TOOL to "Read id=grand_world section=world-atlas before committing worldgen content. Derive broad geography, places and production batches from the prompt within the shared authoringBudgets; planning regions are intent, not extra runtime schema.",

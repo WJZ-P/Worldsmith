@@ -94,45 +94,46 @@ public final class WorldsmithWorldCreationBridge {
 
     public static PublicationStatus requestPublication(WorldsmithPack pack,Path directory) {
         String id=pack.getManifest().getId();
-        var waiting=new PublicationStatus("WAITING_NATIVE_CONTEXT","Open the Create World screen for native validation and activation",List.of());
+        var waiting=new PublicationStatus("WAITING_CREATION","Select this world and click Create New World to validate and load its assets",List.of());
         var result=new CompletableFuture<PublicationStatus>();
-        // Read UI-owned state on the render thread, not from an MCP handler. A receipt
-        // from an older Create World screen must never complete a different context.
         Runnable check=()->{
             try {
-                if(Minecraft.getInstance().gui.screen() instanceof CreateWorldScreen screen) {
-                    var state=SCREENS.computeIfAbsent(screen,ignored->new ScreenState());
-                    if (state.cancelled || (state.intent != null && !state.intent.acceptsPublication(id))) {
-                        result.complete(new PublicationStatus("WAITING_ACTIVATION", "The player's Create World selection belongs to another bundle; select this bundle explicitly to activate it", List.of()));
-                        return;
+                var client=Minecraft.getInstance();
+                DISPLAY_NAMES.put(id,pack.getManifest().getDisplayName());
+                if(client.gui.screen() instanceof CreateWorldScreen screen) {
+                    onScreenInitializing(screen);
+                    var state=SCREENS.get(screen);
+                    if(state.cancelled || state.explicitVanilla || state.intent!=null && !state.intent.acceptsPublication(id)) {
+                        result.complete(new PublicationStatus("WAITING_ACTIVATION","The player's current world choice is different; explicitly choose this world before creating",List.of()));return;
                     }
-                    if (state.intent != null && !state.intent.packId().equals(id) && state.applyingPackId != null) {
-                        result.complete(new PublicationStatus("WAITING_NATIVE_CONTEXT", "The current creation request is still preparing; its result must settle before another authoring request can activate", List.of()));
-                        return;
+                    if(state.creationRequested && (state.intent==null || !state.intent.packId().equals(id))) {
+                        result.complete(new PublicationStatus("WAITING_ACTIVATION","A creation request already owns preparation",List.of()));return;
                     }
-                    if (state.intent == null || !state.intent.packId().equals(id)) bindIntent(screen, state, newIntent(id, pack.getManifest().getDisplayName(), false));
-                    defaultPackId = id;
-                    installStateListener(screen,state);applyPack(screen,state);
+                    if(state.intent==null || !state.intent.packId().equals(id)) selectPack(screen,id,pack.getManifest().getDisplayName(),false);
                     result.complete(progressPublicationStatus(screen,id));
+                } else if(client.level!=null && id.equals(WorldContentClientRuntime.activeScope())
+                    && id.equals(WorldContentRuntime.activeScope()) && WorldContentResources.isLoaded(id)) {
+                    result.complete(new PublicationStatus("PUBLISHED","This local world owns the verified bundle and loaded assets",List.of()));
                 } else {
-                    // A blocking openFresh pumps client work; do not overwrite its explicit request.
-                    var explicit=SCREENS.values().stream().filter(state->!state.cancelled && !state.committed
-                        && state.intent!=null && state.intent.explicit()).findFirst().orElse(null);
-                    if(explicit!=null && id.equals(explicit.intent.packId()) && explicit.applyingPackId!=null
-                        && explicit.publicationStatus!=null)result.complete(explicit.publicationStatus);
-                    else if (!OPENINGS.isEmpty() || explicit!=null || com.wjz.worldsmith.client.content.WorldContentStartupBarrier.isLoading())
-                        result.complete(new PublicationStatus("WAITING_ACTIVATION", "An explicit world creation or world load owns activation", List.of()));
-                    else { defaultPackId = id; DISPLAY_NAMES.put(id, pack.getManifest().getDisplayName()); result.complete(waiting); }
+                    var owned=SCREENS.entrySet().stream().filter(e->!e.getValue().cancelled && e.getValue().intent!=null
+                        && e.getValue().intent.packId().equals(id)).findFirst().orElse(null);
+                    if(owned!=null && canCreate(owned.getKey(),owned.getValue())) result.complete(owned.getValue().publicationStatus);
+                    else if(owned!=null && owned.getValue().creationRequested && owned.getValue().publicationStatus!=null)
+                        result.complete(owned.getValue().publicationStatus);
+                    else {
+                        if(OPENINGS.isEmpty() && SCREENS.values().stream().noneMatch(s->!s.cancelled && !s.committed && (s.explicitVanilla || s.intent!=null && s.intent.explicit()))) defaultPackId=id;
+                        result.complete(waiting);
+                    }
                 }
             } catch(Exception e){failed(id,e);result.complete(failureStatus(e));}
         };
-        var minecraft=Minecraft.getInstance();
-        if(minecraft.isSameThread())check.run();else minecraft.execute(check);
-        try {return result.get(2,java.util.concurrent.TimeUnit.SECONDS);}
+        var client=Minecraft.getInstance();if(client.isSameThread())check.run();else client.execute(check);
+        try{return result.get(2,java.util.concurrent.TimeUnit.SECONDS);}
         catch(java.util.concurrent.TimeoutException e){return waiting;}
         catch(InterruptedException e){Thread.currentThread().interrupt();return waiting;}
         catch(java.util.concurrent.ExecutionException e){failed(id,e);return failureStatus(e);}
     }
+
     private static PublicationStatus failureStatus(Throwable failure) {
         Throwable cause=failure;while(cause.getCause()!=null)cause=cause.getCause();
         String message=cause.getMessage()==null?cause.getClass().getSimpleName():cause.getMessage();
@@ -150,8 +151,13 @@ public final class WorldsmithWorldCreationBridge {
     }
 
     private static void failed(ScreenState state, String id, Throwable failure) {
+        boolean requested=state.creationRequested;
+        state.creationRequested=false; state.vanillaPreparing=false;
         publish(state,id,failureStatus(failure));
         Worldsmith.LOGGER.error("Native publication failed for {}",id,failure);
+        var client=Minecraft.getInstance();
+        if(requested && !state.cancelled && client.isSameThread())SystemToast.add(client.gui.toastManager(),SystemToast.SystemToastId.PACK_LOAD_FAILURE,
+            Component.translatable("worldsmith.creation.title"),Component.translatable("worldsmith.creation.failed"));
     }
 
     /** Render-thread-only read, scoped to the actual screen, selected preset, bundle and native context. */
@@ -173,6 +179,7 @@ public final class WorldsmithWorldCreationBridge {
                 || !java.util.Objects.equals(preset.unwrapKey().orElse(null), state.appliedPresetKey)) return notSelected;
             return state.publicationStatus;
         }
+        if ("WAITING_CREATION".equals(state.publicationStatus.getStage())) return state.publicationStatus;
         if (packId.equals(state.applyingPackId)) {
             if ("NATIVE_CHECK".equals(state.publicationStatus.getStage())
                 && state.lastAttemptContext != uiState.getSettings().worldgenLoadContext()) return notSelected;
@@ -189,10 +196,11 @@ public final class WorldsmithWorldCreationBridge {
         if(state==null)return true;
         if(state.cancelReady) { SCREENS.remove(screen); return true; }
         if(state.cancelled)return false;
-        state.cancelled=true;
+        state.cancelled=true; state.creationRequested=false;
+        WorldsmithWorldTypeMenu.detach(screen);
         if(state.intent!=null)state.intent.cancel(screen);
         ++state.serial;
-        String scope=state.content==null ? state.appliedPackId : state.content.scope();
+        String scope=state.resourceScope!=null ? state.resourceScope : state.content==null ? state.appliedPackId : state.content.scope();
         state.applyingPackId=null;state.appliedPackId=null;state.validatedContext=null;
         if(scope!=null)PUBLICATIONS.put(scope,new PublicationStatus("WAITING_NATIVE_CONTEXT","Creation was cancelled; the immutable bundle is preserved",List.of()));
         var client=Minecraft.getInstance();
@@ -223,6 +231,7 @@ public final class WorldsmithWorldCreationBridge {
             // A stale activation may start its rollback as its original future completes.
             // Wait for that newer transaction too rather than racing its ownership reservation.
             if(WorldContentClientRuntime.whenIdle()!=idle){clearCancelledContent(scope);return;}
+            if(SCREENS.values().stream().anyMatch(s -> !s.cancelled && !s.committed && (s.creationRequested || scope.equals(s.resourceScope))))return;
             if(client.getSingleplayerServer()!=null || client.level!=null || client.gui.screen() instanceof CreateWorldScreen
                 || !OPENINGS.isEmpty() || com.wjz.worldsmith.client.content.WorldContentStartupBarrier.isLoading()
                 || !scope.equals(WorldContentClientRuntime.activeScope()))return;
@@ -233,11 +242,16 @@ public final class WorldsmithWorldCreationBridge {
     /** Captured by both native CompletableFuture callbacks, not re-read when they complete. */
     public static Object captureNativeReload(CreateWorldScreen screen) {
         var state=SCREENS.get(screen);
-        return state==null || state.intent==null ? null : new NativeReloadToken(state,state.intent,state.ticket);
+        if(state==null)return null;
+        if(!state.creationRequested)return new MenuReloadToken(state,state.serial);
+        return state.intent==null ? state.creationRequested ? new VanillaReloadToken(state,state.serial) : null : new NativeReloadToken(state,state.intent,state.ticket);
     }
 
     public static boolean acceptsNativeReload(CreateWorldScreen screen,Object ownership) {
         if(ownership==null)return true;
+        if(ownership instanceof MenuReloadToken token)return SCREENS.get(screen)==token.state() && !token.state().cancelled && token.state().serial==token.serial();
+        if(ownership instanceof VanillaReloadToken token)return SCREENS.get(screen)==token.state() && !token.state().cancelled
+            && token.state().intent==null && token.state().serial==token.serial();
         if(!(ownership instanceof NativeReloadToken token))return false;
         return SCREENS.get(screen)==token.state() && !token.state().cancelled
             && token.state().intent==token.intent() && token.intent().owns(screen,token.ticket());
@@ -245,6 +259,8 @@ public final class WorldsmithWorldCreationBridge {
 
     public static void trackNativeReload(CreateWorldScreen screen,Object ownership,CompletableFuture<?> completion) {
         if(ownership instanceof NativeReloadToken token && SCREENS.get(screen)==token.state())token.state().nativeTask=completion;
+        else if(ownership instanceof VanillaReloadToken token && SCREENS.get(screen)==token.state())token.state().nativeTask=completion;
+        else if(ownership instanceof MenuReloadToken token && SCREENS.get(screen)==token.state())token.state().nativeTask=completion;
     }
 
     public static void updateCreateButton(CreateWorldScreen screen) {
@@ -252,14 +268,19 @@ public final class WorldsmithWorldCreationBridge {
     }
 
     private static void updateCreateButton(CreateWorldScreen screen,ScreenState state) {
-        if(state.intent==null)return;
-        boolean ready=canCreate(screen,state);
-        for(var child:screen.children())if(child instanceof Button button
-            && button.getMessage().getContents() instanceof TranslatableContents translated
-            && "selectWorld.create".equals(translated.getKey())) {
-            button.active=ready;
-            button.setTooltip(ready ? null : Tooltip.create(Component.translatable("worldsmith.creation.preparing")));
+        boolean enabled=!state.cancelled && !state.committed && !state.creationRequested;
+        boolean ownsButton=state.intent!=null || state.creationRequested || state.buttonOwned;
+        for(var child:screen.children()) {
+            if(ownsButton && child instanceof Button button
+                && button.getMessage().getContents() instanceof TranslatableContents translated
+                && "selectWorld.create".equals(translated.getKey())) {
+                button.active=enabled;
+                button.setTooltip(state.creationRequested ? Tooltip.create(Component.translatable("worldsmith.creation.preparing")) : null);
+            }
+            if(child instanceof net.minecraft.client.gui.components.CycleButton<?> cycle && cycle.getValue() instanceof WorldCreationUiState.WorldTypeEntry)
+                cycle.active=enabled && ((CreateWorldScreenAccessor)screen).worldsmith$getUiState().getWorldType().preset()!=null;
         }
+        state.buttonOwned=state.intent!=null || state.creationRequested;
     }
 
     private static boolean canCreate(CreateWorldScreen screen,ScreenState state) {
@@ -279,12 +300,22 @@ public final class WorldsmithWorldCreationBridge {
 
     /** onCreate is used by both the button and the Enter key. No stale/default preset may pass. */
     public static boolean allowCreate(CreateWorldScreen screen) {
-        var state=SCREENS.get(screen);
-        if(state==null || state.intent==null)return true;
-        if(!canCreate(screen,state)){creationBlocked(screen,state);return false;}
+        onScreenInitializing(screen);var state=SCREENS.get(screen);
+        if(state.cancelled || state.committed || state.creationRequested)return false;
+        // The create gesture is itself explicit ownership, even when the menu initially suggested a pack.
+        if(state.intent!=null && !state.intent.explicit())
+            bindIntent(screen,state,newIntent(state.intent.packId(),state.intent.displayName(),true));
+        if(state.intent==null){state.explicitVanilla=true;state.catalogChoiceInitialized=true;}
+        if(state.intent!=null && !canCreate(screen,state)) {
+            state.applyingPackId=null;state.repositoryId=null;state.presetKey=null;state.preparedContent=null;state.resourceReloading=false;
+            state.creationRequested=true;state.lastAttemptContext=null;state.lastAttemptPackId=null;state.publicationStatus=null;
+            resetNativeDimensions(screen,state);applyPack(screen,state);updateCreateButton(screen,state);return false;
+        }
+        if(state.intent==null && (hasGeneratedPacks(screen) || WorldContentClientRuntime.activeScope()!=null)) {
+            beginVanillaCreation(screen,state);return false;
+        }
         var ui=((CreateWorldScreenAccessor)screen).worldsmith$getUiState();
-        state.commitContext=ui.getSettings().worldgenLoadContext();
-        state.commitDimensions=ui.getSettings().selectedDimensions();
+        state.commitContext=ui.getSettings().worldgenLoadContext();state.commitDimensions=ui.getSettings().selectedDimensions();
         state.commitTicket=state.ticket;
         return true;
     }
@@ -292,8 +323,13 @@ public final class WorldsmithWorldCreationBridge {
     /** A confirmation dialog may outlive onCreate; check its captured request again before copying data. */
     public static boolean allowCreationCommit(CreateWorldScreen screen) {
         var state=SCREENS.get(screen);
-        if(state==null || state.intent==null)return true;
+        if(state==null)return true;
         var ui=((CreateWorldScreenAccessor)screen).worldsmith$getUiState();
+        if(state.intent==null) {
+            if(state.cancelled || state.creationRequested || hasGeneratedPacks(screen) || WorldContentClientRuntime.activeScope()!=null
+                || state.commitContext!=ui.getSettings().worldgenLoadContext() || state.commitDimensions!=ui.getSettings().selectedDimensions())return false;
+            state.committed=true;return true;
+        }
         if(!canCreate(screen,state) || state.commitContext!=ui.getSettings().worldgenLoadContext()
             || state.commitDimensions!=ui.getSettings().selectedDimensions() || state.commitTicket!=state.ticket) {
             creationBlocked(screen,state);Minecraft.getInstance().gui.setScreen(screen);return false;
@@ -320,31 +356,101 @@ public final class WorldsmithWorldCreationBridge {
             ? expected.intent().packId() : null;
     }
 
-	/** Called by Fabric after a Create World screen has initialized. */
-	public static void onScreenOpened(CreateWorldScreen screen) {
-		ScreenState state = SCREENS.computeIfAbsent(screen, ignored -> new ScreenState());
-		if (state.cancelled) return;
-        if (state.intent == null) {
-            var explicit = OPENINGS.get(((CreateWorldScreenAccessor)screen).worldsmith$getOnClose());
-            if (explicit != null) bindIntent(screen,state,explicit);
-            else if (defaultPackId != null) {
-                var pack = loadManagedPack(defaultPackId);
-                bindIntent(screen,state,newIntent(defaultPackId,pack.getManifest().getDisplayName(),false));
-            }
+    /** Runs before native WorldTab builds its CycleButton, so its value supplier can see menu-only choices. */
+    public static void onScreenInitializing(CreateWorldScreen screen) {
+        var state=SCREENS.computeIfAbsent(screen,ignored->new ScreenState());
+        if(state.cancelled)return;
+        WorldsmithWorldTypeMenu.attach(screen);
+        if(!state.initialized) {
+            state.initialized=true;state.resourceScope=WorldContentClientRuntime.activeScope();
+            var explicit=OPENINGS.get(((CreateWorldScreenAccessor)screen).worldsmith$getOnClose());
+            if(explicit!=null) {resetNativeDimensions(screen,state);bindIntent(screen,state,explicit);state.catalogChoiceInitialized=true;}
+            else if(WorldsmithWorldTypeMenu.isLegacyPreset(((CreateWorldScreenAccessor)screen).worldsmith$getUiState().getWorldType().preset()))resetNativeDimensions(screen,state);
         }
-		installStateListener(screen, state);
-        ScreenEvents.afterTick(screen).register(ignored->updateCreateButton(screen,state));
+        installStateListener(screen,state);
+    }
+    /** Selection changes are cheap. Only a user create gesture starts native preparation. */
+    public static void onScreenOpened(CreateWorldScreen screen) {
+        onScreenInitializing(screen);var state=SCREENS.get(screen);if(state.cancelled)return;
+        ScreenEvents.afterTick(screen).register(ignored->{
+            WorldsmithWorldTypeMenu.tick(screen);updateCreateButton(screen,state);resumeReadyCreation(screen,state);
+        });
         updateCreateButton(screen,state);
-		if (state.intent != null) {
-            var request = state.intent;
-            // schedule() queues even on the render thread; execute() may re-enter AFTER_INIT.
-			Minecraft.getInstance().schedule(() -> {
-				if (Minecraft.getInstance().gui.screen() == screen) {
-					if(state.intent==request && !state.cancelled)applyPack(screen, state);
-				}
-			});
-		}
-	}
+    }
+    private static void resumeReadyCreation(CreateWorldScreen screen,ScreenState state) {
+        var client=Minecraft.getInstance();
+        if(!state.creationRequested || state.cancelled || state.committed || client.gui.screen()!=screen || client.gui.overlay()!=null)return;
+        if(state.nativeTask!=null && !state.nativeTask.isDone())return;
+        boolean ready=state.intent!=null ? canCreate(screen,state) : !state.vanillaPreparing && !hasGeneratedPacks(screen) && WorldContentClientRuntime.activeScope()==null;
+        if(!ready)return;
+        state.creationRequested=false;updateCreateButton(screen,state);
+        ((CreateWorldScreenAccessor)screen).worldsmith$onCreate();
+    }
+    public static boolean creationInProgress(CreateWorldScreen screen) {var s=SCREENS.get(screen);return s!=null && (s.creationRequested || s.cancelled || s.committed);}
+    public static boolean changingTypeInternally(CreateWorldScreen screen) {var s=SCREENS.get(screen);return s!=null && s.internalWorldTypeChange;}
+    public static String selectedPackId(CreateWorldScreen screen) {var s=SCREENS.get(screen);return s==null || s.intent==null ? null : s.intent.packId();}
+    public static String selectedPackTitle(CreateWorldScreen screen) {var s=SCREENS.get(screen);return s==null || s.intent==null ? "" : s.intent.displayName();}
+    public static void catalogAvailable(CreateWorldScreen screen,List<com.wjz.worldsmith.core.mcp.ResourcePackSummary> packs) {
+        var s=SCREENS.get(screen);if(s==null || s.cancelled || s.catalogChoiceInitialized)return;
+        s.catalogChoiceInitialized=true;
+        if(s.intent==null && !s.explicitVanilla && defaultPackId!=null) packs.stream().filter(p->p.getBundleId().equals(defaultPackId)).findFirst()
+            .ifPresent(p->selectPack(screen,p.getBundleId(),p.getDisplayName(),false));
+    }
+    public static void selectPack(CreateWorldScreen screen,String id,String title,boolean explicit) {
+        if(id==null || !PACK_ID.matcher(id).matches())throw new IllegalArgumentException("Invalid world choice");
+        var s=SCREENS.computeIfAbsent(screen,ignored->new ScreenState());if(creationInProgress(screen))return;
+        if(s.intent!=null && s.intent.packId().equals(id) && (!explicit || s.intent.explicit()))return;
+        s.catalogChoiceInitialized=true;s.explicitVanilla=false;defaultPackId=id;
+        resetNativeDimensions(screen,s);bindIntent(screen,s,newIntent(id,title,explicit));
+        WorldsmithWorldTypeMenu.showSelected(screen);((CreateWorldScreenAccessor)screen).worldsmith$getUiState().onChanged();
+        updateCreateButton(screen,s);
+    }
+    public static void selectNativeWorld(CreateWorldScreen screen) {
+        var s=SCREENS.get(screen);if(s==null || creationInProgress(screen))return;
+        if(s.intent!=null)s.intent.cancel(screen);
+        ++s.serial;s.intent=null;s.ticket=null;s.applyingPackId=null;s.appliedPackId=null;s.validatedContext=null;
+        s.publicationStatus=null;s.publicationPackId=null;s.content=null;s.preparedContent=null;
+        s.commitContext=null;s.commitDimensions=null;s.commitTicket=null;
+        s.explicitVanilla=true;s.catalogChoiceInitialized=true;updateCreateButton(screen,s);
+    }
+    private static void resetNativeDimensions(CreateWorldScreen screen,ScreenState state) {
+        var ui=((CreateWorldScreenAccessor)screen).worldsmith$getUiState();
+        var normal=ui.getSettings().worldgenLoadContext().lookupOrThrow(Registries.WORLD_PRESET)
+            .get(net.minecraft.world.level.levelgen.presets.WorldPresets.NORMAL).orElseThrow();
+        state.internalWorldTypeChange=true;
+        try {ui.setWorldType(new WorldCreationUiState.WorldTypeEntry(normal));}
+        finally {state.internalWorldTypeChange=false;}
+    }
+    private static boolean hasGeneratedPacks(CreateWorldScreen screen) {
+        return ((CreateWorldScreenAccessor)screen).worldsmith$getUiState().getSettings().dataConfiguration().dataPacks().getEnabled().stream().anyMatch(id->id.startsWith(REPOSITORY_PREFIX));
+    }
+    private static void beginVanillaCreation(CreateWorldScreen screen,ScreenState state) {
+        state.creationRequested=true;state.vanillaPreparing=true;long serial=++state.serial;updateCreateButton(screen,state);
+        try {
+            if(!hasGeneratedPacks(screen)) {clearForVanilla(screen,state,serial);return;}
+            var access=(CreateWorldScreenAccessor)screen;var ui=access.worldsmith$getUiState();var repository=repository(access,ui.getSettings().dataConfiguration());
+            repository.setSelected(repository.getSelectedIds().stream().filter(id->!id.startsWith(REPOSITORY_PREFIX)).toList());
+            access.worldsmith$tryApplyNewDataPacks(repository,false,ignored->{state.creationRequested=false;state.vanillaPreparing=false;});
+            var task=state.nativeTask==null ? CompletableFuture.completedFuture(null) : state.nativeTask;
+            task.whenCompleteAsync((ignored,error)-> {
+                if(state.cancelled || state.serial!=serial || state.intent!=null)return;
+                if(error!=null || hasGeneratedPacks(screen)) {state.creationRequested=false;state.vanillaPreparing=false;updateCreateButton(screen,state);return;}
+                clearForVanilla(screen,state,serial);
+            },Minecraft.getInstance());
+        } catch(Exception failure){state.creationRequested=false;state.vanillaPreparing=false;Worldsmith.LOGGER.error("Vanilla world preparation failed",failure);updateCreateButton(screen,state);}
+    }
+    private static void clearForVanilla(CreateWorldScreen screen,ScreenState state,long serial) {
+        WorldContentClientRuntime.whenIdle().thenComposeAsync(ignored->{
+            if(state.cancelled || state.serial!=serial || state.intent!=null)return CompletableFuture.completedFuture(null);
+            String scope=WorldContentClientRuntime.activeScope();return scope==null ? CompletableFuture.completedFuture(null) : WorldContentClientRuntime.clear(scope);
+        },Minecraft.getInstance()).whenCompleteAsync((ignored,error)->{
+            if(state.cancelled || state.serial!=serial || state.intent!=null)return;
+            state.vanillaPreparing=false;
+            if(error!=null){state.creationRequested=false;Worldsmith.LOGGER.error("Vanilla asset restoration failed",error);}
+            else state.resourceScope=null;
+            updateCreateButton(screen,state);
+        },Minecraft.getInstance());
+    }
 
 	/** Legacy completion hook: requests authoring activation without acquiring a player's explicit selection. */
 	public static void activatePack(String packId) {
@@ -407,10 +513,12 @@ public final class WorldsmithWorldCreationBridge {
 	}
 
     private static void applyPack(CreateWorldScreen screen,ScreenState state) {
+        if(!state.creationRequested)return;
         if(state.cancelled || state.committed || state.intent==null)return;
         var intent=state.intent;
         String packId=intent.packId();
         if(com.wjz.worldsmith.client.content.WorldContentStartupBarrier.isLoading()) {
+            state.creationRequested=false;
             publish(state,packId,new PublicationStatus("WAITING_NATIVE_CONTEXT","A local world is starting; reopen Create World before publishing another bundle",List.of()));
             return;
         }
@@ -421,7 +529,9 @@ public final class WorldsmithWorldCreationBridge {
             && WorldContentResources.isLoaded(packId,state.content.contentHash())) {
             // Re-select explicitly if the player changed the preset on the same screen.
             var preset=state.validatedContext.lookupOrThrow(Registries.WORLD_PRESET).getOrThrow(state.appliedPresetKey);
-            uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));
+            state.internalWorldTypeChange=true;
+            try {uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));}
+            finally {state.internalWorldTypeChange=false;}
             if(state.appliedSeed!=null)uiState.setSeed(Long.toString(state.appliedSeed));
             publish(state,packId,new PublicationStatus("PUBLISHED","Native export, reload and preset activation succeeded",List.of()));return;
         }
@@ -452,7 +562,7 @@ public final class WorldsmithWorldCreationBridge {
                 if(state.serial!=serial || state.intent!=intent || !intent.owns(screen,ticket) || !packId.equals(state.applyingPackId))return;
                 if(failure!=null){state.applyingPackId=null;failed(state,packId,failure);updateCreateButton(screen,state);return;}
                 if(Minecraft.getInstance().gui.screen()!=screen || uiState.getSettings().worldgenLoadContext()!=context) {
-                    state.applyingPackId=null;publish(state,packId,new PublicationStatus("WAITING_NATIVE_CONTEXT","Creation context changed; return to Create World to retry",List.of()));return;
+                    state.applyingPackId=null;state.creationRequested=false;publish(state,packId,new PublicationStatus("WAITING_NATIVE_CONTEXT","Creation context changed; return to Create World to retry",List.of()));return;
                 }
                 try {
                     var compiled=exported.compiled();
@@ -488,7 +598,7 @@ public final class WorldsmithWorldCreationBridge {
 	) {
 		String packId = state.applyingPackId;
 		ResourceKey<WorldPreset> presetKey = state.presetKey;
-		if (packId == null || presetKey == null || state.resourceReloading || state.cancelled || state.intent == null) {
+		if (packId == null || presetKey == null || state.resourceReloading || state.cancelled || state.intent == null || !state.creationRequested) {
 			return;
 		}
 		if (!uiState.getSettings().dataConfiguration().dataPacks().getEnabled().contains(state.repositoryId)) {
@@ -516,7 +626,7 @@ public final class WorldsmithWorldCreationBridge {
         WorldContentClientRuntime.whenIdle().thenRunAsync(()-> {
             if(state.serial!=serial || state.intent!=intent || !intent.owns(screen,ticket))return;
             if(uiState.getSettings().worldgenLoadContext()!=targetContext) {
-                state.resourceReloading=false;state.applyingPackId=null;
+                state.resourceReloading=false;state.applyingPackId=null;state.creationRequested=false;
                 publish(state,packId,new PublicationStatus("WAITING_NATIVE_CONTEXT","Native context changed before client activation; retry this creation request",List.of()));
                 return;
             }
@@ -525,16 +635,18 @@ public final class WorldsmithWorldCreationBridge {
                 if(state.serial!=serial || state.intent!=intent || !intent.owns(screen,ticket)
                     || uiState.getSettings().worldgenLoadContext()!=targetContext) {
                     if(failure==null)content.rollback().exceptionally(rollback->{Worldsmith.LOGGER.error("Stale publication rollback failed",rollback);return null;});
-                    if(state.serial==serial){state.applyingPackId=null;state.resourceReloading=false;}
+                    if(state.serial==serial){state.applyingPackId=null;state.resourceReloading=false;state.creationRequested=false;}
                     return;
                 }
                 state.resourceReloading=false;state.applyingPackId=null;state.repositoryId=null;state.presetKey=null;state.seed=null;
                 if(failure!=null){state.appliedPackId=null;state.validatedContext=null;failed(state,packId,failure);updateCreateButton(screen,state);return;}
                 try {
-                    uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));
+                    state.internalWorldTypeChange=true;
+                    try {uiState.setWorldType(new WorldCreationUiState.WorldTypeEntry(preset));}
+                    finally {state.internalWorldTypeChange=false;}
                     if(seed!=null)uiState.setSeed(Long.toString(seed));
                     state.appliedPackId=packId;state.appliedPresetKey=presetKey;state.appliedSeed=seed;state.validatedContext=targetContext;
-                    state.appliedRepositoryId=repositoryId;
+                    state.appliedRepositoryId=repositoryId;state.resourceScope=packId;
                     publish(state,packId,new PublicationStatus("PUBLISHED","The selected creation request passed native data validation, verified asset activation and preset binding",List.of()));
                     updateCreateButton(screen,state);
                     Worldsmith.LOGGER.info("Worldsmith creation request {} bound bundle {} to preset {}",intent.requestId(),packId,presetKey.identifier());
@@ -659,7 +771,7 @@ public final class WorldsmithWorldCreationBridge {
 		}
 		try {
 			String id = Files.readString(file, StandardCharsets.UTF_8).trim();
-			loadManagedPack(id);
+			if(!PACK_ID.matcher(id).matches() || !Files.isDirectory(WorldsmithMcpService.packDirectory().resolve(id),java.nio.file.LinkOption.NOFOLLOW_LINKS))return null;
 			return id;
 		} catch (Exception failure) {
 			Worldsmith.LOGGER.warn("Ignoring invalid Worldsmith active-pack selection in {}", file, failure);
@@ -668,9 +780,12 @@ public final class WorldsmithWorldCreationBridge {
 	}
 
 	private static final class ScreenState {
+
 		private WorldCreationIntent intent;
         private WorldCreationIntent.Ticket ticket;
         private boolean cancelled, cancelReady, committed;
+        private boolean initialized, catalogChoiceInitialized, explicitVanilla, creationRequested, vanillaPreparing, internalWorldTypeChange, buttonOwned;
+        private String resourceScope;
         private CompletableFuture<?> exportTask, nativeTask;
 		private boolean listenerInstalled;
 		private String applyingPackId;
@@ -708,13 +823,17 @@ public final class WorldsmithWorldCreationBridge {
         state.resourceReloading=false;state.publicationStatus=null;state.publicationPackId=null;
         state.commitContext=null;state.commitDimensions=null;state.commitTicket=null;state.committed=false;
         DISPLAY_NAMES.put(intent.packId(),intent.displayName());
+        publish(state,intent.packId(),new PublicationStatus("WAITING_CREATION","The selected world will be prepared when Create New World is pressed",List.of()));
+        WorldsmithWorldTypeMenu.showSelected(screen);
         Worldsmith.LOGGER.info("Worldsmith creation request {} selected bundle {} (explicit={})",intent.requestId(),intent.packId(),intent.explicit());
     }
 
     /** File IO and validation only; called by the library worker and never changes a selection. */
     static CreationSelection prepareCreationSelection(String packId) {
-        WorldsmithPack pack = loadManagedPack(packId);
-        return new CreationSelection(packId, pack.getManifest().getDisplayName());
+        var exchange=new com.wjz.worldsmith.core.mcp.ResourcePackExchange(WorldsmithMcpService.packDirectory());
+        var summary=exchange.listPacks(com.wjz.worldsmith.core.mcp.ResourcePackExchange.MAX_LISTED).stream()
+            .filter(p->p.getBundleId().equals(packId)).findFirst().orElseThrow(()->new IllegalArgumentException("World pack is no longer in the library"));
+        return new CreationSelection(summary.getBundleId(),summary.getDisplayName());
     }
 
     /** The unique close callback binds openFresh's exact screen even while managedBlock pumps queued MCP work. */
@@ -732,6 +851,8 @@ public final class WorldsmithWorldCreationBridge {
     }
 
     record CreationSelection(String id, String displayName) {}
+    private record MenuReloadToken(ScreenState state,long serial) {}
+    private record VanillaReloadToken(ScreenState state,long serial) {}
     private record NativeReloadToken(ScreenState state,WorldCreationIntent intent,WorldCreationIntent.Ticket ticket) {}
     private record StartupExpectation(WorldCreationIntent intent,String folder) {}
     private record Exported(CompiledPack compiled,WorldContentRuntime.Prepared content) {}

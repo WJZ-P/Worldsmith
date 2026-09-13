@@ -15,6 +15,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /** Native button/Enter/confirmation guards, plus ownership for vanilla's async data-pack callbacks. */
 @Mixin(CreateWorldScreen.class)
 public abstract class CreateWorldCreationGuardMixin {
+    @Inject(method="init",at=@At("HEAD"))
+    private void worldsmith$attachMenuBeforeTabs(CallbackInfo ci) {
+        WorldsmithWorldCreationBridge.onScreenInitializing((CreateWorldScreen)(Object)this);
+    }
     @Inject(method="onCreate",at=@At("HEAD"),cancellable=true)
     private void worldsmith$gateCreate(CallbackInfo ci) {
         if(!WorldsmithWorldCreationBridge.allowCreate((CreateWorldScreen)(Object)this))ci.cancel();
