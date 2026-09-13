@@ -37,6 +37,7 @@ public class CreatureEntity extends PathfinderMob {
     private static final EntityDataAccessor<Integer> ACTION = SynchedEntityData.defineId(CreatureEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> BOSS_PHASE = SynchedEntityData.defineId(CreatureEntity.class, EntityDataSerializers.INT);
     private CreatureDefinition configured;
+    private CreatureSoundProfile soundProfile;
     private BlockPos origin;
     private boolean diagnosed;
     private boolean suspendedForMissing;
@@ -84,6 +85,7 @@ public class CreatureEntity extends PathfinderMob {
 
     private void configure(CreatureDefinition d, boolean fresh) {
         configured = d;
+        soundProfile = CreatureSounds.profile(d);
         var a = d.getAttributes();
         getAttribute(Attributes.MAX_HEALTH).setBaseValue(a.getHealth());
         getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(a.getSpeed());
@@ -201,8 +203,33 @@ public class CreatureEntity extends PathfinderMob {
     }
 
     @Override public void die(DamageSource source) {
+        boolean alreadyDead = dead;
         super.die(source);
+        if (!alreadyDead && dead) playCreatureSound(CreatureSoundRole.DEATH);
         if(isDeadOrDying()){clearBossBar();bossTrackedPlayers.clear();}
+    }
+
+    /** Server broadcasts each vocal once. Native client hurt/death animation hooks remain silent. */
+    @Override protected net.minecraft.sounds.SoundEvent getHurtSound(DamageSource source) { return null; }
+    @Override protected net.minecraft.sounds.SoundEvent getDeathSound() { return null; }
+    @Override public void playAmbientSound() { if (isAlive()) playCreatureSound(CreatureSoundRole.AMBIENT); }
+    @Override public int getAmbientSoundInterval() { return soundProfile == null ? 200 : soundProfile.getAmbientIntervalTicks(); }
+    @Override protected void playHurtSound(DamageSource source) {
+        super.playHurtSound(source); // Retain Mob's ambient cooldown reset; getHurtSound is intentionally null.
+        playCreatureSound(CreatureSoundRole.HURT);
+    }
+    @Override public net.minecraft.sounds.SoundSource getSoundSource() {
+        var d = definition();
+        return d != null && d.getCategory() == CreatureCategory.HOSTILE
+            ? net.minecraft.sounds.SoundSource.HOSTILE : net.minecraft.sounds.SoundSource.NEUTRAL;
+    }
+    private void playCreatureSound(CreatureSoundRole role) {
+        if (!(level() instanceof ServerLevel) || isSilent() || suspendedForMissing || soundProfile == null) return;
+        var current = definition();
+        if (current == null || current != configured || !CreatureRuntime.matchesHost(getType(), current)) return;
+        var cue = CreatureSounds.cue(soundProfile, role);
+        if (cue.getSound() == CreatureSound.SILENT || cue.getVolume() <= 0) return;
+        playSound(CreatureSoundRuntime.event(cue.getSound()), cue.getVolume(), CreatureSounds.playbackPitch(cue, random.nextFloat()));
     }
 
     @Override public void onRemoval(Entity.RemovalReason reason) {
@@ -318,7 +345,7 @@ public class CreatureEntity extends PathfinderMob {
             if (frame.getState() == CreatureCombatState.CHASE) {
                 if (nextPath-- <= 0) { getNavigation().moveTo(target, 1.1); nextPath = 10; }
             } else getNavigation().stop();
-            if (decision.getStrike()) { swing(InteractionHand.MAIN_HAND); doHurtTarget((ServerLevel)level(), target); }
+            if (decision.getStrike()) { swing(InteractionHand.MAIN_HAND); playCreatureSound(CreatureSoundRole.ATTACK); doHurtTarget((ServerLevel)level(), target); }
         }
     }
 }

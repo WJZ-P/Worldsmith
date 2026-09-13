@@ -43,6 +43,7 @@ public final class CreatureRuntime {
 
     public static synchronized void register() {
         if (passive != null) return;
+        CreatureSoundRuntime.initialize();
         var passiveKey = ResourceKey.create(Registries.ENTITY_TYPE, Identifier.parse(PASSIVE_ID));
         var hostileKey = ResourceKey.create(Registries.ENTITY_TYPE, Identifier.parse(HOSTILE_ID));
         var encounterKey = ResourceKey.create(Registries.ENTITY_TYPE, Identifier.parse(ENCOUNTER_BOSS_ID));

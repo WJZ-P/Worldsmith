@@ -40,11 +40,12 @@ object LegacyCreaturesV3 {
         val oldDefinitions = creatures.map { entry ->
             val fields = entry.jsonObject
             val drops = fields["drops"]
+            require(fields["sounds"] == null || fields["sounds"] == JsonNull) { "Format 3 contains no authored sounds; use format 6 and creature module schema 3" }
             require(fields["boss"] == null || fields["boss"] == JsonNull) {"Format 3 contains no Boss profile; publish it through format 5 and creature module schema 2"}
             require(drops == null || drops == JsonNull || drops is JsonArray && drops.isEmpty()) {
                 "Format 3 contains no creature drop rules; publish new linked content as a current-format bundle"
             }
-            JsonObject(fields - "drops" - "boss")
+            JsonObject(fields - "drops" - "boss" - "sounds")
         }
         return WorldsmithJson.format.decodeFromJsonElement(Library.serializer(), JsonObject(document + ("creatures" to JsonArray(oldDefinitions))))
     }

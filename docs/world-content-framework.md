@@ -187,3 +187,10 @@ items schema 1 保持普通资源／遗物；schema 2 可选 equipment、consuma
 格式 4 保持其八模块及原域、quests 为空；格式 3 保持七模块、旧生物字段投影、items/quests 为空。
 格式5继续保留其既有任务与普通物品；新内容使用格式6，schema2能力不回填旧包。素材生成服务不与 AI 厂商绑定：确定性像素配方、专用 inbox 导入、实际 PNG
 校验／哈希／模型预览都通过 MCP 公开。外部生图模型由调用方自己提供，参见 [贴图复用](texture-authoring.md)。
+
+
+## 生物声音
+
+Creature schema 3 支持原版声线选择与音高／音量调制，覆盖环境、受伤、死亡、攻击。
+旧包在运行时自动匹配默认声音，不重写包或存档。新配方请显式设计 sounds；
+详见 [生物声音词汇表与创作参数](creature-sounds.md)。

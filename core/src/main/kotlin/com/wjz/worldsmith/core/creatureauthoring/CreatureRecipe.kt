@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 
-/** Authoring input only. Runtime schema 2 explicitly enables boss phases; ordinary schema-1 recipes stay unchanged. */
+/** Authoring input only. Schema 2 enables bosses, schema 3 enables vanilla voices; old recipe identities stay unchanged. */
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
 data class CreatureRecipe(
@@ -26,6 +26,8 @@ data class CreatureRecipe(
     val drops: List<CreatureDrop> = emptyList(),
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val boss: CreatureBossProfile? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val sounds: CreatureSoundProfile? = null,
 )
 
 @Serializable

@@ -96,7 +96,7 @@ object ExistingWorldContentModules {
             ContentContribution(library.items.mapIndexed { i, item -> ContentEntry(ContentKey("item", item.id), "items", "items.items[$i]", assets = listOfNotNull(item.textureAsset, item.equipment?.textureAsset)) },
                 diagnostics = CustomItemValidation.validate(library).map { it.copy(path = "items.${it.path}") })
         },
-        TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1, 2), compileAfter = listOf("biomes"), requirements = listOf(
+        TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1, 2, 3), compileAfter = listOf("biomes"), requirements = listOf(
             ContentRequirement("creatures.native_hosts", 1, ContentLifecycle.BOOTSTRAP),
             ContentRequirement("assets.entity_models", 1, ContentLifecycle.CLIENT_RESOURCES),
             ContentRequirement("creatures.world_behaviors", 1, ContentLifecycle.WORLD_BINDING),

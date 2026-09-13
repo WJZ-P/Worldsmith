@@ -25,7 +25,7 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
             McpTool("worldsmith_get_creature_authoring_contract","Read creature construction and preview contract",
                 "Read the version-independent bone/cube builder recipe, mirroring, automatic UV layout and frozen preview flow. Optional Boss profiles use the installed bounded phase system, never arbitrary Java tick code.",McpJson.schema(emptyMap(),emptyList()),true,handler={
                     val text=javaClass.classLoader.getResourceAsStream("prompts/contract/creature_authoring.system.md")?.bufferedReader()?.use {it.readText()} ?: error("Missing creature authoring contract")
-                    McpToolResult.success(buildJsonObject {put("contract",text);put("views",McpJson.encode(CreaturePreview.VIEWS));put("poses",McpJson.encode(CreaturePose.POSES));put("runtimeSchemas",McpJson.encode(listOf(1,2)))})
+                    McpToolResult.success(buildJsonObject {put("contract",text);put("views",McpJson.encode(CreaturePreview.VIEWS));put("poses",McpJson.encode(CreaturePose.POSES));put("runtimeSchemas",McpJson.encode(listOf(1,2,3)));put("soundVocabulary",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.vocabulary()));put("soundVoices",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.voices()))})
                 }),
             McpTool("worldsmith_build_creature","Build a frozen creature model candidate",
                 "Compile a CreatureRecipe: named bones/cubes, mirrored limbs and automatic box UVs. Optional textureAsset must already be attached to the session. Without it the output is a diagnostic UV guide, not a final skin. Saves an immutable build artifact, but never changes content drafts or activates a world.",
@@ -95,7 +95,7 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
     private fun payload(sid:String,id:String,record:BuildRecord)=buildJsonObject {
         put("sessionId",sid);put("buildId",id);put("recipe",McpJson.encode(record.recipe));put("definition",McpJson.encode(record.definition))
         put("uvLayout",McpJson.encode(record.uvLayout));put("texture",McpJson.encode(record.texture));put("textureGuideOnly",record.textureGuideOnly)
-        put("readyForContentDraft",!record.textureGuideOnly);put("runtimeSchema",if(record.definition.boss==null)1 else 2);put("worldActivated",false)
+        put("readyForContentDraft",!record.textureGuideOnly);put("runtimeSchema",com.wjz.worldsmith.core.content.CreatureSounds.requiredSchema(record.definition));put("worldActivated",false)
         put("publication",if(record.textureGuideOnly)"Paint the guide and attach the real PNG; rebuild with textureAsset. Guide textures are not auto-attached to world content." else "Merge this definition into the session CreatureLibrary using put_content_modules at the current revision; do not replace other species accidentally.")
     }
     private fun read(sid:String,id:String):BuildRecord {

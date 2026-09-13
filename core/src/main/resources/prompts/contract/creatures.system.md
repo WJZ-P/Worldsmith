@@ -12,9 +12,9 @@ and multipart bosses have no schema fields in this module.
 
 ## Exact library and definition fields
 
-`CreatureLibrary` has `schemaVersion` (1 by default, or 2) and `creatures`.
+`CreatureLibrary` has `schemaVersion` (1 by default, or 2/3) and `creatures`.
 Schema 1 preserves ordinary creature definitions and omits `boss`. A non-null
-`boss` requires schema 2 and current bundle format 6; formats 3/4 reject Boss
+`boss` requires schema 2 or 3 and current bundle format 6; formats 3/4 reject Boss
 semantics rather than silently dropping them. An empty library is valid outside
 a complete-world plan's named coverage promises; the maximum is 128 definitions.
 Each definition has exactly:
@@ -29,6 +29,8 @@ Each definition has exactly:
   ecological/narrative function; it is not executable behavior.
 - `drops`: optional bounded death-reward list; see Obtainable rewards below.
 - `boss`: optional `CreatureBossProfile` below; absent/null means ordinary behavior.
+- `sounds`: optional `CreatureSoundProfile` below; requires schema 3. Design one for new species.
+- `sounds`: optional `CreatureSoundProfile` below; requires schema 3. Author one for each new species; omission is legacy automatic matching.
 
 ### Model and coordinates
 
@@ -116,7 +118,7 @@ state-machine, event, script, spell or animation-JSON fields.
 
 ## Schema 2 Boss profile
 
-Use `category: "HOSTILE"`, `CreatureLibrary.schemaVersion: 2`, and an explicit
+Use `category: "HOSTILE"`, `CreatureLibrary.schemaVersion: 2` (3 with sounds), and an explicit
 `boss` object. A large model, name or health number alone does not create a Boss.
 The exact profile fields and defaults are:
 
@@ -165,7 +167,7 @@ For a real landmark encounter, use StructureProgram's
 `a.bossSpawner(at, creatureId[, respawnTicks, requiredPlayerRange, spawnRange])`;
 read `worldsmith_get_contract(id:"draw", section:"boss-encounters")` for both exact
 overloads, typed `boss_spawner` fields, room clearance and native checks. This route
-needs structure module schema 2 as well as creature schema 2. It uses a separate
+needs structure module schema 2 as well as creature schema 2 or 3. It uses a separate
 encounter host with a local cap, not natural habitat/light/chance/spacing selection.
 Declare `contains_encounter` (structure -> creature) and `kill_objective`
 (quest -> creature) in a complete-world design plan when those are actual promises.
@@ -208,8 +210,9 @@ mirrored limbs and automatic box UVs compile to this same runtime schema. Inspec
 A diagnostic UV guide is not a finished skin. Upload a painted PNG of the exact
 atlas size, rebuild with textureAsset, then merge the returned definition into the
 current CreatureLibrary at its shared draft revision. Build artifacts never activate
-a world. A Boss recipe must set recipe.schemaVersion=2 and carry its actual `boss`
-profile; the build reply reports runtimeSchema=2. Merge it into a schema-2 library.
+a world. A Boss recipe uses schemaVersion=2 without authored sounds, or 3 with
+authored sounds, and carries its actual `boss` profile. Merge into a library whose
+schemaVersion is at least the build reply runtimeSchema; never downgrade a schema-3 library.
 Preview with `worldsmith_preview_creature(sessionId, buildId, mode:"sheet", bossPhase:1)`;
 the exact argument is `bossPhase`, zero-based and bounded by the actual 2..3 phases.
 Ordinary creatures accept only phase 0. Model/sheet previews use that phase's shared
@@ -228,3 +231,57 @@ Keep drops in the authoring recipe when rebuilding a creature. Main-line gamepla
 uses the separate `quests` module: a real kill_creature objective can target the
 Boss, and a claimed quest reward can guarantee a later delivery item independently
 of random Boss drops. Death loot and quest rewards are distinct producers.
+
+
+## Vanilla voice selection and modulation (schema 3)
+
+For each newly authored species, design its voice as well as its appearance:
+use creature/recipe schema 3 with a sounds profile. Reuse vanilla events, never
+invent an audio asset or an event ID. The contract tool response soundVocabulary
+lists the exact installed aliases and vanilla IDs; soundVoices lists each voice's
+ambient/hurt/death/attack mappings.
+
+sounds fields: voice; pitch (default 1, finite 0.5..2); volume (default 0.7,
+finite 0..2); pitchVariation (default 0.08, finite 0..0.2); ambientIntervalTicks
+(default 200, integer 120..2400). Optional ambient, hurt, death, attack replace
+that single role with a complete cue: {sound, pitch:1, volume:0.7, pitchVariation:0.08}.
+Cue values are absolute replacements, not multipliers or inherited profile fields.
+Omitted cues use the voice event and profile modulation. sound:SILENT or cue
+volume 0 deliberately mutes a role. Profile volume 0 mutes only inherited cues.
+No steps, music, loops or arbitrary scripts.
+
+Voices: COW, SHEEP, PIG, CHICKEN, RABBIT, WOLF, FOX, CAT, SPIDER, ZOMBIE,
+SKELETON, ENDERMAN, BLAZE, GHAST, SLIME, IRON_GOLEM, RAVAGER, POLAR_BEAR.
+Choose by body/material/temperament: stone guardian -> golem with low pitch;
+small bird -> chicken with restrained higher pitch; frost predator -> wolf with
+lower pitch; spirit -> ghast at low volume. Do not give every species the same roar.
+IRON_GOLEM has no ambient event by default; several passive voices have no attack
+event. Use an explicit installed cue if the species needs one.
+
+Example sounds field for a frost predator (library and recipe schemaVersion=3):
+~~~json
+{
+  "voice": "WOLF", "pitch": 0.75, "volume": 0.65,
+  "pitchVariation": 0.06, "ambientIntervalTicks": 260,
+  "attack": {"sound": "POLAR_BEAR_WARNING", "pitch": 0.8, "volume": 0.9, "pitchVariation": 0.04},
+  "death": {"sound": "WOLF_DEATH", "pitch": 0.65, "volume": 0.8, "pitchVariation": 0.03}
+}
+~~~
+
+These are vanilla playback-rate/pitch and volume changes, not timbre synthesis,
+equalization, reverberation or new recordings. Final pitch is clamped to 0.5..2.
+Variation is sampled once per server playback; volume also affects audible distance.
+Prefer ambient volumes 0.3..0.8 and reserve stronger calls for attacks. Ambient
+uses vanilla scheduling: cooldown plus random delay, not an exact metronome.
+Attack plays once on a valid melee strike, not every animation tick; its audio
+does not grant ranged attacks or other combat capabilities. Server-only broadcasts
+respect Silent and the neutral/hostile volume sliders; client death/hurt animations
+do not duplicate these vocals. Model previews preserve voices but do not audition them.
+
+Legacy schema 1/2 omit sounds from canonical serialization. Live entities receive
+a deterministic name/category/body-size fallback without editing old bundles or
+save identities. Explicit sounds require bundle format 6 and creature schema 3;
+schema 3 also accepts Boss fields. Preserve sounds, geometry, texture, drops and
+Boss phases during rebuilding. Merge libraries at the maximum required schema;
+never downgrade schema 3 when adding an ordinary definition. Java Builder.sounds
+accepts CreatureSoundProfile and automatically selects recipe schema 3.

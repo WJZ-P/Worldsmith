@@ -56,6 +56,9 @@ class ItemFormat6CompatibilityTest {
             val encoded = WorldContentBundleIO.encode(pack)
             assertEquals(id, encoded.manifest.id)
             assertFalse(encoded.texts.getValue("items.json").contains("\"equipment\""))
+            pack.creatures.creatures.forEach { CreatureSounds.profile(it) }
+            assertFalse(encoded.texts.getValue("creatures.json").contains("\"sounds\""))
+            assertEquals(id, WorldContentBundleIO.encode(pack).manifest.id)
         }
     }
 }

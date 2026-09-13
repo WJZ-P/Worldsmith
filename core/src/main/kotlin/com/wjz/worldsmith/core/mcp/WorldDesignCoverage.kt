@@ -153,7 +153,7 @@ object WorldDesignCoverage {
             value.spawn.biomes.forEach { link(owner, key("biome", it), DesignRelation.SPAWNS_IN_BIOME) }
             if (value.spawn.weight > 0 && value.spawn.minGroup > 0 && value.spawn.biomes.any { it in biomeIds }) spawned += value.id
             val profile = McpJson.encode(value).jsonObject["boss"]
-            if (creatures?.schemaVersion == 2 && profile is JsonObject) bosses += value.id
+            if (creatures?.schemaVersion in 2..3 && profile is JsonObject) bosses += value.id
             value.drops.filter { it.chance > 0 && it.maxCount > 0 }.forEach { drop -> item(drop.item)?.let { link(owner, it, DesignRelation.DROPS_ITEM) } }
         }
         val beatIds = theme?.beats.orEmpty().map { it.id }.toSet()
@@ -181,7 +181,7 @@ object WorldDesignCoverage {
                 interactions.filterIsInstance<StructureInteraction.BossSpawner>().forEach { spawner ->
                     link(owner, key("creature", spawner.creatureId), DesignRelation.CONTAINS_ENCOUNTER)
                     val creature = creatures?.creatures?.find { it.id == spawner.creatureId }
-                    if (structures.schemaVersion == 2 && creatures?.schemaVersion == 2 && creature?.boss != null &&
+                    if (structures.schemaVersion == 2 && creatures?.schemaVersion in 2..3 && creature?.boss != null &&
                         creature.category == CreatureCategory.HOSTILE && spawner.respawnTicks in 200..30000 &&
                         spawner.requiredPlayerRange in 8..32 && spawner.spawnRange in 1..8 &&
                         (value.placement.region?.chance ?: 1.0) > 0 && value.placement.biomes.any { it in biomeIds })

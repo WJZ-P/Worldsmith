@@ -189,8 +189,9 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         require(module in setOf("theme","blocks","creatures","items","quests","world_design")) {"Use worldsmith_get_contract for other worldgen domains"}
         val text=javaClass.classLoader.getResourceAsStream("prompts/contract/$module.system.md")?.bufferedReader()?.use {it.readText()} ?: error("Missing content contract: $module")
         return McpToolResult.success(buildJsonObject {
-            put("module",module);put("schemaVersion",if(module=="creatures")2 else 1);put("contract",text)
-            if(module=="creatures") {put("supportedSchemaVersions",McpJson.encode(listOf(1,2)));put("defaultSchemaVersion",1)}
+            put("module",module);put("schemaVersion",if(module=="creatures")3 else 1);put("contract",text)
+            if(module=="creatures"){put("soundVocabulary",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.vocabulary()));put("soundVoices",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.voices()))}
+            if(module=="creatures") {put("supportedSchemaVersions",McpJson.encode(listOf(1,2,3)));put("defaultSchemaVersion",1)}
         })
     }
 }

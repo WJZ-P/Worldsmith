@@ -2,9 +2,10 @@
 
 New publications use bundle format 6. Formats 3/4/5 retain their original read-only content identities; minimum-version notes below describe when an existing feature first became available.
 
-The creature authoring layer compiles data into runtime schema 1 or 2. Ordinary
+The creature authoring layer compiles data into runtime schema 1, 2 or 3. Ordinary
 recipes default to schema 1; explicit schema 2 adds the installed bounded Boss
-profile and 2..3 melee phases. A Boss-looking model alone remains ordinary behavior.
+profile and 2..3 melee phases. Schema 3 adds vanilla sound selection and modulation
+for both ordinary creatures and Bosses. A Boss-looking model alone remains ordinary behavior.
 Recipes are data, not Java tick code or an arbitrary gameplay interpreter. World
 placement is a separate natural habitat or typed structure encounter declaration.
 
@@ -25,8 +26,9 @@ placement is a separate natural habitat or typed structure encounter declaration
    skin when sizes, cube IDs, or packing change.
 7. Merge the returned definition into the current `CreatureLibrary` using
    `worldsmith_put_content_modules` at expectedRevision. Preserve other species;
-   if `runtimeSchema=2`, use CreatureLibrary.schemaVersion=2 rather than putting a
-   Boss profile into a schema-1 envelope.
+   use a CreatureLibrary.schemaVersion at least as high as every definition
+   runtimeSchema (sounds=3, Boss without sounds=2, ordinary without sounds=1).
+   Never downgrade an existing schema-3 envelope when merging an ordinary creature.
 8. Publish with the normal whole-bundle write/finish flow. A build artifact is not
    an active world or an automatically committed creature draft.
 
@@ -74,9 +76,10 @@ pose views for matching markings, a clear face and readability at game distance.
 }
 ```
 
-Optional `attributes`, `behavior`, `spawn`, `drops`, and `boss` are exactly the fields
+Optional `attributes`, `behavior`, `spawn`, `drops`, `boss`, and `sounds` are exactly the fields
 from the creature runtime contract; they do not become new behavior scripts. A
-non-null `boss` requires explicit recipe.schemaVersion=2; keep it and its drops when
+non-null `boss` requires recipe.schemaVersion=2 or 3; non-null `sounds` requires
+recipe.schemaVersion=3. Keep sounds, boss and drops when
 rebuilding a textured model. Defaults are
 provided by the current runtime DTOs. The illustrated model is a field-shape example,
 not a complete art-directed creature.
@@ -131,3 +134,15 @@ optional `.boss(CreatureBossProfile)` (automatically selects recipe schema 2), t
 `.recipe()`, `.guide()` or `.build(textureSha256)`. The result remains typed runtime
 data. The optional local CLI/sample is for developers; MCP requires no local
 Java compilation by its caller and never executes a recipe's text as code.
+
+
+## Sound authoring
+
+Every new species should include deliberate sounds and recipe schemaVersion=3.
+Read the creatures contract for exact fields; this tool also returns soundVocabulary
+(allowed aliases to real vanilla IDs) and soundVoices (default role mappings).
+Select a plausible vanilla voice, restrained volume and body-appropriate pitch,
+then optional per-role overrides. Keep sounds when rebuilding with painted textures;
+it is independent of UVs and needs no audio asset. Offline model previews preserve
+sound metadata but do not audition audio. Builder.sounds(CreatureSoundProfile)
+automatically selects schema 3, including recipes that also contain a Boss profile.

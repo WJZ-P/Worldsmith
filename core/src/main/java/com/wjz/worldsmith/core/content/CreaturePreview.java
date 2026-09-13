@@ -188,7 +188,7 @@ public final class CreaturePreview {
 
     private static CreatureDefinition validate(CreatureDefinition definition, byte[] png) {
         Objects.requireNonNull(definition); Objects.requireNonNull(png);
-        var library = new CreatureLibrary(definition.getBoss()==null?1:2, List.of(definition)); var diagnostics = CustomCreatureValidator.validate(library);
+        var library = new CreatureLibrary(CreatureSounds.requiredSchema(definition), List.of(definition)); var diagnostics = CustomCreatureValidator.validate(library);
         if (!diagnostics.isEmpty()) throw new IllegalArgumentException("Invalid creature preview input: " + diagnostics.stream().limit(8).toList());
         String hash = definition.getModel().getTexture();
         var size = ContentAssetValidation.INSTANCE.verify(new ContentAsset(hash, hash, "image/png", (long)png.length, "assets/" + hash + ".png"), png);

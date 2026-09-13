@@ -27,6 +27,9 @@ data class CreatureDefinition @JvmOverloads constructor(
     /** Schema-1 documents omit this field entirely, including under encodeDefaults=true. */
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val boss: CreatureBossProfile? = null,
+    /** Schema 3 opt-in; absent on legacy documents so their immutable hashes remain unchanged. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val sounds: CreatureSoundProfile? = null,
 )
 
 /** Independent bounded rolls; each successful entry produces one complete item stack. */
@@ -95,7 +98,7 @@ data class CreatureSpawn(
     val maxLight: Int = 15,
 )
 
-/** Limits are versioned contracts: schema 1 remains unchanged; schema 2 explicitly adds bounded boss profiles. */
+/** Versioned contracts: schema 1 is preserved; schema 2 adds bosses; schema 3 adds bounded vanilla voices. */
 object CustomCreatureValidator {
     const val MAX_CREATURES = 128
     const val MAX_BONES = 64
@@ -114,7 +117,7 @@ object CustomCreatureValidator {
     @JvmStatic fun validate(library: CreatureLibrary): List<Diagnostic> {
         val result = mutableListOf<Diagnostic>()
         fun error(path: String, message: String) { result += Diagnostic(path, "creature.invalid", DiagnosticSeverity.ERROR, message) }
-        if (library.schemaVersion !in 1..2) error("creatures.schemaVersion", "Supported creature schemaVersions are 1 and 2")
+        if (library.schemaVersion !in 1..3) error("creatures.schemaVersion", "Supported creature schemaVersions are 1, 2 and 3")
         if (library.creatures.size > MAX_CREATURES) error("creatures.creatures", "At most $MAX_CREATURES creature definitions are supported")
         val ids = mutableSetOf<String>()
         library.creatures.forEachIndexed { i, c ->
@@ -123,7 +126,9 @@ object CustomCreatureValidator {
             if (!ids.add(c.id)) error("$p.id", "Duplicate creature id '${c.id}'")
             if (c.displayName.isBlank() || c.displayName.length > 128) error("$p.displayName", "Display name must contain 1 to 128 characters")
             if (c.themeRole.length > 2048) error("$p.themeRole", "Theme role is limited to 2048 characters")
-            if (c.boss != null && library.schemaVersion != 2) error("$p.boss", "Boss profiles require explicit creature schemaVersion 2")
+            if (c.boss != null && library.schemaVersion < 2) error("$p.boss", "Boss profiles require creature schemaVersion 2 or 3")
+            if (c.sounds != null && library.schemaVersion != 3) error("$p.sounds", "Authored sounds require explicit creature schemaVersion 3")
+            c.sounds?.let { result += CreatureSounds.validate(it, "$p.sounds") }
             result += CreatureBosses.validate(c, p)
             if (c.drops.size > MAX_DROPS) error("$p.drops", "At most $MAX_DROPS independent drop entries are supported")
             c.drops.forEachIndexed { j, drop ->

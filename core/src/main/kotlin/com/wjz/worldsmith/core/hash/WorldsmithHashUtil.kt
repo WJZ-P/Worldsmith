@@ -57,6 +57,9 @@ object WorldsmithHashUtil {
             val path = file.path
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             val parsed = Json.parseToJsonElement(raw)
+            if (role == "creatures") require(WorldsmithJson.decode<CreatureLibrary>(raw).creatures.none { it.sounds != null } || manifest.formatVersion >= 6 && file.schemaVersion == 3) {
+                "Authored creature sounds require bundle format 6 and creature module schema 3"
+            }
             require(parsed.jsonObject["schemaVersion"]?.jsonPrimitive?.intOrNull == file.schemaVersion) { "Module schema differs from manifest: $role" }
             if(manifest.formatVersion==WorldContentBundleIO.PREVIOUS_FORMAT_VERSION && role=="creatures")
                 require(WorldsmithJson.decode<CreatureLibrary>(raw).creatures.none {it.boss!=null}) {"Format 4 has no Boss behavior; publish Boss profiles in format 5 with creature schema 2"}

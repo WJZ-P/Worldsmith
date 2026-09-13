@@ -49,6 +49,9 @@ object WorldContentBundleIO {
     @JvmStatic
     fun encode(pack: WorldsmithPack): WorldContentBundleFiles {
         validateManifest(pack.manifest)
+        require(pack.creatures.creatures.none { it.sounds != null } || pack.manifest.formatVersion >= 6 && pack.creatures.schemaVersion == 3) {
+            "Authored creature sounds require bundle format 6 and creature module schema 3"
+        }
         if (pack.manifest.formatVersion < 5) require(pack.structures.structures.none { structure ->
             (listOf(structure.blueprint) + structure.assembly?.pieces.orEmpty().values)
                 .any { blueprint -> blueprint.interactions.any { it is StructureInteraction.BossSpawner } }
@@ -95,7 +98,7 @@ object WorldContentBundleIO {
         require(manifest.displayName.isNotBlank() && manifest.displayName.length <= 160 && manifest.description.length <= 8192) { "Invalid bundle display metadata" }
         require(manifest.modules.values.map { it.path }.distinct().size == manifest.modules.size) { "Module documents must have distinct paths" }
         manifest.modules.forEach { (id, file) ->
-            val versions=if(id=="structures" || id=="creatures" && manifest.formatVersion>=5 || id=="items" && manifest.formatVersion>=6)1..2 else 1..1
+            val versions=if(id=="creatures" && manifest.formatVersion>=6)1..3 else if(id=="structures" || id=="creatures" && manifest.formatVersion>=5 || id=="items" && manifest.formatVersion>=6)1..2 else 1..1
             require(file.schemaVersion in versions) { "Unsupported schema for module '$id' in bundle format ${manifest.formatVersion}" }
             require(WorldContentRegistry.validRelativePath(file.path) && file.path.endsWith(".json") &&
                 file.path != "worldsmith.json" && !file.path.startsWith("structures/") && !file.path.startsWith("assets/") && !file.path.startsWith("drawings/")) { "Invalid or reserved module document path" }

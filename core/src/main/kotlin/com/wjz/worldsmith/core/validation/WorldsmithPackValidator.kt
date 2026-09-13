@@ -40,6 +40,8 @@ object WorldsmithPackValidator {
             add(error("creatures", "BOSS_REQUIRES_FORMAT5", "Boss behavior requires format 5 and explicit creature module schema 2"))
         if (manifest.formatVersion < 6 && pack.items.schemaVersion != 1)
             add(error("items", "ITEM_ABILITIES_REQUIRE_FORMAT6", "Items schema 2 requires bundle format 6"))
+        if (manifest.formatVersion < 6 && pack.creatures.creatures.any { it.sounds != null })
+            add(error("creatures", "CREATURE_SOUNDS_REQUIRE_FORMAT6", "Authored sounds require format 6 and creature schema 3"))
         manifest.representativeContent?.let { key ->
             val exists = when (key.kind) { "item" -> pack.items.items.any { it.id == key.id }; "block" -> pack.blocks.blocks.any { it.id == key.id }; else -> false }
             if (!exists) add(error("manifest.representativeContent", "REPRESENTATIVE_CONTENT_MISSING", "Representative icon must refer to an existing local item or block"))
@@ -112,8 +114,8 @@ object WorldsmithPackValidator {
                 if (interaction is StructureInteraction.BossSpawner) {
                     val at = "$path.interactions[$j]"
                     if (manifest.formatVersion < 5) add(error(at, "BOSS_SPAWNER_REQUIRES_FORMAT5", "Boss spawner encounters require bundle format 5"))
-                    if (pack.structures.schemaVersion != 2 || pack.creatures.schemaVersion != 2)
-                        add(error(at, "BOSS_SPAWNER_MODULE_SCHEMAS", "Boss spawners require both structure and creature module schema 2"))
+                    if (pack.structures.schemaVersion != 2 || pack.creatures.schemaVersion !in 2..3)
+                        add(error(at, "BOSS_SPAWNER_MODULE_SCHEMAS", "Boss spawners require structure schema 2 and creature schema 2 or 3"))
                     val target = pack.creatures.creatures.find { it.id == interaction.creatureId }
                     if (target == null || target.boss == null || target.category != CreatureCategory.HOSTILE)
                         add(error("$at.creatureId", "BOSS_SPAWNER_TARGET_INVALID", "Boss spawner '${interaction.creatureId}' must resolve to an actual hostile Boss definition in this world"))

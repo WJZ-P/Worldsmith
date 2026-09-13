@@ -190,3 +190,10 @@ world background and meaningful objectives; add no invented intro/toast fields.
 ## Deferred player choice and native preparation
 
 All installed packs are menu choices without native resource activation. The native World Type control and Tiangong header share one creation intent. Browsing, choosing a pack, and finish-world suggestions do not trigger client resource reloads. `WAITING_CREATION` / `requiresUserAction:true` means the player must choose that pack and press Create New World; report this action and pause instead of rebuilding or polling. Native preparation then resumes the original guarded creation action. Core/archive readiness remains distinct from actual native activation and from a played world.
+
+
+Creature voices are authored data too: for each new species use creature/recipe
+schema 3 and a sounds profile from the creatures contract's soundVocabulary and
+soundVoices. Select real vanilla events and modulate pitch/volume/variation; do not
+invent audio files. Preserve voices, drops and Boss profiles through texture rebuilds,
+and never downgrade a schema-3 creature library when merging species.
