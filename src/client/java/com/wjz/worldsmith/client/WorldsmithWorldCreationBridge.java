@@ -298,6 +298,12 @@ public final class WorldsmithWorldCreationBridge {
             && id.equals(WorldContentRuntime.activeScope()) && WorldContentResources.isLoaded(id,state.content.contentHash());
     }
 
+    /** Only a fully prepared, currently owned bundle may omit its generic experimental confirmation. */
+    public static boolean isPreparedWorldsmithCreation(CreateWorldScreen screen) {
+        var state=SCREENS.get(screen);
+        return state!=null && canCreate(screen,state);
+    }
+
     /** onCreate is used by both the button and the Enter key. No stale/default preset may pass. */
     public static boolean allowCreate(CreateWorldScreen screen) {
         onScreenInitializing(screen);var state=SCREENS.get(screen);

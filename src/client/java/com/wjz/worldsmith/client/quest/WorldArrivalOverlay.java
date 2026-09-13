@@ -70,7 +70,8 @@ public final class WorldArrivalOverlay {
         int width = graphics.guiWidth(), height = graphics.guiHeight();
         if (width < 180 || height < 120) return;
         double elapsed = SESSION.elapsed(now) / 1_000_000_000.0;
-        float fade = (float)Math.min(1.0, Math.min(elapsed / .4, (8.0 - elapsed) / .7));
+        double duration = WorldArrivalSession.DURATION_NANOS / 1_000_000_000.0;
+        float fade = (float)Math.min(1.0, Math.min(elapsed / .4, (duration - elapsed) / .7));
         if (fade <= .02f) return;
         int panelWidth = Math.min(460, width - 32), textWidth = panelWidth - 28;
         int x = (width - panelWidth) / 2, top = Math.max(12, height / 7);

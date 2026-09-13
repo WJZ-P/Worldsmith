@@ -2,7 +2,7 @@ package com.wjz.worldsmith.content.quest;
 
 /** Once per actual connection; quest-cache resets, respawns and dimension changes do not affect it. */
 public final class WorldArrivalSession {
-    public static final long DURATION_NANOS = 8_000_000_000L;
+    public static final long DURATION_NANOS = 5_000_000_000L;
     private Object connection;
     private boolean shown;
     private long startedAt;

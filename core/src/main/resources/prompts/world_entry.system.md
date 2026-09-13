@@ -183,7 +183,7 @@ This gate does not rewrite/reject existing immutable packs, embedded save text o
 any previously created worlds. Old loading keeps its prior identity/format rules.
 
 The arrival HUD uses the verified theme and the player's actual current quest for
-an optional, default-on eight-second introduction. It leaves controls active,
+an optional, default-on five-second introduction. It leaves controls active,
 can be skipped with Esc and appears only once per real connection. Write concise
 world background and meaningful objectives; add no invented intro/toast fields.
 

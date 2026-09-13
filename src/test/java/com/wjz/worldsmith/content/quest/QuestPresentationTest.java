@@ -22,13 +22,14 @@ class QuestPresentationTest {
         assertTrue(layout.bodyTop() + 4 + (layout.pageSize() - 1) * 26 + 22 <= layout.bodyBottom() - 21);
     }
 
-    @Test void arrivalShowsOncePerConnectionAndExpiresAfterEightSeconds() {
+    @Test void arrivalShowsOncePerConnectionAndExpiresAfterFiveSeconds() {
         var session = new WorldArrivalSession(); Object connection = new Object();
         assertFalse(session.waiting(connection));
         session.connect(connection); assertTrue(session.waiting(connection));
         assertTrue(session.start(connection, 100));
-        assertTrue(session.active(100)); assertTrue(session.active(8_000_000_099L));
-        assertFalse(session.active(8_000_000_100L));
+        assertEquals(5_000_000_000L, WorldArrivalSession.DURATION_NANOS);
+        assertTrue(session.active(100)); assertTrue(session.active(5_000_000_099L));
+        assertFalse(session.active(5_000_000_100L));
         // A respawn, dimension change, journal reset or resource reload retains the connection token.
         session.connect(connection); assertFalse(session.waiting(connection)); assertFalse(session.start(connection, 9_000_000_000L));
         session.connect(null); assertFalse(session.active(100));
