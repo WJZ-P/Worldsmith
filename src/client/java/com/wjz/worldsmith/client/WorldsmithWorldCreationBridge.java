@@ -417,6 +417,9 @@ public final class WorldsmithWorldCreationBridge {
         ++s.serial;s.intent=null;s.ticket=null;s.applyingPackId=null;s.appliedPackId=null;s.validatedContext=null;
         s.publicationStatus=null;s.publicationPackId=null;s.content=null;s.preparedContent=null;
         s.commitContext=null;s.commitDimensions=null;s.commitTicket=null;
+        var ui=((CreateWorldScreenAccessor)screen).worldsmith$getUiState();
+        String name=s.creationName.selectNative(ui.getName());
+        if(!name.equals(ui.getName()))ui.setName(name);
         s.explicitVanilla=true;s.catalogChoiceInitialized=true;updateCreateButton(screen,s);
     }
     private static void resetNativeDimensions(CreateWorldScreen screen,ScreenState state) {
@@ -594,8 +597,29 @@ public final class WorldsmithWorldCreationBridge {
 		}
 		state.listenerInstalled = true;
 		((CreateWorldScreenAccessor) screen).worldsmith$getUiState()
-			.addListener(uiState -> { trySelectPreset(screen, state, uiState); updateCreateButton(screen,state); });
+			.addListener(uiState -> { syncNameField(state,uiState); trySelectPreset(screen, state, uiState); updateCreateButton(screen,state); });
 	}
+
+    /** Bind the native Game tab's name field on each UI rebuild, including while that tab is hidden. */
+    public static void bindWorldNameField(CreateWorldScreen screen,net.minecraft.client.gui.components.tabs.Tab gameTab) {
+        var state=SCREENS.get(screen);if(state==null)return;
+        gameTab.visitChildren(widget->{
+            if(widget instanceof net.minecraft.client.gui.components.EditBox field
+                && field.getMessage().getContents() instanceof TranslatableContents label
+                && "selectWorld.enterName".equals(label.getKey())) {
+                state.nameEdit=field;
+                syncNameField(state,((CreateWorldScreenAccessor)screen).worldsmith$getUiState());
+            }
+        });
+    }
+
+    private static void syncNameField(ScreenState state,WorldCreationUiState ui) {
+        var field=state.nameEdit;if(field==null || field.getValue().equals(ui.getName()))return;
+        // Vanilla only updates the folder tooltip on model changes. Reflect the title without firing its responder again.
+        field.setResponder(null);
+        try {field.setMaxLength(Math.max(128,ui.getName().length()));field.setValue(ui.getName());}
+        finally {field.setResponder(ui::setName);}
+    }
 
 	private static void trySelectPreset(
 		CreateWorldScreen screen,
@@ -787,6 +811,8 @@ public final class WorldsmithWorldCreationBridge {
 
 	private static final class ScreenState {
 
+        private final WorldsmithCreationName creationName=new WorldsmithCreationName(Component.translatable("selectWorld.newWorld").getString());
+        private net.minecraft.client.gui.components.EditBox nameEdit;
 		private WorldCreationIntent intent;
         private WorldCreationIntent.Ticket ticket;
         private boolean cancelled, cancelReady, committed;
@@ -831,6 +857,9 @@ public final class WorldsmithWorldCreationBridge {
         DISPLAY_NAMES.put(intent.packId(),intent.displayName());
         publish(state,intent.packId(),new PublicationStatus("WAITING_CREATION","The selected world will be prepared when Create New World is pressed",List.of()));
         WorldsmithWorldTypeMenu.showSelected(screen);
+        var ui=((CreateWorldScreenAccessor)screen).worldsmith$getUiState();
+        String name=state.creationName.selectPack(ui.getName(),intent.displayName());
+        if(!name.equals(ui.getName()))ui.setName(name);
         Worldsmith.LOGGER.info("Worldsmith creation request {} selected bundle {} (explicit={})",intent.requestId(),intent.packId(),intent.explicit());
     }
 

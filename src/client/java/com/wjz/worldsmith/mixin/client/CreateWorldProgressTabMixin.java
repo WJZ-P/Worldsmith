@@ -18,6 +18,8 @@ public abstract class CreateWorldProgressTabMixin implements WorldsmithProgressT
     @ModifyArg(method = "init", at = @At(value = "INVOKE", target =
         "Lnet/minecraft/client/gui/components/tabs/MenuTabBar$Builder;addTabs([Lnet/minecraft/client/gui/components/tabs/Tab;)Lnet/minecraft/client/gui/components/tabs/MenuTabBar$Builder;"), index = 0)
     private Tab[] worldsmith$appendProgressTab(Tab[] original) {
+        if (original.length > 0) com.wjz.worldsmith.client.WorldsmithWorldCreationBridge.bindWorldNameField(
+            (CreateWorldScreen)(Object)this, original[0]);
         var previousState = worldsmith$generationProgressTab == null ? null : worldsmith$generationProgressTab.uiState();
         if (worldsmith$generationProgressTab != null) worldsmith$generationProgressTab.removed();
         worldsmith$generationProgressTab = new WorldsmithGenerationProgressTab((CreateWorldScreen)(Object)this, previousState);
