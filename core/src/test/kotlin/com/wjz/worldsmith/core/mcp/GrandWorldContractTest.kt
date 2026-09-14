@@ -35,7 +35,7 @@ class GrandWorldContractTest {
         assertTrue(contract(section="not_a_section").isError)
     }
 
-    @Test fun `world begin reads macro planning before named plan and summaries never inline the full guide`() {
+    @Test fun `world begin retains macro planning but complete worlds start with the world bible`() {
         val fullContract=contract().structuredContent.getValue("contract").jsonPrimitive.content
         val compact=ContractSections.split(fullContract).getValue("overview")
         assertTrue(compact.length<=2048,"The entry overview must remain compact rather than hiding a whole manual")
@@ -46,13 +46,14 @@ class GrandWorldContractTest {
             assertEquals(compact,body.getValue("worldPlanningGuide").jsonPrimitive.content)
             assertFalse(body.getValue("worldPlanningGuideTruncated").jsonPrimitive.boolean)
             assertEquals(PromptSet.CONTRACT_GRAND_WORLD,body.getValue("worldPlanningReference").jsonObject.getValue("id").jsonPrimitive.content)
-            assertEquals("world-atlas",body.getValue("nextArguments").jsonObject.getValue("section").jsonPrimitive.content)
+            if(mode==WorkflowMode.COMPLETE_WORLD)assertEquals("world_bible",body.getValue("nextArguments").jsonObject.getValue("id").jsonPrimitive.content)
+            else assertEquals("world-atlas",body.getValue("nextArguments").jsonObject.getValue("section").jsonPrimitive.content)
             assertEquals(WorldsmithWorkflow.CONTRACT_TOOL,body.getValue("nextTool").jsonPrimitive.content)
             val procedure=body.getValue("procedure").jsonArray.map {it.jsonObject}
-            assertTrue(procedure.first().getValue("instruction").jsonPrimitive.content.contains("grand_world"))
+            assertTrue(procedure.first().getValue("instruction").jsonPrimitive.content.contains(if(mode==WorkflowMode.COMPLETE_WORLD)"world_bible" else "grand_world"))
             if(mode==WorkflowMode.COMPLETE_WORLD) {
                 assertTrue(procedure.indexOfFirst {it.getValue("tool").jsonPrimitive.content=="worldsmith_put_world_design_plan"}>0)
-                assertEquals("worldsmith_put_world_design_plan",body.getValue("progress").jsonObject.getValue("nextTool").jsonPrimitive.content)
+                assertEquals("worldsmith_put_world_bible",body.getValue("progress").jsonObject.getValue("nextTool").jsonPrimitive.content)
             }
             val advertised=body.getValue("contracts").jsonObject.getValue(PromptSet.CONTRACT_GRAND_WORLD)
             if(detail=="summary")assertTrue(advertised is JsonObject && "sections" in advertised && "contract" !in advertised)

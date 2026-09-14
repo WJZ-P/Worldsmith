@@ -8,18 +8,22 @@ Current publication is bundle format 6 with the same nine typed modules; items
 schema 2 supplies equipment, consumables and fixed actions. Formats 3/4/5 remain
 read-only for restoration and unchanged re-embedding, not implicit migrations.
 
-For a new world-sized request, first use `worldsmith_get_contract` with
-`id: "grand_world", section: "world-atlas"` and read the current `authoringBudgets`.
+For a new COMPLETE_WORLD, first save the WorldBible and pass its current
+evidence-bound AI self-review under `world_bible`. Then use `worldsmith_get_contract`
+with `id: "grand_world", section: "world-atlas"` and read the current `authoringBudgets`.
 Translate macro geography, regional identity and travel intent into the named
-targets below; these are planning decisions, not additional runtime module types.
+targets below and `module_briefs`; these are planning decisions, not additional
+runtime module types. Plan resource supply, consumed deliveries, rewards and
+main-line beats alongside ecology, before detailed production.
 For an existing session, preserve its plan and continue from actual gaps.
 
 ## Choose the scope honestly
 
 `worldsmith_begin_world(prompt, mode, detail)` accepts:
 
-- `COMPLETE_WORLD`: a complete themed world, with a named design plan and actual
-  biomes, buildings, blocks, items, creatures, a main line and Boss profiles.
+- `COMPLETE_WORLD`: a complete themed world, with a persistent bible, AI reviews,
+  named plan and module briefs, and actual biomes, buildings, blocks, items,
+  creatures and a main line. Boss is an explicit bible/plan scope promise.
 - `WORLDGEN_ONLY`: the backward-compatible guided terrain/biome/feature/architecture
   route. The existing architecture policy still applies; other modules may be empty.
 - `STANDALONE`: the requested drawing or creature artifact, without compulsory
@@ -29,6 +33,9 @@ Mode defaults to WORLDGEN_ONLY for existing clients. An AI fulfilling a full-wor
 prompt should explicitly select COMPLETE_WORLD, usually with detail=summary.
 An existing COMPLETE_WORLD promise is not silently downgraded to make completion
 easier. If the user changes the goal to a focused artifact, begin that explicit scope.
+Old sessions retain legacy policy (including their existing Boss requirement)
+unless explicitly upgraded with `worldsmith_upgrade_world_authoring`; existing
+assets survive that opt-in. Published packs and saves receive no new loading gate.
 
 ## Design plan schema 1
 
@@ -48,7 +55,10 @@ WorldDesignPlan {
 `goal` is nonblank, at most 8192 characters. Use 1..512 uniquely named targets;
 their titles are 1..160 characters and purposes 1..2048. A complete-world plan
 names at least one of every required kind: `biome`, `structure`, `creature`,
-`block`, `item`, `quest`, plus at least one Boss (at most 16).
+`block`, `item`, `quest`. In the new authoring flow, `bible.requiresBoss: true`
+requires a Boss; false allows a peaceful world with `bosses: []`. Any explicitly
+planned Boss still needs full actual coverage (at most 16). Legacy complete-world
+sessions retain their prior at-least-one-Boss requirement until explicit upgrade.
 Titles are player-facing names displayed by the Create World progress tab before
 the definitions exist. Use readable names in the player's language rather than
 copying machine IDs; keep IDs stable when improving a display title.
@@ -116,6 +126,9 @@ A typed spawner is a repeatable local encounter, not global Boss uniqueness.
 1. Read `worldsmith_get_generation_progress(sessionId)` after meaningful changes.
    It returns scope, shared revision, named counts, current missing modules/assets/
    drawing jobs/quests/Bosses, `nextTool`, `nextArguments`, and `nextInstruction`.
+   Authoring stages include WORLD_BIBLE_DRAFT, WORLD_BIBLE_REVIEW, MODULE_BRIEFS,
+   CONTENT_ALIGNMENT_REVIEW and WORLD_AUTHORING_BLOCKED. Follow the current gap;
+   a passing AI self-review continues automatically, not as user approval.
 2. `nextArguments` contains known arguments, not invented creative documents.
    Fill the listed `requiredAuthoring` fields from the prompt and current plan.
    Contract pointers in begin/resume summaries show exactly where to fetch the
@@ -148,6 +161,16 @@ creatures need a valid habitat; main-line quests bind real narrative beats.
 An empty library does not fill a named category. Keep the existing guided
 architecture quality contract, inspect the actual visuals, and repair the largest
 visible weakness rather than treating machine checks as a beauty score.
+
+New complete-world sessions additionally require current evidence-bound AI
+reviews of the bible and every owning brief against the actual candidate,
+including inline documents. Read the current review context and submit complete
+checks before write/finish. Changed source facts, relevant modules or referenced
+assets invalidate affected reviews without deleting successful assets. Three
+identical failures on the same input/issue exhaust automatic repair; report the
+specific remaining contradiction or scope decision instead of looping.
+The complete bible/briefs/reviews stay in the durable session; the runtime theme
+is a reviewed projection and `.wspack` stays the same format.
 
 Choose the signature item/block for the browser through the write request's
 optional `representativeContent: {"kind":"item","id":"existing_local_id"}`

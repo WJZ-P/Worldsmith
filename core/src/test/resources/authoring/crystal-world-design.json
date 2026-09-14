@@ -1,0 +1,691 @@
+{
+  "note": "Authoring design fixture only: not generated runtime modules, a completed resource pack, or playtest evidence.",
+  "prompt": "创建一个灵晶衰竭的古风世界，包含古城遗迹、晶核守卫和两章连贯主线；最终奖励可主动治疗的护符，不需要 Boss。",
+  "bible": {
+    "title": "残辉古城：最后的灵晶",
+    "premise": "古城曾靠灵晶驱动工坊与守卫。矿脉衰竭后，城民离去，失衡的守卫仍在保护早已停产的矿场。",
+    "playerRole": "寻找古城衰落原因的行路人",
+    "mainConflict": "回收残存灵晶与失衡晶核，在保护遗迹和获得生存力量之间找到出路。",
+    "requirements": [
+      {
+        "id": "ruins",
+        "text": "古城遗迹必须有矿业历史和实际探索用途",
+        "promptQuote": "古城遗迹"
+      },
+      {
+        "id": "mainline",
+        "text": "两章任务有前后因果而非无关收集",
+        "promptQuote": "两章连贯主线"
+      },
+      {
+        "id": "healing",
+        "text": "最终护符具有已安装的主动治疗能力",
+        "promptQuote": "可主动治疗的护符"
+      },
+      {
+        "id": "no_boss",
+        "text": "使用普通守卫遭遇，不要求Boss",
+        "promptQuote": "不需要 Boss"
+      }
+    ],
+    "assumptions": [
+      "灵晶是材料与历史线索，不新增可耗竭的全局能源模拟。",
+      "古城居民仅作为历史设定，不新增NPC对话或交易机制。"
+    ],
+    "requiresBoss": false,
+    "openDecisions": [],
+    "nodes": [
+      {
+        "id": "crystal_law",
+        "kind": "RULE",
+        "title": "余辉有限",
+        "description": "灵晶的失衡体现在矿地色调、遗迹用途和守卫行为上；护符只使用现有USE治疗动作，不能凭故事安装世界净化机制。"
+      },
+      {
+        "id": "decline",
+        "kind": "HISTORY",
+        "title": "矿城停摆",
+        "description": "矿脉衰竭使运输与工坊停摆，守卫失衡是同一历史事件的后果。",
+        "dependsOn": [
+          "crystal_law"
+        ]
+      },
+      {
+        "id": "plain",
+        "kind": "REGION",
+        "title": "黯晶原",
+        "description": "矿城周边有裸露石地、黯色晶体与稀疏植被，保留原版木材和食物的基本来源。",
+        "dependsOn": [
+          "decline"
+        ]
+      },
+      {
+        "id": "culture",
+        "kind": "CULTURE",
+        "title": "矿城工匠",
+        "description": "采矿、储运与工坊建筑各有实际功能；古风屋顶与石质基座共同表达工业遗迹而不是一组同形房屋。",
+        "dependsOn": [
+          "decline"
+        ]
+      },
+      {
+        "id": "keeper",
+        "kind": "ECOLOGY",
+        "title": "晶核守卫",
+        "description": "普通地面近战守卫出现在矿城地区，晶核与碎晶是其合理掉落；声音使用低音铁傀儡声线，不继承额外原版能力。",
+        "dependsOn": [
+          "plain",
+          "crystal_law"
+        ]
+      },
+      {
+        "id": "resources",
+        "kind": "RESOURCE",
+        "title": "碎晶与晶核",
+        "description": "矿场容器提供碎晶，守卫提供可重复的碎晶和晶核来源。任务先回收碎晶，再处理失衡守卫并交付晶核，避免依赖任务自身奖励。",
+        "dependsOn": [
+          "keeper",
+          "culture"
+        ]
+      },
+      {
+        "id": "style",
+        "kind": "STYLE",
+        "title": "石灰与余辉",
+        "description": "建筑用灰石和褪色木构，物品以黯青色晶体为共同材料语言；普通环境叫声克制，守卫攻击声只在击打时触发。",
+        "dependsOn": [
+          "crystal_law"
+        ]
+      },
+      {
+        "id": "journey",
+        "kind": "EXPERIENCE",
+        "title": "从碎晶到护符",
+        "description": "第一章回收三枚碎晶，说明矿城曾如何运作；第二章击败一名已失衡守卫并交付晶核，领取可主动治疗的余辉护符。完成任务不宣称地形或古城自动修复。",
+        "dependsOn": [
+          "resources",
+          "decline"
+        ]
+      }
+    ]
+  },
+  "plan": {
+    "schemaVersion": 1,
+    "goal": "创建一个灵晶衰竭的古风世界，包含古城遗迹、晶核守卫和两章连贯主线；最终奖励可主动治疗的护符，不需要 Boss。",
+    "targets": [
+      {
+        "key": {
+          "kind": "theme",
+          "id": "main"
+        },
+        "title": "残辉古城",
+        "purpose": "保留统一世界简介与两章叙事锚点"
+      },
+      {
+        "key": {
+          "kind": "block",
+          "id": "dim_crystal"
+        },
+        "title": "黯晶石",
+        "purpose": "让世界规则通过实际地表及建筑材料表现"
+      },
+      {
+        "key": {
+          "kind": "terrain",
+          "id": "main"
+        },
+        "title": "残辉古城",
+        "purpose": "建立矿城周围可探索的陆地与起伏"
+      },
+      {
+        "key": {
+          "kind": "feature",
+          "id": "crystal_outcrop"
+        },
+        "title": "碎晶露头",
+        "purpose": "将黯晶材料真实放入地表地物"
+      },
+      {
+        "key": {
+          "kind": "biome",
+          "id": "fading_plain"
+        },
+        "title": "黯晶原",
+        "purpose": "承载矿场生态和守卫栖息地，并保留基本生存资源"
+      },
+      {
+        "key": {
+          "kind": "item",
+          "id": "crystal_fragment"
+        },
+        "title": "残辉碎晶",
+        "purpose": "以可获取材料连接两章主线，并实现有用的主动治疗奖励"
+      },
+      {
+        "key": {
+          "kind": "item",
+          "id": "keeper_core"
+        },
+        "title": "失衡晶核",
+        "purpose": "以可获取材料连接两章主线，并实现有用的主动治疗奖励"
+      },
+      {
+        "key": {
+          "kind": "item",
+          "id": "dawn_amulet"
+        },
+        "title": "余辉护符",
+        "purpose": "以可获取材料连接两章主线，并实现有用的主动治疗奖励"
+      },
+      {
+        "key": {
+          "kind": "creature",
+          "id": "cracked_keeper"
+        },
+        "title": "失衡晶核守卫",
+        "purpose": "让矿城历史产生实际普通遭遇、掉落与声音"
+      },
+      {
+        "key": {
+          "kind": "structure",
+          "id": "old_crystal_mine"
+        },
+        "title": "旧灵晶矿场",
+        "purpose": "用采矿储运空间表现历史并提供可探索奖励来源"
+      },
+      {
+        "key": {
+          "kind": "quest",
+          "id": "recover_fragments"
+        },
+        "title": "循着余辉",
+        "purpose": "将真实来源、交付、击杀、前置和领奖组成两章主线"
+      },
+      {
+        "key": {
+          "kind": "quest",
+          "id": "quiet_keeper"
+        },
+        "title": "让守卫安息",
+        "purpose": "将真实来源、交付、击杀、前置和领奖组成两章主线"
+      }
+    ],
+    "links": [
+      {
+        "from": {
+          "kind": "theme",
+          "id": "main"
+        },
+        "to": {
+          "kind": "biome",
+          "id": "fading_plain"
+        },
+        "relation": "theme_anchor"
+      },
+      {
+        "from": {
+          "kind": "theme",
+          "id": "main"
+        },
+        "to": {
+          "kind": "item",
+          "id": "dawn_amulet"
+        },
+        "relation": "theme_anchor"
+      },
+      {
+        "from": {
+          "kind": "terrain",
+          "id": "main"
+        },
+        "to": {
+          "kind": "block",
+          "id": "dim_crystal"
+        },
+        "relation": "uses_block"
+      },
+      {
+        "from": {
+          "kind": "feature",
+          "id": "crystal_outcrop"
+        },
+        "to": {
+          "kind": "block",
+          "id": "dim_crystal"
+        },
+        "relation": "uses_block"
+      },
+      {
+        "from": {
+          "kind": "biome",
+          "id": "fading_plain"
+        },
+        "to": {
+          "kind": "feature",
+          "id": "crystal_outcrop"
+        },
+        "relation": "uses_feature"
+      },
+      {
+        "from": {
+          "kind": "structure",
+          "id": "old_crystal_mine"
+        },
+        "to": {
+          "kind": "biome",
+          "id": "fading_plain"
+        },
+        "relation": "placed_in_biome"
+      },
+      {
+        "from": {
+          "kind": "structure",
+          "id": "old_crystal_mine"
+        },
+        "to": {
+          "kind": "block",
+          "id": "dim_crystal"
+        },
+        "relation": "uses_block"
+      },
+      {
+        "from": {
+          "kind": "creature",
+          "id": "cracked_keeper"
+        },
+        "to": {
+          "kind": "biome",
+          "id": "fading_plain"
+        },
+        "relation": "spawns_in_biome"
+      },
+      {
+        "from": {
+          "kind": "creature",
+          "id": "cracked_keeper"
+        },
+        "to": {
+          "kind": "item",
+          "id": "crystal_fragment"
+        },
+        "relation": "drops_item"
+      },
+      {
+        "from": {
+          "kind": "creature",
+          "id": "cracked_keeper"
+        },
+        "to": {
+          "kind": "item",
+          "id": "keeper_core"
+        },
+        "relation": "drops_item"
+      },
+      {
+        "from": {
+          "kind": "structure",
+          "id": "old_crystal_mine"
+        },
+        "to": {
+          "kind": "item",
+          "id": "crystal_fragment"
+        },
+        "relation": "contains_reward"
+      },
+      {
+        "from": {
+          "kind": "quest",
+          "id": "recover_fragments"
+        },
+        "to": {
+          "kind": "item",
+          "id": "crystal_fragment"
+        },
+        "relation": "delivery_objective"
+      },
+      {
+        "from": {
+          "kind": "quest",
+          "id": "quiet_keeper"
+        },
+        "to": {
+          "kind": "quest",
+          "id": "recover_fragments"
+        },
+        "relation": "prerequisite"
+      },
+      {
+        "from": {
+          "kind": "quest",
+          "id": "quiet_keeper"
+        },
+        "to": {
+          "kind": "creature",
+          "id": "cracked_keeper"
+        },
+        "relation": "kill_objective"
+      },
+      {
+        "from": {
+          "kind": "quest",
+          "id": "quiet_keeper"
+        },
+        "to": {
+          "kind": "item",
+          "id": "keeper_core"
+        },
+        "relation": "delivery_objective"
+      },
+      {
+        "from": {
+          "kind": "quest",
+          "id": "quiet_keeper"
+        },
+        "to": {
+          "kind": "item",
+          "id": "dawn_amulet"
+        },
+        "relation": "quest_reward"
+      }
+    ],
+    "bosses": []
+  },
+  "briefs": [
+    {
+      "id": "theme",
+      "targets": [
+        {
+          "kind": "theme",
+          "id": "main"
+        }
+      ],
+      "purpose": "保留统一世界简介与两章叙事锚点",
+      "basisRefs": [
+        "world/premise",
+        "node/decline",
+        "node/journey"
+      ],
+      "dependencies": [],
+      "criteria": [
+        {
+          "id": "realization_0",
+          "target": {
+            "kind": "theme",
+            "id": "main"
+          },
+          "claim": "保留统一世界简介与两章叙事锚点；核对该目标实际字段、引用和对应检查证据"
+        }
+      ],
+      "openDecisions": []
+    },
+    {
+      "id": "blocks",
+      "targets": [
+        {
+          "kind": "block",
+          "id": "dim_crystal"
+        }
+      ],
+      "purpose": "让世界规则通过实际地表及建筑材料表现",
+      "basisRefs": [
+        "node/crystal_law",
+        "node/style"
+      ],
+      "dependencies": [
+        "theme"
+      ],
+      "criteria": [
+        {
+          "id": "realization_0",
+          "target": {
+            "kind": "block",
+            "id": "dim_crystal"
+          },
+          "claim": "让世界规则通过实际地表及建筑材料表现；核对该目标实际字段、引用和对应检查证据"
+        }
+      ],
+      "openDecisions": []
+    },
+    {
+      "id": "terrain",
+      "targets": [
+        {
+          "kind": "terrain",
+          "id": "main"
+        }
+      ],
+      "purpose": "建立矿城周围可探索的陆地与起伏",
+      "basisRefs": [
+        "node/plain"
+      ],
+      "dependencies": [
+        "blocks"
+      ],
+      "criteria": [
+        {
+          "id": "realization_0",
+          "target": {
+            "kind": "terrain",
+            "id": "main"
+          },
+          "claim": "建立矿城周围可探索的陆地与起伏；核对该目标实际字段、引用和对应检查证据"
+        }
+      ],
+      "openDecisions": []
+    },
+    {
+      "id": "features",
+      "targets": [
+        {
+          "kind": "feature",
+          "id": "crystal_outcrop"
+        }
+      ],
+      "purpose": "将黯晶材料真实放入地表地物",
+      "basisRefs": [
+        "node/plain",
+        "node/resources"
+      ],
+      "dependencies": [
+        "blocks"
+      ],
+      "criteria": [
+        {
+          "id": "realization_0",
+          "target": {
+            "kind": "feature",
+            "id": "crystal_outcrop"
+          },
+          "claim": "将黯晶材料真实放入地表地物；核对该目标实际字段、引用和对应检查证据"
+        }
+      ],
+      "openDecisions": []
+    },
+    {
+      "id": "biomes",
+      "targets": [
+        {
+          "kind": "biome",
+          "id": "fading_plain"
+        }
+      ],
+      "purpose": "承载矿场生态和守卫栖息地，并保留基本生存资源",
+      "basisRefs": [
+        "node/plain",
+        "node/keeper"
+      ],
+      "dependencies": [
+        "terrain",
+        "features"
+      ],
+      "criteria": [
+        {
+          "id": "realization_0",
+          "target": {
+            "kind": "biome",
+            "id": "fading_plain"
+          },
+          "claim": "承载矿场生态和守卫栖息地，并保留基本生存资源；核对该目标实际字段、引用和对应检查证据"
+        }
+      ],
+      "openDecisions": []
+    },
+    {
+      "id": "items",
+      "targets": [
+        {
+          "kind": "item",
+          "id": "crystal_fragment"
+        },
+        {
+          "kind": "item",
+          "id": "keeper_core"
+        },
+        {
+          "kind": "item",
+          "id": "dawn_amulet"
+        }
+      ],
+      "purpose": "以可获取材料连接两章主线，并实现有用的主动治疗奖励",
+      "basisRefs": [
+        "node/resources",
+        "node/journey",
+        "requirement/healing"
+      ],
+      "dependencies": [
+        "theme"
+      ],
+      "criteria": [
+        {
+          "id": "realization_0",
+          "target": {
+            "kind": "item",
+            "id": "crystal_fragment"
+          },
+          "claim": "以可获取材料连接两章主线，并实现有用的主动治疗奖励；核对该目标实际字段、引用和对应检查证据"
+        },
+        {
+          "id": "realization_1",
+          "target": {
+            "kind": "item",
+            "id": "keeper_core"
+          },
+          "claim": "以可获取材料连接两章主线，并实现有用的主动治疗奖励；核对该目标实际字段、引用和对应检查证据"
+        },
+        {
+          "id": "realization_2",
+          "target": {
+            "kind": "item",
+            "id": "dawn_amulet"
+          },
+          "claim": "实际item定义使用已安装的USE治疗动作，并由第二章正数量奖励发放"
+        }
+      ],
+      "openDecisions": []
+    },
+    {
+      "id": "creatures",
+      "targets": [
+        {
+          "kind": "creature",
+          "id": "cracked_keeper"
+        }
+      ],
+      "purpose": "让矿城历史产生实际普通遭遇、掉落与声音",
+      "basisRefs": [
+        "node/keeper",
+        "node/style",
+        "requirement/no_boss"
+      ],
+      "dependencies": [
+        "biomes",
+        "items"
+      ],
+      "criteria": [
+        {
+          "id": "realization_0",
+          "target": {
+            "kind": "creature",
+            "id": "cracked_keeper"
+          },
+          "claim": "实际普通HOSTILE定义有该群系栖息地、碎晶/晶核正概率掉落及IRON_GOLEM声线，没有Boss配置"
+        }
+      ],
+      "openDecisions": []
+    },
+    {
+      "id": "structures",
+      "targets": [
+        {
+          "kind": "structure",
+          "id": "old_crystal_mine"
+        }
+      ],
+      "purpose": "用采矿储运空间表现历史并提供可探索奖励来源",
+      "basisRefs": [
+        "node/culture",
+        "node/resources",
+        "requirement/ruins"
+      ],
+      "dependencies": [
+        "biomes",
+        "blocks",
+        "items"
+      ],
+      "criteria": [
+        {
+          "id": "realization_0",
+          "target": {
+            "kind": "structure",
+            "id": "old_crystal_mine"
+          },
+          "claim": "用采矿储运空间表现历史并提供可探索奖励来源；核对该目标实际字段、引用和对应检查证据"
+        }
+      ],
+      "openDecisions": []
+    },
+    {
+      "id": "quests",
+      "targets": [
+        {
+          "kind": "quest",
+          "id": "recover_fragments"
+        },
+        {
+          "kind": "quest",
+          "id": "quiet_keeper"
+        }
+      ],
+      "purpose": "将真实来源、交付、击杀、前置和领奖组成两章主线",
+      "basisRefs": [
+        "node/journey",
+        "node/resources",
+        "requirement/mainline"
+      ],
+      "dependencies": [
+        "items",
+        "creatures",
+        "structures"
+      ],
+      "criteria": [
+        {
+          "id": "realization_0",
+          "target": {
+            "kind": "quest",
+            "id": "recover_fragments"
+          },
+          "claim": "将真实来源、交付、击杀、前置和领奖组成两章主线；核对该目标实际字段、引用和对应检查证据"
+        },
+        {
+          "id": "realization_1",
+          "target": {
+            "kind": "quest",
+            "id": "quiet_keeper"
+          },
+          "claim": "将真实来源、交付、击杀、前置和领奖组成两章主线；核对该目标实际字段、引用和对应检查证据"
+        }
+      ],
+      "openDecisions": []
+    }
+  ]
+}

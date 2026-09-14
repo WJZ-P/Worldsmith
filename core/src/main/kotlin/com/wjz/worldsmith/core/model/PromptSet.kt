@@ -32,6 +32,8 @@ data class PromptSet(
     val contracts: Map<String, PromptTemplateRef>
         get() = linkedMapOf(
             CONTRACT_GRAND_WORLD to PromptTemplateRef("contract/grand_world"),
+            "world_bible" to PromptTemplateRef("contract/world_bible"),
+            "module_briefs" to PromptTemplateRef("contract/module_briefs"),
             CONTRACT_TERRAIN to terrainPlan,
             CONTRACT_BIOME to biomePlan,
             CONTRACT_FEATURE to featurePlan,

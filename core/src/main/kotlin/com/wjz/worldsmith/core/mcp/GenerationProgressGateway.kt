@@ -19,6 +19,7 @@ data class GenerationSessionSummary(
     val lastTool: String?,
     val toolRunning: Boolean,
     val lastToolError: String?,
+    val authoringAvailable: Boolean = false,
 )
 
 @Serializable
@@ -31,6 +32,27 @@ data class GenerationProgressSnapshot(
     val toolRunning: Boolean,
     val lastToolError: String?,
 )
+
+/** Selection for an explicitly labeled draft reader, independent from the pack chosen for world creation. */
+object GenerationAuthoringDrafts {
+    @JvmStatic fun current(snapshot: GenerationProgressSnapshot?): GenerationSessionSummary? {
+        val candidate = snapshot ?: return null
+        return candidate.sessions.firstOrNull {
+            it.sessionId == candidate.defaultSessionId && !it.finished && it.authoringAvailable
+        }
+    }
+
+    /** A background read must still belong to the requested live draft, never another default or an older revision. */
+    @JvmStatic fun view(snapshot: GenerationProgressSnapshot?, sessionId: String, minimumRevision: Long): GenerationProgressView? {
+        val candidate = snapshot ?: return null
+        val owner = current(candidate) ?: return null
+        val view = candidate.view ?: return null
+        return view.takeIf {
+            owner.sessionId == sessionId && candidate.selectedSessionId == sessionId && it.sessionId == sessionId &&
+                it.authoring != null && it.revision == owner.revision && it.revision >= minimumRevision
+        }
+    }
+}
 
 /** Current-process activity only: reading progress never edits drafts or manufactures a resumed AI session. */
 internal class GenerationProgressGateway(
@@ -85,7 +107,8 @@ internal class GenerationProgressGateway(
         val summaries = live.map { session ->
             val last = observed[session.id]
             val running = last?.running == true
-            val title = (session.contentModules["theme"]?.get("title") as? JsonPrimitive)?.contentOrNull
+            val title = session.authoring?.bible?.title?.takeIf { it.isNotBlank() }
+                ?: (session.contentModules["theme"]?.get("title") as? JsonPrimitive)?.contentOrNull
                 ?.takeIf { it.isNotBlank() } ?: session.prompt.lineSequence().firstOrNull().orEmpty()
             GenerationSessionSummary(session.id, title.take(160), session.prompt.take(512), session.mode, session.revision,
                 session.packId, session.finished, when {
@@ -93,7 +116,7 @@ internal class GenerationProgressGateway(
                     session.finished -> "HISTORICAL_NATIVE_RECEIPT"
                     session.packId != null -> "CORE_SAVED"
                     else -> "DRAFT"
-                }, last?.sequence ?: 0, last?.displayedTool, running, last?.error)
+                }, last?.sequence ?: 0, last?.displayedTool, running, last?.error, session.authoring?.bible != null)
         }.sortedWith(compareBy<GenerationSessionSummary> { it.mode == WorkflowMode.STANDALONE }.thenByDescending { it.lastActivitySequence }.thenBy { it.sessionId })
         val last = selected?.let { observed[it.id] }
         val view = selected?.let { GenerationProgressViews.inspect(it, jobs(it.id)) }

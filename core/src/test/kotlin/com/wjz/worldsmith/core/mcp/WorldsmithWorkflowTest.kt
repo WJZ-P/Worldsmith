@@ -94,7 +94,7 @@ class WorldsmithWorkflowTest {
         // joins, which belong to no single contract and so would otherwise be
         // stated in all three or in none.
         val howToDesign = brief.text("howToDesign")
-        assertTrue(howToDesign.contains("**terrain first.**", ignoreCase = true))
+        assertTrue(howToDesign.contains("**terrain first**", ignoreCase = true))
         assertTrue(howToDesign.indexOf("grand_world") in 0 until howToDesign.lowercase().indexOf("terrain first"),
             "Macro planning precedes terrain-first implementation, rather than replacing physical planning")
         assertTrue("hydrology" in howToDesign)
@@ -150,20 +150,30 @@ class WorldsmithWorkflowTest {
     }
 
     @Test
-    fun `complete-world summary puts atlas review before plan persistence without replacing actual progress`() {
+    fun `complete-world summary puts persisted bible and AI self-check before plan without replacing actual progress`() {
         val brief = call(WorldsmithWorkflow.BEGIN_TOOL, buildJsonObject {
             put("prompt", "A broad world with distinct regions"); put("mode", "COMPLETE_WORLD"); put("detail", "summary")
         }).structuredContent
         val overview = brief.text("overview")
-        val atlas = overview.indexOf("grand_world/world-atlas")
-        val plan = overview.indexOf("persist a named WorldDesignPlan")
-        assertTrue(atlas >= 0 && plan > atlas)
-        assertTrue("authoringBudgets" in overview)
-        assertTrue("On resume preserve the existing plan" in overview)
+        val bible = overview.indexOf("world_bible")
+        val review = overview.indexOf("AI self-check")
+        val plan = overview.indexOf("WorldDesignPlan")
+        assertTrue(bible >= 0 && review > bible && plan > review)
+        assertTrue("authoringBudgets" in brief)
+        assertTrue("automatically continues" in overview)
+        assertTrue("Legacy restored sessions retain contract 0" in overview)
+        val steps = brief.getValue("procedure").jsonArray.map { it.jsonObject }
+        val savedBible = steps.indexOfFirst { it.text("tool") == "worldsmith_put_world_bible" }
+        val selfCheck = steps.indexOfFirst { it.text("tool") == "worldsmith_get_authoring_review_context" }
+        val savedPlan = steps.indexOfFirst { it.text("tool") == "worldsmith_put_world_design_plan" }
+        assertTrue(savedBible >= 0 && selfCheck > savedBible && savedPlan > selfCheck)
+        assertTrue("worldsmith_review_world_bible" in steps[selfCheck].text("instruction"))
         assertEquals(WorldsmithWorkflow.CONTRACT_TOOL, brief.text("nextTool"))
-        assertEquals(buildJsonObject { put("id", PromptSet.CONTRACT_GRAND_WORLD); put("section", "world-atlas") }, brief.getValue("nextArguments"))
-        assertEquals("worldsmith_put_world_design_plan", brief.getValue("progress").jsonObject.text("nextTool"),
-            "The macro-reading suggestion must not overwrite the actual missing draft action")
+        assertEquals(buildJsonObject { put("id", "world_bible") }, brief.getValue("nextArguments"))
+        assertEquals("worldsmith_put_world_bible", brief.getValue("progress").jsonObject.text("nextTool"),
+            "The reading suggestion must retain the actual missing persisted-setting action")
+        assertEquals("WORLD_BIBLE_DRAFT", brief.getValue("progress").jsonObject.text("stage"))
+        assertFalse(brief.getValue("progress").jsonObject.bool("requiresUserAction"))
         assertFalse(brief.bool("complete"))
     }
 

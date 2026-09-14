@@ -1,0 +1,29 @@
+{
+  "id": "11111111111111111111111111111111",
+  "prompt": "A quiet world of living stone",
+  "finished": false,
+  "structures": {},
+  "revision": 7,
+  "archived": false,
+  "mode": "COMPLETE_WORLD",
+  "contentModules": {
+    "items": {
+      "schemaVersion": 1,
+      "items": [{
+        "id": "kept_relic",
+        "displayName": "Kept relic",
+        "textureAsset": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "description": "A relic from the earlier coastal draft."
+      }]
+    }
+  },
+  "contentAssets": {
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "mediaType": "image/png",
+      "byteLength": 68,
+      "path": "assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"
+    }
+  }
+}

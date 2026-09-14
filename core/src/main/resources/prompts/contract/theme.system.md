@@ -1,8 +1,13 @@
 # Worldsmith unified world theme contract — module schema 1, bundle format 6
 
 Design one world from the player's prompt, not unrelated content catalogs.
-The theme is persistent creative intent: a premise, a player role, world rules,
-one main conflict, and named narrative beats anchored to real world content.
+For new COMPLETE_WORLD authoring, the session's WorldBible is the single source
+of setting facts. Theme is its bounded player-facing runtime projection: a
+premise, player role, rules, conflict, and named beats anchored to real content.
+Read `world_bible` and `module_briefs` first. The AI derives this exact schema,
+records its owning brief and reviews the actual projection against current
+setting/content digests. Do not maintain contradictory facts in two documents.
+Legacy and lightweight sessions retain their existing direct-theme workflow.
 It is not an executable quest state machine or an achievement definition.
 Current publications use bundle format 6 with nine typed modules: `theme`,
 `terrain`, `features`, `biomes`, `structures`, `blocks`, `creatures`, `items`,
@@ -93,7 +98,8 @@ an architecture plan, satisfy that plan's own contract and visual review loop.
 
 1. Begin or reuse a world session. Read `worldsmith_get_content_contract` with
    `module: "theme"` and read `worldsmith_get_content_draft(sessionId)` for the
-   current shared `revision`, modules and available assets.
+   current shared `revision`, modules and available assets. For new complete
+   worlds, first save/review the bible, then establish the plan and owning briefs.
 2. Design stable logical IDs across the theme, terrain, biomes, features, blocks,
    creatures, items, quests and architecture before constructing cross-links.
 3. Create a real PNG using
@@ -112,12 +118,22 @@ an architecture plan, satisfy that plan's own contract and visual review loop.
    retrying. Avoid parallel stale-revision writes to the same session.
 6. Run content/link checks and domain previews. Repair missing references and
    rejected capabilities rather than substituting unrelated vanilla content.
+   For the new workflow read the current review context for theme's brief and
+   submit `worldsmith_review_world_alignment`: check that the premise, rules,
+   player role and beats preserve the bible's claims and actual scope. A theme
+   link resolving is engineering evidence, not proof of semantic consistency.
 7. `worldsmith_write_pack` accepts `theme`, `blocks`, `creatures`, `items`, and `quests` inline or
    uses their session module drafts. Publication binds all session assets to
    the frozen format-6 pack; assets must exist and their bytes must validate.
    Empty optional libraries are valid only when they satisfy the session mode and
    its named complete-world coverage promises. A successful
    draft write is not a claim of native preparation or actual world activation.
+
+When the theme needs a new setting fact, update the structured WorldBible first,
+review its new revision, then update the derived theme and affected briefs.
+The readable bible Markdown is generated, never edited as a parallel source.
+Keep full authoring evidence in the session; no new fields are added to this
+runtime schema or to the existing `.wspack` format.
 
 Choose a signature existing item or block with the write request's optional
 `representativeContent: {"kind":"item","id":"local_item_id"}` (or kind=block).

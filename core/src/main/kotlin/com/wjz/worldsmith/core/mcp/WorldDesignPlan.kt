@@ -45,7 +45,7 @@ object WorldDesignPlans {
     private val targetKinds = requiredKinds + setOf("terrain", "anchor", "feature", "blueprint", "theme", "narrative_beat")
     private val ambientKinds = setOf("terrain", "anchor", "feature", "blueprint", "theme", "narrative_beat")
 
-    fun validate(plan: WorldDesignPlan, completeWorld: Boolean = true): List<Diagnostic> = buildList {
+    fun validate(plan: WorldDesignPlan, completeWorld: Boolean = true, requireBoss: Boolean = true): List<Diagnostic> = buildList {
         fun error(path: String, code: String, message: String) { add(Diagnostic(path, code, DiagnosticSeverity.ERROR, message)) }
         if (plan.schemaVersion != 1) error("designPlan.schemaVersion", "DESIGN_SCHEMA_UNSUPPORTED", "World design plan schema must be 1")
         if (plan.goal.isBlank() || plan.goal.length > 8192) error("designPlan.goal", "DESIGN_GOAL_INVALID", "Record the player's world goal in 1..8192 characters")
@@ -64,7 +64,7 @@ object WorldDesignPlans {
             (requiredKinds - targets.map { it.kind }.toSet()).sorted().forEach { kind ->
                 error("designPlan.targets", "DESIGN_CATEGORY_MISSING", "A complete world must explicitly name at least one $kind; an empty module does not meet that promise")
             }
-            if (plan.bosses.isEmpty()) error("designPlan.bosses", "DESIGN_BOSS_MISSING", "A complete-world plan names at least one actual Boss encounter and its kill quest")
+            if (requireBoss && plan.bosses.isEmpty()) error("designPlan.bosses", "DESIGN_BOSS_MISSING", "This world's scope promises an actual Boss encounter and its kill quest")
         }
         if (plan.links.distinct().size != plan.links.size) error("designPlan.links", "DESIGN_LINK_DUPLICATE", "Do not repeat an identical relationship promise")
         fun declared(key: ContentKey) = key in targets || key.kind in ambientKinds || key.kind == "block_item" && ContentKey("block", key.id) in targets

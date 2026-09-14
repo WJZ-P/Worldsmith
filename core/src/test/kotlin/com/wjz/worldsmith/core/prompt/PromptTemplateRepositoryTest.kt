@@ -32,15 +32,34 @@ class PromptTemplateRepositoryTest {
     }
 
     @Test
-    fun `the contract set exposes planning before typed domain authoring`() {
+    fun `the contract index exposes persistent authoring alongside existing planning and domain contracts`() {
         val contracts = PromptSet.DEFAULT.contracts
 
         assertEquals(
-            listOf(PromptSet.CONTRACT_GRAND_WORLD, PromptSet.CONTRACT_TERRAIN, PromptSet.CONTRACT_BIOME, PromptSet.CONTRACT_FEATURE, PromptSet.CONTRACT_STRUCTURE,
+            listOf(PromptSet.CONTRACT_GRAND_WORLD, "world_bible", "module_briefs", PromptSet.CONTRACT_TERRAIN, PromptSet.CONTRACT_BIOME, PromptSet.CONTRACT_FEATURE, PromptSet.CONTRACT_STRUCTURE,
                 PromptSet.CONTRACT_ARCHITECTURE, PromptSet.CONTRACT_DRAW),
             contracts.keys.toList(),
-            "the order is the order the entry document tells an agent to decide them in",
+            "the shared contract index retains legacy worldgen entries; mode-specific workflow progress chooses the first authoring action",
         )
         assertTrue(contracts.values.all { it in refs })
+    }
+
+    @Test
+    fun `complete-world entry puts the setting and self-review before physical production`() {
+        val repository = ClasspathPromptTemplateRepository()
+        val entry = repository.load(PromptSet.DEFAULT.worldEntry).systemPrompt
+        val bible = entry.indexOf("WorldBible")
+        val review = entry.indexOf("AI self-review")
+        val production = entry.indexOf("**terrain first**")
+        assertTrue(bible >= 0 && review > bible && production > review)
+        val worldBible = repository.load(PromptSet.DEFAULT.contracts.getValue("world_bible")).systemPrompt
+        val briefs = repository.load(PromptSet.DEFAULT.contracts.getValue("module_briefs")).systemPrompt
+        assertTrue("AUTHORING_AI" in worldBible)
+        assertTrue("expectedBasisDigest" in worldBible && "expectedContentDigest" in worldBible)
+        assertTrue("requiredCheckIds" in worldBible && "evidenceRoots" in worldBible)
+        assertTrue("WORLDGEN_ONLY and STANDALONE stay" in worldBible)
+        assertTrue("removeIds" in briefs && "Unmentioned IDs are" in briefs)
+        assertTrue("evidenceDocumentIncluded" in briefs)
+        assertTrue("briefIds" in briefs)
     }
 }

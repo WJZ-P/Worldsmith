@@ -82,6 +82,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private val packStore=ManagedPackStore(this.packDirectory)
     private val publicationService=PackPublicationService(packStore,sessions,publicationHost,drawingService)
     private val contentService=WorldContentMcpService(packStore,nativeChecks!=null,sessions,this.packDirectory.resolveSibling("content-assets"),drawings::list)
+    private val authoringService=WorldAuthoringMcpService(sessions)
     private val materialPalette=PreviewMaterialPalette(contentService::textureBytes)
     private val creatureAuthoringService=CreatureAuthoringMcpService(sessions,contentService,this.packDirectory.resolveSibling("creature-work"))
     private val resourcePackExchange=ResourcePackExchange(this.packDirectory)
@@ -95,9 +96,9 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     /** Native UI entry point: immutable, bounded data only; callers perform projection off the render thread. */
     @JvmOverloads fun progressSnapshot(preferredSessionId: String? = null): GenerationProgressSnapshot = progressGateway.snapshot(preferredSessionId)
 
-    fun all(): List<McpTool> = rawTools().map(progressGateway::observe)
+    fun all(): List<McpTool> = rawTools().map { WorldAuthoringFlow.guard(it,sessions) }.map(progressGateway::observe)
 
-    private fun rawTools(): List<McpTool> = resourcePackService.tools()+contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+listOf(
+    private fun rawTools(): List<McpTool> = authoringService.tools()+resourcePackService.tools()+contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+listOf(
         McpTool("worldsmith_get_generation_progress_view", "Read the native progress view", "Read the same bounded in-memory session catalog and progress view shown in Create World. No draft edits, selection changes, source execution or archived-file scan.",
             objectSchema(mapOf("sessionId" to stringSchema()),emptyList()),true,handler={ a ->
                 McpToolResult.success(encode(progressSnapshot((a["sessionId"] as? JsonPrimitive)?.contentOrNull)).jsonObject)
@@ -347,6 +348,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         return McpToolResult.success(buildJsonObject {
             put("sessionId",session.id);put("prompt",session.prompt);put("revision",session.revision)
             put("mode",session.mode.name);put("designPlanPresent",session.designPlan!=null)
+            put("authoring",WorldAuthoringMcpService.summary(session))
             session.architecture?.let { put("architecture",encode(it)) }
             if(detail=="full") {
                 put("structures",encode(session.structureLibrary()))
@@ -384,9 +386,9 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val overview=WorldsmithWorkflow.overview(mode,detail=="summary")
         val planningText=if(mode!=WorkflowMode.STANDALONE)templates.load(PromptSet.DEFAULT.contracts.getValue(PromptSet.CONTRACT_GRAND_WORLD)).systemPrompt else null
         val planningOverview=planningText?.let {ContractSections.split(it).getValue("overview")}
-        val nextTool=if(planningText!=null)WorldsmithWorkflow.CONTRACT_TOOL else progress.nextTool
-        val nextArguments=if(planningText!=null)buildJsonObject {put("id",PromptSet.CONTRACT_GRAND_WORLD);put("section","world-atlas")} else progress.nextArguments
-        val nextInstruction=if(planningText!=null)"Read grand_world/world-atlas, plan broad geography, places and production batches within authoringBudgets, then commit intent through the existing world-design/theme/content fields. The progress object retains the actual missing draft action." else progress.nextInstruction
+        val nextTool=if(planningText!=null || session.authoring!=null)WorldsmithWorkflow.CONTRACT_TOOL else progress.nextTool
+        val nextArguments=if(session.authoring!=null)buildJsonObject {put("id","world_bible")} else if(planningText!=null)buildJsonObject {put("id",PromptSet.CONTRACT_GRAND_WORLD);put("section","world-atlas")} else progress.nextArguments
+        val nextInstruction=if(session.authoring!=null)"Read world_bible, expand this original prompt into the persistent WorldBible, then perform the evidence-bearing AI self-check. Continue automatically into regional ecology, main-line/resource planning and module briefs before producing assets. This is authoring AI review, not user approval." else if(planningText!=null)"Read grand_world/world-atlas, plan broad geography, places and production batches within authoringBudgets, then commit intent through the existing world-design/theme/content fields. The progress object retains the actual missing draft action." else progress.nextInstruction
         val structured = buildJsonObject {
             put("sessionId", session.id)
             put("prompt", prompt)
@@ -420,6 +422,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             }
             put("detail",detail)
             put("contentFramework",contentService.capabilities())
+            put("authoring",WorldAuthoringMcpService.summary(session))
             put("contractPointers",generationContractPointers());put("progress",encode(progress))
             put("styleCount", styles.list().size)
             put("climatePlacement", climatePlacementJson())
@@ -591,6 +594,9 @@ class WorldsmithMcpTools @JvmOverloads constructor(
 
     /** Small, executable contract lookups retained even when the full cross-domain prompts are omitted. */
     private fun generationContractPointers():JsonObject=buildJsonObject {
+        listOf("world_bible","module_briefs").forEach {id->
+            putJsonObject(id){put("tool",WorldsmithWorkflow.CONTRACT_TOOL);putJsonObject("arguments"){put("id",id)}}
+        }
         putJsonObject(PromptSet.CONTRACT_GRAND_WORLD) {
             put("tool",WorldsmithWorkflow.CONTRACT_TOOL)
             putJsonObject("arguments") {put("id",PromptSet.CONTRACT_GRAND_WORLD);put("detail","index")}
@@ -922,7 +928,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     }
 
     private fun writePackAttempt(arguments: JsonObject): McpToolResult {
-        val displayName = requiredString(arguments, "displayName").trim()
+        val selectedSession=optionalString(arguments,"sessionId").trim().let(sessions::find)
+        val displayName = optionalString(arguments, "displayName").trim().ifBlank {selectedSession?.authoring?.bible?.title.orEmpty()}
         require(displayName.isNotBlank()) { "displayName must not be blank" }
         require(displayName.length <= MAX_DISPLAY_NAME_LENGTH) {
             "displayName must be at most $MAX_DISPLAY_NAME_LENGTH characters"
@@ -943,7 +950,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         }
         if(completeWorld) {
             val design=session?.designPlan
-            val problems=if(design==null) listOf(Diagnostic("designPlan","DESIGN_PLAN_REQUIRED",DiagnosticSeverity.ERROR,"A COMPLETE_WORLD run must commit its named design plan before publication")) else WorldDesignPlans.validate(design)
+            val problems=if(design==null) listOf(Diagnostic("designPlan","DESIGN_PLAN_REQUIRED",DiagnosticSeverity.ERROR,"A COMPLETE_WORLD run must commit its named design plan before publication")) else WorldDesignPlans.validate(design,requireBoss=requireNotNull(session).requiresPlannedBoss())
             if(problems.isNotEmpty())return McpToolResult.error("Complete-world plan is missing or invalid",buildJsonObject {
                 put("sessionId",sessionId);put("valid",false);put("diagnostics",diagnosticsJson(problems));put("nextTool","worldsmith_put_world_design_plan")
             })
@@ -1002,7 +1009,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             )
         }
         if(completeWorld && diagnostics.none {it.severity==DiagnosticSeverity.ERROR}) {
-            diagnostics += WorldDesignCoverage.validate(pack,requireNotNull(session?.designPlan))
+            diagnostics += WorldDesignCoverage.validate(pack,requireNotNull(session?.designPlan),requireNotNull(session).requiresPlannedBoss())
+            diagnostics += WorldAuthoringPolicy.publicationProblems(session,pack)
         }
         val structured = buildJsonObject {
             put("id", manifest.id)
@@ -1019,6 +1027,14 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val directory = persistPack(manifest, bundle.texts, bundle.binaries)
         // Display metadata is not part of the content hash. An existing identical directory retains its actual metadata.
         val savedManifest=WorldsmithJson.decode<WorldsmithPackManifest>(Files.readString(directory.resolve("worldsmith.json")))
+        if(session?.authoring!=null) {
+            val storedProblems=WorldAuthoringPolicy.publicationProblems(session,pack.copy(manifest=savedManifest))
+            if(storedProblems.isNotEmpty())return McpToolResult.error("The retained package metadata differs from the reviewed world design",buildJsonObject {
+                put("sessionId",session.id);put("valid",false);put("id",savedManifest.id);put("storedDisplayName",savedManifest.displayName)
+                put("diagnostics",diagnosticsJson(storedProblems));put("nextTool","worldsmith_get_generation_progress")
+                put("existingPackagePreserved",true)
+            })
+        }
         // Session validity and the complete architecture were checked before writing files.
         val savedSession = session?.let { sessions.recordPackSnapshotAtRevision(sessionId,pack.copy(manifest=savedManifest),it.revision) }
         val recorded = savedSession != null
@@ -1082,7 +1098,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
                         put("nextTool","worldsmith_inspect_world_content");put("nextArguments",buildJsonObject {put("id",session.packId)})
                     }))
                 }
-                val diagnostics=WorldDesignCoverage.validate(loaded,plan)
+                val diagnostics=WorldDesignCoverage.validate(loaded,plan,session.requiresPlannedBoss())
                 if(diagnostics.any {it.severity==DiagnosticSeverity.ERROR})return receipt(McpToolResult.error("Frozen complete-world coverage no longer meets its plan",buildJsonObject {
                     put("sessionId",session.id);put("complete",false);put("diagnostics",diagnosticsJson(diagnostics));put("nextTool","worldsmith_get_generation_progress")
                 }))
@@ -1239,7 +1255,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             "features" to documentSchema("A FeatureLibrary object matching the template."),
             "structures" to documentSchema("StructureLibrary with complete definitions and optional architecture plan. Omit to use the session drafts and plan. Guided publication requires all planned groups, landmark and independent structures; an empty library is only valid outside guided runs."),
         ),
-        required = listOf("displayName"),
+        required = emptyList(),
     )
 
     private fun resourcePackFilenameSchema():JsonObject=buildJsonObject {

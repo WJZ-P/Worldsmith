@@ -18,6 +18,8 @@ data class GenerationIssue(
     val requiresAuthoring: List<String> = emptyList(),
     val requiresUserAction: Boolean = false,
     val priority: Int = 100,
+    /** Authoring provenance only; do not inject this into a tool's arguments unless its schema declares it. */
+    val authoringSubjectId: String? = null,
 )
 
 /** One bounded failed publication receipt, tied to the validated revision rather than a growing event log. */
@@ -86,17 +88,36 @@ object WorldGenerationProgress {
         if (session.archived) issue("GENERATION_ARCHIVED", "session", "Resume this saved draft before editing it; its existing content remains available", "worldsmith_resume_session", -100, sid)
         val failure = session.lastWriteFailure
         val currentFailure = failure?.revision == session.revision
-        failure?.takeIf { currentFailure }?.let { receipt -> receipt.diagnostics.filter { it.severity == DiagnosticSeverity.ERROR }.forEach { diagnostic ->
+        failure?.takeIf { currentFailure }?.let { receipt -> receipt.diagnostics.filter { it.severity == DiagnosticSeverity.ERROR }.forEach diagnosticLoop@{ diagnostic ->
+            if(session.authoring!=null && (diagnostic.code.startsWith("AUTHORING_") || diagnostic.code.startsWith("WORLD_BIBLE_"))) {
+                val inline=receipt.inlineInputs
+                if(inline.isNotEmpty()) {
+                    val modules=inline.filter {it!="structures" && it!="architecture"}
+                    val tool=if(modules.isNotEmpty())"worldsmith_put_content_modules" else "worldsmith_put_architecture_draft"
+                    issue(diagnostic.code,"frozen_repair","The failed publication used unsaved inline inputs (${inline.joinToString()}). Commit those exact intended documents, preserving all other inline inputs, then review the resulting current snapshot. ${diagnostic.message}",
+                        tool,-50,cas,if(modules.isNotEmpty())modules.map {"modules.$it"} else listOf("architecture","structures"))
+                } else {
+                    val candidates=WorldAuthoringFlow.issues(session)
+                    val subject=WorldAuthoringFlow.subject(session,diagnostic)
+                    val next=candidates.firstOrNull {subject!=null && it.authoringSubjectId==subject}
+                        ?: candidates.firstOrNull {it.code==diagnostic.code} ?: candidates.firstOrNull()
+                    if(next!=null)issues+=next.copy(priority=-50,message="${diagnostic.message} ${next.message}")
+                    else issue(diagnostic.code,"frozen_repair","Frozen publication differs from the currently reviewed draft: ${diagnostic.message} Inspect the exact rejected snapshot and its retained package metadata before changing the design; repeating a read or the same write is not a repair.",
+                        "worldsmith_get_world_bible",-50,sid,user=true)
+                }
+                return@diagnosticLoop
+            }
             val repair = repair(session, diagnostic)
             val inline = if (receipt.inlineInputs.isEmpty()) "" else " Failed write used unsaved inline inputs (${receipt.inlineInputs.joinToString()}); commit the corrected documents and preserve the other inline inputs before retrying."
             issue(diagnostic.code, "frozen_repair", "${diagnostic.path}: ${diagnostic.message}" + diagnostic.hint?.let { " Repair: $it" }.orEmpty() + inline,
                 repair.first, -50, if (repair.first in setOf("worldsmith_put_content_modules", "worldsmith_put_world_design_plan", "worldsmith_build_texture")) cas else sid, repair.second)
         } }
         val complete = session.mode == WorkflowMode.COMPLETE_WORLD
+        issues += WorldAuthoringFlow.issues(session)
         if (complete && session.designPlan == null) issue("GENERATION_DESIGN_PLAN_REQUIRED", "plan",
-            "Translate this prompt into a named, linked complete-world plan before filling modules. Declare biomes, structures, blocks, items, creatures, main-line quests and an actual Boss.",
+            "Translate this prompt into a named, linked complete-world plan before filling modules. Declare biomes, structures, blocks, items, creatures and main-line quests; include actual Boss encounters when the current scope promises them.",
             "worldsmith_put_world_design_plan", 0, authoring = listOf("plan"))
-        session.designPlan?.let { plan -> WorldDesignPlans.validate(plan, complete).take(16).forEach { diagnostic ->
+        session.designPlan?.let { plan -> WorldDesignPlans.validate(plan, complete, session.requiresPlannedBoss()).take(16).forEach { diagnostic ->
             issue(diagnostic.code, "plan", diagnostic.message, "worldsmith_put_world_design_plan", 1, authoring = listOf("plan"))
         } }
         val required = when (session.mode) {
@@ -187,7 +208,12 @@ object WorldGenerationProgress {
         val action = next ?: fallback
         val stage = when {
             session.archived -> "ARCHIVED"
+            action.requiresUserAction && next?.category in setOf("world_bible_review","content_alignment_review") -> "WORLD_AUTHORING_BLOCKED"
             action.requiresUserAction -> "WAITING_USER"
+            next?.category == "world_bible_draft" -> "WORLD_BIBLE_DRAFT"
+            next?.category == "world_bible_review" -> "WORLD_BIBLE_REVIEW"
+            next?.category == "module_briefs" -> "MODULE_BRIEFS"
+            next?.category == "content_alignment_review" -> "CONTENT_ALIGNMENT_REVIEW"
             next != null && next.category == "plan" -> "DESIGN_PLAN"
             next?.category == "frozen_repair" -> "FROZEN_REPAIR"
             next != null -> "AUTHORING"

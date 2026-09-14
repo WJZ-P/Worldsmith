@@ -43,6 +43,9 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         put("customItemReference","worldsmith:item/<itemId>; plain resources and relics, not new tools or equipment")
         put("nextTool","worldsmith_get_content_contract")
         put("generationModes",McpJson.encode(WorkflowMode.entries.map { it.name }))
+        put("worldBibleAuthoring",true);put("authoringContractVersion",1);put("automaticAfterAiReview",true)
+        put("worldBibleContract", "world_bible");put("moduleBriefContract", "module_briefs")
+        put("worldBibleStoredInPackage",false);put("newCompleteWorldRequiresWorldBible",true)
         put("completeWorldPlanTool","worldsmith_put_world_design_plan");put("generationProgressTool","worldsmith_get_generation_progress")
         put("completeWorldCoverageRequiresActualContent",true)
         put("resourcePackWorkflowTool","worldsmith_get_resource_pack_workflow");put("resourcePackExtension",".wspack")
@@ -128,7 +131,7 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         val s=current(a)
         val plan=McpJson.decode<WorldDesignPlan>(a.getValue("plan"))
         val mode=a["mode"]?.jsonPrimitive?.content?.let {WorkflowMode.valueOf(it)} ?: s.mode
-        val diagnostics=WorldDesignPlans.validate(plan,mode==WorkflowMode.COMPLETE_WORLD)
+        val diagnostics=WorldDesignPlans.validate(plan,mode==WorkflowMode.COMPLETE_WORLD,s.requiresPlannedBoss())
         if(diagnostics.isNotEmpty())return McpToolResult.error("World design plan needs repair",buildJsonObject {
             put("sessionId",s.id);put("revision",s.revision);put("diagnostics",McpJson.encode(diagnostics));put("nextTool","worldsmith_put_world_design_plan")
         })
@@ -174,6 +177,7 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         put("sessionId",s.id);put("revision",s.revision);put("modules",JsonObject(s.contentModules));put("assets",McpJson.encode(s.contentAssets.values.map(::portable)))
         put("mode",s.mode.name);put("designPlan",s.designPlan?.let {McpJson.encode(it)} ?: JsonNull)
         put("structureCount",s.structures.size);put("published",s.packId!=null);put("packId",s.packId?.let(::JsonPrimitive) ?: JsonNull)
+        put("authoring",WorldAuthoringMcpService.summary(s))
         put("missingModules",McpJson.encode(progress.missingModules));put("progress",McpJson.encode(progress));put("nextTool",progress.nextTool);put("nextArguments",progress.nextArguments);put("nextInstruction",progress.nextInstruction)
     })
     private fun availableCapabilities()=if(nativeAdapterPresent) ExistingWorldContentModules.nativeCapabilities() else emptyMap()

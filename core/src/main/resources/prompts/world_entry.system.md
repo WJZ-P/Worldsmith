@@ -8,19 +8,28 @@ contract, not a tenth bundle module. This page connects their responsibilities.
 
 ## Plan the whole world before multiplying assets
 
-For a world-sized request, first read `grand_world` section `world-atlas` and the
-current `authoringBudgets` returned by begin/framework. Establish the physical
-skeleton, distinct regions, transitions, resource routes and exploration rhythm.
-Then read `world_design` and save a named, linked design plan. Scale follows the
-player's prompt, not the count in a sample pack. Regional names and societies are
-planning text, not invented module fields or installed faction/NPC mechanics.
+For a new COMPLETE_WORLD, first read `world_bible` and save a persistent structured
+WorldBible from the original prompt. Record hard constraints, assumptions, history,
+regional ecology, main-line experience and resource/reward chains together. Read
+the returned review context and submit an evidence-bound AI self-review; passing
+the current review automatically continues, without a user-confirmation pause.
+Then read `grand_world` section `world-atlas`, the live `authoringBudgets`,
+`world_design` and `module_briefs`; save named targets and concrete derived briefs
+before multiplying assets. Scale follows the player's prompt, not a sample pack.
+Regional names and societies are session setting nodes, not invented runtime
+module fields or installed faction/NPC mechanics. An unsupported promised mechanic
+stays an explicit open decision, not a silently downgraded piece of lore.
 Begin summaries retain a compact `worldPlanningGuide` and a section reference;
 use those instead of loading every contract or skipping the macro-design step.
 On resume preserve accepted content and continue from actual progress gaps.
+Legacy sessions keep their old workflow unless explicitly upgraded through
+`worldsmith_upgrade_world_authoring`. WORLDGEN_ONLY and STANDALONE stay lightweight.
+The complete bible, briefs and reviews persist in the session, not in `.wspack`.
 
 ## Order
 
-Within the physical skeleton, **terrain first.** It decides where material ends up - how much land there is,
+After the bible, AI review, plan and module briefs, **terrain first** is the
+physical production order, not the order in which the story is invented. It decides where material ends up - how much land there is,
 how the coast runs, where the ground rises, where water collects. Biomes cannot
 be chosen sensibly before that, because a biome is a label applied to terrain
 that already exists, not a recipe that produces it.
@@ -96,10 +105,12 @@ Use worldsmith_authoring_stats for host work; never call request gaps model-thin
 
 ## One theme, one immutable content bundle
 
-Begin with `worldsmith_get_content_framework` and read theme/blocks/creatures/items/quests using
-`worldsmith_get_content_contract`. Establish the world's premise, player role,
-rules, main conflict and narrative beats linked to real terrain/biomes/structures,
-blocks or creatures. Narrative beats preserve creative intent; a separate linear quests module can make explicit kill/delivery goals executable; existing quests project into native advancements after reward claims; independent achievement authoring remains uninstalled.
+Use `worldsmith_get_content_framework` and the needed domain contracts. In the
+new complete-world flow, derive theme from the reviewed WorldBible: the existing
+runtime theme is a bounded projection, not a second editable fact source. Its
+premise, player role, rules, conflict and beats must agree with the authoring
+basis and link to actual content. Review that projection through its owning brief.
+Narrative beats preserve creative intent; a separate linear quests module can make explicit kill/delivery goals executable; existing quests project into native advancements after reward claims; independent achievement authoring remains uninstalled.
 
 Use `worldsmith_put_content_modules` for complete typed theme, terrain, features,
 biomes, blocks, creatures, world-bound items and quests documents. Architecture and frozen Java drawings keep
@@ -116,7 +127,12 @@ profiles. Do not invent raw host slots, arbitrary state properties, custom stair
 or unsupported flight/swimming/behavior code.
 
 Plan catalog links with `worldsmith_plan_world_content`; it never implies native
-activation. `worldsmith_write_pack` freezes a format-6 bundle with all nine
+activation. Before publishing a new complete world, submit current AI alignment
+reviews against actual modules, drawings and referenced assets, not just plans.
+`worldsmith_write_pack` and `worldsmith_finish_world` recheck authoring provenance
+and the existing engineering gates. Repeated identical blockers on the same input
+have at most three automatic repair attempts; report the unresolved decision
+instead of repeatedly self-approving. `worldsmith_write_pack` freezes a format-6 bundle with all nine
 modules and its verified PNGs at expectedRevision. `worldsmith_finish_world`
 reports native preparation/activation separately; a real Create World selection
 owns any required data/resource reload and preset activation. Do not reload the

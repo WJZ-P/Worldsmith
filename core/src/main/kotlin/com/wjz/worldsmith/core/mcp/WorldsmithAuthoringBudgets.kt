@@ -19,6 +19,15 @@ object WorldsmithAuthoringBudgets {
         put("mapInstancesAreNotCounted",true)
         put("notRecommendedTargetCounts",true)
         put("exhaustive",false)
+        putJsonObject("worldAuthoring") {
+            put("contractVersion",1);put("capabilityContract",WorldAuthoringModel.CAPABILITY_CONTRACT)
+            put("maxBibleBytes",WorldAuthoringModel.MAX_BIBLE_BYTES);put("maxBriefEditBytes",WorldAuthoringModel.MAX_BRIEF_EDIT_BYTES)
+            put("maxReviewBytes",WorldAuthoringModel.MAX_REVIEW_BYTES);put("maxStateBytes",WorldAuthoringModel.MAX_STATE_BYTES)
+            put("maxRequirements",WorldAuthoringModel.MAX_REQUIREMENTS);put("maxNodes",WorldAuthoringModel.MAX_NODES)
+            put("maxBriefs",WorldAuthoringModel.MAX_BRIEFS);put("maxCriteriaPerBrief",WorldAuthoringModel.MAX_CRITERIA)
+            put("maxChecksPerReview",WorldAuthoringModel.MAX_REVIEW_CHECKS);put("maxReviewAttempts",WorldAuthoringModel.MAX_REVIEW_ATTEMPTS)
+            put("note","Session-only world design; all documents also share the existing session byte budget. Reports attest current authoring AI evidence, not semantic certainty or a playtest.")
+        }
         putJsonObject("designPlan") {
             put("maxTargets",WorldDesignPlans.MAX_TARGETS)
             put("maxLinks",WorldDesignPlans.MAX_LINKS)

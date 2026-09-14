@@ -43,8 +43,8 @@ object WorldDesignCoverage {
     fun frozen(pack: WorldsmithPack): DesignInventory = inventory(pack.terrain, pack.biomes, pack.features, pack.blocks,
         pack.items, pack.creatures, pack.quests, pack.theme, pack.structures, true, emptyMap())
 
-    fun validate(pack: WorldsmithPack, plan: WorldDesignPlan): List<Diagnostic> {
-        val result = WorldDesignPlans.validate(plan).toMutableList()
+    fun validate(pack: WorldsmithPack, plan: WorldDesignPlan, requireBoss: Boolean = true): List<Diagnostic> {
+        val result = WorldDesignPlans.validate(plan, requireBoss = requireBoss).toMutableList()
         if (result.isNotEmpty()) return result
         val actual = try { frozen(pack) } catch (failure: Exception) {
             return listOf(Diagnostic("designPlan", "DESIGN_FROZEN_GEOMETRY_INVALID", DiagnosticSeverity.ERROR,

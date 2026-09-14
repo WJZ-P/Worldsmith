@@ -36,7 +36,11 @@ data class WorkflowStep(
     val mode: WorkflowMode = WorkflowMode.WORLDGEN_ONLY,
     val designPlan: WorldDesignPlan? = null,
     val lastWriteFailure: PackValidationReceipt? = null,
+    /** Null denotes the legacy authoring contract, including restored sessions lacking this field. */
+    val authoring: WorldAuthoringState? = null,
 )
+
+internal fun WorkflowSession.requiresPlannedBoss(): Boolean = authoring?.bible?.requiresBoss ?: true
 
 /** Sessions store definitions, not a module envelope; derive the minimum module schema when assembling one. */
 internal fun WorkflowSession.structureLibrary(): StructureLibrary {
@@ -196,8 +200,7 @@ object WorldsmithWorkflow {
 
     fun overview(mode: WorkflowMode, summary: Boolean): String = when (mode) {
         WorkflowMode.STANDALONE -> "This is a focused artifact session. Build, inspect and export the requested drawing or creature; do not manufacture terrain, architecture groups, items or quests merely to satisfy a world-publication workflow. Use the current progress and preserve successful jobs. A preview is not a gameplay screenshot."
-        WorkflowMode.COMPLETE_WORLD -> if (summary) "This is an explicit COMPLETE_WORLD promise. First read grand_world/world-atlas and the returned authoringBudgets, then persist a named WorldDesignPlan and follow worldsmith_get_generation_progress rather than restarting a fixed checklist. On resume preserve the existing plan and accepted content, continuing from the actual gap. All declared biomes, buildings, blocks, items, creatures, main-line quests and actual Boss profiles must exist and have real usage links before publication. Shared expectedRevision protects every edit. The Mod does not call an LLM or provide an image model; any capable MCP client can author its data and PNGs. Frozen-content checks and native activation are separate receipts."
-            else "COMPLETE_WORLD additionally requires a persisted WorldDesignPlan and verified coverage of its named targets, relationships and Boss quests. Empty optional libraries are not completion in this mode. Follow the current generation progress for the next missing action.\n\n$OVERVIEW"
+        WorkflowMode.COMPLETE_WORLD -> "New COMPLETE_WORLD sessions use authoring contract 1: read world_bible, persist the prompt-derived setting, and perform an evidence-bearing AI self-check. A current passing self-check automatically continues to joint regional ecology/main-line/resource planning, WorldDesignPlan and ModuleBriefs. Drawings and textures name their owning briefIds. All promised content must exist and actual content must pass current AI alignment reviews plus the existing Core/frozen/native checks. Bosses are required only when promised by the WorldBible scope. Legacy restored sessions retain contract 0 until explicitly upgraded; preserve their accepted work. The Mod calls no hidden LLM. Shared expectedRevision and source/content digests prevent stale results from becoming current receipts. Use generation progress for the actual next action, not a restart checklist."
         WorkflowMode.WORLDGEN_ONLY -> if (summary) "This is a WORLDGEN_ONLY guided run: theme, terrain, biomes, features and the existing architecture quality policy. Other content modules may be empty unless explicitly requested. Use progress for missing work, share expectedRevision across all edits, and preserve existing drawings. For the full biomes/buildings/blocks/items/creatures/quests/Boss promise, begin with mode=COMPLETE_WORLD; for one artifact use STANDALONE. Native finish is distinct from a preview or Core save."
             else OVERVIEW
     }
@@ -212,12 +215,17 @@ object WorldsmithWorkflow {
                 "worldsmith_preview_drawing" to "Inspect the actual result, repair its largest visible flaw, and export the artifact when requested.",
             )
             WorkflowMode.COMPLETE_WORLD -> listOf(
+                CONTRACT_TOOL to "For authoringContractVersion=1, first read id=world_bible. Legacy restored sessions keep their prior contract unless explicitly upgraded; follow their current progress, not a new empty checklist.",
+                "worldsmith_put_world_bible" to "Expand the original prompt into one persistent creative source of truth: hard requirements, history, rules, region/ecology/resource/experience nodes and actual scope. Do not rewrite the user's original prompt.",
+                "worldsmith_get_authoring_review_context" to "Read subjectId=world_bible, then submit worldsmith_review_world_bible with actual evidence for every required check. Repair blockers; on a current passing AI self-check continue automatically, without waiting for user approval.",
                 CONTRACT_TOOL to "Read id=grand_world section=world-atlas before committing the named world design plan. Allocate the shared authoringBudgets, regional identities, route intent and production batches using existing fields, not invented runtime region/faction/branching-quest fields.",
                 "worldsmith_get_content_contract" to "Read module=world_design and the compact cross-domain contract pointers.",
                 "worldsmith_put_world_design_plan" to "Commit prompt-specific names, roles, real relationship promises and Boss/quest links at expectedRevision.",
+                "worldsmith_put_module_briefs" to "Jointly plan the main line, regional ecology and resource/reward chain. Assign concrete targets, setting references, dependencies and evidence criteria to briefs. Drawings/textures use briefIds; do not produce unbriefed content.",
                 "worldsmith_get_generation_progress" to "Follow the highest-priority current gap. Read full contracts only for the domain being authored.",
                 "worldsmith_put_content_modules" to "Author theme/worldgen/content/quests coherently. Build real textures and creature rigs through the linked authoring tools; keep returned asset identities.",
                 STRUCTURE_TOOL to "Use the established SDK, preview, architecture and preflight loops for every planned building; preserve current jobs and shared revisions.",
+                "worldsmith_review_world_alignment" to "For each brief, first read get_authoring_review_context with its subjectId, then cite actual module/asset evidence against every required check. Reports bind current setting, briefs and content digests. A reference or a passing schema check alone is not semantic review.",
                 WRITE_TOOL to "Freeze the current revision and receive the single-file resourcePack .wspack receipt. Publication verifies real compiled-material/reward/spawn/objective links. Archive-only errors preserve the frozen draft and name an export-only retry.",
                 FINISH_TOOL to "Ensure the same archive and request the separate native receipt. resourcePackReady may be true while WAITING_CREATION needs the player to choose the pack and press Create New World, or WAITING_NATIVE_CONTEXT needs the creation page. Do not rebuild frozen content or poll indefinitely while awaiting that gesture.",
             )
@@ -268,7 +276,8 @@ class WorkflowSessions @JvmOverloads constructor(
     @Synchronized @JvmOverloads
     fun begin(prompt: String, mode: WorkflowMode = WorkflowMode.WORLDGEN_ONLY): WorkflowSession {
         require(sessions.values.count { !it.finished } < maxSessions && sessions.size<128) { "Active session capacity reached; resume existing drafts rather than discarding them" }
-        val session = WorkflowSession(idFactory(), prompt, mode = mode)
+        val session = WorkflowSession(idFactory(), prompt, mode = mode,
+            authoring = if (mode == WorkflowMode.COMPLETE_WORLD) WorldAuthoringState() else null)
         save(session)
         sessions[session.id] = session
         return session
@@ -365,7 +374,7 @@ class WorkflowSessions @JvmOverloads constructor(
     @Synchronized fun putDesignPlan(id: String, expectedRevision: Long, plan: WorldDesignPlan, mode: WorkflowMode): WorkflowSession? = update(id) {
         require(it.revision == expectedRevision) { "DRAFT_REVISION_CONFLICT: expected $expectedRevision, current ${it.revision}" }
         require(it.mode != WorkflowMode.COMPLETE_WORLD || mode == WorkflowMode.COMPLETE_WORLD) { "A complete-world run keeps its declared scope; start an explicit focused run instead of silently downgrading it" }
-        val errors = WorldDesignPlans.validate(plan, mode == WorkflowMode.COMPLETE_WORLD)
+        val errors = WorldDesignPlans.validate(plan, mode == WorkflowMode.COMPLETE_WORLD, it.requiresPlannedBoss())
         require(errors.isEmpty()) { errors.take(16).joinToString("; ") { d -> "${d.path}: ${d.message}" } }
         val frozen = WorldDesignPlans.freeze(plan)
         if (it.designPlan == frozen && it.mode == mode) it else it.copy(designPlan = frozen, mode = mode, revision = it.revision + 1, packId = null, finished = false)
@@ -392,6 +401,20 @@ class WorkflowSessions @JvmOverloads constructor(
         save(updated)
         sessions[id] = updated
         return updated
+    }
+
+    /** Authoring evidence shares the durable CAS, while Bible revisions change only with Bible semantics. */
+    @Synchronized fun putAuthoring(id: String, expectedRevision: Long, authoring: WorldAuthoringState): WorkflowSession? = update(id) {
+        require(!it.archived) { "Resume the archived session before editing its world design" }
+        require(it.mode == WorkflowMode.COMPLETE_WORLD) { "World Bible gates belong to COMPLETE_WORLD, not a focused artifact run" }
+        require(it.revision == expectedRevision) { "DRAFT_REVISION_CONFLICT: expected $expectedRevision, current ${it.revision}" }
+        val frozen = WorldAuthoringModel.freezeState(authoring)
+        require(frozen.contractVersion==1 && frozen.bibleRevision>=0){"Unsupported world authoring contract or revision"}
+        require(frozen.briefs.size<=WorldAuthoringModel.MAX_BRIEFS && frozen.alignmentReviews.size<=WorldAuthoringModel.MAX_BRIEFS
+            && frozen.reviewAttempts.size<=WorldAuthoringModel.MAX_REVIEW_ATTEMPTS){"World authoring record budget exceeded"}
+        require(WorldsmithJson.encode(frozen).toByteArray(Charsets.UTF_8).size<=WorldAuthoringModel.MAX_STATE_BYTES){"World authoring state exceeds 2 MiB"}
+        if (it.authoring == frozen) it else it.copy(authoring = frozen, revision = it.revision + 1,
+            packId = null, finished = false, lastWriteFailure = null)
     }
 
     private fun save(session:WorkflowSession) {

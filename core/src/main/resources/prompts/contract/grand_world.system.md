@@ -5,24 +5,30 @@ and consequences of one premise, not merely a larger list of assets. The player'
 prompt sets ambition; a small island and a vast continent need different plans.
 This is an authoring method, not a new runtime module or a mandatory world size.
 
-Before detailed production, read `grand_world` section `world-atlas`, get the
+Before detailed production in a new complete world, save and AI-review the
+WorldBible under `world_bible`. Read `grand_world` section `world-atlas`, get the
 live `authoringBudgets` from `worldsmith_get_content_framework`, then read
-`world_design` and save named targets and links. Use COMPLETE_WORLD for a full
+`world_design` and `module_briefs` and save named targets, links and derived
+implementation briefs. Plan main-line experience and resource/reward chains
+alongside regional ecology. Use COMPLETE_WORLD for a full
 world; STANDALONE remains a focused artifact workflow. Preserve an existing plan
 and completed assets when resuming; add this review at the current gap rather
 than starting over.
 
 Think at three scales: the world's physical skeleton; regions and travel routes;
-individual habitats, settlements, ruins and encounters. Express the atlas using
-existing `goal`, target `purpose`, theme `premise`/`worldRules`/`beats`, and actual
-terrain/biome/structure fields. Region and faction labels are creative notes,
-not new JSON keys or ContentKey kinds. Catalog counts are distinct definitions,
+individual habitats, settlements, ruins and encounters. Persist the atlas as
+stable REGION, ECOLOGY, RESOURCE, HISTORY, STYLE and EXPERIENCE setting nodes in
+the bible; derive existing `goal`, target `purpose`, theme and actual domain fields
+from these facts. Region and faction labels are not new runtime JSON keys or
+ContentKey kinds. Catalog counts are distinct definitions,
 not the number of places generated in an unbounded world.
 
 ## World atlas
 
-Produce a compact atlas before spending most of the run on models. Its form may
-be prose or a table in working notes; do not submit it as an unknown module.
+Produce an atlas before spending most of the run on models. In new complete
+worlds its facts live in the structured bible, with deterministic readable MD;
+do not maintain an independent atlas document or submit an unknown runtime module.
+Legacy/lightweight sessions retain their existing compact-plan approach.
 
 1. **Premise and scale.** State the player's role, central tension, physical
    consequences and exploration promise. Choose an intimate, regional or broad
@@ -50,11 +56,11 @@ be prose or a table in working notes; do not submit it as an unknown module.
    stable local IDs and concrete purposes. Assign shared assets to one owner;
    record cross-region reuse rather than duplicating IDs or budget counts.
 
-Persist a concise atlas summary in `WorldDesignPlan.goal` and the appropriate
-targets' `purpose` text. Preserve essential setting intent in the bundle's theme
-`premise`, `worldRules` and narrative beat descriptions/content links. The session
-design plan itself is not a new `.wspack` module: keep a separate planning note if
-the full atlas exceeds existing string limits. All links must use installed
+Derive a concise atlas summary into `WorldDesignPlan.goal` and the appropriate
+targets' `purpose` text. Project essential setting intent into the bundle's theme
+`premise`, `worldRules` and beats, then review that projection through its brief.
+The full atlas stays in the session bible within authoring budgets, not a new
+`.wspack` module or a second independently edited document. All runtime links use installed
 ContentKey kinds and real definitions; do not add `regions`, `factions`, `routes`
 or new relationship verbs to typed documents. A supported `placement.region`
 field is its exact existing statistical placement grammar, not this prose atlas.
@@ -128,7 +134,9 @@ encounter; it does not guarantee a placed building or a globally unique final Bo
 Organize work by dependencies and the largest current uncertainty, not by a rigid
 sequence that repeats already finished work. A useful initial path is:
 
-1. Save the named plan and shared setting. Establish terrain/biome coverage,
+1. Save and AI-review the bible, then save the named plan and module briefs.
+   Terrain-first now means physical production after these authoring foundations.
+   Establish terrain/biome coverage,
    material families, item roles, habitats, narrative beats and progression links.
 2. Build a representative slice: one distinctive inhabited place and its terrain,
    block textures, creature skin, obtainable reward and applicable quest link.
@@ -138,7 +146,8 @@ sequence that repeats already finished work. A useful initial path is:
    the same building shell for every purpose. Freeze accepted drawings, reuse
    their IDs and record which regional targets each batch fulfills.
 4. Assemble cross-region links, remaining transitions and major encounters.
-   Reconcile the shared ledger and perform a global review before final freezing.
+   Reconcile the shared ledger and submit evidence-bound implementation reviews
+   against actual candidate content before final freezing, not only a prose plan.
 
 Independent source/recipe design and visual reviews can run in parallel. Shared
 session mutations require the latest expectedRevision; a coordinator should merge
@@ -157,6 +166,11 @@ texture, and a referenced drawing is not present until its frozen data is resolv
 
 Evaluate the whole world as a journey, not only one beautiful model per batch.
 Keep a brief finding/evidence/repair ledger and inspect the highest-impact gaps.
+Use `worldsmith_get_authoring_review_context` and the persisted bible/alignment
+review tools, with current digests, required checks and real evidence paths.
+AI PASS automatically continues; it is not user approval. The same input/issue
+gets at most three identical automatic repair failures before an explicit blocker
+or scope decision is reported. Keep accepted geometry and textures during repair.
 
 | Review | Questions and evidence |
 | --- | --- |

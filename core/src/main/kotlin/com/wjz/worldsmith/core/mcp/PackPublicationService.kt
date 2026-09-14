@@ -40,7 +40,8 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
             )
         }
 
-        val diagnostics = WorldsmithPackValidator.validate(pack) + if (pack.structures.architecture == null) listOf(StructureArchitectureValidator.missingPlan()) else emptyList()
+        val diagnostics = WorldsmithPackValidator.validate(pack) + WorldAuthoringPolicy.publicationProblems(session,pack) +
+            if (pack.structures.architecture == null) listOf(StructureArchitectureValidator.missingPlan()) else emptyList()
         if (diagnostics.any { it.severity == DiagnosticSeverity.ERROR }) {
             val failed = buildJsonObject {
                 put("sessionId", sessionId)

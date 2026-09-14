@@ -22,6 +22,11 @@ import kotlinx.serialization.json.*
     val jobId:String,val name:String,val stage:String,val drawingIds:List<String>,val structureIds:List<String>,
     val needsApproval:Boolean,val detail:String? = null,
 )
+/** Bounded display-only snapshot. The complete structured bible stays in the session. */
+@Serializable data class WorldAuthoringView(
+    val bibleRevision:Long,val title:String,val premise:String,val stage:String,val aiReviewed:Boolean,
+    val briefCount:Int,val reviewedBriefs:Int,val markdown:String,val markdownTruncated:Boolean=false,
+)
 @Serializable data class GenerationProgressView(
     val sessionId:String,val revision:Long,val title:String,val prompt:String,val mode:WorkflowMode,val stage:String,
     val planPresent:Boolean,val packId:String?,val declaredTargets:Int,val totalPlannedTargets:Int?,val overallLabel:String,
@@ -29,6 +34,7 @@ import kotlinx.serialization.json.*
     val issues:List<GenerationIssue>,val nextTool:String,val nextInstruction:String,val requiresUserAction:Boolean,
     val nativeActivationVerified:Boolean,val targetsTruncated:Boolean=false,val jobsTruncated:Boolean=false,val issuesTruncated:Boolean=false,
     val verificationBoundary:String="目标状态只描述已提交草稿或已记录的冻结快照；不代表本次几何/贴图校验、资源包就绪或游戏内完成。",
+    val authoring:WorldAuthoringView?=null,
 )
 
 /** Pure display projection over supplied in-memory snapshots. No files, PNG decoding, drawing compiler or host locks. */
@@ -36,6 +42,7 @@ object GenerationProgressViews {
     const val MAX_TARGETS=512
     const val MAX_JOBS=32
     const val MAX_ISSUES=32
+    const val MAX_AUTHORING_MARKDOWN=64*1024
     private const val MAX_INPUT_JOBS=256
     private val mainKinds=listOf("biome","structure","creature","block","item","quest")
     private val moduleKinds=mapOf("biomes" to "biome","features" to "feature","blocks" to "block","items" to "item","creatures" to "creature","quests" to "quest")
@@ -103,12 +110,24 @@ object GenerationProgressViews {
         val visibleIssues=progress.issues.take(MAX_ISSUES).map {it.copy(code=it.code.take(128),category=it.category.take(64),message=it.message.take(2048),
             nextTool=it.nextTool.take(128),requiresAuthoring=it.requiresAuthoring.take(16).map {field->field.take(128)})}
         val themeTitle=(current.contentModules["theme"]?.get("title") as? JsonPrimitive)?.contentOrNull?.takeIf {it.isNotBlank()}
-        val title=(themeTitle ?: plan?.goal?.takeIf {it.isNotBlank()} ?: current.prompt).lineSequence().firstOrNull().orEmpty().take(160)
+        val title=(current.authoring?.bible?.title ?: themeTitle ?: plan?.goal?.takeIf {it.isNotBlank()} ?: current.prompt).lineSequence().firstOrNull().orEmpty().take(160)
         val label=if(denominator==null)"已提交目标草稿 $declared / 目标总数未知" else "已提交目标草稿 $declared/$denominator"
         return GenerationProgressView(current.id,current.revision,title,current.prompt.take(4000),current.mode,progress.stage,originalPlan!=null,current.packId,
             declared,denominator,label,categories,targets,rows,visibleIssues,progress.nextTool,progress.nextInstruction.take(2048),
             progress.requiresUserAction || knownJobs.any {it.stage==DrawingJobStage.WAITING_APPROVAL},progress.nativeActivationVerified,
-            targetsTruncated,suppliedJobs.size>MAX_INPUT_JOBS || orderedJobs.size>MAX_JOBS,progress.issues.size>MAX_ISSUES)
+            targetsTruncated,suppliedJobs.size>MAX_INPUT_JOBS || orderedJobs.size>MAX_JOBS,progress.issues.size>MAX_ISSUES,
+            authoring=authoringView(session,progress.stage))
+    }
+
+    private fun authoringView(session:WorkflowSession,stage:String):WorldAuthoringView? {
+        val state=session.authoring ?: return null
+        val bible=state.bible ?: return null
+        val markdown=WorldAuthoringModel.markdown(bible)
+        var end=minOf(markdown.length,MAX_AUTHORING_MARKDOWN)
+        if(end<markdown.length && end>0 && markdown[end-1].isHighSurrogate())end--
+        return WorldAuthoringView(state.bibleRevision,bible.title.take(160),bible.premise.take(2048),stage,
+            WorldAuthoringPolicy.hasCurrentBibleReview(session),state.briefs.size,WorldAuthoringPolicy.currentReviewedBriefCount(session),
+            markdown.substring(0,end),end<markdown.length)
     }
 
     private fun jobPriority(stage:DrawingJobStage)=when {
