@@ -1,7 +1,8 @@
 # 从一句话到可检查的完整世界
 
 Worldsmith 提供可复用的 MCP 创作和原生运行时，不内置调用某个 LLM 或图片服务。
-外部 AI 将玩家的一句话展开为设计计划，再通过同一套类型化接口生成、预览、修正和保存。
+外部 AI 先将玩家的一句话展开为持久世界观，完成 AI 自检，再派生设计计划与任务书，
+通过同一套类型化接口生成、预览、修正和保存。详见 [世界观驱动创作](world-bible-authoring.md)。
 因此“一句话”是玩家入口，不是省略中间设计与验证步骤的承诺。
 当前新写入为**格式6的九模块**；theme/quests仍为schema1，物品能力使用items schema2。
 格式3/4/5只读恢复并保持原身份与原文，生成流程不自动升级既有世界。
@@ -11,8 +12,9 @@ Worldsmith 提供可复用的 MCP 创作和原生运行时，不内置调用某�
 `worldsmith_begin_world` 显式选择 `mode: COMPLETE_WORLD`，建议 `detail: summary`。
 旧客户端省略 mode 时仍为 `WORLDGEN_ONLY`；`STANDALONE` 用于单个作品，不等同于完整世界。
 
-1. 读取 `worldsmith_get_content_contract(module: world_design)`，用
-   `worldsmith_put_world_design_plan` 声明世界目标、真实 ID、跨模块关系和 Boss 对应任务。
+1. 新完整会话先读取 `world_bible` 契约，保存并 AI 自检 WorldBible；通过后自动继续。
+   用 `worldsmith_put_world_design_plan` 和 `worldsmith_put_module_briefs` 声明世界目标、
+   真实 ID、跨模块关系、来源与验收项；Boss 按明确范围承诺，不强套和平世界。
 2. 编写 theme、terrain、biomes、features、blocks、items、creatures、quests。
    使用 `worldsmith_build_texture` 或 PNG 导入绑定真实素材；生物构建返回 UV 后绘制皮肤。
    根据世界体验主动安排武器／工具、护甲、消耗品或固定动作遗物，不把所有自定义物品都做成提交凭证。
@@ -21,8 +23,9 @@ Worldsmith 提供可复用的 MCP 创作和原生运行时，不内置调用某�
    [typed boss_spawner](creature-bosses.md)，不是一段任意实体 NBT。
 4. 用 `worldsmith_get_generation_progress` 获取当前 revision、缺项和下一步参数。
    内容写入共享 `expectedRevision`，不靠重建素材解决 CAS 冲突。
-5. `worldsmith_write_pack` 检查冻结几何和承诺的关系：计划中的方块实际使用、物品有来源、
-   生物有配置的遭遇路线、任务绑定叙事、Boss 有真实 profile 和击杀目标。
+5. 新作者态流程先对实际内容提交当前有效 AI 实现审核。`worldsmith_write_pack` 复验
+   作者态来源、冻结几何和承诺关系：计划中的方块实际使用、物品有来源、
+   生物有配置的遭遇路线、任务绑定叙事、已承诺 Boss 有真实 profile 和击杀目标。
    新玩家文案通过PlayerTextPolicy，技术提示留在作者回执；可用representativeContent指定真实物品／方块作为包图标。
    成功时默认导出一份可导入的 [`.wspack` 资源包](resource-packs.md)，返回其路径和摘要。
 6. `worldsmith_finish_world` 分别报告原生准备和实际激活，按返回的等待状态继续。
@@ -30,6 +33,8 @@ Worldsmith 提供可复用的 MCP 创作和原生运行时，不内置调用某�
    `WAITING_NATIVE_CONTEXT`／`WAITING_ACTIVATION` 等等待状态保持真实，不写成已经进入玩家世界。
 
 这些检查区分“配置了可达来源”和“玩家在某个种子、位置已经找到它”。
+旧会话按原流程恢复，只有显式 `worldsmith_upgrade_world_authoring` 升级旧完整会话才
+追加作者态工作，不删除既有资产；完整世界观与审核证据保存在 session 而非 `.wspack`。
 固定地标库存及前置任务奖励按有限数量消费；自身/未来奖励不被用来解锁当前交付。
 未知原版或其他 Mod 的获取机制不作猜测。世界地形、随机战利品和玩家操作仍需实际游玩验证。
 
@@ -58,7 +63,9 @@ MELEE_HIT仅支持非护甲武器／工具；材料和护甲可用USE。护甲�
 `completeWorldCoverageVerified` 与 `complete`、原生激活状态分别报告：Core 覆盖通过
 不代表 Minecraft 已加载世界。
 
-可直接使用[《月蚀诸峰》源套件](examples/complete-world/README.md)。执行器保存请求、回执、
+可参考[《月蚀诸峰》源套件](examples/complete-world/README.md)的领域文档和原有执行路径；
+新作者态会话还需先补齐世界观、任务书与审稿，不将旧执行器当作省略这些步骤的入口。
+执行器保存请求、回执、
 素材 ID、源码/绘图 ID 和预览。修改生物文案且 UV 配方未变时复用原贴图。
 局部改动后若有意复用旧 revision 的绘图，先核对未受影响的实现，再显式指定：
 
