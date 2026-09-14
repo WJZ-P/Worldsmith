@@ -40,6 +40,29 @@ public final class WorldsmithLangProvider extends FabricLanguageProvider {
 	}
 
 	private static void addGenerationProgress(TranslationBuilder builder) {
+		builder.add("worldsmith.progress.bible.draft.open", "Current draft");
+		builder.add("worldsmith.progress.bible.draft.loading", "Reading draft…");
+		builder.add("worldsmith.progress.bible.draft.open_hint", "Read the active draft: %s. This does not change the selected world pack or world type.");
+		builder.add("worldsmith.progress.bible.draft.title", "Current draft · World bible");
+		builder.add("worldsmith.progress.bible.draft.scope", "This is the active authoring session, not the world pack selected for creation. Viewing it leaves that selection unchanged.");
+		builder.add("worldsmith.progress.bible.draft.changed", "The draft changed or is no longer active. Choose Current draft again to read its latest snapshot.");
+		builder.add("worldsmith.progress.bible.draft.failed", "The draft snapshot did not arrive. Click Current draft to try the read again.");
+		builder.add("worldsmith.progress.bible.open", "World bible");
+		builder.add("worldsmith.progress.bible.open_hint", "Read the selected session's saved world bible.");
+		builder.add("worldsmith.progress.bible.title", "World bible");
+		builder.add("worldsmith.progress.bible.summary", "Bible v%s · %s · Content reviews %s/%s");
+		builder.add("worldsmith.progress.bible.ai_reviewed", "AI reviewed");
+		builder.add("worldsmith.progress.bible.needs_review", "Needs AI review");
+		builder.add("worldsmith.progress.bible.snapshot", "Session %s · snapshot %s · bible v%s");
+		builder.add("worldsmith.progress.bible.review_boundary", "AI review is not user approval or a playtest.");
+		builder.add("worldsmith.progress.bible.read_only", "Read-only snapshot. Ask your connected AI to edit the same session; return and reopen to see updates.");
+		builder.add("worldsmith.progress.bible.truncated", "This view is shortened. The session retains the full bible; request worldsmith_get_world_bible with format=markdown for the full text.");
+		builder.add("worldsmith.progress.bible.scroll_hint", "Scroll, Page Up/Down or Home/End to read; Escape returns to the world page.");
+		builder.add("worldsmith.progress.stage.WORLD_BIBLE_DRAFT", "Drafting world bible");
+		builder.add("worldsmith.progress.stage.WORLD_BIBLE_REVIEW", "AI world review");
+		builder.add("worldsmith.progress.stage.MODULE_BRIEFS", "Planning content briefs");
+		builder.add("worldsmith.progress.stage.CONTENT_ALIGNMENT_REVIEW", "AI content review");
+		builder.add("worldsmith.progress.stage.WORLD_AUTHORING_BLOCKED", "Authoring needs repair");
 		builder.add("worldsmith.progress.kind.anchor", "Landmarks");
 		builder.add("worldsmith.progress.kind.blueprint", "Blueprints");
 		builder.add("worldsmith.progress.world_waiting", "A world waiting to take shape");

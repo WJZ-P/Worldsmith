@@ -1,13 +1,18 @@
 package com.wjz.worldsmith.client;
 
 import com.wjz.worldsmith.core.mcp.GenerationCategoryProgress;
+import com.wjz.worldsmith.core.mcp.GenerationAuthoringDrafts;
 import com.wjz.worldsmith.core.mcp.GenerationDrawingProgress;
 import com.wjz.worldsmith.core.mcp.GenerationProgressSnapshot;
 import com.wjz.worldsmith.core.mcp.GenerationProgressView;
 import com.wjz.worldsmith.core.mcp.GenerationSessionSummary;
 import com.wjz.worldsmith.core.mcp.GenerationTargetProgress;
 import com.wjz.worldsmith.mixin.client.CreateWorldScreenAccessor;
+import com.wjz.worldsmith.mcp.WorldsmithMcpService;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -30,12 +35,19 @@ import org.lwjgl.glfw.GLFW;
 /** The native Worldsmith tab: fixed-layout category cards, fed only by actual cached authoring state. */
 public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
     private static final List<String> MAIN_KINDS = List.of("biome", "structure", "creature", "block", "item", "quest");
+    private static final ExecutorService BIBLE_READS = Executors.newSingleThreadExecutor(task -> {
+        var thread = new Thread(task, "worldsmith-world-bible-read"); thread.setDaemon(true); return thread;
+    });
     private final CreateWorldScreen screen;
     private final Dashboard dashboard;
-    private final Button sessionPrevious, sessionPicker, sessionNext;
+    private final Button sessionPrevious, sessionPicker, sessionNext, worldBible, draftBible;
     private WorldsmithGenerationProgressPoller poller;
     private WorldsmithGenerationProgressPoller.Snapshot cached;
     private List<GenerationSessionSummary> sessions = List.of();
+    private GenerationSessionSummary currentDraft;
+    private long draftReadToken;
+    private boolean draftReadPending;
+    private Component draftReadNotice;
     private boolean following = true;
     private String preferredSession, restoreSession;
     private double restoreScroll;
@@ -61,6 +73,9 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
         sessionNext = layout.addChild(Button.builder(Component.literal(">"), ignored -> chooseSession(1))
                 .tooltip(Tooltip.create(tr("world_next"))).build(), 2, 0);
         dashboard = layout.addChild(new Dashboard(), 3, 0);
+        worldBible = layout.addChild(Button.builder(tr("bible.open"), ignored -> openWorldBible())
+                .tooltip(Tooltip.create(tr("bible.open_hint"))).build(), 4, 0);
+        draftBible = layout.addChild(Button.builder(tr("bible.draft.open"), ignored -> openCurrentDraft()).build(), 5, 0);
         updateControls();
     }
 
@@ -80,6 +95,7 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
         String id = selectedId(cached);
         if (id != null) { restoreSession = id; restoreScroll = dashboard.scrollAmount(); }
         if (poller != null) { poller.close(); poller = null; }
+        ++draftReadToken; draftReadPending = false; currentDraft = null; draftReadNotice = null;
         cached = null;
     }
     private void tick() {
@@ -87,6 +103,12 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
         ensurePoller(); poller.tick(screen);
         var raw=poller.snapshot();var progress=raw==null ? null : raw.progress();
         sessions=progress==null ? sessions : List.copyOf(progress.getSessions());
+        // Keep the live authoring entry separate: this raw catalog is not filtered to the selected pack.
+        var nextDraft = raw != null && raw.connected() ? GenerationAuthoringDrafts.current(progress) : null;
+        if (!Objects.equals(currentDraft == null ? null : currentDraft.getSessionId(), nextDraft == null ? null : nextDraft.getSessionId())) {
+            ++draftReadToken; draftReadPending = false; draftReadNotice = null;
+        }
+        currentDraft = nextDraft;
         String packId=WorldsmithWorldCreationBridge.selectedPackId(screen);
         if(packId!=null) {
             var matching=sessions.stream().filter(s->packId.equals(s.getPackId())).findFirst().orElse(null);
@@ -144,16 +166,70 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
             sessionPicker.active=!sessions.isEmpty() && !WorldsmithWorldCreationBridge.creationInProgress(screen);
             sessionPicker.setTooltip(Tooltip.create(entry==null ? tr("world_picker_hint") : Component.literal(bound(entry.getPrompt(),384))));
         }
+        worldBible.visible = selectedAuthoringView() != null;
+        worldBible.active = worldBible.visible && !WorldsmithWorldCreationBridge.creationInProgress(screen);
+        draftBible.visible = currentDraft != null;
+        draftBible.active = draftBible.visible && !draftReadPending && !WorldsmithWorldCreationBridge.creationInProgress(screen);
+        draftBible.setMessage(tr(draftReadPending ? "bible.draft.loading" : "bible.draft.open"));
+        if (currentDraft != null) draftBible.setTooltip(Tooltip.create(draftReadNotice == null
+                ? tr("bible.draft.open_hint", bound(currentDraft.getTitle(), 160)) : draftReadNotice));
         layoutSessionControls();
+    }
+    /** Never borrow an active session's bible for another selected pack or a stale selection. */
+    private GenerationProgressView selectedAuthoringView() {
+        var progress = cached == null ? null : cached.progress();
+        var view = progress == null ? null : progress.getView();
+        if (view == null || view.getAuthoring() == null || !view.getSessionId().equals(progress.getSelectedSessionId())) return null;
+        if (!following && !view.getSessionId().equals(preferredSession)) return null;
+        String packId = WorldsmithWorldCreationBridge.selectedPackId(screen);
+        return Objects.equals(packId, view.getPackId()) ? view : null;
+    }
+    private void openWorldBible() {
+        var view = selectedAuthoringView();
+        if (view == null || WorldsmithWorldCreationBridge.creationInProgress(screen)) return;
+        Minecraft.getInstance().gui.setScreen(new WorldsmithWorldBibleScreen(screen, view));
+    }
+    private void openCurrentDraft() {
+        var target = currentDraft;
+        var connection = WorldsmithMcpService.progressConnection();
+        if (target == null || draftReadPending || !connection.connected() || WorldsmithWorldCreationBridge.creationInProgress(screen)) return;
+        final long ticket = ++draftReadToken;
+        final String selectedPack = WorldsmithWorldCreationBridge.selectedPackId(screen);
+        draftReadPending = true; draftReadNotice = null; updateControls();
+        // Snapshot construction stays on the worker. This neither selects the draft's pack nor changes the main poller.
+        CompletableFuture.supplyAsync(() -> WorldsmithMcpService.readGenerationProgress(target.getSessionId()), BIBLE_READS)
+                .whenComplete((read, failure) -> Minecraft.getInstance().execute(() -> {
+                    if (ticket != draftReadToken) return;
+                    draftReadPending = false;
+                    var client = Minecraft.getInstance();
+                    if (client.gui.screen() != screen || ((CreateWorldScreenAccessor)screen).worldsmith$getTabManager().getCurrentTab() != this
+                            || WorldsmithWorldCreationBridge.creationInProgress(screen)
+                            || !Objects.equals(selectedPack, WorldsmithWorldCreationBridge.selectedPackId(screen))) return;
+                    var live = WorldsmithMcpService.progressConnection();
+                    var view = failure == null && read != null && read.connected() && read.epoch() == connection.epoch()
+                            && live.connected() && live.epoch() == connection.epoch()
+                            ? GenerationAuthoringDrafts.view(read.snapshot(), target.getSessionId(), target.getRevision()) : null;
+                    if (view == null || currentDraft == null || !target.getSessionId().equals(currentDraft.getSessionId())
+                            || view.getRevision() < currentDraft.getRevision()) {
+                        draftReadNotice = tr(failure == null ? "bible.draft.changed" : "bible.draft.failed"); updateControls(); return;
+                    }
+                    client.gui.setScreen(new WorldsmithWorldBibleScreen(screen, view, true));
+                }));
     }
     private void layoutSessionControls() {
         int choiceCount=WorldsmithWorldTypeMenu.packs(screen).isEmpty() ? sessions.size() : WorldsmithWorldTypeMenu.packs(screen).size();
-        boolean multiple = choiceCount > 1 && rowWidth >= 230;
+        int bibleWidth = Math.min(88, Math.max(48, rowWidth / 5));
+        int readerCount = (worldBible.visible ? 1 : 0) + (draftBible.visible ? 1 : 0);
+        int pickerWidth = Math.max(1, rowWidth - readerCount * (bibleWidth + 6));
+        boolean multiple = choiceCount > 1 && pickerWidth >= 230;
         sessionPrevious.visible = sessionNext.visible = multiple;
         sessionPrevious.active = sessionNext.active = multiple && !WorldsmithWorldCreationBridge.creationInProgress(screen);
         sessionPrevious.setRectangle(20, 20, rowLeft, rowTop);
-        sessionNext.setRectangle(20, 20, rowLeft + Math.max(0, rowWidth - 20), rowTop);
-        sessionPicker.setRectangle(Math.max(1, rowWidth - (multiple ? 48 : 0)), 20, rowLeft + (multiple ? 24 : 0), rowTop);
+        sessionNext.setRectangle(20, 20, rowLeft + Math.max(0, pickerWidth - 20), rowTop);
+        sessionPicker.setRectangle(Math.max(1, pickerWidth - (multiple ? 48 : 0)), 20, rowLeft + (multiple ? 24 : 0), rowTop);
+        int readerX = rowLeft + pickerWidth + 6;
+        worldBible.setRectangle(bibleWidth, 20, readerX, rowTop);
+        draftBible.setRectangle(bibleWidth, 20, readerX + (worldBible.visible ? bibleWidth + 6 : 0), rowTop);
     }
     @Override public void doLayout(ScreenRectangle area) {
         int margin = area.width() < 360 ? 8 : 12;
@@ -212,8 +288,18 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
                 if (!kinds.contains(category.getKind()) && ((category.getPlanned() != null && category.getPlanned() > 0) || category.getDeclaredTotal() > 0)) kinds.add(category.getKind());
             }
             if(view==null && installed!=null && savedCount("feature")>0)kinds.add("feature");
-            for (int i = 0; i < kinds.size(); i++) card(view, kinds.get(i), 12 + (i % columns) * (cardWidth + GAP), 34 + (i / columns) * (CARD_HEIGHT + GAP), cardWidth);
-            int bottom = 34 + ((kinds.size() + columns - 1) / columns) * (CARD_HEIGHT + GAP);
+            int cardTop = 34;
+            if (view != null && view.getAuthoring() != null) {
+                var authoring = view.getAuthoring();
+                var summary = tr("bible.summary", authoring.getBibleRevision(),
+                        tr(authoring.getAiReviewed() ? "bible.ai_reviewed" : "bible.needs_review"),
+                        authoring.getReviewedBriefs(), authoring.getBriefCount());
+                wrapped(12, cardTop, summary, authoring.getAiReviewed() ? GREEN : GOLD, inner, 2);
+                hints.add(new Hint(12, cardTop, inner, 24, summary.copy().append(" ").append(tr("bible.review_boundary"))));
+                cardTop += 28;
+            }
+            for (int i = 0; i < kinds.size(); i++) card(view, kinds.get(i), 12 + (i % columns) * (cardWidth + GAP), cardTop + (i / columns) * (CARD_HEIGHT + GAP), cardWidth);
+            int bottom = cardTop + ((kinds.size() + columns - 1) / columns) * (CARD_HEIGHT + GAP);
             if (snapshot != null && snapshot.error() != null && !snapshot.error().isBlank()) {
                 wrapped(12, bottom + 2, tr("feed_delayed"), RED, inner, 2);
                 hints.add(new Hint(12, bottom, inner, 28, Component.literal(bound(snapshot.error(), 256)))); bottom += 32;
@@ -236,6 +322,8 @@ public final class WorldsmithGenerationProgressTab extends GridLayoutTab {
             targetStates.keySet().retainAll(live);
         }
         private static Component phase(WorldsmithGenerationProgressPoller.Snapshot snapshot, GenerationProgressView view) {
+            if (view != null && Set.of("WORLD_BIBLE_DRAFT", "WORLD_BIBLE_REVIEW", "MODULE_BRIEFS", "CONTENT_ALIGNMENT_REVIEW", "WORLD_AUTHORING_BLOCKED").contains(view.getStage()))
+                return tr("stage." + view.getStage());
             if(snapshot!=null && snapshot.nativeStatus()!=null) {
                 Component status=switch(snapshot.nativeStatus().getStage()) {
                     case "WAITING_CREATION" -> tr("phase.selected");

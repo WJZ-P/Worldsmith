@@ -1,10 +1,14 @@
 package com.wjz.worldsmith.client;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
+import net.minecraft.SharedConstants;
+import net.minecraft.server.Bootstrap;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** UI metadata objects are not native generation presets; these tests do not open Minecraft screens. */
 class WorldsmithWorldTypeMenuTest {
+    @BeforeAll static void bootstrapNativePresetCodecs() { SharedConstants.tryDetectVersion(); Bootstrap.bootStrap(); }
     @Test void everyPackHasADistinctCycleButtonValueAndName() {
         var oath=WorldsmithWorldTypeMenu.deferredChoice("a".repeat(64),"Oathfire");
         var provinces=WorldsmithWorldTypeMenu.deferredChoice("b".repeat(64),"Nine Provinces");
