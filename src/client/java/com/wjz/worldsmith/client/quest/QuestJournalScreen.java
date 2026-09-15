@@ -34,6 +34,7 @@ public final class QuestJournalScreen extends Screen {
     private boolean tooSmall;
     private Button deliver;
     private Button claim;
+    private Button guideButton;
 
     QuestJournalScreen(String scope, ClientPacketListener connection) {
         super(Component.translatable("worldsmith.quests.title")); worldScope = scope; worldConnection = connection;
@@ -83,6 +84,15 @@ public final class QuestJournalScreen extends Screen {
             if (selectedId != null) QuestJournalClient.claim(selectedId);
         }).bounds(detailX + buttonWidth + 6, height - 26, buttonWidth, 20).tooltip(Tooltip.create(Component.translatable("worldsmith.quests.claim_hint"))).build());
         addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose()).bounds(12, height - 26, listWidth, 20).build());
+        var guideReferences = MechanicGuideClient.references(selected());
+        guideButton = null;
+        if (!guideReferences.isEmpty()) {
+            guideButton = addRenderableWidget(Button.builder(Component.translatable("worldsmith.mechanics.guide.open", guideReferences.size()), button -> {
+                if (selectedId != null && QuestJournalClient.current(worldScope, worldConnection))
+                    minecraft.gui.setScreen(new MechanicGuideScreen(this, worldScope, worldConnection, selectedId, guideReferences));
+            }).bounds(detailX + 6, bodyBottom - 23, detailWidth - 12, 20)
+                .tooltip(Tooltip.create(Component.translatable("worldsmith.mechanics.guide.open_hint"))).build());
+        }
         updateButtons();
     }
 
@@ -100,6 +110,7 @@ public final class QuestJournalScreen extends Screen {
         var quest = selected(); boolean usable = connected && !pending && quest != null;
         deliver.active = usable && quest.status() == QuestProtocol.Status.ACTIVE && quest.objectives().stream().anyMatch(o -> o.kind().equals("deliver_item"));
         claim.active = usable && quest.status() == QuestProtocol.Status.READY;
+        if (guideButton != null) guideButton.active = connected && MechanicGuideClient.references(quest).stream().allMatch(id -> MechanicGuideClient.available(worldScope, id));
     }
 
     @Override public void tick() {
@@ -150,14 +161,15 @@ public final class QuestJournalScreen extends Screen {
         blank(lines); add(lines, Component.translatable("worldsmith.quests.rewards"), 0xFFB9D8F6, textWidth);
         if (quest.rewards().isEmpty()) add(lines, Component.translatable("worldsmith.quests.no_rewards"), 0xFFB6C0CE, textWidth);
         else for (var reward : quest.rewards()) add(lines, Component.translatable("worldsmith.quests.reward", reward.label(), reward.count()), 0xFFD9DFE8, textWidth);
-        int viewport = bodyBottom - bodyTop - 16;
+        int detailBottom = bodyBottom - (guideButton == null ? 0 : 26);
+        int viewport = detailBottom - bodyTop - 16;
         maximumDetailScroll = Math.max(0, lines.size() * 12 - viewport); detailScroll = Math.max(0, Math.min(detailScroll, maximumDetailScroll));
-        graphics.enableScissor(detailX + 3, bodyTop + 3, detailX + detailWidth - 3, bodyBottom - 3);
+        graphics.enableScissor(detailX + 3, bodyTop + 3, detailX + detailWidth - 3, detailBottom - 3);
         int y = bodyTop + 8 - detailScroll;
-        for (var line : lines) { if (y + 10 >= bodyTop && y < bodyBottom) graphics.text(font, line.text, detailX + 10, y, line.color); y += 12; }
+        for (var line : lines) { if (y + 10 >= bodyTop && y < detailBottom) graphics.text(font, line.text, detailX + 10, y, line.color); y += 12; }
         graphics.disableScissor();
         if (maximumDetailScroll > 0) {
-            int track = bodyBottom - bodyTop - 12, thumb = Math.max(12, track * viewport / (lines.size() * 12));
+            int track = detailBottom - bodyTop - 12, thumb = Math.max(12, track * viewport / (lines.size() * 12));
             int top = bodyTop + 6 + (track - thumb) * detailScroll / maximumDetailScroll;
             graphics.fill(detailX + detailWidth - 6, top, detailX + detailWidth - 3, top + thumb, 0xFF7C8CA3);
         }

@@ -38,14 +38,21 @@ public final class QuestJournalClient {
     public static void initialize() {
         if (initialized) return;
         QuestProtocol.registerTypes();
+        MechanicGuideClient.initialize();
         openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping("key.worldsmith.quest_journal", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_J,
             KeyMapping.Category.register(Identifier.fromNamespaceAndPath("worldsmith", "quests"))));
         ClientPlayNetworking.registerGlobalReceiver(QuestProtocol.Snapshot.TYPE, (payload, context) -> {
             if (context.player() != context.client().player) return;
             receive(context.client(), payload);
         });
-        ClientPlayConnectionEvents.INIT.register((handler, client) -> reset(client, handler, null));
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> reset(client, null, null));
+        // Fabric may dispatch connection teardown from Netty. UI/cache transitions belong to the render thread.
+        // A late callback from an old connection must not erase a newer world's journal or guide.
+        ClientPlayConnectionEvents.INIT.register((handler, client) -> client.execute(() -> {
+            if (client.getConnection() == handler) reset(client, handler, null);
+        }));
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(() -> {
+            if (connection == handler && (client.getConnection() == null || client.getConnection() == handler)) reset(client, null, null);
+        }));
         ClientTickEvents.END_CLIENT_TICK.register(QuestJournalClient::tick);
         initialized = true;
     }
@@ -159,9 +166,10 @@ public final class QuestJournalClient {
     }
     private static void changed(Minecraft client) { if (client.gui.screen() instanceof QuestJournalScreen screen) screen.serverStateChanged(); }
     private static void reset(Minecraft client, ClientPacketListener nextConnection, String nextScope) {
+        MechanicGuideClient.reset();
         snapshot = null; pendingRequest = 0; latestRequest = 0; notice = null; noticeUntil = 0; waitingNotice = false;
         connection = nextConnection; scope = nextScope; lastSyncTick = ticks;
         syncNeeded = nextScope != null; syncAttempts = 0;
-        if (client.gui.screen() instanceof QuestJournalScreen) client.gui.setScreen(null);
+        if (client.gui.screen() instanceof QuestJournalScreen || client.gui.screen() instanceof MechanicGuideScreen) client.gui.setScreen(null);
     }
 }

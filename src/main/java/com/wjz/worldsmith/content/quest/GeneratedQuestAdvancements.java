@@ -45,7 +45,8 @@ public final class GeneratedQuestAdvancements {
         put(resources, rootId(scope), root);
         for (var quest : quests) {
             boolean boss = quest.getObjectives().stream().anyMatch(objective -> objective instanceof QuestObjective.KillCreature kill && bosses.contains(kill.getCreature()));
-            JsonObject node = advancement(quest.getTitle(), quest.getDescription(), "minecraft:book", true, boss, OBJECTIVES_MET, CLAIMED);
+            boolean mechanic = quest.getObjectives().stream().anyMatch(objective -> objective instanceof QuestObjective.ActivateMechanic);
+            JsonObject node = advancement(quest.getTitle(), quest.getDescription(), mechanic ? "minecraft:lodestone" : "minecraft:book", true, boss, OBJECTIVES_MET, CLAIMED);
             node.addProperty("parent", (quest.getPrerequisites().isEmpty() ? rootId(scope) : taskId(scope, quest.getPrerequisites().getFirst())).toString());
             JsonArray extra = new JsonArray();
             extra.add(text("\n\n"));

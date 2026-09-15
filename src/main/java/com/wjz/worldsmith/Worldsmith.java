@@ -17,6 +17,8 @@ public final class Worldsmith implements ModInitializer {
 		com.wjz.worldsmith.content.item.CustomItemRuntime.register();
 		com.wjz.worldsmith.content.creative.WorldsmithCreativeContent.register();
 		com.wjz.worldsmith.content.quest.server.QuestRuntime.register();
+		com.wjz.worldsmith.content.interaction.WorldMechanicRuntime.register();
+		com.wjz.worldsmith.content.interaction.MechanicGuideProtocol.registerServer();
 		WorldsmithWorldgen.initialize();
 		LOGGER.info(
 			"Worldsmith initialized for Minecraft 26.2 with blueprint schema {}",

@@ -78,6 +78,8 @@ public final class QuestRuntime {
         List<Quest> order = QuestValidation.ordered(library);
         Map<String, String> blockNames = new LinkedHashMap<>();
         pack.getBlocks().getBlocks().forEach(block -> blockNames.put("worldsmith:content/" + block.getId(), block.getDisplayName()));
+        Map<String, String> mechanicNames = new LinkedHashMap<>();
+        pack.getMechanics().getMechanics().forEach(mechanic -> mechanicNames.put(mechanic.getId(), clean(mechanic.getDisplayName(), 128)));
         Map<String, PreparedQuest> quests = new LinkedHashMap<>();
         for (Quest quest : order) {
             List<Objective> objectives = new ArrayList<>();
@@ -90,6 +92,10 @@ public final class QuestRuntime {
                     ItemStack prototype = WorldRewardItems.stack(deliver.getItem(), 1, blocks, items);
                     WorldItemIdentity identity = prototype.getItem() == CustomItemRuntime.host() ? prototype.get(CustomItemRuntime.identityComponent()) : null;
                     objectives.add(new Objective("deliver_item", deliver.getItem(), itemLabel(deliver.getItem(), prototype, blockNames, items), deliver.getCount(), prototype.getItem(), identity));
+                } else if (objective instanceof QuestObjective.ActivateMechanic activate) {
+                    String label = mechanicNames.get(activate.getMechanic());
+                    if (label == null) throw new IllegalArgumentException("Quest references an undefined world mechanic: " + activate.getMechanic());
+                    objectives.add(new Objective("activate_mechanic", activate.getMechanic(), label, activate.getCount(), null, null));
                 } else throw new IllegalArgumentException("Unsupported native quest objective");
             }
             List<Reward> rewards = new ArrayList<>();
@@ -99,16 +105,31 @@ public final class QuestRuntime {
             }
             quests.put(quest.getId(), new PreparedQuest(quest, List.copyOf(objectives), List.copyOf(rewards)));
         }
-        return new Snapshot(scope, clean(pack.getManifest().getDisplayName(), 160), quests, items, blocks);
+        return new Snapshot(scope, clean(pack.getManifest().getDisplayName(), 160), quests, mechanicNames, items, blocks);
     }
 
     public static void bind(ServerLevel level, Snapshot snapshot) {
         Snapshot previous = WORLDS.putIfAbsent(Objects.requireNonNull(level), Objects.requireNonNull(snapshot));
-        if (previous != null && (!previous.scope.equals(snapshot.scope) || !previous.quests.equals(snapshot.quests)))
+        if (previous != null && (!previous.scope.equals(snapshot.scope) || !previous.quests.equals(snapshot.quests) || !previous.mechanicNames.equals(snapshot.mechanicNames)))
             throw new IllegalStateException("A running level already owns different immutable quests");
     }
     public static void unbind(ServerLevel level) { WORLDS.remove(level); }
     public static Snapshot snapshot(ServerLevel level) { return WORLDS.get(level); }
+
+    /** Reading an active/previous journal goal is independent of having assembled its device already. */
+    public static boolean canReadMechanicGuide(ServerPlayer player, String mechanicId) {
+        requireServerThread(player);
+        Snapshot world = WORLDS.get(player.level());
+        if (world == null || !player.isAlive() || player.isSpectator() || !world.mechanicNames.containsKey(mechanicId)) return false;
+        try {
+            world.requireBound(player.level());
+            QuestPlayerState state = world.state(attached(player));
+            return world.quests.values().stream().anyMatch(quest -> unlocked(state, quest)
+                && quest.objectives.stream().anyMatch(objective -> objective.kind.equals("activate_mechanic") && objective.reference.equals(mechanicId)));
+        } catch (RuntimeException invalidState) {
+            return false;
+        }
+    }
 
     private static void handle(ServerPlayer player, QuestProtocol.Action action) {
         requireServerThread(player);
@@ -230,6 +251,29 @@ public final class QuestRuntime {
         } catch (RuntimeException failure) { Worldsmith.LOGGER.error("Quest kill credit failed for {}", player.getUUID(), failure); }
     }
 
+    /**
+     * Called once by the interaction runtime after a successful commit, never by a quest action.
+     * Retain the fact even while the observing quest is locked or there is no quest objective yet.
+     * The world's anchor ledger and this player attachment are separate saves, not crash-atomic stores.
+     */
+    public static void afterMechanicActivation(ServerPlayer player, String mechanicId) {
+        try {
+            requireServerThread(player);
+            Snapshot world = WORLDS.get(player.level());
+            if (world == null || !world.mechanicNames.containsKey(mechanicId)) return;
+            world.requireBound(player.level());
+            QuestPlayerState state = world.state(attached(player));
+            QuestPlayerState next = state.withMechanicActivation(mechanicId);
+            if (next == state) return;
+            ((AttachmentTarget)player).setAttached(progressAttachment, next);
+            QuestAdvancementBridge.request(player);
+            requestJournal(player);
+        } catch (RuntimeException failure) {
+            // Interaction content is already committed; an observer failure must not replay its actions.
+            Worldsmith.LOGGER.error("Quest mechanic fact recording failed for {}: {}", player.getUUID(), mechanicId, failure);
+        }
+    }
+
     public static void sendJournal(ServerPlayer player, int requestId, QuestProtocol.Feedback feedback, String message) {
         requireServerThread(player);
         if (!ServerPlayNetworking.canSend(player, QuestProtocol.Snapshot.TYPE)) return;
@@ -275,13 +319,10 @@ public final class QuestRuntime {
         if (!player.level().getServer().isSameThread()) throw new IllegalStateException("Quest player state is server-thread-only");
     }
     private static QuestPlayerState.Progress progress(QuestPlayerState state, PreparedQuest quest) {
-        var value = state.quests().get(quest.definition.getId());
-        return value == null ? new QuestPlayerState.Progress(Collections.nCopies(quest.objectives.size(), 0), false) : value;
+        return state.progressFor(quest.definition);
     }
     private static boolean unlocked(QuestPlayerState state, PreparedQuest quest) {
-        if (quest.definition.getPrerequisites().isEmpty()) return true;
-        QuestPlayerState.Progress previous = state.quests().get(quest.definition.getPrerequisites().getFirst());
-        return previous != null && previous.claimed();
+        return state.questUnlocked(quest.definition);
     }
     private static boolean ready(PreparedQuest quest, QuestPlayerState.Progress progress) {
         for (int index = 0; index < quest.objectives.size(); index++) if (progress.counts().get(index) < quest.objectives.get(index).required) return false;
@@ -309,10 +350,12 @@ public final class QuestRuntime {
         private final String scope;
         private final String worldTitle;
         private final Map<String, PreparedQuest> quests;
+        private final Map<String, String> mechanicNames;
         private final CustomItemRuntime.Snapshot items;
         private final WorldBlockBindings.Resolver blocks;
-        private Snapshot(String scope, String worldTitle, Map<String, PreparedQuest> quests, CustomItemRuntime.Snapshot items, WorldBlockBindings.Resolver blocks) {
-            this.scope = scope; this.worldTitle = worldTitle; this.quests = Collections.unmodifiableMap(new LinkedHashMap<>(quests)); this.items = items; this.blocks = blocks;
+        private Snapshot(String scope, String worldTitle, Map<String, PreparedQuest> quests, Map<String, String> mechanicNames, CustomItemRuntime.Snapshot items, WorldBlockBindings.Resolver blocks) {
+            this.scope = scope; this.worldTitle = worldTitle; this.quests = Collections.unmodifiableMap(new LinkedHashMap<>(quests));
+            this.mechanicNames = Collections.unmodifiableMap(new LinkedHashMap<>(mechanicNames)); this.items = items; this.blocks = blocks;
         }
         public String scope() { return scope; }
         public String worldTitle() { return worldTitle; }
@@ -328,11 +371,16 @@ public final class QuestRuntime {
         private QuestPlayerState state(QuestPlayerState stored) {
             QuestPlayerState state = stored == null ? QuestPlayerState.empty(scope) : stored;
             if (!scope.equals(state.bundleHash())) throw new ScopeMismatch("玩家任务进度属于另一个世界，未覆盖旧进度。");
+            if (!mechanicNames.keySet().containsAll(state.mechanicActivations().keySet()))
+                throw new IllegalStateException("Persistent mechanic facts differ from their immutable definitions");
             for (var entry : state.quests().entrySet()) {
                 PreparedQuest quest = quests.get(entry.getKey());
                 if (quest == null || entry.getValue().counts().size() != quest.objectives.size()) throw new IllegalStateException("Persistent quest progress differs from its immutable definitions");
                 for (int index = 0; index < quest.objectives.size(); index++) {
                     if (entry.getValue().counts().get(index) > quest.objectives.get(index).required) throw new IllegalStateException("Persistent quest objective exceeds its definition");
+                    Objective objective = quest.objectives.get(index);
+                    if (objective.kind.equals("activate_mechanic") && entry.getValue().counts().get(index) > state.mechanicActivationCount(objective.reference))
+                        throw new IllegalStateException("Persistent mechanic objective exceeds its observed activation facts");
                 }
                 if ((!unlocked(state, quest) && (entry.getValue().claimed() || entry.getValue().counts().stream().anyMatch(count -> count > 0)))
                     || entry.getValue().claimed() && !ready(quest, entry.getValue())) throw new IllegalStateException("Persistent quest order or claim state is inconsistent");
@@ -348,7 +396,7 @@ public final class QuestRuntime {
                 List<QuestProtocol.Objective> objectives = new ArrayList<>();
                 for (int index = 0; index < quest.objectives.size(); index++) {
                     var objective = quest.objectives.get(index);
-                    objectives.add(new QuestProtocol.Objective(objective.kind, objective.label, progress.counts().get(index), objective.required));
+                    objectives.add(new QuestProtocol.Objective(objective.kind, objective.reference, objective.label, progress.counts().get(index), objective.required));
                 }
                 var rewards = quest.rewards.stream().map(reward -> new QuestProtocol.Reward(reward.label, reward.count)).toList();
                 entries.add(new QuestProtocol.Entry(quest.definition.getId(), quest.definition.getTitle(), quest.definition.getDescription(), status, objectives, rewards));

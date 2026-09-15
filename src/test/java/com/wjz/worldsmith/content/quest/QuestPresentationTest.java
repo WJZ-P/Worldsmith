@@ -5,6 +5,14 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class QuestPresentationTest {
+    @Test void committedMechanicObjectiveIsAFirstClassJournalKind() {
+        var objective = new QuestProtocol.Objective("activate_mechanic", "ritual_altar", "Ritual Altar", 1, 2);
+        var quest = new QuestProtocol.Entry("ritual", "Ritual", "Awaken the altar", QuestProtocol.Status.ACTIVE, List.of(objective), List.of());
+        assertEquals("activate_mechanic", quest.objectives().getFirst().kind());
+        assertEquals(1, quest.objectives().getFirst().progress());
+        assertThrows(IllegalArgumentException.class, () -> new QuestProtocol.Objective("run_mechanic", "altar", "Altar", 0, 1));
+    }
+
     @Test void normalWindowsShowAtLeastFourRowsWithoutTouchingPagerOrFooter() {
         for (int height : List.of(232, 239, 240, 256, 270, 360, 540)) {
             var layout = QuestJournalLayout.of(622, height);
@@ -50,6 +58,6 @@ class QuestPresentationTest {
 
     private static QuestProtocol.Entry entry(String id, QuestProtocol.Status status) {
         return new QuestProtocol.Entry(id, id, "A chapter of the journey", status,
-            List.of(new QuestProtocol.Objective("deliver_item", "Token", 0, 1)), List.of());
+            List.of(new QuestProtocol.Objective("deliver_item", "worldsmith:item/token", "Token", 0, 1)), List.of());
     }
 }

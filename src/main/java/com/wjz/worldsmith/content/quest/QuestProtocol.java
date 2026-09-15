@@ -34,9 +34,12 @@ public final class QuestProtocol {
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
-    public record Objective(String kind, String targetLabel, int progress, int required) {
+    public record Objective(String kind, String reference, String targetLabel, int progress, int required) {
         public Objective {
-            if (!"kill_creature".equals(kind) && !"deliver_item".equals(kind)) throw new IllegalArgumentException("Unknown quest objective kind");
+            if (!"kill_creature".equals(kind) && !"deliver_item".equals(kind) && !"activate_mechanic".equals(kind)) throw new IllegalArgumentException("Unknown quest objective kind");
+            text(reference, 256, false);
+            if (reference.isBlank() || "activate_mechanic".equals(kind) && !com.wjz.worldsmith.core.content.WorldMechanicValidation.validId(reference))
+                throw new IllegalArgumentException("Quest objective needs a stable content reference");
             text(targetLabel, 128, false);
             if (required < 1 || required > 1024 || progress < 0 || progress > required) throw new IllegalArgumentException("Invalid server objective progress");
         }
@@ -85,7 +88,7 @@ public final class QuestProtocol {
             buffer.writeUtf(quest.id, 64); buffer.writeUtf(quest.title, 160); buffer.writeUtf(quest.description, 4096); buffer.writeVarInt(quest.status.ordinal());
             buffer.writeVarInt(quest.objectives.size());
             for (var objective : quest.objectives) {
-                buffer.writeUtf(objective.kind, 16); buffer.writeUtf(objective.targetLabel, 128); buffer.writeVarInt(objective.progress); buffer.writeVarInt(objective.required);
+                buffer.writeUtf(objective.kind, 24); buffer.writeUtf(objective.reference, 256); buffer.writeUtf(objective.targetLabel, 128); buffer.writeVarInt(objective.progress); buffer.writeVarInt(objective.required);
             }
             buffer.writeVarInt(quest.rewards.size());
             for (var reward : quest.rewards) { buffer.writeUtf(reward.label, 128); buffer.writeVarInt(reward.count); }
@@ -98,7 +101,7 @@ public final class QuestProtocol {
         for (int i = 0; i < count; i++) {
             String id = buffer.readUtf(64), questTitle = buffer.readUtf(160), description = buffer.readUtf(4096); Status status = enumeration(buffer, Status.values());
             int objectivesCount = count(buffer, MAX_OBJECTIVES); List<Objective> objectives = new ArrayList<>(objectivesCount);
-            for (int j = 0; j < objectivesCount; j++) objectives.add(new Objective(buffer.readUtf(16), buffer.readUtf(128), buffer.readVarInt(), buffer.readVarInt()));
+            for (int j = 0; j < objectivesCount; j++) objectives.add(new Objective(buffer.readUtf(24), buffer.readUtf(256), buffer.readUtf(128), buffer.readVarInt(), buffer.readVarInt()));
             int rewardsCount = count(buffer, MAX_REWARDS); List<Reward> rewards = new ArrayList<>(rewardsCount);
             for (int j = 0; j < rewardsCount; j++) rewards.add(new Reward(buffer.readUtf(128), buffer.readVarInt()));
             quests.add(new Entry(id, questTitle, description, status, objectives, rewards));
