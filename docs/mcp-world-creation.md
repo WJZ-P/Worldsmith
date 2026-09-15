@@ -42,7 +42,7 @@ The guided MCP contract requires this sequence:
 6. Reference frozen drawing ids and submit metadata with `worldsmith_put_structure`
 7. `worldsmith_validate_architecture` checks real variants, required/optional members,
    landmark scale and occupied-space lighting
-8. `worldsmith_write_pack` with `sessionId` and the current `expectedRevision`. It uses inline or committed module documents and freezes all attached PNG assets into format 6 (repair precise diagnostics on errors).
+8. `worldsmith_write_pack` with `sessionId` and the current `expectedRevision`. It uses inline or committed module documents and freezes all attached PNG assets into format 7 (repair precise diagnostics on errors).
 9. `worldsmith_finish_world`
 
 The first tool returns terrain, biome, feature, structure, draw and architecture contracts. The terrain
@@ -91,7 +91,7 @@ JDK, javac or Python. The hidden worker is not an OS filesystem/network sandbox.
 
 ## Shared content framework
 
-The [world content framework](world-content-framework.md) installs nine typed
+The [world content framework](world-content-framework.md) installs ten typed
 modules. `worldsmith_get_content_framework` reports native adapter availability;
 `worldsmith_plan_world_content` reports catalog links, not a game activation.
 `worldsmith_inspect_world_content` revalidates a saved bundle.
@@ -110,7 +110,7 @@ Reload rejects changes to a running world's immutable identity before replacing
 its resource manager. Missing/corrupt assets and conflicting selected bundles
 are errors; they do not silently remap old chunks.
 
-New writes use format 6; existing formats 3/4/5 are read-only for restoration and unchanged re-embedding with their original module sets and hashes. The current native lifecycle is for one local integrated
+New writes use format 7; older formats are rejected without rewriting local packs or saves. The current native lifecycle is for one local integrated
 world; dedicated/remote content negotiation is not installed. The theme's beats
 are durable narrative intent, not executable quests or achievement criteria. The separate quests module implements one bounded linear main line; achievements are not installed. Explicit Boss profiles provide ground-melee 2–3 health-phase encounters.
 

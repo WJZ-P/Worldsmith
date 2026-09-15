@@ -129,3 +129,8 @@ publishing {
 		// retrieving dependencies.
 	}
 }
+
+// Opt-in native server smoke. Regular compilation/jars never include the test mod.
+if (project.hasProperty('mechanicsGameTest')) {
+	apply from: file('src/gametest/validation.gradle')
+}

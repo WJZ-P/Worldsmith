@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "worldsmith_mechanics_smoke",
+  "version": "1.0.0",
+  "name": "Worldsmith mechanic server smoke tests",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": ["com.wjz.worldsmith.gametest.WorldMechanicSmokeTests", "com.wjz.worldsmith.gametest.MechanicExplorationTests"],
+    "fabric-client-gametest": ["com.wjz.worldsmith.client.quest.MechanicGuideClientGameTest"]
+  },
+  "depends": {
+    "worldsmith": "*",
+    "fabric-gametest-api-v1": "*"
+  }
+}

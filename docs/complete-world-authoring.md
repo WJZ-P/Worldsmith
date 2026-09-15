@@ -4,8 +4,8 @@ Worldsmith 提供可复用的 MCP 创作和原生运行时，不内置调用某�
 外部 AI 先将玩家的一句话展开为持久世界观，完成 AI 自检，再派生设计计划与任务书，
 通过同一套类型化接口生成、预览、修正和保存。详见 [世界观驱动创作](world-bible-authoring.md)。
 因此“一句话”是玩家入口，不是省略中间设计与验证步骤的承诺。
-当前新写入为**格式6的九模块**；theme/quests仍为schema1，物品能力使用items schema2。
-格式3/4/5只读恢复并保持原身份与原文，生成流程不自动升级既有世界。
+当前新写入为**格式7的十模块**；theme/quests仍为schema1，物品能力使用items schema2。
+格式1–6被显式拒绝，生成流程不自动迁移或改写本地旧包和存档。
 
 ## 完整模式
 
@@ -99,3 +99,7 @@ node docs/examples/complete-world/run-mcp.mjs --phase architecture --reuse-drawi
 支持的 Boss 是地面近战、血条和 2–3 个生命阶段；自然稀有刷新与可重复地标刷怪笼是两条路线。
 没有世界唯一性账本、任意技能脚本、分支 NPC 对话或独立成就创作模块；现有任务会映射为世界专属原版进度树。
 当前完整内容仍面向本地整合服务器世界；不是可直接分发的远程多人同步方案。
+
+## 可执行交互
+
+需要仪式、钥匙或兑换时，使用 [mechanics 模块](mechanics.md)：WorldBible RULE → mechanic 目标与任务书 → 实际 pattern/cost/state/actions → 当前审核证据。叙事规则不代替执行规则；十模块中 mechanics 可为空，但显式承诺过的装置必须有真实定义。

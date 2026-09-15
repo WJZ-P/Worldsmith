@@ -7,7 +7,7 @@
 
 先读取 worldsmith_get_content_contract(module="creatures") 或生物创作契约。
 响应的 soundVocabulary 给出全部别名与原版事件 ID，soundVoices 给出每种声线的四类默认事件。
-使用 CreatureLibrary.schemaVersion=3、CreatureRecipe.schemaVersion=3；世界包仍是格式 6。
+使用 CreatureLibrary.schemaVersion=3、CreatureRecipe.schemaVersion=3；世界包仍是格式 7。
 其他生物、Boss 阶段、掉落和已绘制贴图照常保留，合并新物种时不要降级整个库版本。
 
 例如霜狼的定义／配方中添加这个字段：
@@ -60,5 +60,5 @@ sound:"SILENT" 或该 cue 的 volume=0 可关闭一种叫声；全局 volume=0 �
 无需重生成旧世界：不改世界包文件、资源哈希、已有生物身份或存档。
 缺失／身份不匹配的生物定义继续暂停 AI 与发声，不使用其他世界的声音。
 
-Schema 1/2 序列化仍省略 sounds，原哈希保持原字段域；新声音仅在格式 6 的 creature schema 3 中发布。
+当前格式 7 的 creature schema 1/2 可省略声音并使用原生回退；显式声音使用 creature schema 3。旧格式哈希不是当前兼容目标。
 Java Builder 支持 .sounds(CreatureSoundProfile)，自动选择 schema 3，贴图重建保留声音配置。

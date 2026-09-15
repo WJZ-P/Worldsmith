@@ -1,15 +1,15 @@
-# Worldsmith 世界内容地基：格式 6
+# Worldsmith 世界内容地基：格式 7
 
 ## 目标与真实边界
 
 一个世界拥有一个持续保存的主线主题；地形、群系、生态装饰、建筑、自定义方块和自定义生物引用同一套内容身份与冻结资产。
 创作阶段可以迭代任意模块，发布阶段必须形成可校验的完整内容快照。游戏运行阶段消费冻结数据和原生实现，不在方块、区块或实体 tick 中执行作者源码或调用大模型。
 
-本仓库的未发布格式 1/2 不再作为磁盘兼容目标。新写入格式为 **6**；格式 **3/4/5** 保留只读恢复及其原有内容哈希。`WorldsmithPackFiles` 仅暂留源代码构造兼容；它不再序列化，存储和加载必须读取 `manifest.modules`。
+当前读写仅接受**格式 7**；旧格式 1–6 被显式拒绝。旧模型 `WorldsmithPackFiles` 已移除，存储和加载统一读取 `manifest.modules`。不遍历、迁移或改写本地旧包与存档。
 
 公共层已经实现：
 
-- 九个有类型的模块：`theme`、`blocks`、`terrain`、`features`、`biomes`、`creatures`、`structures`、`items`、`quests`。
+- 十个有类型的模块：`theme`、`blocks`、`terrain`、`features`、`biomes`、`creatures`、`structures`、`items`、`quests`、`mechanics`。
 - 本地符号、跨模块引用、确定性编译依赖、能力与生命周期要求。
 - PNG 字节验证、内容寻址、资源预算，以及包含全部模块和资产的不可变内容哈希。
 - 新格式加载、统一编码、类型化内存投影、主题持久化与损坏诊断。
@@ -20,11 +20,11 @@
 
 ## 模块与清单
 
-`worldsmith.json` 的结构如下；省略号仅供阅读，新格式实际文件必须给出九个模块及完整哈希：
+`worldsmith.json` 的结构如下；省略号仅供阅读，新格式实际文件必须给出十个模块及完整哈希：
 
 ```json
 {
-  "formatVersion": 6,
+  "formatVersion": 7,
   "id": "<64 位小写 SHA-256>",
   "displayName": "月石诸国",
   "description": "月石沉眠于群山之间，重燃旧日烽火的旅人将连接失散的诸国。",
@@ -38,13 +38,14 @@
     "creatures": {"schemaVersion": 1, "path": "creatures.json"},
     "items": {"schemaVersion": 2, "path": "items.json"},
     "quests": {"schemaVersion": 1, "path": "quests.json"},
+    "mechanics": {"schemaVersion": 1, "path": "mechanics.json"},
     "structures": {"schemaVersion": 2, "path": "structures.json"}
   },
   "assets": []
 }
 ```
 
-九个模块都出现；非引导的底层内容包允许空方块、生物和建筑库。MCP 的引导创作仍保留现有建筑质量契约：至少两个建筑群、独立建筑与一个主题地标，发布时再次验证；底层格式与引导流程的约束不是同一层。
+十个模块都出现；非引导的底层内容包允许空方块、生物和建筑库。MCP 的引导创作仍保留现有建筑质量契约：至少两个建筑群、独立建筑与一个主题地标，发布时再次验证；底层格式与引导流程的约束不是同一层。
 结构模块继续以 `StructureIndex` 加独立蓝图文件和冻结绘图二进制保存，在内存中投影为 `StructureLibrary`。其他模块各自保存类型化文档。
 items 只含普通物品时仍可使用 schema 1；装备、消耗和动作要求 schema 2。
 可选 `manifest.representativeContent` 必须指向本包真实 item 或 block；示例中的 moonstone_seal 应实际定义在 items 中。
@@ -96,10 +97,10 @@ worldsmith:content/moonstone
 - 方块／物品图标进一步要求 16..256 的方形、二次幂纹理，编码文件最多 1 MiB；护甲独立图集为64x32至512x256的二次幂倍数，最多1 MiB；生物纹理尺寸匹配模型UV声明。纹理引用直接使用实际资产SHA-256。
 - `WorldsmithPack.assets` 复制输入字节，并只返回独立字节数组，外部修改不会篡改已冻结资源。
 
-新哈希使用格式 6 独立域，包括模块身份、模式版本、路径、全部类型化文档、结构蓝图、冻结绘图及资产描述与已验证摘要。计算前先进行类型化反序列化与规范化序列化，再对对象键排序，因此 JSON 排版、对象键顺序和省略默认值不改变语义身份。
+新哈希使用格式 7 独立域，包括模块身份、模式版本、路径、全部类型化文档、结构蓝图、冻结绘图及资产描述与已验证摘要。计算前先进行类型化反序列化与规范化序列化，再对对象键排序，因此 JSON 排版、对象键顺序和省略默认值不改变语义身份。
 
 主题文字、纹理、行为、地形及源码出处变化会生成新 ID。清单展示用的 `displayName`/`description`/`representativeContent` 不参与生成身份，主题模块内的标题和设定参与。未声明的额外输入文件拒绝进入编码/哈希边界。验证时还会重新计算类型化内容哈希，发现冻结后修改会报 `PACK_CONTENT_MUTATED`。
-格式 3/4/5 继续使用各自原域；`LegacyItemsV1` 对旧物品固定字段投影，排除新增 equipment/consumable/actions 默认字段。
+mechanics 的规则、成本、状态与动作参与新格式哈希；只有显示清单元数据被排除。旧格式哈希投影不再用于当前读写。
 
 方块的透明视觉目前应优先选择 GLASS profile；其他 profile 的原生全方块遮挡/面剔除语义不保证任意 alpha 贴图的视觉效果。公共验证层暂不把非 GLASS 透明度作为额外格式错误。
 
@@ -165,8 +166,7 @@ items schema 1 保持普通资源／遗物；schema 2 可选 equipment、consuma
 动作冷却按每玩家／世界／逻辑物品共享，不让所有自定义物品因宿主相同而互锁。blink最多8格，统一投射物不爆破地形。
 逻辑引用 `worldsmith:item/<id>` 连接创造分类、物种死亡掉落、建筑容器和任务奖励；原生堆栈保留世界身份与完整能力组件。参见 [物品与奖励](items-and-rewards.md)。
 
-格式 3 使用旧字段投影和原域，items/quests 为空；格式 4 引入第八模块与普通物品掉落；格式 5 包含第九任务模块及已支持Boss，但items仍为schema1。
-格式3/4/5仅按原身份读取恢复或重新封装，读取旧包不升级、不改写其内容、文案或玩家进度，也不使同名新物品接管旧内容。新创作写格式6的九模块，格式1/2继续要求重新生成。
+当前包使用格式 7 的十模块，旧格式 1–6 被拒绝。域 schema 的版本独立于包版本：当前包内仍可使用支持的 items schema1/2、creatures schema1/2/3。
 
 ## 玩家文案与作者诊断分离
 
@@ -179,13 +179,12 @@ items schema 1 保持普通资源／遗物；schema 2 可选 equipment、consuma
 
 ## 主线任务与素材复用
 
-第九模块 quests 定义单条线性主线，可关联 themeBeat，目标仅 kill_creature 和 deliver_item。
+第十模块 quests 定义单条线性主线，可关联 themeBeat，目标为 kill_creature、deliver_item 和 activate_mechanic。
 进度由服务器按玩家／世界保存；主动分次交付才消费物品并增加进度，所有目标完成后单独一次领奖，
 满背包时领奖无变化。玩家附件和 Inventory 一起保存，客户端只显示快照与发送意图。
 详见 [主线任务](mainline-quests.md)；这并非全局跨存储事务或完整任务树／NPC系统。
 
-格式 4 保持其八模块及原域、quests 为空；格式 3 保持七模块、旧生物字段投影、items/quests 为空。
-格式5继续保留其既有任务与普通物品；新内容使用格式6，schema2能力不回填旧包。素材生成服务不与 AI 厂商绑定：确定性像素配方、专用 inbox 导入、实际 PNG
+新内容使用格式 7，能力字段不回填旧文件。素材生成服务不与 AI 厂商绑定：确定性像素配方、专用 inbox 导入、实际 PNG
 校验／哈希／模型预览都通过 MCP 公开。外部生图模型由调用方自己提供，参见 [贴图复用](texture-authoring.md)。
 
 
@@ -194,3 +193,7 @@ items schema 1 保持普通资源／遗物；schema 2 可选 equipment、consuma
 Creature schema 3 支持原版声线选择与音高／音量调制，覆盖环境、受伤、死亡、攻击。
 旧包在运行时自动匹配默认声音，不重写包或存档。新配方请显式设计 sounds；
 详见 [生物声音词汇表与创作参数](creature-sounds.md)。
+
+## 方块构型与交互
+
+第十模块 [mechanics](mechanics.md) 提供有界事件驱动状态机：玩家成功放置任一最后构件或主手右键锚点，匹配构型、成本与状态后事务性执行 set_block/spawn_creature/give_item。没有扔物检测、tick 脚本或命令解释器。

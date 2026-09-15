@@ -3,9 +3,9 @@
 Worldsmith is being built as a Fabric mod that turns a prompt into a
 deterministic Minecraft world-generation blueprint.
 
-The [content framework](docs/world-content-framework.md) provides nine typed
+The [content framework](docs/world-content-framework.md) provides ten typed
 modules spanning world themes, terrain, biomes, features, structures, blocks,
-creatures, ordinary items and linear quests, with logical references, shared
+creatures, items, linear quests and event-driven mechanics, with logical references, shared
 assets and a local-world lifecycle. Custom content uses bounded native hosts;
 Independent achievement authoring remains a future module; existing quests also project into world-specific vanilla advancements after reward claims.
 
@@ -47,7 +47,7 @@ The current player-facing flow is:
 ```text
 Player prompt
   -> MCP theme, content and worldgen contracts
-  -> version-5 bundle (9 typed modules + immutable PNG/drawing assets)
+  -> version-7 bundle (10 typed modules + immutable PNG/drawing assets)
   -> deterministic validation
   -> Minecraft 26.2 target compiler
   -> verified native data + client resources + selected Create World preset
@@ -68,7 +68,7 @@ NBT export. It remains separate from architecture composition and placement.
 The [Structure Agent](docs/structure-agent.md) connects Java submission, hidden
 worker compilation, model-image preview, composition and native publication through MCP.
 
-The format-6 world bundle freezes Java drawing geometry, structure metadata and source provenance. Structure module schemas 1/2 select bounded JSON or frozen drawing data; they are not backward-compatible world-bundle formats. Both routes compile into native templates with biome placement and terrain fitting.
+The format-7 world bundle freezes Java drawing geometry, structure metadata and source provenance. Structure module schemas 1/2 select bounded JSON or frozen drawing data; they are not backward-compatible world-bundle formats. Both routes compile into native templates with biome placement and terrain fitting.
 
 See [structure building and MCP previews](docs/structure-building.md).
 New guided worlds also follow [the architecture-agent policy](docs/architecture-agent.md):
@@ -90,8 +90,8 @@ The executable AI contract is
 
 ## Unified world content
 
-[World content framework](docs/world-content-framework.md) describes the nine
-installed modules: theme, terrain, features, biomes, structures, blocks, creatures, items, quests.
+[World content framework](docs/world-content-framework.md) describes the ten
+installed modules: theme, terrain, features, biomes, structures, blocks, creatures, items, quests, mechanics.
 MCP has revision-checked drafts, genuine PNG upload/indexed-pixel authoring, linked
 narrative beats, immutable bundle hashing and full publication gates.
 
@@ -105,8 +105,7 @@ save; reopening never depends on an AI, authoring drafts or a config pack copy.
 Client resources are prepared before local-server startup and publication.
 Current scope is local integrated-server worlds. Remote content negotiation,
 branching NPC dialogue, independent achievement authoring, free-form behavior scripts and arbitrary block
-physical shapes are not installed. Formats 3/4/5 remain read-only; older unreleased world-bundle formats 1/2 must
-be regenerated; existing files are not silently migrated.
+physical shapes are not installed. Older bundle formats 1–6 are rejected; existing local files are not silently migrated.
 
 ## Creature authoring and creative inventory
 
@@ -130,7 +129,7 @@ native health bars and repeatable, world-bound landmark spawners.
 [Items and rewards](docs/items-and-rewards.md) adds world-bound resources/relics,
 server-side creature death drops and native structure-container rewards. Canonical
 ItemStacks retain their world identity, model, name, rarity and stack limits through
-loot export, persistence and the creative catalog. Items schema 2 adds native weapons, tools, armor, food and server-owned combinations of healing, status, projectiles and short-range blink. New bundles use format 6; formats 3/4/5 restore their original identities without acquiring new behavior or rewriting saves. Independent crafting and arbitrary skill scripts are not part of this layer.
+loot export, persistence and the creative catalog. Items schema 2 adds native weapons, tools, armor, food and server-owned combinations of healing, status, projectiles and short-range blink. New bundles use format 7 with ten modules including event-driven mechanics; older formats are rejected without rewriting local saves. Independent crafting and arbitrary skill scripts are not part of this layer.
 
 ## Main-line journal and reusable textures
 
@@ -145,3 +144,7 @@ Any MCP-capable client can use deterministic pixel recipes or import a PNG from 
 own painting/image-generation provider. Worldsmith does not bundle a hosted image
 model. A dedicated inbox avoids transcribing large image blobs through the model;
 whole-image nearest resampling is explicit and preserves the original file.
+
+### Event-driven mechanics
+
+[Mechanics](docs/mechanics.md) compose block placement/main-hand use, bounded patterns, explicit item costs, anchor-scoped state and typed block/spawn/reward actions. [Three executable-schema examples](docs/examples/mechanics/README.md) cover last-component summoning, a key-operated gate and material exchange without thrown-item detection or tick scripts.

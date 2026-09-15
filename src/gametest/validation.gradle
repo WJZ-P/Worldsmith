@@ -1,0 +1,70 @@
+// Opt-in for either the normal checkout or build/structure-efficiency-validation.
+// The production jar never contains this source set or its Fabric entrypoint.
+def checkoutDir = new File(project.projectDir, 'src/gametest/resources/fabric.mod.json').isFile()
+    ? project.projectDir.canonicalFile : new File(project.projectDir, '../..').canonicalFile
+if (!new File(checkoutDir, 'src/gametest/resources/fabric.mod.json').isFile()) {
+    throw new GradleException('Mechanic smoke configuration expects the checkout or its build/structure-efficiency-validation project')
+}
+
+fabricApi.configureTests {
+    createSourceSet = true
+    modId = 'worldsmith_mechanics_smoke'
+    enableGameTests = true
+    enableClientGameTests = project.hasProperty('mechanicGuideClientTest')
+    clearRunDirectory = false
+}
+sourceSets.gametest {
+    java.setSrcDirs([new File(checkoutDir, 'src/gametest/java')] + (project.hasProperty('mechanicGuideClientTest') ? [new File(checkoutDir, 'src/clientGametest/java')] : []))
+    resources.setSrcDirs([new File(checkoutDir, 'src/gametest/resources')])
+}
+
+if (project.hasProperty('mechanicGuideClientTest')) {
+    def clientRoot = new File(checkoutDir, 'build/mechanic-discovery')
+    def clientRun = new File(clientRoot, 'client-gametest-' + System.currentTimeMillis())
+    loom.runs.clientGameTest {
+        runDir clientRun.absolutePath
+        vmArg '-Dworldsmith.guide.client-report=' + new File(clientRoot, 'client-guide-report.txt').absolutePath
+        ideConfigGenerated false
+    }
+    tasks.named('runClientGameTest').configure {
+        doFirst {
+            clientRoot.mkdirs()
+            java.nio.file.Files.deleteIfExists(new File(clientRoot, 'client-guide-report.txt').toPath())
+            println 'Isolated guide ClientGameTest directory: ' + clientRun.absolutePath
+        }
+        doLast {
+            def report = new File(clientRoot, 'client-guide-report.txt')
+            if (!report.isFile() || !report.text.contains('PASS mechanic guide client'))
+                throw new GradleException('The guide client test produced no successful fresh report')
+            println 'Verified mechanic guide client screenshots: ' + report.absolutePath
+        }
+    }
+}
+
+def smokeRoot = new File(checkoutDir, project.hasProperty('mechanicDiscovery') ? 'build/mechanic-discovery' : 'build/interaction-kernel')
+def freshRun = new File(smokeRoot, 'gametest-' + System.currentTimeMillis())
+def reportFile = new File(smokeRoot, 'native-gametest.xml')
+loom.runs.gameTest {
+    runDir freshRun.absolutePath
+    vmArg '-Djava.awt.headless=true'
+    vmArg '-Dfabric-api.gametest.filter=worldsmith_mechanics_smoke:*'
+    vmArg '-Dfabric-api.gametest.report-file=' + reportFile.absolutePath
+    ideConfigGenerated false
+}
+tasks.named('runGameTest').configure {
+    doFirst {
+        smokeRoot.mkdirs()
+        java.nio.file.Files.deleteIfExists(reportFile.toPath())
+        println 'Isolated mechanic GameTest run directory: ' + freshRun.absolutePath
+    }
+    doLast {
+        if (!reportFile.isFile()) throw new GradleException('The native smoke runner produced no fresh XML report')
+        def result = new groovy.xml.XmlSlurper().parse(reportFile)
+        def cases = result.depthFirst().findAll { it.name() == 'testcase' }
+        def failures = result.depthFirst().findAll { it.name() in ['failure', 'error', 'skipped'] }
+        if (cases.size() != 2 || !failures.isEmpty()) {
+            throw new GradleException('Expected two completed native mechanic tests and no failures: ' + reportFile.absolutePath)
+        }
+        println 'Verified two executed native mechanic tests in separate environment batches: ' + reportFile.absolutePath
+    }
+}
