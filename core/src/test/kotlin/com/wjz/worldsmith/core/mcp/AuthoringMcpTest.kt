@@ -43,9 +43,15 @@ class AuthoringMcpTest {
             val good=build(1);val first=good.getValue("drawingIds").jsonArray.first().jsonPrimitive.content
             fun definition(id:String)=buildJsonObject {put("id","hall");putJsonObject("blueprint"){put("id","hall");putJsonObject("authored"){put("variants",JsonArray(listOf(JsonPrimitive(id))))}};putJsonObject("placement"){put("biomes",JsonArray(listOf(JsonPrimitive("frostash_flats"))))}}
             val preflight=call("worldsmith_preflight_structure",buildJsonObject {put("sessionId",sid);put("structure",definition(first))});assertTrue(preflight.structuredContent.getValue("valid").jsonPrimitive.boolean,preflight.toString())
-            source(AuthoringUpgradeTest.HALL.replace("15);","1);"),1);val dark=build(2).getValue("drawingIds").jsonArray.first().jsonPrimitive.content
+            // Numeric light is now advisory, so retain a real spatial error to test repairable previews.
+            val broken = AuthoringUpgradeTest.HALL.replace("15);", "1);").replace("return a.snapshot();",
+                "c.pen(\"stone\").fill(Box.of(0,1,2,0,2,2)); return a.snapshot();")
+            source(broken,1);val dark=build(2).getValue("drawingIds").jsonArray.first().jsonPrimitive.content
             val put=call("worldsmith_put_structure",buildJsonObject {put("sessionId",sid);put("structure",definition(dark))})
             assertFalse(put.structuredContent.getValue("checks").jsonObject.getValue("valid").jsonPrimitive.boolean)
+            assertTrue(put.structuredContent.getValue("checks").jsonObject.getValue("stages").jsonObject.values.any { stage ->
+                stage.jsonObject.getValue("diagnostics").jsonArray.any { it.jsonObject.getValue("code").jsonPrimitive.content == "UNWALKABLE_STRUCTURE_POINT" }
+            }, "The deliberately blocked entrance, not a dim-light estimate, must produce the error")
             assertNotNull(sessions.find(sid)!!.structures["hall"])
             val preview=call("worldsmith_preview_structure",buildJsonObject {
                 put("sessionId",sid);put("blueprint",definition(dark).getValue("blueprint"));put("views",JsonArray(listOf(JsonPrimitive("front"),JsonPrimitive("isometric"))))

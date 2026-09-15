@@ -996,7 +996,7 @@ final class WorldsmithTerrainSamplingTest {
 		String id = String.valueOf(idCharacter).repeat(64);
 		WorldsmithPackManifest oldManifest = source.getManifest();
 		WorldsmithPackManifest manifest = new WorldsmithPackManifest(
-			oldManifest.getFormatVersion(), id, "Terrain sample", "Compiler fixture", oldManifest.getFiles()
+			oldManifest.getFormatVersion(), id, "Terrain sample", "Compiler fixture", oldManifest.getModules(), oldManifest.getAssets()
 		);
 		BiomePlan biomes = new BiomePlan(
 			source.getBiomes().getSchemaVersion(), source.getBiomes().getBiomes(), spatial

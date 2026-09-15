@@ -1,0 +1,102 @@
+{
+  "originalPrompt": "搭建召唤、持钥开门和交料兑换",
+  "bible": {
+    "title": "守卫与门座",
+    "premise": "古代工匠将金属构型、钥匙与等价交换刻进石座。",
+    "playerRole": "重启旧工坊的访客",
+    "mainConflict": "恢复通路而不浪费最后的材料。",
+    "requirements": [
+      {
+        "id": "interactions",
+        "text": "实际搭建召唤、持钥开门和交料兑换。",
+        "promptQuote": "搭建召唤、持钥开门和交料兑换"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "devices",
+        "kind": "RULE",
+        "title": "石座的约定",
+        "description": "构型完成才唤醒守卫；钥匙开门时被消耗；兑换台收取主手四枚紫水晶碎片并返还一枚绿宝石。"
+      }
+    ],
+    "requiresBoss": false
+  },
+  "briefs": [
+    {
+      "id": "sentinel_assembly",
+      "targets": [
+        {
+          "kind": "mechanic",
+          "id": "sentinel_assembly"
+        }
+      ],
+      "purpose": "以金块为底座，铁块搭出躯干与双臂，在顶端放置雕刻南瓜；最后补齐任一构件，祭台吞下构件，唤来碎晶守卫。每个底座位置只唤醒一次。",
+      "basisRefs": [
+        "node/devices",
+        "requirement/interactions"
+      ],
+      "dependencies": [],
+      "criteria": [
+        {
+          "id": "actual_rule",
+          "claim": "以金块为底座，铁块搭出躯干与双臂，在顶端放置雕刻南瓜；最后补齐任一构件，祭台吞下构件，唤来碎晶守卫。每个底座位置只唤醒一次。",
+          "target": {
+            "kind": "mechanic",
+            "id": "sentinel_assembly"
+          }
+        }
+      ]
+    },
+    {
+      "id": "keyed_gate",
+      "targets": [
+        {
+          "kind": "mechanic",
+          "id": "keyed_gate"
+        }
+      ],
+      "purpose": "站直身躯，以主手握住一枚绊线钩钥匙，右键磁石门座。钥匙消耗后，上方两格铁栅消失，门道开启。",
+      "basisRefs": [
+        "node/devices",
+        "requirement/interactions"
+      ],
+      "dependencies": [],
+      "criteria": [
+        {
+          "id": "actual_rule",
+          "claim": "站直身躯，以主手握住一枚绊线钩钥匙，右键磁石门座。钥匙消耗后，上方两格铁栅消失，门道开启。",
+          "target": {
+            "kind": "mechanic",
+            "id": "keyed_gate"
+          }
+        }
+      ]
+    },
+    {
+      "id": "crystal_exchange",
+      "targets": [
+        {
+          "kind": "mechanic",
+          "id": "crystal_exchange"
+        }
+      ],
+      "purpose": "主手握住至少四枚紫水晶碎片，站直后右键氧化铜块，每次交出四枚，领取一枚绿宝石。",
+      "basisRefs": [
+        "node/devices",
+        "requirement/interactions"
+      ],
+      "dependencies": [],
+      "criteria": [
+        {
+          "id": "actual_rule",
+          "claim": "主手握住至少四枚紫水晶碎片，站直后右键氧化铜块，每次交出四枚，领取一枚绿宝石。",
+          "target": {
+            "kind": "mechanic",
+            "id": "crystal_exchange"
+          }
+        }
+      ]
+    }
+  ]
+}

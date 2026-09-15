@@ -23,19 +23,12 @@ import org.junit.jupiter.api.Test
 class WorldAuthoringPackCompatibilityTest {
     private data class Version(val format: Int, val schemas: Map<String, Int>)
 
-    // Formats 3/4 have seven/eight modules and schema-1 creatures/items. Format 5 adds quests
-    // and supports schema-2 structures/creatures. Format 6 also supports items 2 and voices 3.
-    private val seven = setOf("theme", "terrain", "features", "biomes", "structures", "blocks", "creatures")
-    private val eight = seven + "items"
-    private val nine = eight + "quests"
+    private val modules = WorldContentBundleIO.REQUIRED_MODULES
     private val versions = listOf(
-        Version(3, seven.associateWith { 1 }),
-        Version(4, eight.associateWith { 1 }),
-        Version(5, nine.associateWith { if (it in setOf("structures", "creatures")) 2 else 1 }),
-        Version(6, nine.associateWith { when (it) { "structures", "items" -> 2; "creatures" -> 3; else -> 1 } }),
+        Version(7, modules.associateWith { when (it) { "structures", "items" -> 2; "creatures" -> 3; else -> 1 } }),
     )
 
-    /** The checked-in Ashlands source is currently format 5; these are derived format fixtures, not historical golden archives. */
+    /** Format-7 schema combinations are derived in memory; retained user worlds are never inspected or rewritten. */
     private fun fixture(version: Version): WorldContentBundleFiles {
         val base = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
         val manifest = base.manifest.copy(formatVersion = version.format, id = "0".repeat(64),
@@ -70,7 +63,7 @@ class WorldAuthoringPackCompatibilityTest {
         assertEquals(source.computedId, restored.computedId)
     }
 
-    @Test fun `formats three through six preserve their exact module sets schemas and hash domains on reencoding`() {
+    @Test fun `format seven preserves its exact module set and schemas on reencoding`() {
         val identities = mutableSetOf<String>()
         for (version in versions) {
             val first = fixture(version)
@@ -91,7 +84,7 @@ class WorldAuthoringPackCompatibilityTest {
             assertEquals(first.manifest.id, fixture(version).manifest.id, "The fixture is deterministic, not a random golden hash")
             identities += first.manifest.id
         }
-        assertEquals(versions.size, identities.size, "Different version/hash domains retain different content identities")
+        assertEquals(versions.size, identities.size, "Fixtures retain deterministic content identities")
     }
 
     @Test fun `session-only authoring metadata leaves every saved pack independently readable and identically encoded`() {
@@ -124,4 +117,21 @@ class WorldAuthoringPackCompatibilityTest {
                 "The pack reader must not request session provenance or install an additional runtime module")
         }
     }
+    @Test fun `former bundle formats fail on the manifest without opening module content`() {
+        val base = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
+        for (version in 3..6) {
+            val old = base.manifest.copy(formatVersion = version, modules = base.manifest.modules - "mechanics")
+            val reads = mutableListOf<String>()
+            val source = WorldsmithPackSource { path ->
+                reads += path
+                check(path == "worldsmith.json") { "Old module content must remain untouched" }
+                WorldsmithJson.encode(old)
+            }
+            val failure = assertThrows(IllegalArgumentException::class.java) { WorldsmithPackLoader.load(source) }
+            assertTrue(failure.message.orEmpty().contains("requires format 7"), failure.message)
+            assertEquals(listOf("worldsmith.json"), reads)
+            assertThrows(IllegalArgumentException::class.java) { WorldContentBundleIO.encode(base.copy(manifest = old)) }
+        }
+    }
+
 }

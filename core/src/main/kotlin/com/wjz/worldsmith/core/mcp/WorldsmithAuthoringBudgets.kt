@@ -5,6 +5,7 @@ import com.wjz.worldsmith.core.content.CustomBlockProfile
 import com.wjz.worldsmith.core.content.CustomBlockValidation
 import com.wjz.worldsmith.core.content.CustomCreatureValidator
 import com.wjz.worldsmith.core.content.CustomItemValidation
+import com.wjz.worldsmith.core.content.WorldMechanicValidation
 import com.wjz.worldsmith.core.content.QuestValidation
 import com.wjz.worldsmith.core.content.WorldContentRegistry
 import com.wjz.worldsmith.core.pack.WorldContentBundleIO
@@ -58,6 +59,18 @@ object WorldsmithAuthoringBudgets {
         }
         putJsonObject("creatures") {put("maxDefinitions",CustomCreatureValidator.MAX_CREATURES)}
         putJsonObject("items") {put("maxDefinitions",CustomItemValidation.MAX_ITEMS)}
+        putJsonObject("mechanics") {
+            put("maxDefinitions",WorldMechanicValidation.MAX_MECHANICS)
+            put("maxRulesPerDefinition",WorldMechanicValidation.MAX_RULES)
+            put("maxPatternCellsPerRule",WorldMechanicValidation.MAX_PATTERN_CELLS)
+            put("maxActionsPerRule",WorldMechanicValidation.MAX_ACTIONS)
+            put("maxStatesPerDefinition",WorldMechanicValidation.MAX_STATES)
+            put("maxOffsetMagnitude",WorldMechanicValidation.MAX_OFFSET)
+            put("maxCooldownTicks",WorldMechanicValidation.MAX_COOLDOWN_TICKS)
+            put("maxTotalRules",WorldMechanicValidation.MAX_TOTAL_RULES)
+            put("maxTotalPatternCells",WorldMechanicValidation.MAX_TOTAL_CELLS)
+            put("note","Event-driven anchor state machines; last player placement may complete any pattern cell. Main-hand use offers the exact declared cost; no tick scripts or thrown-item detection.")
+        }
         putJsonObject("quests") {
             put("maxDefinitions",QuestValidation.MAX_QUESTS)
             put("graph","SINGLE_LINEAR_MAIN_LINE")

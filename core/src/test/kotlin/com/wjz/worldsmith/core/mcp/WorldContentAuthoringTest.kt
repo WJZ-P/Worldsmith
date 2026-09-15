@@ -101,7 +101,7 @@ class WorldContentAuthoringTest {
         assertEquals(before, draft(id, restarted), "Preview is read-only after recovery")
     }
 
-    @Test fun `pixel texture blocks creature and linked theme publish and load one immutable format3 world`() {
+    @Test fun `pixel texture blocks creature and linked theme publish and load one immutable format7 world`() {
         val (id, assetId) = completeDraft()
         val plan = call("worldsmith_plan_world_content", buildJsonObject { put("sessionId", id) })
         assertFalse(plan.isError, plan.text)
@@ -111,7 +111,7 @@ class WorldContentAuthoringTest {
         })
         assertFalse(written.isError, written.text)
         val pack = WorldsmithPackLoader.loadDirectory(Path.of(written.structuredContent.getValue("path").jsonPrimitive.content))
-        assertEquals(3, pack.manifest.formatVersion)
+        assertEquals(7, pack.manifest.formatVersion)
         assertEquals(pack.manifest.id, pack.computedId)
         assertEquals("moon_courts", pack.theme.id)
         assertEquals("moonstone", pack.blocks.blocks.single().id)
@@ -134,14 +134,14 @@ class WorldContentAuthoringTest {
             "Identical frozen publication is idempotent at its current revision")
     }
 
-    @Test fun `unknown quests module rejects the whole edit without partial theme mutation`() {
+    @Test fun `unknown achievements module rejects the whole edit without partial theme mutation`() {
         val id = begin()
         val before = sessions.find(id)!!
         val bytes = Files.readAllBytes(root.resolve("drafts/$id.json"))
         val error = assertThrows(IllegalStateException::class.java) {
-            put(id, linkedMapOf("theme" to template().getValue("theme").jsonObject, "quests" to buildJsonObject { put("schemaVersion", 1) }))
+            put(id, linkedMapOf("theme" to template().getValue("theme").jsonObject, "achievements" to buildJsonObject { put("schemaVersion", 1) }))
         }
-        assertTrue(error.message!!.contains("quests"))
+        assertTrue(error.message!!.contains("achievements"))
         assertEquals(before, sessions.find(id))
         assertArrayEquals(bytes, Files.readAllBytes(root.resolve("drafts/$id.json")))
     }
@@ -159,7 +159,10 @@ class WorldContentAuthoringTest {
         assertTrue(failure.message!!.contains("hash mismatch"))
         assertEquals(before, sessions.find(id))
         assertNull(sessions.find(id)!!.packId)
-        assertFalse(Files.isDirectory(root.resolve("packs")), "Asset verification must fail before publishing any pack directory")
+        val packDirectories = Files.list(root.resolve("packs")).use { paths ->
+            paths.filter { Files.isDirectory(it) && it.fileName.toString().matches(Regex("[a-f0-9]{64}")) }.count()
+        }
+        assertEquals(0L, packDirectories, "Asset verification must fail before publishing a content-hash directory")
         assertArrayEquals(damaged, Files.readAllBytes(file), "Corrupt evidence stays in place instead of being silently replaced")
     }
 
@@ -179,15 +182,15 @@ class WorldContentAuthoringTest {
     }
 
     @Test fun `content contracts expose implemented fields and never invent future module support`() {
-        for (module in listOf("theme", "blocks", "creatures")) {
+        for (module in listOf("theme", "blocks", "creatures", "items", "quests", "mechanics")) {
             val result = call("worldsmith_get_content_contract", buildJsonObject { put("module", module) })
             assertFalse(result.isError)
             val content = result.structuredContent.getValue("contract").jsonPrimitive.content
             assertTrue(content.contains("expectedRevision"))
             assertTrue(content.contains("worldsmith_put_content_modules"))
-            assertEquals(1, result.structuredContent.getValue("schemaVersion").jsonPrimitive.int)
+            assertEquals(when (module) { "creatures" -> 3; "items" -> 2; else -> 1 }, result.structuredContent.getValue("schemaVersion").jsonPrimitive.int)
         }
-        assertThrows(IllegalArgumentException::class.java) { call("worldsmith_get_content_contract", buildJsonObject { put("module", "quests") }) }
+        assertThrows(IllegalArgumentException::class.java) { call("worldsmith_get_content_contract", buildJsonObject { put("module", "achievements") }) }
     }
 
     @Test fun `two different publications at one draft revision have exactly one CAS winner`() {

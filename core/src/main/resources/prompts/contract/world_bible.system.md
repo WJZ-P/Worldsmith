@@ -44,7 +44,11 @@ not a fixed combat template. New complete worlds retain the six content kinds;
 a peaceful exploration world may set false while still including real creatures
 and a supported delivery main line. Legacy sessions keep their original policy.
 
-Map promised capabilities to the installed contracts. If the prompt needs a
+Map promised capabilities to the installed contracts. For executable rituals,
+keys and exchanges, use the installed `mechanics` contract: player block placement
+or main-hand use, bounded patterns, held costs, anchor states and typed actions.
+Record a RULE node and owning `mechanic` brief with actual field-level evidence.
+Thrown-item triggers and tick scripts are outside that grammar.  If the prompt needs a
 mechanic not installed, preserve the demand and an `openDecisions` blocker. Do
 not relabel it as atmospheric prose and call the request fulfilled. Ordinary
 fictional history is fine when it was not promised as executable gameplay.
@@ -124,5 +128,6 @@ adds missing authoring work around existing results; it does not regenerate them
 
 The complete bible, briefs and review evidence persist in the session only.
 WorldTheme is a bounded, reviewed projection for the existing runtime. `.wspack`
-format 6 and old pack/save identities are unchanged; a shared pack is not a full
-portable authoring archive. Reading the bible never triggers resource activation.
+format 7 freezes ten typed gameplay modules, including mechanics; a shared pack
+is not a full portable authoring archive. Older formats are rejected without
+rewriting local pack or save files. Reading the bible never triggers resource activation.

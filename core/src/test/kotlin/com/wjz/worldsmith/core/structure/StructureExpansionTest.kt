@@ -2,6 +2,7 @@ package com.wjz.worldsmith.core.structure
 
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -132,7 +133,7 @@ class StructureExpansionTest {
         assertEquals(setOf("structures/root.json","structures/hall.json","structures/cap.json","structures.json"),files.keys)
         assertEquals(library,StructurePackIO.load(WorldsmithJson.decode(files.getValue("structures.json")),files))
         val base=WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
-        val documents=mapOf("terrain.json" to WorldsmithJson.encode(base.terrain),"biomes.json" to WorldsmithJson.encode(base.biomes),"features.json" to WorldsmithJson.encode(base.features))+files
+        val documents=WorldContentBundleIO.encode(base.copy(structures=library)).texts
         val changed=documents+("structures/cap.json" to WorldsmithJson.encode(d.assembly!!.pieces.getValue("cap").copy(palette=mapOf("stone" to BuildMaterial("minecraft:andesite")))))
         assertNotEquals(WorldsmithHashUtil.computeGenerationId(base.manifest,documents),WorldsmithHashUtil.computeGenerationId(base.manifest,changed))
     }

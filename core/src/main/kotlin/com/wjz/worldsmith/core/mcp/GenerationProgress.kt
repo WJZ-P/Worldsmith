@@ -69,10 +69,10 @@ data class GenerationProgress(
 
 /** Read-only, bounded draft inspection. No drawing compilation, source execution, image decode or native reload. */
 object WorldGenerationProgress {
-    private val completeModules = listOf("theme", "terrain", "biomes", "features", "blocks", "items", "creatures", "quests")
+    private val completeModules = listOf("theme", "terrain", "biomes", "features", "blocks", "items", "creatures", "quests", "mechanics")
     private val worldgenModules = listOf("theme", "terrain", "biomes", "features")
     private val modulePriority = mapOf("theme" to 10, "terrain" to 20, "biomes" to 25, "features" to 30,
-        "blocks" to 35, "items" to 36, "creatures" to 45, "quests" to 75)
+        "blocks" to 35, "items" to 36, "creatures" to 45, "mechanics" to 65, "quests" to 75)
 
     fun inspect(session: WorkflowSession, jobs: List<DrawingJob> = emptyList()): GenerationProgress =
         inspectUsingInventory(session, jobs, WorldDesignCoverage.draft(session))
@@ -176,7 +176,7 @@ object WorldGenerationProgress {
         }
         val ordered = issues.sortedWith(compareBy({ it.priority }, { it.code }, { it.message }))
         val counts = linkedMapOf<String, Int>()
-        listOf("biome", "structure", "creature", "block", "item", "quest").forEach { kind ->
+        listOf("biome", "structure", "creature", "block", "item", "quest", "mechanic").forEach { kind ->
             counts["${kind}Definitions"] = inventory.symbols.count { it.kind == kind }
             counts["${kind}Planned"] = session.designPlan?.targets?.count { it.key.kind == kind } ?: 0
         }
@@ -259,7 +259,7 @@ object WorldGenerationProgress {
     }
 
     private fun moduleFor(kind: String?) = when (kind) {
-        "biome" -> "biomes"; "feature" -> "features"; "creature" -> "creatures"; "block" -> "blocks"; "item" -> "items"; "quest" -> "quests"
+        "biome" -> "biomes"; "feature" -> "features"; "creature" -> "creatures"; "block" -> "blocks"; "item" -> "items"; "quest" -> "quests"; "mechanic" -> "mechanics"
         "theme", "narrative_beat" -> "theme"; "terrain", "anchor" -> "terrain"; else -> null
     }
 
@@ -271,6 +271,7 @@ object WorldGenerationProgress {
                 "items" -> CustomItemValidation.validate(McpJson.decode(raw))
                 "creatures" -> CustomCreatureValidator.validate(McpJson.decode(raw))
                 "quests" -> QuestValidation.validate(McpJson.decode(raw))
+                "mechanics" -> WorldMechanicValidation.validate(McpJson.decode(raw))
                 "terrain" -> TerrainPlanValidator.validate(McpJson.decode(raw))
                 "features" -> FeatureLibraryValidator.validate(McpJson.decode(raw))
                 "biomes" -> session.contentModules["features"]?.let { BiomePlanValidator.validate(McpJson.decode(raw), McpJson.decode(it)) }.orEmpty()

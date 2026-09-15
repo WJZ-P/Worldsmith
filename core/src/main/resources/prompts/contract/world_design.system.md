@@ -4,9 +4,10 @@ The Mod provides deterministic authoring, persistence and checks; the connected
 AI develops the world from the player's prompt. It does not call a hidden LLM.
 Use stable names and an explicit plan so a long run can resume without replacing
 finished work or quietly dropping a requested category.
-Current publication is bundle format 6 with the same nine typed modules; items
-schema 2 supplies equipment, consumables and fixed actions. Formats 3/4/5 remain
-read-only for restoration and unchanged re-embedding, not implicit migrations.
+Current publication is bundle format 7 with the same ten typed modules; items
+schema 2 supplies equipment, consumables and fixed actions. The mechanics module
+adds bounded event-driven block interactions. Older bundle formats are rejected,
+not implicitly migrated.
 
 For a new COMPLETE_WORLD, first save the WorldBible and pass its current
 evidence-bound AI self-review under `world_bible`. Then use `worldsmith_get_contract`
@@ -72,7 +73,7 @@ This is a minimum coverage check, not a suggested catalog size or a fixed style.
 Derive diversity and scale from the prompt. A repeatable test example is not a
 catalog to copy into every world.
 
-Targets may also name `terrain`, `anchor`, `feature`, `blueprint`, `theme`, and
+Targets may also name `mechanic`, `terrain`, `anchor`, `feature`, `blueprint`, `theme`, and
 `narrative_beat`. Terrain identity is `terrain/main`; blueprint identities are
 `structureId/blueprintId`. Items use logical `item/id` ContentKeys, not native
 host addresses. A block's pickup form is a `block_item/id` endpoint referring
@@ -93,12 +94,16 @@ may be implicit. Every complete-world target participates in a promised link.
 | --- | --- | --- |
 | placed_in_biome | structure → biome | structure.placement.biomes |
 | spawns_in_biome | creature → biome | creature.spawn.biomes |
-| uses_block | terrain/biome/feature/structure → block | selected material declaration or compiled structure voxel |
+| uses_block | terrain/biome/feature/structure/mechanic → block | selected material, compiled voxel or mechanic pattern/action |
+| consumes_item | mechanic → item/block_item | explicit heldItem cost or consumed custom-block cell |
+| grants_item | mechanic → item/block_item | positive give_item action |
+| spawns_creature | mechanic → creature | typed spawn_creature action |
 | uses_feature | biome → feature | the biome's configured feature references |
 | drops_item | creature → item/block_item | positive-chance creature drop entry |
 | contains_reward | structure → item/block_item | actual container item or weighted reward in an executable plan |
 | contains_encounter | structure → creature | actual typed boss_spawner in an executable plan |
 | kill_objective | quest → creature | a real kill_creature objective |
+| activation_objective | quest → mechanic | a real activate_mechanic objective observing committed activation |
 | delivery_objective | quest → item/block_item | a real deliver_item objective |
 | quest_reward | quest → item/block_item | a positive one-stack quest reward |
 | prerequisite | quest → quest | the first quest actually requires the second |
@@ -111,10 +116,11 @@ already available vanilla candidate is not guaranteed use. An unused blueprint
 palette entry does not satisfy a compiled structure's uses_block promise.
 
 Every Boss entry names a planned creature and a planned quest, with the matching
-`kill_objective` link. Actual completion requires creature module schema 2, a real
-nonempty Boss profile, and a positive natural habitat or typed BossSpawner in an
-enabled structure placed in a defined biome. BossSpawner was introduced in format
-5 and remains supported in new format-6 bundles with structure/creature module
+`kill_objective` link. Actual completion requires creature module schema 2 or 3, a real
+nonempty Boss profile, and a positive natural habitat, typed BossSpawner in an
+enabled structure, or a reachable mechanic spawn action. Mechanic summons need
+actual state and material-source proof, not just a spawns_creature declaration. BossSpawner was introduced in format
+5 and remains supported in new format-7 bundles with structure/creature module
 schema 2; it references a hostile Boss definition.
 High health,
 a Boss-looking model, or a word in its name is not a Boss profile. This version
@@ -133,7 +139,7 @@ A typed spawner is a repeatable local encounter, not global Boss uniqueness.
    Fill the listed `requiredAuthoring` fields from the prompt and current plan.
    Contract pointers in begin/resume summaries show exactly where to fetch the
    relevant full domain grammar without repeatedly loading every contract.
-3. Commit theme/worldgen/blocks/items/creatures/quests through
+3. Commit theme/worldgen/blocks/items/creatures/quests/mechanics through
    `worldsmith_put_content_modules` with the latest expectedRevision. Textures
    use the provider-independent texture workflow; drawings use the existing SDK,
    source jobs, preview and architecture tools. All edits share this revision.
@@ -158,7 +164,9 @@ In COMPLETE_WORLD mode, `worldsmith_write_pack` checks the immutable candidate
 against every named target, promised relationship and Boss/quest link. Planned
 blocks need actual use; items need a producer plus a quest/theme role; planned
 creatures need a valid habitat; main-line quests bind real narrative beats.
-An empty library does not fill a named category. Keep the existing guided
+An empty library does not fill a named category. Mechanics need not be invented
+for every complete world, but an explicitly named mechanic needs its real
+pattern/cost/state/actions definition and an owning reviewed brief. Keep the existing guided
 architecture quality contract, inspect the actual visuals, and repair the largest
 visible weakness rather than treating machine checks as a beauty score.
 

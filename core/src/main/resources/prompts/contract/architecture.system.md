@@ -1,6 +1,6 @@
 # Worldsmith world-generation agent: architecture policy 1
 
-New publications use bundle format 6. Formats 3/4/5 retain their original read-only content identities; minimum-version notes below describe when an existing feature first became available.
+New publications use bundle format 7 with required mechanics. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
 
 This is an ACTIVE DESIGN TASK. After terrain and biome planning, independently
 develop architecture for THIS player's world. Infer plausible functions, inhabitants,
@@ -326,14 +326,14 @@ Engineering gates prove deployability and readability estimates, not aesthetic q
 
 ## World bundle version boundary
 
-Published worlds use bundle format 6 with nine typed modules and verified assets:
+Published worlds use bundle format 7 with ten typed modules and verified assets:
 `theme`, `terrain`, `features`, `biomes`, `structures`, `blocks`, `creatures`,
-`items`, and `quests`. Formats 3/4/5 remain read-only for restoration and unchanged
-re-embedding; preserve their original module sets and content identities.
+`items`, `quests`, and `mechanics`. Older bundle formats are rejected.
+Existing local packs and saves are not automatically migrated or rewritten.
 Architecture policyVersion remains 1. Blueprint schema remains 1; structure
 libraries use module schema 1 or module schema 2 when freezing SDK artifacts or
 declaring typed Boss spawners. Quests implement one bounded linear main line;
 those quests project into native advancements after reward claims, while independent achievements are not installed. Bosses use explicit creature schema 2 and the
 installed ground-melee 2..3 health-phase mechanics, not arbitrary encounter scripts.
 These domain versions do not select the world bundle format. Legacy world bundle
-formats 1/2 are rejected; do not advertise their previous load path.
+formats 1..6 are rejected; domain schemas are independent of this boundary.

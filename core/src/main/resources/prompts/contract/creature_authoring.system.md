@@ -1,6 +1,6 @@
 # Creature authoring foundation
 
-New publications use bundle format 6. Formats 3/4/5 retain their original read-only content identities; minimum-version notes below describe when an existing feature first became available.
+New publications use bundle format 7 with required mechanics. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
 
 The creature authoring layer compiles data into runtime schema 1, 2 or 3. Ordinary
 recipes default to schema 1; explicit schema 2 adds the installed bounded Boss

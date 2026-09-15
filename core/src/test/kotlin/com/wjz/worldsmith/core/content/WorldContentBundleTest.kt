@@ -47,11 +47,11 @@ class WorldContentBundleTest {
         return files
     }
 
-    @Test fun `seven typed modules and verified assets survive portable round trip`() {
+    @Test fun `ten typed modules and verified assets survive portable round trip`() {
         val pack = bundle()
         val files = write(pack)
         val loaded = WorldsmithPackLoader.loadDirectory(temp)
-        assertEquals(3, loaded.manifest.formatVersion)
+        assertEquals(7, loaded.manifest.formatVersion)
         assertEquals(WorldContentBundleIO.REQUIRED_MODULES, loaded.manifest.modules.keys)
         assertFalse(WorldsmithJson.encode(files.manifest).contains("\"files\""))
         assertEquals(pack.manifest.id, loaded.computedId)
@@ -98,7 +98,7 @@ class WorldContentBundleTest {
         assertTrue(WorldsmithPackValidator.validate(invalid).any { it.code == "CONTENT_REFERENCE_MISSING" && it.path.startsWith("theme") })
         assertTrue(WorldsmithPackValidator.validate(pack.copy(theme = WorldTheme())).any { it.code == "THEME_TEXT_INVALID" })
         val input = ExistingWorldContentModules.input(pack)
-        val plan = ExistingWorldContentModules.registry().plan(input.copy(modules = input.modules + ("quests" to buildJsonObject { put("schemaVersion", 1) })))
+        val plan = ExistingWorldContentModules.registry().plan(input.copy(modules = input.modules + ("achievements" to buildJsonObject { put("schemaVersion", 1) })))
         assertTrue(plan.diagnostics.any { it.code == "CONTENT_MODULE_UNAVAILABLE" })
     }
 
@@ -194,4 +194,103 @@ class WorldContentBundleTest {
         assertEquals(listOf("worldsmith.json") + manifest.modules.values.take(2).map { it.path }, calls,
             "No later module or blueprint may be read after the cumulative limit fails")
     }
+    private fun mechanics(pack: WorldsmithPack): WorldMechanicLibrary = WorldMechanicLibrary(mechanics = listOf(
+        WorldMechanicDefinition("moon_gate", "Moon gate", rules = listOf(WorldMechanicRule(
+            "awaken", WorldMechanicEvent.USE_BLOCK,
+            listOf(MechanicPatternCell(MechanicOffset(), MechanicBlockPredicate("worldsmith:content/moonstone")),
+                MechanicPatternCell(MechanicOffset(1, 0, 0), MechanicBlockPredicate("minecraft:sandstone"), consume = true)),
+            listOf(MechanicAction.SetBlock(MechanicOffset(), MechanicBlockPredicate("minecraft:stone")),
+                MechanicAction.SpawnCreature("guardian", MechanicOffset(0, 1, 0)), MechanicAction.GiveItem("minecraft:diamond")),
+            heldItem = MechanicItemCost("minecraft:amethyst_shard", 2), biomes = listOf(pack.biomes.biomes.first().id),
+        )))
+    ))
+
+    @Test fun `required mechanics round trip binds block item creature and biome references`() {
+        val base = bundle()
+        val pack = freeze(base.copy(mechanics = mechanics(base)))
+        val files = write(pack)
+        assertTrue("mechanics.json" in files.texts)
+        val restored = WorldsmithPackLoader.loadDirectory(temp)
+        assertEquals(pack.mechanics, restored.mechanics)
+        assertEquals(pack.manifest.id, restored.computedId)
+        assertTrue(WorldsmithPackValidator.validate(restored).isEmpty(), WorldsmithPackValidator.validate(restored).toString())
+        val plan = ExistingWorldContentModules.registry().plan(ExistingWorldContentModules.input(restored))
+        val rule = plan.catalog.entries.single { it.key == ContentKey("mechanic_rule", "moon_gate/awaken") }
+        assertTrue(rule.references.any { it.target == ContentKey("block", "moonstone") })
+        assertTrue(rule.references.any { it.target == ContentKey("creature", "guardian") })
+        assertTrue(rule.references.any { it.target == ContentKey("biome", base.biomes.biomes.first().id) })
+        assertTrue(rule.nativeReferences.contains(NativeContentReference("item", "minecraft:amethyst_shard")))
+        assertTrue(plan.requirements.any { it.capability == "mechanics.anchor_interactions" })
+    }
+
+    @Test fun `mechanics alter identity and are mandatory in current bundles`() {
+        val base = bundle()
+        val first = freeze(base.copy(mechanics = mechanics(base)))
+        assertNotEquals(base.computedId, first.computedId)
+        val changed = first.mechanics.copy(mechanics = first.mechanics.mechanics.map { it.copy(rules = it.rules.map { r -> r.copy(cooldownTicks = 40) }) })
+        assertNotEquals(first.computedId, freeze(first.copy(mechanics = changed)).computedId)
+        assertTrue(WorldsmithPackValidator.validate(first.copy(mechanics = changed)).any { it.code == "PACK_CONTENT_MUTATED" })
+        assertThrows(IllegalArgumentException::class.java) { WorldContentBundleIO.encode(base.copy(manifest = base.manifest.copy(modules = base.manifest.modules - "mechanics"))) }
+        val encoded = WorldContentBundleIO.encode(base)
+        assertThrows(IllegalArgumentException::class.java) { WorldsmithHashUtil.computeGenerationId(encoded.manifest, encoded.texts - "mechanics.json", encoded.binaries) }
+        assertThrows(IllegalArgumentException::class.java) { WorldsmithHashUtil.computeGenerationId(encoded.manifest,
+            encoded.texts + ("mechanics.json" to "{\"schemaVersion\":2,\"mechanics\":[]}"), encoded.binaries) }
+        assertEquals(base.computedId, WorldsmithHashUtil.computeGenerationId(encoded.manifest,
+            encoded.texts + ("mechanics.json" to "{\"schemaVersion\":1}"), encoded.binaries))
+    }
+
+    @Test fun `mechanic cross module missing references fail with their authored paths`() {
+        val base = bundle()
+        val rule = mechanics(base).mechanics.single().rules.single().copy(
+            pattern = listOf(MechanicPatternCell(MechanicOffset(), MechanicBlockPredicate("worldsmith:content/absent_block"))),
+            heldItem = MechanicItemCost("worldsmith:item/absent_item"), biomes = listOf("absent_biome"),
+            actions = listOf(MechanicAction.SpawnCreature("absent_creature", MechanicOffset(0, 1, 0))),
+        )
+        val library = WorldMechanicLibrary(mechanics = listOf(WorldMechanicDefinition("gate", "Gate", rules = listOf(rule))))
+        val errors = WorldsmithPackValidator.validate(freeze(base.copy(mechanics = library))).filter { it.code == "CONTENT_REFERENCE_MISSING" }
+        assertEquals(4, errors.size, errors.toString())
+        for (suffix in listOf("pattern[0].block.block", "heldItem.item", "biomes[0]", "actions[0].creature"))
+            assertTrue(errors.any { it.path.endsWith(suffix) }, suffix)
+    }
+
+    @Test fun `mechanic custom item costs and rewards respect one stack limits`() {
+        val base = bundle()
+        val item = CustomItemDefinition("focus", "Focus", base.assets.keys.single(), maxStackSize = 1)
+        val rule = mechanics(base).mechanics.single().rules.single().copy(heldItem = MechanicItemCost("worldsmith:item/focus", 2),
+            actions = listOf(MechanicAction.GiveItem("worldsmith:item/focus", 2)))
+        val pack = freeze(base.copy(items = CustomItemLibrary(items = listOf(item)), mechanics = WorldMechanicLibrary(
+            mechanics = listOf(WorldMechanicDefinition("gate", "Gate", rules = listOf(rule))))))
+        val errors = WorldsmithPackValidator.validate(pack).filter { it.code == "CONTENT_ITEM_STACK_LIMIT" }
+        assertEquals(2, errors.size, errors.toString())
+    }
+
+    @Test fun `large mechanics keep catalog references bounded per rule instead of per device`() {
+        val base = bundle()
+        val cells = (-4..3).flatMap { x -> (-4..3).flatMap { z -> (0..1).map { y ->
+            MechanicPatternCell(MechanicOffset(x, y, z), MechanicBlockPredicate("worldsmith:content/moonstone"))
+        } } }
+        val rules = (0 until 16).map { i -> WorldMechanicRule("rule_$i", WorldMechanicEvent.BLOCK_PLACED, cells,
+            listOf(MechanicAction.SetBlock(MechanicOffset(), MechanicBlockPredicate("minecraft:stone")))) }
+        val pack = base.copy(mechanics = WorldMechanicLibrary(mechanics = listOf(WorldMechanicDefinition("large_gate", "Large gate", rules = rules))))
+        val plan = ExistingWorldContentModules.registry().plan(ExistingWorldContentModules.input(pack))
+        assertTrue(plan.catalogValid, plan.diagnostics.toString())
+        assertEquals(16, plan.catalog.entries.count { it.key.kind == "mechanic_rule" })
+    }
+
+    @Test fun `quests observe concrete mechanics through validated links and portable objective data`() {
+        val base = bundle()
+        val quest = Quest("awaken_gate", "Awaken the gate", "Activate the moon gate once.",
+            objectives = listOf(QuestObjective.ActivateMechanic("moon_gate")))
+        val pack = freeze(base.copy(mechanics = mechanics(base), quests = QuestLibrary(quests = listOf(quest))))
+        assertTrue(WorldsmithPackValidator.validate(pack).isEmpty(), WorldsmithPackValidator.validate(pack).toString())
+        write(pack)
+        assertEquals(pack.quests, WorldsmithPackLoader.loadDirectory(temp).quests)
+        val plan = ExistingWorldContentModules.registry().plan(ExistingWorldContentModules.input(pack))
+        val entry = plan.catalog.entries.single { it.key == ContentKey("quest", "awaken_gate") }
+        assertTrue(entry.references.any { it.target == ContentKey("mechanic", "moon_gate") })
+        assertTrue(plan.compileOrder.indexOf("mechanics") < plan.compileOrder.indexOf("quests"))
+        val absent = freeze(pack.copy(mechanics = WorldMechanicLibrary()))
+        assertTrue(WorldsmithPackValidator.validate(absent).any { it.code == "CONTENT_REFERENCE_MISSING" && it.path == "quests.quests[0].objectives[0].mechanic" })
+    }
+
 }

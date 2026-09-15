@@ -17,17 +17,17 @@ class WorldContentMcpTest {
     private val tools by lazy { WorldsmithMcpTools(root.resolve("packs")) }
     private fun call(name: String, args: JsonObject = JsonObject(emptyMap())) = StructureTestWorld.call(tools, name, args)
 
-    @Test fun `capabilities distinguish installed format3 modules from absent native host and future quest modules`() {
+    @Test fun `capabilities distinguish installed format7 modules from absent native host and future achievement modules`() {
         val result = call("worldsmith_get_content_framework")
         assertFalse(result.isError)
         val data = result.structuredContent
         assertFalse(data.getValue("customBlockRuntime").jsonPrimitive.boolean)
         assertFalse(data.getValue("customCreatureRuntime").jsonPrimitive.boolean)
         assertTrue(data.getValue("newPackFormatEnabled").jsonPrimitive.boolean)
-        assertEquals(3, data.getValue("packFormat").jsonPrimitive.int)
+        assertEquals(7, data.getValue("packFormat").jsonPrimitive.int)
         assertTrue(data.getValue("legacyPackFormats").jsonArray.isEmpty())
-        assertEquals(7, data.getValue("installedModules").jsonArray.size)
-        assertEquals(setOf("quests", "achievements"), data.getValue("plannedModules").jsonArray.map { it.jsonObject.getValue("id").jsonPrimitive.content }.toSet())
+        assertEquals(10, data.getValue("installedModules").jsonArray.size)
+        assertEquals(setOf("achievements"), data.getValue("plannedModules").jsonArray.map { it.jsonObject.getValue("id").jsonPrimitive.content }.toSet())
         for (tool in tools.all().filter { it.name in setOf("worldsmith_get_content_framework", "worldsmith_plan_world_content", "worldsmith_inspect_world_content") }) assertTrue(tool.readOnly)
     }
 
@@ -38,7 +38,7 @@ class WorldContentMcpTest {
         assertTrue(good.structuredContent.getValue("catalogValid").jsonPrimitive.boolean)
         assertFalse(good.structuredContent.getValue("activationVerified").jsonPrimitive.boolean)
         assertFalse(good.structuredContent.getValue("capabilitiesSatisfied").jsonPrimitive.boolean, "Core-only host does not advertise a native compiler")
-        val extra = JsonObject(input + ("modules" to JsonObject(input.getValue("modules").jsonObject + ("quests" to buildJsonObject { put("schemaVersion", 1) }))))
+        val extra = JsonObject(input + ("modules" to JsonObject(input.getValue("modules").jsonObject + ("achievements" to buildJsonObject { put("schemaVersion", 1) }))))
         val bad = call("worldsmith_plan_world_content", extra)
         assertTrue(bad.isError)
         assertTrue(bad.structuredContent.getValue("plan").jsonObject.getValue("diagnostics").jsonArray.any { it.jsonObject.getValue("code").jsonPrimitive.content == "CONTENT_MODULE_UNAVAILABLE" })
@@ -76,9 +76,9 @@ class WorldContentMcpTest {
                 assertEquals(200, response.statusCode())
                 val result = Json.parseToJsonElement(response.body()).jsonObject.getValue("result").jsonObject
                 val data = result.getValue("structuredContent").jsonObject
-                assertEquals(2, data.getValue("frameworkVersion").jsonPrimitive.int)
+                assertEquals(6, data.getValue("frameworkVersion").jsonPrimitive.int)
                 assertFalse(data.getValue("customCreatureRuntime").jsonPrimitive.boolean)
-                assertEquals(7, data.getValue("installedModules").jsonArray.size)
+                assertEquals(10, data.getValue("installedModules").jsonArray.size)
             }
         }
     }

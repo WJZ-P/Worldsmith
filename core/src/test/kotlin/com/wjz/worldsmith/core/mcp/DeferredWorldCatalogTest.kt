@@ -17,7 +17,7 @@ class DeferredWorldCatalogTest {
         val root=temp.resolve("packs")
         for ((id,name) in listOf("a".repeat(64) to "Oathfire", "b".repeat(64) to "Nine Provinces")) {
             val directory=Files.createDirectories(root.resolve(id))
-            val manifest=WorldsmithPackManifest(6,id,name,"A world waiting to be explored.",modules=WorldContentBundleIO.REQUIRED_MODULES.associateWith { WorldsmithModuleFile(1,"$it.json") })
+            val manifest=WorldsmithPackManifest(WorldContentBundleIO.FORMAT_VERSION,id,name,"A world waiting to be explored.",modules=WorldContentBundleIO.REQUIRED_MODULES.associateWith { WorldsmithModuleFile(1,"$it.json") })
             Files.writeString(directory.resolve("worldsmith.json"),WorldsmithJson.encode(manifest))
         }
         val packs=ResourcePackExchange(root).listPacks()

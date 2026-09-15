@@ -72,18 +72,14 @@ class ResourcePackExchangeTest {
         assertArrayEquals(bytes,Files.readAllBytes(Path.of(exported.path)))
     }
 
-    @Test fun `legacy import preserves format while ordinary managed writer stays current only`() {
-        val draft=base.copy(manifest=base.manifest.copy(formatVersion=3,modules=base.manifest.modules.filterKeys {it in WorldContentBundleIO.LEGACY_MODULES}),
-            items=CustomItemLibrary(),quests=QuestLibrary(),creatures=CreatureLibrary())
-        val encoded=WorldContentBundleIO.encode(draft)
-        val legacy=draft.copy(manifest=encoded.manifest,computedId=encoded.manifest.id)
+    @Test fun `old format candidates are rejected without creating managed bundles`() {
         val store=ManagedPackStore(packDirectory)
-        assertThrows(IllegalArgumentException::class.java) {store.persist(encoded.manifest,encoded.texts,encoded.binaries)}
-        inbox(legacy,"legacy.wspack")
-        val result=exchange.importPack("legacy.wspack")
-        assertEquals(3,result.formatVersion)
-        assertEquals(legacy.manifest.id,result.bundleId)
-        assertEquals(3,WorldsmithPackLoader.loadDirectory(Path.of(result.savedPackPath!!)).manifest.formatVersion)
+        for (format in 3..6) {
+            val old=base.copy(manifest=base.manifest.copy(formatVersion=format))
+            assertThrows(IllegalArgumentException::class.java) {WorldContentBundleIO.encode(old)}
+            assertThrows(IllegalArgumentException::class.java) {store.importValidated(old)}
+            assertFalse(Files.exists(packDirectory.resolve(old.manifest.id)))
+        }
     }
 
     @Test fun `inbox names and listings stay bounded to regular basename files`() {

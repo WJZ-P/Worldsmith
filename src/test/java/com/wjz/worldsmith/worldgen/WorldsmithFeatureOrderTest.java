@@ -52,7 +52,7 @@ final class WorldsmithFeatureOrderTest {
 		String id = "f".repeat(64);
 		WorldsmithPackManifest oldManifest = source.getManifest();
 		WorldsmithPackManifest manifest = new WorldsmithPackManifest(
-			oldManifest.getFormatVersion(), id, "Feature order fixture", "Compiler regression", oldManifest.getFiles()
+			oldManifest.getFormatVersion(), id, "Feature order fixture", "Compiler regression", oldManifest.getModules(), oldManifest.getAssets()
 		);
 		CompiledPack pack = CompiledPack.scoped(new WorldsmithPack(
 			manifest, source.getTerrain(), biomes, source.getFeatures(), id, source.getStructures()

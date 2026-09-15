@@ -1,6 +1,6 @@
 # Portable texture production: item / block / creature
 
-New publications use bundle format 6. Formats 3/4/5 retain their original read-only content identities; minimum-version notes below describe when an existing feature first became available.
+New publications use bundle format 7 with required mechanics. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
 
 Worldsmith provides PNG authoring/import, validation, content addressing and model
 preview. It does NOT contain or promise access to a hosted text-to-image model.

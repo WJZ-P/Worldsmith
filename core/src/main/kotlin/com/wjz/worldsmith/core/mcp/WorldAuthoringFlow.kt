@@ -58,7 +58,7 @@ object WorldAuthoringFlow {
             val repair=report!=null || problem.code=="AUTHORING_ALIGNMENT_THEME_TITLE_MISMATCH"
             val affected=brief?.criteria?.filter {c->report?.checks?.any {it.criterionId==c.id && it.status==ReviewCheckStatus.BLOCKED}==true}?.map {it.target}.orEmpty().ifEmpty {brief?.targets.orEmpty()}
             val modules=affected.mapNotNull {target->mapOf("theme" to "theme","terrain" to "terrain","biome" to "biomes","feature" to "features",
-                "block" to "blocks","block_item" to "blocks","item" to "items","creature" to "creatures","quest" to "quests")[target.kind]}.distinct()
+                "block" to "blocks","block_item" to "blocks","item" to "items","creature" to "creatures","quest" to "quests","mechanic" to "mechanics")[target.kind]}.distinct()
             val tool=if(repair) {
                 if(problem.code=="AUTHORING_ALIGNMENT_THEME_TITLE_MISMATCH" || modules.isNotEmpty())"worldsmith_put_content_modules" else "worldsmith_put_architecture_draft"
             } else if(subject==null)"worldsmith_put_module_briefs" else "worldsmith_get_authoring_review_context"
@@ -119,7 +119,7 @@ object WorldAuthoringFlow {
                     "terrain" -> add(ContentKey("terrain","main"))
                     "theme" -> add(ContentKey("theme",document["id"]?.jsonPrimitive?.content ?: "main"))
                     else -> {
-                        val kind=mapOf("biomes" to "biome","features" to "feature","blocks" to "block","items" to "item","creatures" to "creature","quests" to "quest")[module]
+                        val kind=mapOf("biomes" to "biome","features" to "feature","blocks" to "block","items" to "item","creatures" to "creature","quests" to "quest","mechanics" to "mechanic")[module]
                         if(kind!=null)document[module]?.jsonArray?.forEach {it.jsonObject["id"]?.jsonPrimitive?.content?.let {id->add(ContentKey(kind,id))}}
                     }
                 }

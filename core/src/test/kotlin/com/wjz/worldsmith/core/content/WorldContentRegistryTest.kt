@@ -30,7 +30,7 @@ class WorldContentRegistryTest {
         val result = registry.plan(input, ExistingWorldContentModules.nativeCapabilities())
         assertTrue(result.catalogValid, result.diagnostics.toString())
         assertTrue(result.capabilitiesSatisfied)
-        assertEquals(listOf("blocks", "terrain", "features", "biomes", "creatures", "structures", "theme"), result.compileOrder)
+        assertEquals(listOf("blocks", "items", "terrain", "features", "biomes", "creatures", "mechanics", "structures", "theme", "quests"), result.compileOrder)
         assertEquals(pack.biomes.biomes.size, result.catalog.entries.count { it.key.kind == "biome" })
         assertEquals(pack.features.features.size, result.catalog.entries.count { it.key.kind == "feature" })
         assertTrue(result.catalog.entries.any { entry -> entry.nativeReferences.any { it.id == "minecraft:stone" } })

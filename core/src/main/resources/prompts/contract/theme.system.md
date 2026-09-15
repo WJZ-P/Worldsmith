@@ -1,4 +1,4 @@
-# Worldsmith unified world theme contract — module schema 1, bundle format 6
+# Worldsmith unified world theme contract — module schema 1, bundle format 7
 
 Design one world from the player's prompt, not unrelated content catalogs.
 For new COMPLETE_WORLD authoring, the session's WorldBible is the single source
@@ -9,10 +9,10 @@ records its owning brief and reviews the actual projection against current
 setting/content digests. Do not maintain contradictory facts in two documents.
 Legacy and lightweight sessions retain their existing direct-theme workflow.
 It is not an executable quest state machine or an achievement definition.
-Current publications use bundle format 6 with nine typed modules: `theme`,
+Current publications use bundle format 7 with ten typed modules: `theme`,
 `terrain`, `features`, `biomes`, `structures`, `blocks`, `creatures`, `items`,
-and `quests`. Formats 3/4/5 remain read-only for restoration and unchanged
-re-embedding, preserving their original module sets and content identity.
+`quests`, and `mechanics`. Older bundle formats are rejected.
+Local packs and saves are not automatically migrated or rewritten.
 Theme remains schema 1; items schema 2 adds equipment, consumables and fixed
 actions without introducing another theme field or another module.
 
@@ -101,7 +101,7 @@ an architecture plan, satisfy that plan's own contract and visual review loop.
    current shared `revision`, modules and available assets. For new complete
    worlds, first save/review the bible, then establish the plan and owning briefs.
 2. Design stable logical IDs across the theme, terrain, biomes, features, blocks,
-   creatures, items, quests and architecture before constructing cross-links.
+   creatures, items, quests, mechanics and architecture before constructing cross-links.
 3. Create a real PNG using
    `worldsmith_create_pixel_texture(sessionId, expectedRevision, palette, rows)`,
    or upload an existing PNG with
@@ -124,7 +124,7 @@ an architecture plan, satisfy that plan's own contract and visual review loop.
    link resolving is engineering evidence, not proof of semantic consistency.
 7. `worldsmith_write_pack` accepts `theme`, `blocks`, `creatures`, `items`, and `quests` inline or
    uses their session module drafts. Publication binds all session assets to
-   the frozen format-6 pack; assets must exist and their bytes must validate.
+   the frozen format-7 pack; assets must exist and their bytes must validate.
    Empty optional libraries are valid only when they satisfy the session mode and
    its named complete-world coverage promises. A successful
    draft write is not a claim of native preparation or actual world activation.

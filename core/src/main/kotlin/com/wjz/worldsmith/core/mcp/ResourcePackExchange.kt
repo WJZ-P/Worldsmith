@@ -140,7 +140,7 @@ class ResourcePackExchange(packDirectory:Path) {
         pack.manifest.formatVersion,info,pack.manifest.modules.keys.sorted(),pack.manifest.assets.map {it.id}.sorted(),linkedMapOf(
             "biomes" to pack.biomes.biomes.size,"features" to pack.features.features.size,"structures" to pack.structures.structures.size,
             "blocks" to pack.blocks.blocks.size,"items" to pack.items.items.size,"creatures" to pack.creatures.creatures.size,
-            "quests" to pack.quests.quests.size,"pngAssets" to pack.manifest.assets.size,"frozenDrawings" to pack.structures.artifacts.size,
+            "quests" to pack.quests.quests.size,"mechanics" to pack.mechanics.mechanics.size,"pngAssets" to pack.manifest.assets.size,"frozenDrawings" to pack.structures.artifacts.size,
         ))
 
     private fun inboxFile(filename:String):Path {

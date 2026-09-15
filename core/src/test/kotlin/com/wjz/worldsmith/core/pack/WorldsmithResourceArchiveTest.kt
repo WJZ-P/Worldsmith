@@ -62,14 +62,14 @@ class WorldsmithResourceArchiveTest {
         return path
     }
 
-    @Test fun `single file preserves nine modules PNG frozen drawing and inert provenance`() {
+    @Test fun `single file preserves ten modules PNG frozen drawing and inert provenance`() {
         val source = assets()
         val path = temp.resolve("world.wspack")
         val info = WorldsmithResourceArchive.write(source, path)
         val restored = WorldsmithResourceArchive.read(path)
         assertEquals(source.computedId, restored.pack.computedId)
         assertEquals(source.manifest.modules, restored.pack.manifest.modules)
-        assertEquals(9, restored.pack.manifest.modules.size)
+        assertEquals(10, restored.pack.manifest.modules.size)
         assertEquals(source.structures.sources, restored.pack.structures.sources)
         assertArrayEquals(source.assets.values.single(), restored.pack.assets.values.single())
         assertArrayEquals(DrawSnapshotCodec.encode(source.structures.drawingAssets.values.single()), DrawSnapshotCodec.encode(restored.pack.structures.drawingAssets.values.single()))
@@ -89,16 +89,16 @@ class WorldsmithResourceArchiveTest {
         assertEquals(a, WorldsmithResourceArchive.write(pack, first))
     }
 
-    @Test fun `legacy formats retain their own content identity`() {
+    @Test fun `old format archives are rejected before content is accepted`() {
         val base = base()
-        for (version in listOf(3, 4)) {
-            val names = if (version == 3) WorldContentBundleIO.LEGACY_MODULES else WorldContentBundleIO.FORMAT4_MODULES
-            val source = freeze(base.copy(manifest = base.manifest.copy(formatVersion = version, modules = base.manifest.modules.filterKeys { it in names })))
-            val path = temp.resolve("v$version.wspack")
-            WorldsmithResourceArchive.write(source, path)
-            val restored = WorldsmithResourceArchive.read(path).pack
-            assertEquals(version, restored.manifest.formatVersion)
-            assertEquals(source.computedId, restored.computedId)
+        val current = entries(base)
+        for (version in 3..6) {
+            val old = current.map { (path, bytes) -> path to if (path == "worldsmith.json")
+                WorldsmithJson.encode(base.manifest.copy(formatVersion = version)).toByteArray() else bytes }
+            val failure = assertThrows(IllegalArgumentException::class.java) { WorldsmithResourceArchive.read(zip(old, "v$version.wspack")) }
+            assertTrue(failure.message.orEmpty().contains("requires format 7"), failure.message)
+            assertThrows(IllegalArgumentException::class.java) { WorldsmithResourceArchive.write(base.copy(manifest = base.manifest.copy(formatVersion = version)), temp.resolve("out$version.wspack")) }
+            assertFalse(Files.exists(temp.resolve("out$version.wspack")))
         }
     }
 

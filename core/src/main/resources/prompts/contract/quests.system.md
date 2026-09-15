@@ -4,7 +4,7 @@ The quests module is a bounded server-owned main line, not an NPC dialogue syste
 branching quest tree, independent achievement-definition language or arbitrary gameplay script.
 Native exports project these existing quests into a vanilla advancement tab named
 after the world bundle. No additional authoring module or fields are required.
-Current new publications use bundle format 6; the quests module remains schema 1.
+Current new publications use bundle format 7; the quests module remains schema 1.
 
 ## Library and graph
 
@@ -39,6 +39,7 @@ prose are not rewritten or rejected by this new authoring gate.
 
 - `{"kind":"kill_creature","creature":"local_species_id","count":1}`
 - `{"kind":"deliver_item","item":"worldsmith:item/local_item_id","count":4}`
+- `{"kind":"activate_mechanic","mechanic":"local_mechanic_id","count":1}`
 
 Counts are 1..1024. Kill references name real custom species, not generic native
 hosts. Item references use real native items, `worldsmith:content/<blockId>` or
@@ -46,7 +47,27 @@ hosts. Item references use real native items, `worldsmith:content/<blockId>` or
 
 A root is initially active. The next quest unlocks after its predecessor is CLAIMED,
 not merely after its objectives become READY. Only the active/unclaimed quest gains
-progress. There is no retroactive credit for kills before a quest unlocks.
+kill/delivery progress. There is no retroactive credit for kills before a quest unlocks.
+
+Activation names an actual mechanics definition and observes only successful
+committed activations attributed to this player. Matching a pattern, an attempted
+use or quest prose does not count. The mechanic executes independently of quest
+unlocks; the quest never drives or replays its actions. Previously committed
+activations are retained and credited when a later objective unlocks, so a
+one-shot device used earlier cannot make its later quest permanently impossible.
+Use `activation_objective` from quest to mechanic in the design plan and review
+the real mechanic event/cost/state/action fields plus material acquisition.
+Independent anchor positions may activate the same mechanic ID; count names
+committed activations, not unique world-wide bosses.
+
+Unlocked/ready/claimed activation objectives also expose rule-derived mechanic
+guides, including multiple targets in one quest. The link uses the stable mechanic
+ID, never its display name; missing or incomplete construction does not hide it.
+Locked quests offer no deep-link. Material lists, per-Y construction layers,
+costs and effects come from the frozen rule, not authored duplicate instructions.
+Optional aimed-anchor inspection is read-only and has separate server permission,
+reach and loaded-area checks. Quest descriptions should still explain where to
+find the actual device and sources of its materials; the guide creates neither.
 
 ## Two explicit player actions
 
@@ -96,7 +117,7 @@ Its delivery and claim buttons send requests; the server decides and reports mis
 materials, full inventory, lock state and stale revisions. The journal is a simple
 local-world UI, not a full quest-tree editor or a remote asset-negotiation feature.
 The journal has no manual refresh button or idle polling: opening it gets a
-snapshot, delivery/claim replies carry the resulting state, and kill changes are
+snapshot, delivery/claim replies carry the resulting state, and kill/activation changes are
 coalesced into server pushes. Its list fits at least four entries in normal GUI
 heights while remaining responsive on small windows.
 
@@ -114,7 +135,7 @@ objectives. Vanilla visibility gradually reveals the chain. Empty quest librarie
 produce no root/tab. IDs are isolated by the immutable bundle hash.
 
 Each task has server-granted `objectives_met` and `claimed` conditions, both required.
-Meeting kill/delivery objectives alone does not complete the advancement: the player
+Meeting kill/delivery/activation objectives alone does not complete the advancement: the player
 claims in the journal, and only a successful inventory/state commit lights the node.
 Advancement definitions contain no XP, loot, recipes or function rewards. The
 existing quest attachment remains authoritative; manually granting an advancement
@@ -133,8 +154,5 @@ complete quests library via `worldsmith_put_content_modules` at expectedRevision
 it shares the existing session revision. Link the world content, then use normal
 write/finish publication. MCP edits definitions, not a player's earned progress.
 
-New bundles use format 6 with the same ninth quests module. Formats 3/4/5 remain
-read-only for restoration and unchanged re-embedding: formats 3/4 retain empty
-quests, while format 5 retains its real main line and ordinary schema-1 items.
-Their original module sets/hash domains and player progress remain intact. No
-old save is silently upgraded or passed through the new authoring prose gate.
+New bundles use format 7 with ten typed modules including quests and mechanics.
+Older bundle formats are rejected. No old save is silently upgraded or rewritten.

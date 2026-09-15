@@ -308,6 +308,7 @@ object WorldAuthoringPolicy {
                 "creatures" -> McpJson.encode(McpJson.decode<CreatureLibrary>(raw))
                 "items" -> McpJson.encode(McpJson.decode<CustomItemLibrary>(raw))
                 "quests" -> McpJson.encode(McpJson.decode<QuestLibrary>(raw))
+                "mechanics" -> McpJson.encode(McpJson.decode<WorldMechanicLibrary>(raw))
                 else -> raw
             }.jsonObject }.getOrDefault(raw))
         }
@@ -331,6 +332,7 @@ object WorldAuthoringPolicy {
         "creature" -> "creatures"
         "item" -> "items"
         "quest" -> "quests"
+        "mechanic" -> "mechanics"
         "theme", "narrative_beat" -> "theme"
         else -> null
     }
@@ -339,7 +341,7 @@ object WorldAuthoringPolicy {
     private fun actualTargets(documents: Map<String, JsonObject>): Set<ContentKey> = buildSet {
         if ("terrain" in documents) add(ContentKey("terrain", "main"))
         documents["theme"]?.get("id")?.let { (it as? JsonPrimitive)?.contentOrNull }?.let { add(ContentKey("theme", it)) }
-        mapOf("biomes" to "biome", "features" to "feature", "blocks" to "block", "creatures" to "creature", "items" to "item", "quests" to "quest", "structures" to "structure").forEach { (module, kind) ->
+        mapOf("biomes" to "biome", "features" to "feature", "blocks" to "block", "creatures" to "creature", "items" to "item", "quests" to "quest", "mechanics" to "mechanic", "structures" to "structure").forEach { (module, kind) ->
             (documents[module]?.get(module) as? JsonArray).orEmpty().forEach { value ->
                 ((value as? JsonObject)?.get("id") as? JsonPrimitive)?.contentOrNull?.let { add(ContentKey(kind, it)) }
             }

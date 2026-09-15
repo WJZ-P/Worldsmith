@@ -1,6 +1,6 @@
 package com.wjz.worldsmith.core.mcp
 
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -88,7 +88,16 @@ class McpHttpServerTest {
                 """{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"${WorldsmithWorkflow.BEGIN_TOOL}","arguments":{"prompt":"a glass desert"}}}""",
             )
             val structured = begun.getValue("result").jsonObject.getValue("structuredContent").jsonObject
-            assertEquals(WorldsmithWorkflow.TEMPLATE_TOOL, structured.getValue("nextTool").jsonPrimitive.content)
+            assertEquals(WorldsmithWorkflow.CONTRACT_TOOL, structured.getValue("nextTool").jsonPrimitive.content)
+            val next = structured.getValue("nextArguments").jsonObject
+            assertEquals("grand_world", next.getValue("id").jsonPrimitive.content)
+            assertEquals("world-atlas", next.getValue("section").jsonPrimitive.content)
+            val contract = post(endpoint, buildJsonObject {
+                put("jsonrpc", "2.0"); put("id", 5); put("method", "tools/call")
+                putJsonObject("params") { put("name", WorldsmithWorkflow.CONTRACT_TOOL); put("arguments", next) }
+            }.toString()).getValue("result").jsonObject.getValue("structuredContent").jsonObject
+            assertEquals("world-atlas", contract.getValue("section").jsonPrimitive.content)
+            assertTrue(contract.getValue("contract").jsonPrimitive.content.startsWith("## World atlas"))
             assertTrue(structured.getValue("sessionId").jsonPrimitive.content.isNotBlank())
         }
     }

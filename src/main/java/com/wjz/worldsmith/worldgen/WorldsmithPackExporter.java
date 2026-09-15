@@ -246,7 +246,9 @@ public final class WorldsmithPackExporter {
 		TagKey<WorldPreset> normal = WorldPresetTags.NORMAL;
 		writeJson(
 			elementPath(root, normal.location(), Registries.tagsDirPath(Registries.WORLD_PRESET)),
-			tagFile(Set.of(pack.worldPresetKey().identifier()))
+			// Match datagen: the unscoped built-in fixture is hidden from the new-world menu.
+			// Explicitly exported authored packs retain their own discoverable preset.
+			tagFile(pack.scoped() ? Set.of(pack.worldPresetKey().identifier()) : Set.of())
 		);
 		return written + 1;
 	}

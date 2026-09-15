@@ -1,10 +1,14 @@
 # Worldsmith World Design
 
-One current Worldsmith format 6 pack freezes nine typed modules: `theme`, `terrain`,
-`biomes`, `features`, `structures`, `blocks`, `creatures`, `items`, and `quests`.
-Each has its own contract. `architecture` coordinates building groups, independent
+One current Worldsmith format 7 pack freezes ten typed modules: `theme`, `terrain`,
+`biomes`, `features`, `structures`, `blocks`, `creatures`, `items`, `quests`, and `mechanics`.
+Each has its own contract. Mechanics compose actual player placement or main-hand
+use with a block pattern, item cost, anchor state and typed actions; read
+`worldsmith_get_content_contract(module="mechanics")` for executable interactions.
+A WorldBible RULE or a narrative beat alone never executes one.
+ `architecture` coordinates building groups, independent
 structures, a theme-defining landmark and readable interiors; it is an authoring
-contract, not a tenth bundle module. This page connects their responsibilities.
+contract, not an additional bundle module. This page connects their responsibilities.
 
 ## Plan the whole world before multiplying assets
 
@@ -82,7 +86,7 @@ worker, inspect returned model images, revise, and attach frozen drawing ids to
 contract/structure metadata. Required and optional roles must match actual assembly variants;
 every occupied indoor space needs authored readable night lighting. Blueprints own
 geometry/material choices; placement references real biome ids. Validate the complete
-architecture before publication. Format 6 freezes all nine typed modules, PNG assets, SDK geometry, metadata and source provenance. Formats 1/2 require regeneration; formats 3/4/5 retain their original read-only identities. Native export/readback and activation precede completion. No network or AI calls occur during chunk generation. A validated
+architecture before publication. Format 7 freezes all ten typed modules, PNG assets, SDK geometry, metadata and source provenance. Older bundle formats are rejected; local packs and saves are not rewritten. Native export/readback and activation precede completion. No network or AI calls occur during chunk generation. A validated
 landmark plan is not proof of a placed instance.
 
 
@@ -110,10 +114,10 @@ new complete-world flow, derive theme from the reviewed WorldBible: the existing
 runtime theme is a bounded projection, not a second editable fact source. Its
 premise, player role, rules, conflict and beats must agree with the authoring
 basis and link to actual content. Review that projection through its owning brief.
-Narrative beats preserve creative intent; a separate linear quests module can make explicit kill/delivery goals executable; existing quests project into native advancements after reward claims; independent achievement authoring remains uninstalled.
+Narrative beats preserve creative intent; a separate linear quests module can make explicit kill/delivery/committed-activation goals executable; existing quests project into native advancements after reward claims; independent achievement authoring remains uninstalled.
 
 Use `worldsmith_put_content_modules` for complete typed theme, terrain, features,
-biomes, blocks, creatures, world-bound items and quests documents. Architecture and frozen Java drawings keep
+biomes, blocks, creatures, world-bound items, quests and mechanics documents. Architecture and frozen Java drawings keep
 their dedicated tools. All changes use the SAME durable session revision: read
 `worldsmith_get_content_draft`, send expectedRevision, and keep returned revisions.
 A conflict means re-read/merge; never silently overwrite another agent's draft.
@@ -132,7 +136,7 @@ reviews against actual modules, drawings and referenced assets, not just plans.
 `worldsmith_write_pack` and `worldsmith_finish_world` recheck authoring provenance
 and the existing engineering gates. Repeated identical blockers on the same input
 have at most three automatic repair attempts; report the unresolved decision
-instead of repeatedly self-approving. `worldsmith_write_pack` freezes a format-6 bundle with all nine
+instead of repeatedly self-approving. `worldsmith_write_pack` freezes a format-7 bundle with all ten
 modules and its verified PNGs at expectedRevision. `worldsmith_finish_world`
 reports native preparation/activation separately; a real Create World selection
 owns any required data/resource reload and preset activation. Do not reload the
@@ -140,7 +144,7 @@ whole client merely to inspect or validate a pack.
 Bundles and slot assignments are embedded in the native datapack carried by the
 save. Runtime has no AI/network calls during chunk generation or entity ticks.
 Current generated content targets one local integrated-server world; remote
-asset/binding negotiation is not installed. Formats 1/2 require regeneration; formats 3/4/5 remain read-only with their original identities.
+asset/binding negotiation is not installed. Older bundle formats are rejected; local packs and saves are not rewritten.
 
 For creature construction, prefer `worldsmith_get_creature_authoring_contract` and
 `worldsmith_build_creature` for named bones/cubes, mirrored limbs and automatic UVs.

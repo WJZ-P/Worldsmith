@@ -3,15 +3,6 @@ package com.wjz.worldsmith.core.model
 import kotlinx.serialization.Serializable
 import com.wjz.worldsmith.core.structure.StructureLibrary
 import com.wjz.worldsmith.core.content.*
-import kotlinx.serialization.Transient
-
-@Serializable
-data class WorldsmithPackFiles(
-    val terrain: String = "terrain.json",
-    val biomes: String = "biomes.json",
-    val features: String = "features.json",
-    val structures: String = "structures.json",
-)
 
 @Serializable
 data class WorldsmithModuleFile(val schemaVersion: Int, val path: String)
@@ -22,7 +13,6 @@ data class WorldsmithPackManifest @JvmOverloads constructor(
     val id: String,
     val displayName: String,
     val description: String,
-    @Transient val files: WorldsmithPackFiles = WorldsmithPackFiles(),
     val modules: Map<String, WorldsmithModuleFile> = emptyMap(),
     val assets: List<ContentAsset> = emptyList(),
     /** Display metadata only; resolves to an existing item/block icon without activating its world. */
@@ -44,10 +34,12 @@ class WorldsmithPack @JvmOverloads constructor(
     assets: Map<String, ByteArray> = emptyMap(),
     items: CustomItemLibrary = CustomItemLibrary(),
     quests: QuestLibrary = QuestLibrary(),
+    mechanics: WorldMechanicLibrary = WorldMechanicLibrary(),
 ) {
     private val frozenAssets = assets.mapValues { (_, bytes) -> bytes.copyOf() }
     val items: CustomItemLibrary = CustomItemValidation.freeze(items)
     val quests: QuestLibrary = QuestValidation.freeze(quests)
+    val mechanics: WorldMechanicLibrary = WorldMechanicValidation.freeze(mechanics)
     /** Callers never receive the immutable bundle's backing bytes. */
     val assets: Map<String, ByteArray> get() = frozenAssets.mapValues { (_, bytes) -> bytes.copyOf() }
 
@@ -55,6 +47,7 @@ class WorldsmithPack @JvmOverloads constructor(
         biomes: BiomePlan = this.biomes, features: FeatureLibrary = this.features, computedId: String = this.computedId,
         structures: StructureLibrary = this.structures, theme: WorldTheme = this.theme,
         blocks: CustomBlockLibrary = this.blocks, creatures: CreatureLibrary = this.creatures,
-        assets: Map<String, ByteArray> = this.assets, items: CustomItemLibrary = this.items, quests: QuestLibrary = this.quests) =
-        WorldsmithPack(manifest, terrain, biomes, features, computedId, structures, theme, blocks, creatures, assets, items, quests)
+        assets: Map<String, ByteArray> = this.assets, items: CustomItemLibrary = this.items, quests: QuestLibrary = this.quests,
+        mechanics: WorldMechanicLibrary = this.mechanics) =
+        WorldsmithPack(manifest, terrain, biomes, features, computedId, structures, theme, blocks, creatures, assets, items, quests, mechanics)
 }

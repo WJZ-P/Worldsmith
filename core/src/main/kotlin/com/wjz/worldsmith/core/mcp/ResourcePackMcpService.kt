@@ -22,7 +22,7 @@ class ResourcePackMcpService(private val exchange:ResourcePackExchange,private v
                 "Read one plain .wspack filename from the dedicated inbox. Validate archive paths/budgets, bundle SHA, typed modules, PNGs and references without importing, activating or executing archived code.",
                 filename,true,handler={a->result("inspect") {exchange.inspect(McpJson.string(a,"filename"))}}),
             McpTool("worldsmith_import_resource_pack","Import a validated single-file resource pack",
-                "Import one .wspack inbox filename as the original immutable bundle. Writes reusable PNG blobs before publishing its hash directory. Existing identical content keeps its saved display metadata; formats 3/4 remain read-only. Does not edit a session or activate a world.",
+                "Import one .wspack inbox filename as the original immutable bundle. Writes reusable PNG blobs before publishing its hash directory. Existing identical content keeps its saved display metadata; only current format 7 is accepted; older formats are rejected. Does not edit a session or activate a world.",
                 filename,false,idempotent=true,handler={a->result("import") {exchange.importPack(McpJson.string(a,"filename"))}}),
             McpTool("worldsmith_export_resource_pack","Export a saved bundle as one reusable file",
                 "Export a managed bundle id to the dedicated exports directory. Optional plain .wspack filename defaults to <id>.wspack. Includes frozen drawings, source provenance and PNGs; incompatible existing files are preserved rather than overwritten. No source execution or activation.",

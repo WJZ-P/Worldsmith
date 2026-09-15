@@ -26,11 +26,11 @@ class ManagedPackStore(packDirectory:Path) {
     }
 
     fun persist(manifest: WorldsmithPackManifest, contents: Map<String, String>, binaries: Map<String,ByteArray> = emptyMap()): Path {
-        require(manifest.formatVersion==com.wjz.worldsmith.core.pack.WorldContentBundleIO.FORMAT_VERSION) { "New managed bundles must use the current writer format; legacy formats 3/4 are read-only" }
+        require(manifest.formatVersion==com.wjz.worldsmith.core.pack.WorldContentBundleIO.FORMAT_VERSION) { "Managed bundles must use current format 7; older formats are rejected" }
         return persistVerified(manifest,contents,binaries)
     }
 
-    /** Import is preservation, not a legacy writer: retain the validated archive's original version and hash. */
+    /** Import preserves a validated current-format archive and its content identity. */
     fun importValidated(pack:WorldsmithPack):Path {
         val diagnostics=WorldsmithPackValidator.validate(pack)
         require(diagnostics.none {it.severity==DiagnosticSeverity.ERROR}) {

@@ -21,8 +21,10 @@ data class DesignInventory(
     /** Per-structure upper bounds from frozen plans; mutually exclusive variants are not added together. */
     val structureSupplies: Map<String, Map<ContentKey, Long>> = emptyMap(),
     val structureCreatures: Set<String> = emptySet(),
+    val mechanicCreatures: Set<String> = emptySet(),
+    val reachableMechanics: Set<String> = emptySet(),
 ) {
-    val encounterCreatures: Set<String> get() = naturalCreatures + structureCreatures
+    val encounterCreatures: Set<String> get() = naturalCreatures + structureCreatures + mechanicCreatures
 }
 
 object WorldDesignCoverage {
@@ -36,12 +38,16 @@ object WorldDesignCoverage {
             read("features") { McpJson.decode<FeatureLibrary>(it) }, read("blocks") { McpJson.decode<CustomBlockLibrary>(it) },
             read("items") { McpJson.decode<CustomItemLibrary>(it) }, read("creatures") { McpJson.decode<CreatureLibrary>(it) },
             read("quests") { McpJson.decode<QuestLibrary>(it) }, read("theme") { McpJson.decode<WorldTheme>(it) },
-            session.structureLibrary(), false, errors,
+            session.structureLibrary(), false, errors, read("mechanics") { McpJson.decode<WorldMechanicLibrary>(it) },
         )
     }
 
-    fun frozen(pack: WorldsmithPack): DesignInventory = inventory(pack.terrain, pack.biomes, pack.features, pack.blocks,
-        pack.items, pack.creatures, pack.quests, pack.theme, pack.structures, true, emptyMap())
+    fun frozen(pack: WorldsmithPack): DesignInventory {
+        val raw = inventory(pack.terrain, pack.biomes, pack.features, pack.blocks,
+            pack.items, pack.creatures, pack.quests, pack.theme, pack.structures, true, emptyMap(), pack.mechanics)
+        val proof = WorldMechanicReachability.analyze(pack, raw)
+        return raw.copy(mechanicCreatures = proof.creatures, reachableMechanics = proof.mechanics)
+    }
 
     fun validate(pack: WorldsmithPack, plan: WorldDesignPlan, requireBoss: Boolean = true): List<Diagnostic> {
         val result = WorldDesignPlans.validate(plan, requireBoss = requireBoss).toMutableList()
@@ -71,18 +77,24 @@ object WorldDesignCoverage {
             if (link !in actual.links && (strictGeometry || link.relation !in setOf(DesignRelation.USES_BLOCK, DesignRelation.CONTAINS_REWARD) || link.from.kind != "structure"))
                 error("designPlan.links[$i]", "DESIGN_LINK_MISSING", "Promised ${link.relation}: ${link.from.kind}/${link.from.id} -> ${link.to.kind}/${link.to.id} is absent from the actual content")
         }
+        // Drafts report configured relationships only; material/state reachability is proved on the frozen pack.
+        fun hasEncounter(id: String) = id in actual.encounterCreatures || !strictGeometry && actual.links.any {
+            it.relation == DesignRelation.SPAWNS_CREATURE && it.to == ContentKey("creature", id)
+        }
         plan.targets.filter { it.key in actual.symbols }.forEach { target ->
             val key = target.key
             when (key.kind) {
+                "mechanic" -> if (strictGeometry && key.id !in actual.reachableMechanics)
+                    error("designPlan.targets[${plan.targets.indexOf(target)}]", "DESIGN_MECHANIC_UNREACHABLE", "Planned mechanic '${key.id}' has no reachable initial-state activation route with obtainable inputs; a rule declaration alone is not an executable encounter route")
                 "block" -> if (strictGeometry && actual.links.none { it.relation == DesignRelation.USES_BLOCK && it.to == key })
                     error("designPlan.targets", "DESIGN_BLOCK_UNUSED", "Planned block '${key.id}' is not used by a world material or compiled structure voxel; an unused palette entry does not count")
-                "creature" -> if (key.id !in actual.encounterCreatures)
-                    error("designPlan.targets", "DESIGN_CREATURE_UNPLACED", "Planned creature '${key.id}' has no positive natural habitat or valid structure encounter in a defined biome")
+                "creature" -> if (!hasEncounter(key.id))
+                    error("designPlan.targets", "DESIGN_CREATURE_UNPLACED", "Planned creature '${key.id}' has no positive natural habitat, valid structure encounter or reachable mechanic summon")
                 "item" -> {
-                    val producers = actual.links.filter { it.to == key && it.relation in setOf(DesignRelation.DROPS_ITEM, DesignRelation.CONTAINS_REWARD, DesignRelation.QUEST_REWARD) }
-                    if (strictGeometry && producers.isEmpty()) error("designPlan.targets", "DESIGN_ITEM_UNOBTAINABLE", "Planned item '${key.id}' has no configured creature, structure or quest reward producer")
-                    if (actual.links.none { it.to == key && it.relation in setOf(DesignRelation.DELIVERY_OBJECTIVE, DesignRelation.QUEST_REWARD, DesignRelation.THEME_ANCHOR) })
-                        error("designPlan.targets", "DESIGN_ITEM_UNCONNECTED", "Planned item '${key.id}' has no delivery objective, quest reward role or concrete theme anchor")
+                    val producers = actual.links.filter { it.to == key && it.relation in setOf(DesignRelation.DROPS_ITEM, DesignRelation.CONTAINS_REWARD, DesignRelation.QUEST_REWARD, DesignRelation.GRANTS_ITEM) }
+                    if (strictGeometry && producers.isEmpty()) error("designPlan.targets", "DESIGN_ITEM_UNOBTAINABLE", "Planned item '${key.id}' has no configured creature, structure, quest or mechanic reward producer")
+                    if (actual.links.none { it.to == key && it.relation in setOf(DesignRelation.DELIVERY_OBJECTIVE, DesignRelation.QUEST_REWARD, DesignRelation.THEME_ANCHOR, DesignRelation.CONSUMES_ITEM, DesignRelation.GRANTS_ITEM) })
+                        error("designPlan.targets", "DESIGN_ITEM_UNCONNECTED", "Planned item '${key.id}' has no delivery objective, quest/mechanic reward or consumption role, or concrete theme anchor")
                 }
                 "quest" -> if (key.id !in actual.themedQuests)
                     error("designPlan.targets", "DESIGN_QUEST_UNTHEMED", "Planned quest '${key.id}' must bind to an existing narrative beat through themeBeat")
@@ -90,7 +102,7 @@ object WorldDesignCoverage {
         }
         plan.bosses.forEachIndexed { i, boss ->
             if (boss.creature !in actual.bosses) error("designPlan.bosses[$i]", "DESIGN_BOSS_PROFILE_MISSING", "'${boss.creature}' needs an actual schema-2 Boss profile; high health or a Boss-looking name is not a Boss profile")
-            if (boss.creature !in actual.encounterCreatures) error("designPlan.bosses[$i]", "DESIGN_BOSS_UNREACHABLE", "Boss '${boss.creature}' has no positive natural habitat or valid structure encounter")
+            if (!hasEncounter(boss.creature)) error("designPlan.bosses[$i]", "DESIGN_BOSS_UNREACHABLE", "Boss '${boss.creature}' has no positive natural habitat, valid structure encounter or reachable mechanic summon")
             if (DesignLink(ContentKey("quest", boss.quest), ContentKey("creature", boss.creature), DesignRelation.KILL_OBJECTIVE) !in actual.links)
                 error("designPlan.bosses[$i]", "DESIGN_BOSS_QUEST_MISSING", "Quest '${boss.quest}' does not actually require defeating Boss '${boss.creature}'")
         }
@@ -98,7 +110,7 @@ object WorldDesignCoverage {
 
     private fun inventory(terrain: TerrainPlan?, biomes: BiomePlan?, features: FeatureLibrary?, blocks: CustomBlockLibrary?,
         items: CustomItemLibrary?, creatures: CreatureLibrary?, quests: QuestLibrary?, theme: WorldTheme?, structures: StructureLibrary,
-        frozen: Boolean, errors: Map<String, String>): DesignInventory {
+        frozen: Boolean, errors: Map<String, String>, mechanics: WorldMechanicLibrary?): DesignInventory {
         val symbols = linkedSetOf<ContentKey>(); val links = linkedSetOf<DesignLink>()
         val textures = linkedMapOf<ContentKey, Set<String>>(); val drawings = linkedSetOf<String>()
         val bosses = linkedSetOf<String>(); val spawned = linkedSetOf<String>(); val themed = linkedSetOf<String>()
@@ -156,12 +168,28 @@ object WorldDesignCoverage {
             if (creatures?.schemaVersion in 2..3 && profile is JsonObject) bosses += value.id
             value.drops.filter { it.chance > 0 && it.maxCount > 0 }.forEach { drop -> item(drop.item)?.let { link(owner, it, DesignRelation.DROPS_ITEM) } }
         }
+        mechanics?.mechanics.orEmpty().forEach { value ->
+            val owner = key("mechanic", value.id); symbols += owner
+            value.rules.forEach { rule ->
+                rule.pattern.forEach { cell ->
+                    block(cell.block.block)?.let { link(owner, it, DesignRelation.USES_BLOCK) }
+                    if (cell.consume) item(cell.block.block)?.let { link(owner, it, DesignRelation.CONSUMES_ITEM) }
+                }
+                rule.heldItem?.let { cost -> item(cost.item)?.let { link(owner, it, DesignRelation.CONSUMES_ITEM) } }
+                rule.actions.forEach { action -> when (action) {
+                    is MechanicAction.SetBlock -> block(action.block.block)?.let { link(owner, it, DesignRelation.USES_BLOCK) }
+                    is MechanicAction.SpawnCreature -> link(owner, key("creature", action.creature), DesignRelation.SPAWNS_CREATURE)
+                    is MechanicAction.GiveItem -> if (action.count > 0) item(action.item)?.let { link(owner, it, DesignRelation.GRANTS_ITEM) }
+                } }
+            }
+        }
         val beatIds = theme?.beats.orEmpty().map { it.id }.toSet()
         quests?.quests.orEmpty().forEach { value ->
             val owner = key("quest", value.id); symbols += owner
             value.prerequisites.forEach { link(owner, key("quest", it), DesignRelation.PREREQUISITE) }
             value.objectives.forEach { objective -> when (objective) {
                 is QuestObjective.KillCreature -> link(owner, key("creature", objective.creature), DesignRelation.KILL_OBJECTIVE)
+                is QuestObjective.ActivateMechanic -> link(owner, key("mechanic", objective.mechanic), DesignRelation.ACTIVATION_OBJECTIVE)
                 is QuestObjective.DeliverItem -> item(objective.item)?.let { link(owner, it, DesignRelation.DELIVERY_OBJECTIVE) }
             } }
             value.rewards.filter { it.count > 0 }.forEach { reward -> item(reward.item)?.let { link(owner, it, DesignRelation.QUEST_REWARD) } }

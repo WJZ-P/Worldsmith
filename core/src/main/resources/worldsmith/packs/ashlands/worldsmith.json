@@ -1,6 +1,6 @@
 {
-  "formatVersion": 5,
-  "id": "427dda88756492382537b3f099ace276f20cc949a7f9013fdc50978d89ece074",
+  "formatVersion": 7,
+  "id": "6b9c814bdeeeb9299866c3f365ae01a4630676f692dc745fc8a975078b6a49f2",
   "displayName": "Ashlands",
   "description": "A wind-scoured industrial wasteland used by the procedural terrain compiler fixture.",
   "modules": {
@@ -39,6 +39,10 @@
     "quests": {
       "schemaVersion": 1,
       "path": "quests.json"
+    },
+    "mechanics": {
+      "schemaVersion": 1,
+      "path": "mechanics.json"
     }
   },
   "assets": []

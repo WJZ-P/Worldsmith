@@ -32,17 +32,21 @@ data class WorldDesignPlan(
     @SerialName("contains_reward") CONTAINS_REWARD,
     @SerialName("contains_encounter") CONTAINS_ENCOUNTER,
     @SerialName("kill_objective") KILL_OBJECTIVE,
+    @SerialName("activation_objective") ACTIVATION_OBJECTIVE,
     @SerialName("delivery_objective") DELIVERY_OBJECTIVE,
     @SerialName("quest_reward") QUEST_REWARD,
     @SerialName("prerequisite") PREREQUISITE,
     @SerialName("theme_anchor") THEME_ANCHOR,
+    @SerialName("consumes_item") CONSUMES_ITEM,
+    @SerialName("grants_item") GRANTS_ITEM,
+    @SerialName("spawns_creature") SPAWNS_CREATURE,
 }
 
 object WorldDesignPlans {
     const val MAX_TARGETS = 512
     const val MAX_LINKS = 2048
     private val requiredKinds = setOf("biome", "structure", "creature", "block", "item", "quest")
-    private val targetKinds = requiredKinds + setOf("terrain", "anchor", "feature", "blueprint", "theme", "narrative_beat")
+    private val targetKinds = requiredKinds + setOf("mechanic", "terrain", "anchor", "feature", "blueprint", "theme", "narrative_beat")
     private val ambientKinds = setOf("terrain", "anchor", "feature", "blueprint", "theme", "narrative_beat")
 
     fun validate(plan: WorldDesignPlan, completeWorld: Boolean = true, requireBoss: Boolean = true): List<Diagnostic> = buildList {
@@ -94,13 +98,16 @@ object WorldDesignPlans {
         return when (link.relation) {
             DesignRelation.PLACED_IN_BIOME -> from == "structure" && to == "biome"
             DesignRelation.SPAWNS_IN_BIOME -> from == "creature" && to == "biome"
-            DesignRelation.USES_BLOCK -> from in setOf("terrain", "biome", "feature", "structure") && to == "block"
+            DesignRelation.USES_BLOCK -> from in setOf("terrain", "biome", "feature", "structure", "mechanic") && to == "block"
             DesignRelation.USES_FEATURE -> from == "biome" && to == "feature"
             DesignRelation.DROPS_ITEM -> from == "creature" && to in setOf("item", "block_item")
             DesignRelation.CONTAINS_REWARD -> from == "structure" && to in setOf("item", "block_item")
             DesignRelation.CONTAINS_ENCOUNTER -> from == "structure" && to == "creature"
             DesignRelation.KILL_OBJECTIVE -> from == "quest" && to == "creature"
+            DesignRelation.ACTIVATION_OBJECTIVE -> from == "quest" && to == "mechanic"
             DesignRelation.DELIVERY_OBJECTIVE, DesignRelation.QUEST_REWARD -> from == "quest" && to in setOf("item", "block_item")
+            DesignRelation.CONSUMES_ITEM, DesignRelation.GRANTS_ITEM -> from == "mechanic" && to in setOf("item", "block_item")
+            DesignRelation.SPAWNS_CREATURE -> from == "mechanic" && to == "creature"
             DesignRelation.PREREQUISITE -> from == "quest" && to == "quest"
             DesignRelation.THEME_ANCHOR -> from in setOf("theme", "narrative_beat") && to in targetKinds + "block_item"
         }

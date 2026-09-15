@@ -81,7 +81,7 @@ final class BiomeCompilerTest {
 		String id = "b".repeat(64);
 		WorldsmithPackManifest oldManifest = source.getManifest();
 		WorldsmithPackManifest manifest = new WorldsmithPackManifest(
-			oldManifest.getFormatVersion(), id, "Tint fixture", "Compiler regression", oldManifest.getFiles()
+			oldManifest.getFormatVersion(), id, "Tint fixture", "Compiler regression", oldManifest.getModules(), oldManifest.getAssets()
 		);
 		BiomePlan plan = new BiomePlan(
 			source.getBiomes().getSchemaVersion(),

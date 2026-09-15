@@ -45,7 +45,7 @@ object GenerationProgressViews {
     const val MAX_AUTHORING_MARKDOWN=64*1024
     private const val MAX_INPUT_JOBS=256
     private val mainKinds=listOf("biome","structure","creature","block","item","quest")
-    private val moduleKinds=mapOf("biomes" to "biome","features" to "feature","blocks" to "block","items" to "item","creatures" to "creature","quests" to "quest")
+    private val moduleKinds=mapOf("biomes" to "biome","features" to "feature","blocks" to "block","items" to "item","creatures" to "creature","quests" to "quest","mechanics" to "mechanic")
     private val activeStages=setOf(DrawingJobStage.WAITING_APPROVAL,DrawingJobStage.QUEUED,DrawingJobStage.COMPILING,DrawingJobStage.DRAWING,DrawingJobStage.VALIDATING)
 
     @JvmStatic @JvmOverloads fun inspect(session:WorkflowSession,jobs:List<DrawingJob> = emptyList()):GenerationProgressView {

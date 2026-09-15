@@ -20,7 +20,7 @@ import java.util.zip.ZipFile
 /** Bounded configuration reads for the browser; never decodes PNGs, geometry or executable source. */
 internal object ResourcePackMetadata {
     private const val MANIFEST_LIMIT=512*1024
-    private val kinds=listOf("biomes","structures","features","blocks","creatures","items","quests")
+    private val kinds=listOf("biomes","structures","features","blocks","creatures","items","quests","mechanics")
 
     fun directory(directory:Path,manifest:WorldsmithPackManifest):ResourcePackDetails {
         var remaining=WorldContentBundleIO.MAX_TEXT_BYTES

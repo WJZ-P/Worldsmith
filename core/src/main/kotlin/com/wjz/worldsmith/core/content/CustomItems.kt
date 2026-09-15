@@ -101,7 +101,7 @@ object CustomItemValidation {
             if (item.description.length > 2048 || item.description.any { it.isISOControl() && it != '\n' }) error("$path.description", "items.description", "Description supports up to 2048 plain-text characters")
             if (item.description.lineSequence().count() > 256) error("$path.description", "items.description_lines", "Item lore supports at most 256 lines")
             if (item.themeRole.length > 2048) error("$path.themeRole", "items.theme_role", "Theme role is limited to 2048 characters")
-            if (library.schemaVersion == 1 && (item.equipment != null || item.consumable != null || item.actions.isNotEmpty())) error(path, "items.schema", "Equipment, consumption and actions require items schema 2 / bundle format 6")
+            if (library.schemaVersion == 1 && (item.equipment != null || item.consumable != null || item.actions.isNotEmpty())) error(path, "items.schema", "Equipment, consumption and actions require items schema 2")
             item.equipment?.let { e ->
                 if (item.maxStackSize != 1) error("$path.maxStackSize", "items.equipment_stack", "Equipment is non-stackable")
                 if (e.durability !in 1..100000) error("$path.equipment.durability", "items.durability", "Durability supports 1..100000")

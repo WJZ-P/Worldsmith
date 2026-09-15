@@ -1,6 +1,6 @@
-# Worldsmith custom creature contract — module schemas 1 and 2
+# Worldsmith custom creature contract — module schemas 1, 2 and 3
 
-New publications use bundle format 6. Formats 3/4/5 retain their original read-only content identities; minimum-version notes below describe when an existing feature first became available.
+New publications use bundle format 7 with required mechanics. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
 
 Create ground creatures whose silhouette, material and behavior belong to the
 same world theme. The installed runtime supports data-driven cuboid rigs,
@@ -14,8 +14,8 @@ and multipart bosses have no schema fields in this module.
 
 `CreatureLibrary` has `schemaVersion` (1 by default, or 2/3) and `creatures`.
 Schema 1 preserves ordinary creature definitions and omits `boss`. A non-null
-`boss` requires schema 2 or 3 and current bundle format 6; formats 3/4 reject Boss
-semantics rather than silently dropping them. An empty library is valid outside
+`boss` requires schema 2 or 3 and current bundle format 7. Older bundle formats
+are rejected rather than silently dropping fields. An empty library is valid outside
 a complete-world plan's named coverage promises; the maximum is 128 definitions.
 Each definition has exactly:
 
@@ -278,9 +278,9 @@ does not grant ranged attacks or other combat capabilities. Server-only broadcas
 respect Silent and the neutral/hostile volume sliders; client death/hurt animations
 do not duplicate these vocals. Model previews preserve voices but do not audition them.
 
-Legacy schema 1/2 omit sounds from canonical serialization. Live entities receive
-a deterministic name/category/body-size fallback without editing old bundles or
-save identities. Explicit sounds require bundle format 6 and creature schema 3;
+Creature schema 1/2 definitions without sounds use a deterministic
+name/category/body-size fallback. Explicit sounds require bundle format 7 and
+creature schema 3;
 schema 3 also accepts Boss fields. Preserve sounds, geometry, texture, drops and
 Boss phases during rebuilding. Merge libraries at the maximum required schema;
 never downgrade schema 3 when adding an ordinary definition. Java Builder.sounds

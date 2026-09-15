@@ -50,7 +50,7 @@ data class ContentModuleDescriptor(
     val description: String,
 )
 
-/** Draft documents for the installed modules. Format-3 manifests persist paths to these typed domains. */
+/** Draft documents for the installed modules. Format-7 manifests persist paths to these typed domains. */
 @Serializable
 data class WorldContentInput(
     val scope: String,

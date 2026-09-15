@@ -182,7 +182,7 @@ final class WorldsmithHydrologySamplingTest {
 		String id = String.valueOf(idCharacter).repeat(64);
 		WorldsmithPackManifest oldManifest = source.getManifest();
 		WorldsmithPackManifest manifest = new WorldsmithPackManifest(
-			oldManifest.getFormatVersion(), id, "Hydrology sample", "Compiler fixture", oldManifest.getFiles()
+			oldManifest.getFormatVersion(), id, "Hydrology sample", "Compiler fixture", oldManifest.getModules(), oldManifest.getAssets()
 		);
 		CompiledPack compiledPack = CompiledPack.scoped(new WorldsmithPack(
 			manifest, terrain, source.getBiomes(), source.getFeatures(), id, source.getStructures()

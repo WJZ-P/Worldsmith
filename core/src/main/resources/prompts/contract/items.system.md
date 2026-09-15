@@ -1,6 +1,6 @@
 # Worldsmith items — schema 2 equipment, consumables and a fixed action library
 
-New publications use bundle format 6 with nine typed modules. `items` may retain
+New publications use bundle format 7 with ten typed modules. `items` may retain
 schemaVersion=1 for plain resources/relics, or explicitly select schemaVersion=2
 for equipment, consumables and actions. Schema 2 is a typed capability library,
 not arbitrary scripts. Choose capabilities that deepen this world's exploration,
@@ -229,10 +229,6 @@ container. The separate quest system owns explicit delivery and once-only claims
 
 ## Compatibility
 
-New writes use format 6 and the same nine typed modules; abilities need items
-schema 2. Formats 3/4/5 remain read-only for restoration and unchanged re-embedding:
-format 3 has seven modules and no items/quests; format 4 has eight and items/drops;
-format 5 has nine, quests and supported Boss profiles, but schema-1 ordinary items.
-`LegacyItemsV1` preserves the old item projection/hash domain instead of injecting
-new default capability fields into old content identity. Existing packs, embedded
-worlds and player progress are not automatically migrated or rewritten.
+New writes use format 7 and ten typed modules; abilities need items schema 2.
+Older bundle formats are rejected. Domain schemas 1/2 remain valid inside the
+current bundle; this does not restore old hash domains or migrate local saves.

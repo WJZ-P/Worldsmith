@@ -5,7 +5,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
@@ -29,15 +28,11 @@ import com.wjz.worldsmith.core.content.CustomBlockLibrary
 import com.wjz.worldsmith.core.content.CreatureLibrary
 import com.wjz.worldsmith.core.content.CustomItemLibrary
 import com.wjz.worldsmith.core.content.QuestLibrary
-import com.wjz.worldsmith.core.pack.LegacyCreaturesV3
-import com.wjz.worldsmith.core.pack.LegacyItemsV1
+import com.wjz.worldsmith.core.content.WorldMechanicLibrary
 
 /** Computes the immutable id of the files that affect world generation. */
 object WorldsmithHashUtil {
-    private const val HASH_DOMAIN_V3 = "worldsmith-world-content-bundle-v3"
-    private const val HASH_DOMAIN_V4 = "worldsmith-world-content-bundle-v4"
-    private const val HASH_DOMAIN_V5 = "worldsmith-world-content-bundle-v5"
-    private const val HASH_DOMAIN_V6 = "worldsmith-world-content-bundle-v6"
+    private const val HASH_DOMAIN = "worldsmith-world-content-bundle-v7"
 
     @JvmStatic @JvmOverloads
     fun computeGenerationId(manifest: WorldsmithPackManifest, contents: Map<String, String>,binaries:Map<String,ByteArray> = emptyMap()): String {
@@ -45,28 +40,19 @@ object WorldsmithHashUtil {
         require(contents.size <= 1024 && contents.values.sumOf { it.toByteArray(StandardCharsets.UTF_8).size.toLong() } <= WorldContentBundleIO.MAX_TEXT_BYTES) { "Bundle text budget exceeded" }
         require(binaries.size <= 1024 && binaries.values.sumOf { it.size.toLong() } <= WorldContentBundleIO.MAX_DRAWING_BYTES + ContentAssetValidation.MAX_TOTAL_BYTES) { "Bundle binary budget exceeded" }
         val digest = MessageDigest.getInstance("SHA-256")
-        updateField(digest, "domain", when (manifest.formatVersion) {
-            WorldContentBundleIO.LEGACY_FORMAT_VERSION -> HASH_DOMAIN_V3
-            WorldContentBundleIO.PREVIOUS_FORMAT_VERSION -> HASH_DOMAIN_V4
-            5 -> HASH_DOMAIN_V5
-            else -> HASH_DOMAIN_V6
-        })
+        updateField(digest, "domain", HASH_DOMAIN)
         updateField(digest, "formatVersion", manifest.formatVersion.toString())
 
         manifest.modules.toSortedMap().forEach { (role, file) ->
             val path = file.path
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             val parsed = Json.parseToJsonElement(raw)
-            if (role == "creatures") require(WorldsmithJson.decode<CreatureLibrary>(raw).creatures.none { it.sounds != null } || manifest.formatVersion >= 6 && file.schemaVersion == 3) {
-                "Authored creature sounds require bundle format 6 and creature module schema 3"
+            if (role == "creatures") require(WorldsmithJson.decode<CreatureLibrary>(raw).creatures.none { it.sounds != null } || file.schemaVersion == 3) {
+                "Authored creature sounds require creature module schema 3"
             }
             require(parsed.jsonObject["schemaVersion"]?.jsonPrimitive?.intOrNull == file.schemaVersion) { "Module schema differs from manifest: $role" }
-            if(manifest.formatVersion==WorldContentBundleIO.PREVIOUS_FORMAT_VERSION && role=="creatures")
-                require(WorldsmithJson.decode<CreatureLibrary>(raw).creatures.none {it.boss!=null}) {"Format 4 has no Boss behavior; publish Boss profiles in format 5 with creature schema 2"}
             updateField(digest, "module:$role", file.schemaVersion.toString())
-            val normalized = if (manifest.formatVersion == WorldContentBundleIO.LEGACY_FORMAT_VERSION && role == "creatures")
-                LegacyCreaturesV3.normalize(raw) else if (role == "items" && manifest.formatVersion < 6)
-                LegacyItemsV1.normalize(raw) else normalizeTyped(role, raw)
+            val normalized = normalizeTyped(role, raw)
             updateField(digest, "$role:$path", canonicalJson(normalized))
         }
 
@@ -75,7 +61,6 @@ object WorldsmithHashUtil {
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             val blueprint = WorldsmithJson.decode<StructureBlueprint>(raw)
             if (blueprint.interactions.any { it is StructureInteraction.BossSpawner }) {
-                require(manifest.formatVersion >= 5) { "Boss spawner encounters require bundle format 5" }
                 require(index.schemaVersion == 2) { "Boss spawner encounters require structure schema 2" }
             }
             updateField(digest, "blueprint:$path", canonicalJson(WorldsmithJson.format.encodeToJsonElement(StructureBlueprint.serializer(), blueprint)))
@@ -126,13 +111,6 @@ object WorldsmithHashUtil {
         else -> element.toString()
     }
 
-    private fun normalize(role: String, element: JsonElement): JsonElement {
-        if (role == "terrain" && element is JsonObject && element["seed"] === JsonNull) {
-            return JsonObject(element - "seed")
-        }
-        return element
-    }
-
     /** Defaults and optional fields are semantic, not an accidental dependence on author JSON spelling. */
     private fun normalizeTyped(role: String, raw: String): JsonElement = when (role) {
         "terrain" -> WorldsmithJson.format.encodeToJsonElement(TerrainPlan.serializer(), WorldsmithJson.decode<TerrainPlan>(raw))
@@ -144,6 +122,7 @@ object WorldsmithHashUtil {
         "creatures" -> WorldsmithJson.format.encodeToJsonElement(CreatureLibrary.serializer(), WorldsmithJson.decode<CreatureLibrary>(raw))
         "items" -> WorldsmithJson.format.encodeToJsonElement(CustomItemLibrary.serializer(), WorldsmithJson.decode<CustomItemLibrary>(raw))
         "quests" -> WorldsmithJson.format.encodeToJsonElement(QuestLibrary.serializer(), WorldsmithJson.decode<QuestLibrary>(raw))
+        "mechanics" -> WorldsmithJson.format.encodeToJsonElement(WorldMechanicLibrary.serializer(), WorldsmithJson.decode<WorldMechanicLibrary>(raw))
         else -> error("Uninstalled content module '$role'")
     }
 }

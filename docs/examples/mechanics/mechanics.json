@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "mechanics": [
+    {
+      "id": "sentinel_assembly",
+      "displayName": "碎晶守卫构型",
+      "description": "以金块为底座，铁块搭出躯干与双臂，在顶端放置雕刻南瓜；最后补齐任一构件，祭台吞下构件，唤来碎晶守卫。每个底座位置只唤醒一次。",
+      "initialState": "idle",
+      "states": [
+        "idle",
+        "spent"
+      ],
+      "rules": [
+        {
+          "id": "complete_assembly",
+          "event": "BLOCK_PLACED",
+          "fromState": "idle",
+          "toState": "spent",
+          "rotateY": true,
+          "cooldownTicks": 20,
+          "pattern": [
+            {
+              "offset": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:gold_block"
+              },
+              "consume": false
+            },
+            {
+              "offset": {
+                "x": 0,
+                "y": 1,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:iron_block"
+              },
+              "consume": true
+            },
+            {
+              "offset": {
+                "x": -1,
+                "y": 1,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:iron_block"
+              },
+              "consume": true
+            },
+            {
+              "offset": {
+                "x": 1,
+                "y": 1,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:iron_block"
+              },
+              "consume": true
+            },
+            {
+              "offset": {
+                "x": 0,
+                "y": 2,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:carved_pumpkin"
+              },
+              "consume": true
+            },
+            {
+              "offset": {
+                "x": 0,
+                "y": 1,
+                "z": 1
+              },
+              "block": {
+                "block": "minecraft:air"
+              },
+              "consume": false
+            }
+          ],
+          "actions": [
+            {
+              "offset": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:crying_obsidian"
+              },
+              "kind": "set_block"
+            },
+            {
+              "creature": "shardbound_sentinel",
+              "offset": {
+                "x": 0,
+                "y": 1,
+                "z": 1
+              },
+              "kind": "spawn_creature"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "keyed_gate",
+      "displayName": "铸钥石门",
+      "description": "站直身躯，以主手握住一枚绊线钩钥匙，右键磁石门座。钥匙消耗后，上方两格铁栅消失，门道开启。",
+      "initialState": "locked",
+      "states": [
+        "locked",
+        "open"
+      ],
+      "rules": [
+        {
+          "id": "unlock",
+          "event": "USE_BLOCK",
+          "fromState": "locked",
+          "toState": "open",
+          "rotateY": false,
+          "heldItem": {
+            "item": "minecraft:tripwire_hook",
+            "count": 1
+          },
+          "cooldownTicks": 20,
+          "pattern": [
+            {
+              "offset": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:lodestone"
+              },
+              "consume": false
+            },
+            {
+              "offset": {
+                "x": 0,
+                "y": 1,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:iron_bars"
+              },
+              "consume": false
+            },
+            {
+              "offset": {
+                "x": 0,
+                "y": 2,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:iron_bars"
+              },
+              "consume": false
+            }
+          ],
+          "actions": [
+            {
+              "offset": {
+                "x": 0,
+                "y": 1,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:air"
+              },
+              "kind": "set_block"
+            },
+            {
+              "offset": {
+                "x": 0,
+                "y": 2,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:air"
+              },
+              "kind": "set_block"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crystal_exchange",
+      "displayName": "晶片兑换台",
+      "description": "主手握住至少四枚紫水晶碎片，站直后右键氧化铜块，每次交出四枚，领取一枚绿宝石。",
+      "initialState": "ready",
+      "states": [
+        "ready"
+      ],
+      "rules": [
+        {
+          "id": "exchange",
+          "event": "USE_BLOCK",
+          "fromState": "ready",
+          "toState": "ready",
+          "rotateY": false,
+          "heldItem": {
+            "item": "minecraft:amethyst_shard",
+            "count": 4
+          },
+          "cooldownTicks": 20,
+          "pattern": [
+            {
+              "offset": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "block": {
+                "block": "minecraft:oxidized_copper"
+              },
+              "consume": false
+            }
+          ],
+          "actions": [
+            {
+              "item": "minecraft:emerald",
+              "count": 1,
+              "kind": "give_item"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

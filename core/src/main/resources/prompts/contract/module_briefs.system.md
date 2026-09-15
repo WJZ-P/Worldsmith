@@ -23,7 +23,10 @@ ModuleBrief {
 }
 ```
 
-Use actual supported ContentKeys. Authoring nodes/regions are not new ContentKey
+Use actual supported ContentKeys, including `mechanic/<id>` for installed
+event-driven interactions. Review their actual pattern, heldItem cost, state
+transition and typed actions through `/modules/mechanics/mechanics/<index>`;
+a setting rule or quest description alone does not fulfill that target. Authoring nodes/regions are not new ContentKey
 kinds. A target has exactly one owning brief; reuse shared content through brief
 dependencies instead of duplicating ownership. Every target needs at least one
 criterion naming that owned target. Dependencies are brief IDs forming an acyclic
@@ -126,5 +129,5 @@ The review loop does not bypass independent worker source-execution approvals.
 
 Briefs and review evidence remain session data, not extra runtime modules or
 fields in `.wspack`. Existing packs, legacy sessions and lightweight modes retain
-their compatibility paths. Browsing the read-only progress/bible screens starts
+their session recovery paths; published bundles must use format 7. Browsing the read-only progress/bible screens starts
 no content generation and performs no resource reload.

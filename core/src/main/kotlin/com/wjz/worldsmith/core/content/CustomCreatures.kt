@@ -3,15 +3,12 @@ package com.wjz.worldsmith.core.content
 import com.wjz.worldsmith.core.validation.Diagnostic
 import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 
 /** Ground creatures are data, never generated executable tick code. Model units are 1/16 block. */
 @Serializable
 data class CreatureLibrary(val schemaVersion: Int = 1, val creatures: List<CreatureDefinition> = emptyList())
 
 @Serializable
-@OptIn(ExperimentalSerializationApi::class)
 data class CreatureDefinition @JvmOverloads constructor(
     val id: String,
     val displayName: String,
@@ -21,14 +18,11 @@ data class CreatureDefinition @JvmOverloads constructor(
     val behavior: CreatureBehavior = CreatureBehavior(),
     val spawn: CreatureSpawn = CreatureSpawn(),
     val themeRole: String = "",
-    /** Empty is omitted even with encodeDefaults=true, preserving existing format-3 canonical documents. */
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    /** Bounded item drops are part of the current canonical content. */
     val drops: List<CreatureDrop> = emptyList(),
-    /** Schema-1 documents omit this field entirely, including under encodeDefaults=true. */
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    /** Boss behavior requires creature schema 2 or 3. */
     val boss: CreatureBossProfile? = null,
-    /** Schema 3 opt-in; absent on legacy documents so their immutable hashes remain unchanged. */
-    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    /** Authored voices require creature schema 3; null selects the native default profile. */
     val sounds: CreatureSoundProfile? = null,
 )
 
@@ -98,7 +92,7 @@ data class CreatureSpawn(
     val maxLight: Int = 15,
 )
 
-/** Versioned contracts: schema 1 is preserved; schema 2 adds bosses; schema 3 adds bounded vanilla voices. */
+/** Domain schemas: schema 1 is basic creatures; schema 2 adds bosses; schema 3 adds bounded vanilla voices. */
 object CustomCreatureValidator {
     const val MAX_CREATURES = 128
     const val MAX_BONES = 64

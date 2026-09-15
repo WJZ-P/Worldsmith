@@ -30,6 +30,10 @@ sealed interface QuestObjective {
     /** Progress means items actually consumed by a player's explicit delivery action, not items merely held. */
     @Serializable @SerialName("deliver_item")
     data class DeliverItem @JvmOverloads constructor(val item: String, override val count: Int = 1) : QuestObjective
+
+    /** Observes a committed interaction fact, including activations before this quest was unlocked. */
+    @Serializable @SerialName("activate_mechanic")
+    data class ActivateMechanic @JvmOverloads constructor(val mechanic: String, override val count: Int = 1) : QuestObjective
 }
 
 /** One full item stack per reward entry. Rewards are granted by a separate once-only claim action. */
@@ -73,6 +77,8 @@ object QuestValidation {
                         error("$at.creature", "quests.creature_reference", "Use an existing normalized local creature id")
                     is QuestObjective.DeliverItem -> if (!validItemReference(objective.item))
                         error("$at.item", "quests.item_reference", "Use a non-air native item or a logical world item/block-item alias, never raw hosts or state properties")
+                    is QuestObjective.ActivateMechanic -> if (!WorldMechanicValidation.validId(objective.mechanic))
+                        error("$at.mechanic", "quests.mechanic_reference", "Use an existing normalized local mechanic id; the objective only observes successful activations")
                 }
             }
             if (quest.rewards.size > MAX_REWARDS) error("$path.rewards", "quests.reward_count", "At most $MAX_REWARDS item-stack reward entries per quest")

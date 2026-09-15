@@ -2,6 +2,7 @@ package com.wjz.worldsmith.core.structure
 
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -73,15 +74,14 @@ class StructureGeometryTest {
         assertTrue(svg.contains("not in-game render"))
     }
 
-    @Test fun `all referenced blueprints participate in pack identity but preview files do not`() {
+    @Test fun `all referenced blueprints participate in pack identity and loose previews are rejected`() {
         val pack=WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
         val b=blueprint(listOf(BuildOperation.Fill("floor",BuildPos(0,0,0),BuildPos(3,0,3),"stone")))
-        fun files(blueprint:StructureBlueprint):Map<String,String> = mapOf(
-            "terrain.json" to WorldsmithJson.encode(pack.terrain),"biomes.json" to WorldsmithJson.encode(pack.biomes),"features.json" to WorldsmithJson.encode(pack.features),
-        )+StructurePackIO.files(StructureLibrary(structures=listOf(WorldStructureDefinition("test",blueprint,StructurePlacement(listOf("ashfall_plain"))))))
+        fun files(blueprint:StructureBlueprint):Map<String,String> = WorldContentBundleIO.encode(pack.copy(
+            structures=StructureLibrary(structures=listOf(WorldStructureDefinition("test",blueprint,StructurePlacement(listOf("ashfall_plain"))))))).texts
         val a=files(b)
         val first=WorldsmithHashUtil.computeGenerationId(pack.manifest,a)
-        assertEquals(first,WorldsmithHashUtil.computeGenerationId(pack.manifest,a+("preview.svg" to "ignored")))
+        assertThrows(IllegalArgumentException::class.java) { WorldsmithHashUtil.computeGenerationId(pack.manifest,a+("preview.svg" to "untracked")) }
         val changed=b.copy(palette=mapOf("stone" to BuildMaterial("minecraft:andesite")))
         assertNotEquals(first,WorldsmithHashUtil.computeGenerationId(pack.manifest,files(changed)))
         val index=WorldsmithJson.decode<StructureIndex>(a.getValue("structures.json"))

@@ -13,14 +13,14 @@ class ContractConsistencyTest {
     private val repository = ClasspathPromptTemplateRepository()
     private fun contract(id: String) = repository.load(PromptTemplateRef("contract/$id")).systemPrompt
 
-    @Test fun `publication contracts use the current nine-module format and preserve legacy boundaries`() {
-        assertEquals(9, WorldContentBundleIO.REQUIRED_MODULES.size)
-        val stalePublication = Regex("Published worlds use bundle format [345]|New writes use format [345]|(?m)^# .*bundle format [345]")
+    @Test fun `publication contracts use the current ten-module format and reject old bundle formats`() {
+        assertEquals(10, WorldContentBundleIO.REQUIRED_MODULES.size)
+        val stalePublication = Regex("Published worlds use bundle format [3456]|New writes use format [3456]|(?m)^# .*bundle format [3456]")
         for (id in listOf("theme", "architecture", "items")) {
             val text = contract(id)
             assertTrue("format ${WorldContentBundleIO.FORMAT_VERSION}" in text, "$id must name the current bundle format")
-            assertTrue("nine typed modules" in text, "$id must not retain the old seven/eight-module publication promise")
-            assertTrue(Regex("Formats 3/4(?:/5)? remain\\s+read-only").containsMatchIn(text), "$id must preserve the explicit legacy boundary")
+            assertTrue("ten typed modules" in text, "$id must not retain the old seven/eight-module publication promise")
+            assertTrue("Older bundle formats are rejected" in text, "$id must name the explicit old-format rejection")
             assertFalse(stalePublication.containsMatchIn(text), "$id advertises an obsolete current publication format")
         }
         for (id in listOf("theme", "architecture")) {
@@ -29,7 +29,7 @@ class ContractConsistencyTest {
         }
         assertTrue("the frozen format-${WorldContentBundleIO.FORMAT_VERSION} pack" in contract("theme"))
         for (id in listOf("theme", "items", "quests"))
-            assertTrue(Regex("Formats 3/4/5 remain\\s+read-only").containsMatchIn(contract(id)), "$id must include format-5 restoration")
+            assertTrue("Older bundle formats are rejected" in contract(id), "$id must reject obsolete format restoration")
     }
 
     @Test fun `theme and gameplay contracts agree on installed quests achievements and bounded bosses`() {
@@ -41,7 +41,7 @@ class ContractConsistencyTest {
         assertTrue("quests (0..${QuestValidation.MAX_QUESTS})" in quests)
         assertTrue("exactly one root" in quests)
         assertTrue("at most one successor" in quests)
-        assertTrue("kill_creature" in quests && "deliver_item" in quests)
+        assertTrue("kill_creature" in quests && "deliver_item" in quests && "activate_mechanic" in quests)
         val creatures = contract("creatures")
         assertTrue("${CustomCreatureValidator.MAX_CREATURES} definitions" in creatures)
         assertTrue("ground-melee" in creatures && "2..3 phase" in creatures)

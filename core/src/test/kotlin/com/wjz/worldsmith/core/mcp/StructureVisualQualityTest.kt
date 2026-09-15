@@ -29,7 +29,7 @@ class StructureVisualQualityTest {
         assertEquals(begin[0].getValue("designGuide"), begin[1].getValue("designGuide"))
         val guide = begin[0].getValue("designGuide").jsonPrimitive.content
         assertTrue(guide.length in 500..2000)
-        listOf("silhouette", "spatial sequence", "material", "representative", "Minimum size/count/light checks").forEach { assertTrue(it in guide, it) }
+        listOf("silhouette", "spatial sequence", "material", "representative", "Minimum size/count checks", "Default lighting is authored, not a numeric publication gate").forEach { assertTrue(it in guide, it) }
         assertFalse("howToDesign" in begin[0])
         val reference = begin[0].getValue("designReference").jsonObject
         val loop = call(reference.getValue("tool").jsonPrimitive.content, JsonObject(reference - "tool")).text

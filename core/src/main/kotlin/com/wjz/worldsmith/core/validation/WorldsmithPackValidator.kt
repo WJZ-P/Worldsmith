@@ -16,7 +16,7 @@ object WorldsmithPackValidator {
 
     fun validate(pack: WorldsmithPack): List<Diagnostic> = buildList {
         val manifest = pack.manifest
-        if (manifest.formatVersion !in WorldContentBundleIO.LEGACY_FORMAT_VERSION..WorldContentBundleIO.FORMAT_VERSION) {
+        if (manifest.formatVersion != WorldContentBundleIO.FORMAT_VERSION) {
             add(error("manifest.formatVersion", "UNSUPPORTED_PACK_FORMAT", "Unsupported pack format ${manifest.formatVersion}"))
         }
         if (!ID.matches(manifest.id)) {
@@ -30,18 +30,6 @@ object WorldsmithPackValidator {
         try { WorldContentBundleIO.validateManifest(manifest) } catch (e: IllegalArgumentException) {
             add(error("manifest", "INVALID_CONTENT_MANIFEST", e.message ?: "Invalid module manifest"))
         }
-        if (manifest.formatVersion == WorldContentBundleIO.LEGACY_FORMAT_VERSION) {
-            if (pack.items.items.isNotEmpty()) add(error("items", "ITEMS_REQUIRE_FORMAT4", "Format 3 contains no ordinary item module; freeze linked content as a new current-format bundle"))
-            if (pack.creatures.creatures.any { it.drops.isNotEmpty() }) add(error("creatures", "CREATURE_DROPS_REQUIRE_FORMAT4", "Format 3 does not contain creature drop behavior; freeze linked content as a new current-format bundle"))
-        }
-        if (manifest.formatVersion < 5 && pack.quests.quests.isNotEmpty())
-            add(error("quests", "QUESTS_REQUIRE_FORMAT5", "Formats 3/4 contain no quest gameplay; freeze the main line as format 5"))
-        if (manifest.formatVersion < 5 && pack.creatures.creatures.any { it.boss != null })
-            add(error("creatures", "BOSS_REQUIRES_FORMAT5", "Boss behavior requires format 5 and explicit creature module schema 2"))
-        if (manifest.formatVersion < 6 && pack.items.schemaVersion != 1)
-            add(error("items", "ITEM_ABILITIES_REQUIRE_FORMAT6", "Items schema 2 requires bundle format 6"))
-        if (manifest.formatVersion < 6 && pack.creatures.creatures.any { it.sounds != null })
-            add(error("creatures", "CREATURE_SOUNDS_REQUIRE_FORMAT6", "Authored sounds require format 6 and creature schema 3"))
         manifest.representativeContent?.let { key ->
             val exists = when (key.kind) { "item" -> pack.items.items.any { it.id == key.id }; "block" -> pack.blocks.blocks.any { it.id == key.id }; else -> false }
             if (!exists) add(error("manifest.representativeContent", "REPRESENTATIVE_CONTENT_MISSING", "Representative icon must refer to an existing local item or block"))
@@ -99,6 +87,14 @@ object WorldsmithPackValidator {
             // Delivery counts deliberately cross stack boundaries and accumulate real contributions.
             // They are not capped to one item's maxStackSize as reward entries are.
         }
+        pack.mechanics.mechanics.forEachIndexed { i, mechanic ->
+            mechanic.rules.forEachIndexed { j, rule ->
+                rule.heldItem?.let { checkItemStack(it.item, it.count, "mechanics.mechanics[$i].rules[$j].heldItem.count") }
+                rule.actions.forEachIndexed { k, action ->
+                    if (action is MechanicAction.GiveItem) checkItemStack(action.item, action.count, "mechanics.mechanics[$i].rules[$j].actions[$k].count")
+                }
+            }
+        }
         pack.creatures.creatures.forEachIndexed { i, creature ->
             checkTextureAddress(creature.model.texture, "creatures.creatures[$i].model.texture")
             assets[creature.model.texture]?.let { size ->
@@ -113,7 +109,6 @@ object WorldsmithPackValidator {
             blueprints.forEach { (blueprint, path) -> blueprint.interactions.forEachIndexed { j, interaction ->
                 if (interaction is StructureInteraction.BossSpawner) {
                     val at = "$path.interactions[$j]"
-                    if (manifest.formatVersion < 5) add(error(at, "BOSS_SPAWNER_REQUIRES_FORMAT5", "Boss spawner encounters require bundle format 5"))
                     if (pack.structures.schemaVersion != 2 || pack.creatures.schemaVersion !in 2..3)
                         add(error(at, "BOSS_SPAWNER_MODULE_SCHEMAS", "Boss spawners require structure schema 2 and creature schema 2 or 3"))
                     val target = pack.creatures.creatures.find { it.id == interaction.creatureId }
@@ -133,7 +128,7 @@ object WorldsmithPackValidator {
                     add(error("structures.artifacts.$drawingId", "CONTENT_REFERENCE_MISSING", "Frozen drawing references missing logical block '$ref'"))
             }
         }
-        if (manifest.formatVersion in WorldContentBundleIO.LEGACY_FORMAT_VERSION..WorldContentBundleIO.FORMAT_VERSION) {
+        if (manifest.formatVersion == WorldContentBundleIO.FORMAT_VERSION) {
             try {
                 val actual = WorldContentBundleIO.encode(pack).manifest.id
                 if (actual != pack.computedId) add(error("manifest.id", "PACK_CONTENT_MUTATED", "Typed content differs from its immutable loaded hash; freeze a new bundle"))
