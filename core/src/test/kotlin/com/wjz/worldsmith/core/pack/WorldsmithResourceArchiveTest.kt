@@ -62,14 +62,14 @@ class WorldsmithResourceArchiveTest {
         return path
     }
 
-    @Test fun `single file preserves ten modules PNG frozen drawing and inert provenance`() {
+    @Test fun `single file preserves twelve modules PNG frozen drawing and inert provenance`() {
         val source = assets()
         val path = temp.resolve("world.wspack")
         val info = WorldsmithResourceArchive.write(source, path)
         val restored = WorldsmithResourceArchive.read(path)
         assertEquals(source.computedId, restored.pack.computedId)
         assertEquals(source.manifest.modules, restored.pack.manifest.modules)
-        assertEquals(10, restored.pack.manifest.modules.size)
+        assertEquals(12, restored.pack.manifest.modules.size)
         assertEquals(source.structures.sources, restored.pack.structures.sources)
         assertArrayEquals(source.assets.values.single(), restored.pack.assets.values.single())
         assertArrayEquals(DrawSnapshotCodec.encode(source.structures.drawingAssets.values.single()), DrawSnapshotCodec.encode(restored.pack.structures.drawingAssets.values.single()))
@@ -92,11 +92,11 @@ class WorldsmithResourceArchiveTest {
     @Test fun `old format archives are rejected before content is accepted`() {
         val base = base()
         val current = entries(base)
-        for (version in 3..6) {
+        for (version in 3..9) {
             val old = current.map { (path, bytes) -> path to if (path == "worldsmith.json")
                 WorldsmithJson.encode(base.manifest.copy(formatVersion = version)).toByteArray() else bytes }
             val failure = assertThrows(IllegalArgumentException::class.java) { WorldsmithResourceArchive.read(zip(old, "v$version.wspack")) }
-            assertTrue(failure.message.orEmpty().contains("requires format 7"), failure.message)
+            assertTrue(failure.message.orEmpty().contains("requires format 10"), failure.message)
             assertThrows(IllegalArgumentException::class.java) { WorldsmithResourceArchive.write(base.copy(manifest = base.manifest.copy(formatVersion = version)), temp.resolve("out$version.wspack")) }
             assertFalse(Files.exists(temp.resolve("out$version.wspack")))
         }

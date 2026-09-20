@@ -1,0 +1,24 @@
+// Same inherited scene, separate program locals/state. Coordination is source-authored.
+on start {
+    let parent = map.get(args, "parent");
+    let mark = map.get(args, "mark");
+    let waited = 0;
+    while (shared.scene_get("ward_built") != true && waited < 30) {
+        wait 1;
+        waited = waited + 1;
+    }
+    if (shared.scene_get("ward_built") != true) {
+        signal.send(parent, "ward_blocked", null);
+        return;
+    }
+    repeat 3 {
+        wait 12;
+        let pulses = shared.scene_get("ward_pulses");
+        if (pulses == null) { pulses = 0; }
+        pulses = pulses + 1;
+        shared.scene_set("ward_pulses", pulses);
+        scene.emit("ward_pulse", pulses);
+        fx.sound("minecraft:block.amethyst_block.chime", mark, 0.5, 1.0);
+    }
+    signal.send(parent, "ward_ready", shared.scene_get("ward_pulses"));
+}

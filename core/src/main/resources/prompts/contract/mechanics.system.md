@@ -1,10 +1,10 @@
-# Worldsmith mechanics contract — module schema 1, bundle format 7
+# Worldsmith mechanics contract — module schema 1, bundle format 10
 
 Compose actual gameplay using `worldsmith_put_content_modules(sessionId,
 expectedRevision, modules: {mechanics: WorldMechanicLibrary})`. Read this contract
 with `worldsmith_get_content_contract(module: "mechanics")`. `write_pack` also
 accepts an inline `mechanics` document; it freezes the same typed module into
-`mechanics.json`. All ten module documents are required in format 7, including
+`mechanics.json`. All twelve module documents are required in format 10, including
 an explicit empty mechanics library when the world promises no interactions.
 Older bundle formats are rejected rather than automatically migrated.
 
@@ -27,6 +27,7 @@ MechanicAction =
   {kind: "set_block", offset: {x, y, z}, block: {block, properties: {}}}
   | {kind: "spawn_creature", creature: localCreatureId, offset: {x, y, z}}
   | {kind: "give_item", item: itemReference, count: 1}
+  | {kind: "run_program", program: localAbilityId}
 heldItem = null | {item: itemReference, count: 1}
 ```
 
@@ -173,3 +174,15 @@ triggers combat, and whether a key is consumed. Do not make a vital guide depend
 on already solving its construction. `docs/examples/mechanic-discovery/README.md`
 documents one reproducible small archive and its native event regression; it is
 not a claim of a completed large world or human playthrough.
+
+## Shared program launch
+
+`{kind:"run_program",program:"local_ability_id"}` invokes the separate abilities
+module after the current activation commits. Each rule has at most one program launch; compose further flow inside source.
+All references resolve before publication. Inspection is read-only preflight; execution reserves capacity before
+world writes, cancels reservations on rollback, and commits launches after the
+ledger transaction. Source owns subsequent timing, events and effects; delayed
+effects are not part of the mechanic rollback transaction. The actor is the
+activating player and origin is the matched anchor. Creature/item hosts use this
+same programmable runtime. Read abilities for real source grammar and capability
+signatures. Declare `invokes_ability` from the mechanic to its ability target.

@@ -29,10 +29,12 @@ import com.wjz.worldsmith.core.content.CreatureLibrary
 import com.wjz.worldsmith.core.content.CustomItemLibrary
 import com.wjz.worldsmith.core.content.QuestLibrary
 import com.wjz.worldsmith.core.content.WorldMechanicLibrary
+import com.wjz.worldsmith.core.ability.AbilityLibrary
+import com.wjz.worldsmith.core.story.StoryLibrary
 
 /** Computes the immutable id of the files that affect world generation. */
 object WorldsmithHashUtil {
-    private const val HASH_DOMAIN = "worldsmith-world-content-bundle-v7"
+    private const val HASH_DOMAIN = "worldsmith-world-content-bundle-v9"
 
     @JvmStatic @JvmOverloads
     fun computeGenerationId(manifest: WorldsmithPackManifest, contents: Map<String, String>,binaries:Map<String,ByteArray> = emptyMap()): String {
@@ -47,8 +49,8 @@ object WorldsmithHashUtil {
             val path = file.path
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             val parsed = Json.parseToJsonElement(raw)
-            if (role == "creatures") require(WorldsmithJson.decode<CreatureLibrary>(raw).creatures.none { it.sounds != null } || file.schemaVersion == 3) {
-                "Authored creature sounds require creature module schema 3"
+            if (role == "creatures") require(WorldsmithJson.decode<CreatureLibrary>(raw).creatures.none { it.sounds != null } || file.schemaVersion >= 3) {
+                "Authored creature sounds require creature module schema 3 or later"
             }
             require(parsed.jsonObject["schemaVersion"]?.jsonPrimitive?.intOrNull == file.schemaVersion) { "Module schema differs from manifest: $role" }
             updateField(digest, "module:$role", file.schemaVersion.toString())
@@ -60,8 +62,9 @@ object WorldsmithHashUtil {
         StructurePackIO.paths(index).forEach { path ->
             val raw = requireNotNull(contents[path]) { "Missing generation content '$path'" }
             val blueprint = WorldsmithJson.decode<StructureBlueprint>(raw)
+            require(index.schemaVersion>=3 || blueprint.interactions.none { it is StructureInteraction.StoryAnchor }) { "Story anchors require structure schema 3" }
             if (blueprint.interactions.any { it is StructureInteraction.BossSpawner }) {
-                require(index.schemaVersion == 2) { "Boss spawner encounters require structure schema 2" }
+                require(index.schemaVersion >= 2) { "Boss spawner encounters require structure schema 2" }
             }
             updateField(digest, "blueprint:$path", canonicalJson(WorldsmithJson.format.encodeToJsonElement(StructureBlueprint.serializer(), blueprint)))
         }
@@ -122,7 +125,9 @@ object WorldsmithHashUtil {
         "creatures" -> WorldsmithJson.format.encodeToJsonElement(CreatureLibrary.serializer(), WorldsmithJson.decode<CreatureLibrary>(raw))
         "items" -> WorldsmithJson.format.encodeToJsonElement(CustomItemLibrary.serializer(), WorldsmithJson.decode<CustomItemLibrary>(raw))
         "quests" -> WorldsmithJson.format.encodeToJsonElement(QuestLibrary.serializer(), WorldsmithJson.decode<QuestLibrary>(raw))
+        "abilities" -> WorldsmithJson.format.encodeToJsonElement(AbilityLibrary.serializer(), WorldsmithJson.decode<AbilityLibrary>(raw))
         "mechanics" -> WorldsmithJson.format.encodeToJsonElement(WorldMechanicLibrary.serializer(), WorldsmithJson.decode<WorldMechanicLibrary>(raw))
+        "story" -> WorldsmithJson.format.encodeToJsonElement(StoryLibrary.serializer(), WorldsmithJson.decode<StoryLibrary>(raw))
         else -> error("Uninstalled content module '$role'")
     }
 }

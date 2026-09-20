@@ -21,9 +21,9 @@ class CreatureSoundCompatibilityTest {
             mapOf(guide.asset.id to guide.png),base.items,base.quests)
     }
 
-    @Test fun `format seven carries schema three and modulation participates in immutable identity`() {
+    @Test fun `format eight carries schema three and modulation participates in immutable identity`() {
         val first=voicedPack(0.7f)
-        assertEquals(7,first.manifest.formatVersion)
+        assertEquals(10, first.manifest.formatVersion)
         assertEquals(3,first.manifest.modules.getValue("creatures").schemaVersion)
         val encoded=WorldContentBundleIO.encode(first)
         assertEquals(first.computedId,WorldsmithHashUtil.computeGenerationId(encoded.manifest,encoded.texts,encoded.binaries))

@@ -1,9 +1,10 @@
-# Worldsmith items — schema 2 equipment, consumables and a fixed action library
+# Worldsmith items — schema 4 adds generic native event bindings
 
-New publications use bundle format 7 with ten typed modules. `items` may retain
+New publications use bundle format 10 with twelve typed modules. `items` may retain
 schemaVersion=1 for plain resources/relics, or explicitly select schemaVersion=2
-for equipment, consumables and actions. Schema 2 is a typed capability library,
-not arbitrary scripts. Choose capabilities that deepen this world's exploration,
+for equipment, consumables and actions, or schemaVersion=3 for shared AbilityScript
+invocation. Schema 2 retains its small typed effect library; schema 3 is the
+source-program extension point. Choose capabilities that deepen this world's exploration,
 combat and rewards; ordinary materials should remain ordinary when that is useful.
 
 ## Exact item library
@@ -140,7 +141,7 @@ durabilityCost=0**, and MELEE_HIT is disallowed on food. Cancelling consumption
 or a failed completion action leaves the food unfinished. Creative mode retains
 its usual no-consumption behavior. Do not charge the same mouthful a second time.
 
-## Fixed action vocabulary
+## Native effect vocabulary and shared program invocation
 
 `ItemAction`: trigger=USE, cooldownTicks=20 (1..72000), consumeCount=0
 (0..maxStackSize), durabilityCost=0 (0..100000, at most equipment.durability;
@@ -149,8 +150,9 @@ Triggers are exactly USE and MELEE_HIT. Each item has at most one of each.
 MELEE_HIT requires non-armor equipment: MELEE, AXE, PICKAXE, SHOVEL or HOE.
 Plain materials/relics and armor may have USE actions, not MELEE_HIT actions.
 
-Effects use the `kind` discriminator; no script, command, function or arbitrary
-entity payload field is accepted:
+Effects use the `kind` discriminator. Program source belongs in the abilities
+module and is referenced by run_program, not embedded as arbitrary command,
+function or entity payload fields inside an effect:
 
 | kind | Exact fields and defaults |
 | --- | --- |
@@ -159,6 +161,7 @@ entity payload field is accepted:
 | status | effect required; durationTicks=200, 1..72000; amplifier=0, 0..9; target=SELF or TARGET |
 | projectile | damage=4.0, 0..100; speed=1.5, 0.1..4; gravity=0.03, 0..0.2; lifetimeTicks=80, 1..200; hitEffects=[], at most four ItemStatusEffect entries |
 | blink | distance=6.0, 0.1..8; USE only |
+| run_program | program required: local ability ID; items schema 3, sole effect of a non-consumable USE action |
 
 TARGET is available only for heal/status on MELEE_HIT and refers to the struck
 living target. SELF means the bearer. An action may contain at most one projectile
@@ -229,6 +232,57 @@ container. The separate quest system owns explicit delivery and once-only claims
 
 ## Compatibility
 
-New writes use format 7 and ten typed modules; abilities need items schema 2.
+New writes use format 10 and twelve typed modules; abilities need items schema 2.
 Older bundle formats are rejected. Domain schemas 1/2 remain valid inside the
 current bundle; this does not restore old hash domains or migrate local saves.
+
+## Schema 3: shared source-program action
+
+Add `{kind:"run_program",program:"existing_ability_id"}` as the sole effect of
+a non-consumable `USE` action. The referenced definition and actual source live
+in required module `abilities`; read its contract and dynamic capability list.
+The existing action cooldown, consumeCount and durabilityCost are activation
+costs. The host reserves a start before charging; effects execute on a later
+server tick, with no cost rollback for a subsequent program error. Source may
+use functions, waits, event handlers, branches, loops and persistent state, not
+a named skill catalogue. Item, creature and mechanic invocations use the same
+runtime. Keep player-facing controls in the item description. Author a real
+`invokes_ability` design link and review both binding and source.
+
+## Schema 4: native input and equipment event bindings
+
+`CustomItemDefinition` additionally accepts `abilityBindings:[]` and `maxUseTicks:0`.
+Each binding has `{id,program,startOn:[events],listenTo:[],cancelOn:[],cooldownTicks:20,range:8.0}`.
+At most 16 distinct local binding IDs, with existing program IDs; startOn has 1..8
+names and the other lists at most 8 each. Lists are distinct/disjoint. Cooldown
+1..72000, finite range 0.5..24. Installed hooks are `use_start`, `use_tick`,
+`use_release`, `use_cancel`, `melee_hit`, `equip`, `unequip`, `interact_entity`.
+Read the abilities event-binding section for event payload and ownership semantics.
+
+maxUseTicks=0 is immediate; 1..12000 enables the real native held-use session.
+Held tick/release/cancel events require a positive duration. The server validates
+scope + logical item + hand + selected hotbar slot + nonce + exact invocation UUID;
+our shared native Item host alone is not identity. Old releases never adopt newer
+invocations. on start is queued before the initial host event; neither runs inside
+the input callback. An input observation lease remains subject to program budgets.
+
+Each input has one activation model. Consumables reject use_* bindings. Held use
+rejects old USE actions; use_start conflicts with any USE ItemAction, and melee_hit
+conflicts with any MELEE_HIT ItemAction. Other event hooks can coexist with old
+actions. Event bindings add no implicit stack/durability fee or second cooldown;
+source may use resource/inventory operations for conditional costs. A rejected
+start does not install a held session or charge inventory. Armor still equips on
+ordinary right click; crouch-right-click invokes its optional active program.
+
+melee_hit is the confirmed native weapon postHurtEnemy path, requiring non-armor
+weapon/tool equipment, not attack intent. Equip/unequip observe actual native slots,
+including hands; ordinary wear/name/count mutation does not re-equip. While equipped,
+an equip-started program holds an observation lease and may restart after its
+normal maxTicks/cooldown; `reason=while_equipped` distinguishes renewal. Unequip
+listeners get a short handling window before owned equipment invocation cleanup.
+
+Entity interaction uses the real reach-checked UseEntityCallback; a declared held
+item interaction takes precedence over a target NPC's declared interaction, avoiding
+double starts. Start/listen/cancel only operate on this binding's owned UUID.
+All fields participate in validation, deep freeze, hash and invokes_ability links.
+Use worldsmith_put_content_modules(sessionId,expectedRevision,modules) as usual.

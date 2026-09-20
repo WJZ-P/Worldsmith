@@ -31,8 +31,15 @@ internal object StructureContentChecks {
         if(b.interactions.size>128 || b.interactions.map { it.at }.distinct().size!=b.interactions.size)error("interactions","INVALID_INTERACTIONS","At most 128 interactions, one per block position")
         b.interactions.forEachIndexed { i,entry ->
             val path="interactions[$i]";val voxel=cells[entry.at]
-            if(!inside(entry.at)||voxel==null||voxel.material.isAir())error(path,"INTERACTION_WITHOUT_BLOCK","Interaction must target a surviving authored block")
+            if(entry !is StructureInteraction.StoryAnchor && (!inside(entry.at)||voxel==null||voxel.material.isAir()))error(path,"INTERACTION_WITHOUT_BLOCK","Interaction must target a surviving authored block")
             when(entry) {
+                is StructureInteraction.StoryAnchor -> {
+                    if(!com.wjz.worldsmith.core.story.StoryValidation.validId(entry.place) || entry.character?.let { !com.wjz.worldsmith.core.story.StoryValidation.validId(it) }==true)
+                        error(path,"INVALID_STORY_ANCHOR","Use stable story place/character IDs")
+                    val head=cells[entry.at.copy(y=entry.at.y+1)];val floor=cells[entry.at.copy(y=entry.at.y-1)]
+                    if(!inside(entry.at)||!inside(entry.at.copy(y=entry.at.y+1))||voxel?.let { it.material.isAir()||it.passable }!=true||head?.let { it.material.isAir()||it.passable }!=true||floor?.let(StructureNavigation::supports)!=true)
+                        error(path,"STORY_ANCHOR_CLEARANCE","A story marker needs authored traversable feet/head cells and a supporting floor",entry.at)
+                }
                 is StructureInteraction.Container -> {
                     if(listOf(entry.lootTable!=null,entry.items.isNotEmpty(),entry.loot!=null).count {it}>1)error(path,"CONFLICTING_CONTAINER_CONTENT","Choose explicit items, an inline loot pool or a loot-table reference")
                     if(entry.lootTable!=null && (!resource(entry.lootTable)||entry.items.isNotEmpty()))error(path,"INVALID_STRUCTURE_LOOT","Use a namespaced loot table OR explicit items, not both")

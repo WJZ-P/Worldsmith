@@ -1,12 +1,16 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
 import com.wjz.worldsmith.core.structure.*
 import com.wjz.worldsmith.core.validation.*
 import kotlinx.serialization.json.*
 
 /** Revision-checked final publication. Preview/preflight never substitutes for this receipt. */
-class PackPublicationService(private val store:ManagedPackStore,private val sessions:WorkflowSessions,private val publicationHost:PublicationHost,private val metrics:DrawingMcpService) {
+class PackPublicationService(private val store:ManagedPackStore,private val sessions:WorkflowSessions,private val publicationHost:PublicationHost,private val metrics:DrawingMcpService,
+    private val abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()) {
     private fun diagnosticsJson(values:List<Diagnostic>)=McpJson.encode(values)
     fun finish(arguments: JsonObject): McpToolResult {
         val sessionId = McpJson.string(arguments, "sessionId").trim()
@@ -40,7 +44,7 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
             )
         }
 
-        val diagnostics = WorldsmithPackValidator.validate(pack) + WorldAuthoringPolicy.publicationProblems(session,pack) +
+        val diagnostics = WorldsmithPackValidator.validate(pack, abilityCapabilities) + WorldAuthoringPolicy.publicationProblems(session,pack) +
             if (pack.structures.architecture == null) listOf(StructureArchitectureValidator.missingPlan()) else emptyList()
         if (diagnostics.any { it.severity == DiagnosticSeverity.ERROR }) {
             val failed = buildJsonObject {
@@ -89,6 +93,8 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
             put("themeTitle",pack.theme.title);put("narrativeBeatCount",pack.theme.beats.size)
             put("itemCount",pack.items.items.size)
             put("questCount",pack.quests.quests.size)
+            put("placeDefinitionCount",pack.story.places.size);put("characterDefinitionCount",pack.story.characters.size)
+            put("storyInstancesVerified",false)
             put("assetCount",pack.manifest.assets.size);put("packFormat",pack.manifest.formatVersion)
             put("clientResourcesVerified",true);put("runtimeScope","local_integrated_world")
             put("groupCount", pack.structures.architecture?.groups?.size ?: 0)

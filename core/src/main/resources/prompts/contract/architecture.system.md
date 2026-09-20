@@ -1,6 +1,6 @@
 # Worldsmith world-generation agent: architecture policy 1
 
-New publications use bundle format 7 with required mechanics. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
+New publications use bundle format 10 with required mechanics, abilities and story. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
 
 This is an ACTIVE DESIGN TASK. After terrain and biome planning, independently
 develop architecture for THIS player's world. Infer plausible functions, inhabitants,
@@ -326,14 +326,16 @@ Engineering gates prove deployability and readability estimates, not aesthetic q
 
 ## World bundle version boundary
 
-Published worlds use bundle format 7 with ten typed modules and verified assets:
+Published worlds use bundle format 10 with twelve typed modules and verified assets:
 `theme`, `terrain`, `features`, `biomes`, `structures`, `blocks`, `creatures`,
-`items`, `quests`, and `mechanics`. Older bundle formats are rejected.
+`items`, `quests`, `mechanics`, `abilities`, and `story`. Older bundle formats are rejected.
 Existing local packs and saves are not automatically migrated or rewritten.
 Architecture policyVersion remains 1. Blueprint schema remains 1; structure
 libraries use module schema 1 or module schema 2 when freezing SDK artifacts or
-declaring typed Boss spawners. Quests implement one bounded linear main line;
+declaring typed Boss spawners; schema 3 adds typed story place/character anchors. Quests implement a bounded branching DAG;
 those quests project into native advancements after reward claims, while independent achievements are not installed. Bosses use explicit creature schema 2 and the
 installed ground-melee 2..3 health-phase mechanics, not arbitrary encounter scripts.
 These domain versions do not select the world bundle format. Legacy world bundle
-formats 1..6 are rejected; domain schemas are independent of this boundary.
+formats 1..8 are rejected; domain schemas are independent of this boundary.
+
+The required `abilities` module carries portable AbilityScript programs (empty is valid when unpromised). Read contract/abilities for source and host bindings.

@@ -6,10 +6,10 @@ import kotlinx.serialization.Serializable
 
 @Serializable enum class CreatureBossBarColor { PINK, BLUE, RED, GREEN, YELLOW, PURPLE, WHITE }
 
-/** Ground-melee boss mechanics, not an arbitrary action/script interpreter. Enabled by creature schema 2. */
+/** Boss identity/presentation; optional simple stat phases or an ability program can provide behavior. */
 @Serializable
 data class CreatureBossProfile @JvmOverloads constructor(
-    val phases: List<CreatureBossPhase>,
+    val phases: List<CreatureBossPhase> = emptyList(),
     val barTitle: String = "",
     val barColor: CreatureBossBarColor = CreatureBossBarColor.PURPLE,
     /** Independent acceptance roll after species selection, so a boss-only biome is still genuinely rare. */
@@ -36,10 +36,11 @@ object CreatureBosses {
         fun error(field: String, message: String) { add(Diagnostic("$path.boss$field", "creature.boss_invalid", DiagnosticSeverity.ERROR, message)) }
         if (definition.category != CreatureCategory.HOSTILE) error("", "Bosses require the hostile native host")
         if (definition.attributes.health > 1024.0) error("", "Boss health must fit the native max_health attribute limit of 1024")
-        if (definition.attributes.attackDamage <= 0.0) error("", "A melee boss needs positive base attack damage")
+        if (definition.ability == null && definition.abilityBindings.isEmpty() && definition.attributes.attackDamage <= 0.0) error("", "A melee boss needs positive base attack damage")
         if (boss.barTitle.length > 128 || boss.barTitle.any(Char::isISOControl)) error(".barTitle", "Boss bar title is optional printable text, at most 128 characters")
         if (boss.barTitle.isBlank() && definition.displayName.any(Char::isISOControl)) error(".barTitle", "The fallback creature name must be printable boss-bar text")
-        if (boss.phases.size !in 2..3) error(".phases", "A boss requires two or three health-threshold combat phases")
+        if (boss.phases.isEmpty() && definition.ability == null && definition.abilityBindings.isEmpty() || boss.phases.isNotEmpty() && boss.phases.size !in 2..3)
+            error(".phases", "Use an ability binding with no automatic phases, or two or three simple health-threshold stat phases")
         if (!boss.naturalSpawnChance.isFinite() || boss.naturalSpawnChance !in 0.001..0.05)
             error(".naturalSpawnChance", "Boss natural acceptance probability must be between 0.001 and 0.05")
         if (boss.naturalSpacingBlocks !in 32..256) error(".naturalSpacingBlocks", "Loaded live-boss spacing must be 32..256 blocks")

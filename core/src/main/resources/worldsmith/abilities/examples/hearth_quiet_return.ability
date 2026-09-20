@@ -1,0 +1,8 @@
+// Cosmetic response only. A durable receipt, not this player's invocation, owns the memorial.
+on start {
+    let home = map.get(args, "place_origin");
+    if (home == null) { return; }
+    fx.telegraph(shape.sphere(vector.add(home, vec(0, 0.5, 0)), 2), 60, "blue");
+    fx.sound("minecraft:block.amethyst_block.chime", home, 0.5, 1.0);
+    fx.message("留声之约已经记下。等晶石安放妥当，再听听居民的回答。");
+}

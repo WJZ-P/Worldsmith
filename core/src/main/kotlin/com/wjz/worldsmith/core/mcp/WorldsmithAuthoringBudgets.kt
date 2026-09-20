@@ -59,6 +59,19 @@ object WorldsmithAuthoringBudgets {
         }
         putJsonObject("creatures") {put("maxDefinitions",CustomCreatureValidator.MAX_CREATURES)}
         putJsonObject("items") {put("maxDefinitions",CustomItemValidation.MAX_ITEMS)}
+        putJsonObject("abilities") { put("maxPrograms",64);put("maxSourceCharacters",32768);put("maxTicks",12000);put("maxOperations",65536);put("maxStateBytes",65536) }
+        putJsonObject("story") {
+            put("maxFacts",com.wjz.worldsmith.core.story.StoryValidation.MAX_DEFINITIONS)
+            put("maxPlaces",com.wjz.worldsmith.core.story.StoryValidation.MAX_PLACES)
+            put("maxCharacters",com.wjz.worldsmith.core.story.StoryValidation.MAX_CHARACTERS)
+            put("maxDialogues",com.wjz.worldsmith.core.story.StoryValidation.MAX_DIALOGUES)
+            put("maxKnowledge",com.wjz.worldsmith.core.story.StoryValidation.MAX_KNOWLEDGE)
+            put("maxTrades",com.wjz.worldsmith.core.story.StoryValidation.MAX_TRADES)
+            put("maxSoundscapes",com.wjz.worldsmith.core.story.StoryValidation.MAX_SOUNDSCAPES)
+            put("maxConditionNodes",com.wjz.worldsmith.core.story.StoryConditions.MAX_NODES)
+            put("maxConditionDepth",com.wjz.worldsmith.core.story.StoryConditions.MAX_DEPTH)
+            put("note","Definition counts are not generated instance counts or actual placement evidence. All entries share the catalog budget.")
+        }
         putJsonObject("mechanics") {
             put("maxDefinitions",WorldMechanicValidation.MAX_MECHANICS)
             put("maxRulesPerDefinition",WorldMechanicValidation.MAX_RULES)
@@ -73,9 +86,11 @@ object WorldsmithAuthoringBudgets {
         }
         putJsonObject("quests") {
             put("maxDefinitions",QuestValidation.MAX_QUESTS)
-            put("graph","SINGLE_LINEAR_MAIN_LINE")
+            put("graph","DISCOVERED_BRANCHING_DAG")
             put("maxObjectivesPerQuest",QuestValidation.MAX_OBJECTIVES)
-            put("note","These are linear main-line definitions, not branching quest trees or guaranteed gameplay hours.")
+            put("maxPrerequisites",QuestValidation.MAX_PREREQUISITES)
+            put("maxChangesPerTransition",QuestValidation.MAX_CHANGES)
+            put("note","Schema2 discovered DAG: ALL/ANY prerequisites, explicit exclusive-branch acceptance, optional goals and shared story facts; counts do not guarantee gameplay hours.")
         }
         putJsonObject("pngAssets") {
             put("maxAssets",ContentAssetValidation.MAX_ASSETS)

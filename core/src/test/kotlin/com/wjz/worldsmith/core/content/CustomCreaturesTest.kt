@@ -22,7 +22,7 @@ class CustomCreaturesTest {
     }
 
     @Test fun `duplicates unsupported schema and excessive species are rejected`() {
-        val diagnostics = CustomCreatureValidator.validate(CreatureLibrary(4, List(129) { creature }))
+        val diagnostics = CustomCreatureValidator.validate(CreatureLibrary(7, List(129) { creature }))
         assertTrue(diagnostics.any { it.path == "creatures.schemaVersion" })
         assertTrue(diagnostics.any { it.message.contains("At most") })
         assertTrue(diagnostics.any { it.message.contains("Duplicate creature") })

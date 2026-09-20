@@ -1,0 +1,8 @@
+// Cosmetic response only. Permanent scene changes belong to the durable actual-place projection.
+on start {
+    let home = map.get(args, "place_origin");
+    if (home == null) { return; }
+    fx.telegraph(shape.sphere(vector.add(home, vec(0, 0.5, 0)), 2), 60, "amber");
+    fx.sound("minecraft:block.bell.use", home, 0.5, 1.0);
+    fx.message("归灯之约已经记下。等灯火安放妥当，再听听居民的回答。");
+}

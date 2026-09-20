@@ -4,8 +4,8 @@ The Mod provides deterministic authoring, persistence and checks; the connected
 AI develops the world from the player's prompt. It does not call a hidden LLM.
 Use stable names and an explicit plan so a long run can resume without replacing
 finished work or quietly dropping a requested category.
-Current publication is bundle format 7 with the same ten typed modules; items
-schema 2 supplies equipment, consumables and fixed actions. The mechanics module
+Current publication is bundle format 10 with the same twelve typed modules; items
+schema 2 supplies equipment, consumables and fixed effects; schema 3 invokes programmable abilities. The mechanics module
 adds bounded event-driven block interactions. Older bundle formats are rejected,
 not implicitly migrated.
 
@@ -73,7 +73,7 @@ This is a minimum coverage check, not a suggested catalog size or a fixed style.
 Derive diversity and scale from the prompt. A repeatable test example is not a
 catalog to copy into every world.
 
-Targets may also name `mechanic`, `terrain`, `anchor`, `feature`, `blueprint`, `theme`, and
+Targets may also name `story_fact`, `place`, `character`, `dialogue`, `knowledge`, `trade`, `soundscape`, `ability`, `mechanic`, `terrain`, `anchor`, `feature`, `blueprint`, `theme`, and
 `narrative_beat`. Terrain identity is `terrain/main`; blueprint identities are
 `structureId/blueprintId`. Items use logical `item/id` ContentKeys, not native
 host addresses. A block's pickup form is a `block_item/id` endpoint referring
@@ -81,9 +81,9 @@ to the same planned `block/id`.
 
 Proactively choose useful item roles rather than a catalog made only of delivery
 tokens. Add weapons, mining tools, wearable armor, consumables and/or composed
-fixed abilities when they serve the world's exploration and combat. These are
-items schema 2 capabilities under contract/items, not new WorldDesignPlan fields
-or a new capability relation. Give each planned item a real producer and a theme
+programmed abilities when they serve the world's exploration and combat. These are
+items schema 2 effects or schema 3 program invocations under contract/items and
+contract/abilities. Use the invokes_ability relationship for actual host bindings. Give each planned item a real producer and a theme
 or quest role; tell the player its actual controls in world-appropriate language.
 
 At most 2048 distinct links are allowed. Each substantive endpoint must be a
@@ -92,11 +92,13 @@ may be implicit. Every complete-world target participates in a promised link.
 
 | relation | from → to | What is checked in actual content |
 | --- | --- | --- |
+| story_reference | a story kind or a structure/quest referencing a story kind → actual target | exact typed story reference or StoryAnchor, never an inferred relationship |
 | placed_in_biome | structure → biome | structure.placement.biomes |
 | spawns_in_biome | creature → biome | creature.spawn.biomes |
 | uses_block | terrain/biome/feature/structure/mechanic → block | selected material, compiled voxel or mechanic pattern/action |
 | consumes_item | mechanic → item/block_item | explicit heldItem cost or consumed custom-block cell |
 | grants_item | mechanic → item/block_item | positive give_item action |
+| invokes_ability | item/creature/mechanic/dialogue → ability | actual run_program action or CreatureDefinition.ability |
 | spawns_creature | mechanic → creature | typed spawn_creature action |
 | uses_feature | biome → feature | the biome's configured feature references |
 | drops_item | creature → item/block_item | positive-chance creature drop entry |
@@ -116,11 +118,11 @@ already available vanilla candidate is not guaranteed use. An unused blueprint
 palette entry does not satisfy a compiled structure's uses_block promise.
 
 Every Boss entry names a planned creature and a planned quest, with the matching
-`kill_objective` link. Actual completion requires creature module schema 2 or 3, a real
-nonempty Boss profile, and a positive natural habitat, typed BossSpawner in an
+`kill_objective` link. Actual completion requires creature module schema 2 through 4, a real
+Boss profile (ability-bound Bosses may have empty automatic phases), and a positive natural habitat, typed BossSpawner in an
 enabled structure, or a reachable mechanic spawn action. Mechanic summons need
 actual state and material-source proof, not just a spawns_creature declaration. BossSpawner was introduced in format
-5 and remains supported in new format-7 bundles with structure/creature module
+5 and remains supported in new format-10 bundles with structure/creature module
 schema 2; it references a hostile Boss definition.
 High health,
 a Boss-looking model, or a word in its name is not a Boss profile. This version
@@ -139,7 +141,7 @@ A typed spawner is a repeatable local encounter, not global Boss uniqueness.
    Fill the listed `requiredAuthoring` fields from the prompt and current plan.
    Contract pointers in begin/resume summaries show exactly where to fetch the
    relevant full domain grammar without repeatedly loading every contract.
-3. Commit theme/worldgen/blocks/items/creatures/quests/mechanics through
+3. Commit theme/worldgen/blocks/items/creatures/quests/mechanics/abilities through
    `worldsmith_put_content_modules` with the latest expectedRevision. Textures
    use the provider-independent texture workflow; drawings use the existing SDK,
    source jobs, preview and architecture tools. All edits share this revision.
@@ -224,3 +226,9 @@ deliveries; it does not guarantee a random loot roll or an actual generated site
 ## Deferred player choice and native preparation
 
 All installed packs are menu choices without native resource activation. The native World Type control and Tiangong header share one creation intent. Browsing, choosing a pack, and finish-world suggestions do not trigger client resource reloads. `WAITING_CREATION` / `requiresUserAction:true` means the player must choose that pack and press Create New World; report this action and pause instead of rebuilding or polling. Native preparation then resumes the original guarded creation action. Core/archive readiness remains distinct from actual native activation and from a played world.
+
+Ability targets name actual AbilityScript programs, not prose attack names. A
+planned ability needs a concrete item/creature/mechanic invokes_ability binding;
+review `/modules/abilities/programs/<index>/source`, required capability versions
+and runtime constraints. A valid program/reference alone is not a native
+combat acceptance result.

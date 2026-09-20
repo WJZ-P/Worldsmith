@@ -22,16 +22,18 @@ object WorldMechanicReachability {
         val creatures = linkedSetOf<String>()
         val summoned = pack.mechanics.mechanics.flatMap { it.rules }.flatMap { it.actions }
             .filterIsInstance<MechanicAction.SpawnCreature>().map { it.creature }.distinct()
-        fun inspect() {
-            pack.mechanics.mechanics.forEach { if (it.id !in mechanics && current.fork().activate(it.id, 1)) mechanics += it.id }
-            summoned.forEach { if (it !in creatures && current.fork().ensureCreature(it, 1)) creatures += it }
+        fun inspect(planner: Planner) {
+            pack.mechanics.mechanics.forEach { if (it.id !in mechanics && planner.fork().activate(it.id, 1)) mechanics += it.id }
+            summoned.forEach { if (it !in creatures && planner.fork().ensureCreature(it, 1)) creatures += it }
         }
-        inspect()
+        inspect(current)
         if (QuestValidation.validate(pack.quests).isEmpty()) {
-            for (quest in QuestValidation.ordered(pack.quests)) {
+            val ordered = QuestValidation.ordered(pack.quests)
+            if (QuestMaterialRoutes.needsGraphProof(ordered)) QuestMaterialRoutes.explore(pack, inventory, observe = ::inspect)
+            else for (quest in ordered) {
                 if (!current.satisfyQuest(quest)) break
                 quest.rewards.forEach { reward -> logicalItem(reward.item)?.let { current.grant(it, reward.count.toLong()) } }
-                inspect()
+                inspect(current)
             }
         }
         return Proof(java.util.Set.copyOf(mechanics), java.util.Set.copyOf(creatures))
@@ -99,6 +101,12 @@ object WorldMechanicReachability {
         fun available(key: ContentKey): Long = if (key in repeatable) Long.MAX_VALUE else stock[key] ?: 0L
         fun grant(key: ContentKey, count: Long) { if (count > 0) stock[key] = ((stock[key] ?: 0L) + count).coerceAtMost(MAX_SUPPLY) }
         fun fork(): Planner = Planner(pack, mechanics, biomes, baseCreatures, repeatable, stock.toMutableMap(), creatureStock.toMutableMap(), facts.toMutableMap(), questKillCredits.toMutableMap(), stateSupply.toMutableMap(), budget)
+        /** Distinguish equal completed-quest sets with different finite inventory or device state. */
+        fun proofKey(): String = listOf(
+            stock.entries.sortedBy { "${it.key.kind}/${it.key.id}" }.joinToString(),
+            creatureStock.toSortedMap().toString(), facts.toSortedMap().toString(),
+            stateSupply.entries.sortedBy { it.key.toString() }.joinToString(),
+        ).joinToString("|")
         private fun adopt(other: Planner) {
             stock.clear(); stock.putAll(other.stock)
             creatureStock.clear(); creatureStock.putAll(other.creatureStock)
@@ -111,15 +119,17 @@ object WorldMechanicReachability {
             is QuestObjective.ActivateMechanic -> activate(objective.mechanic, objective.count)
             is QuestObjective.KillCreature -> observeKill(objective.creature, objective.count)
             is QuestObjective.DeliverItem -> logicalItem(objective.item)?.let { takeItem(it, objective.count) } ?: true
+            is QuestObjective.Fact -> true // No material consumption: shared story semantics are validated separately.
         }
 
         /** One current-quest kill credits all matching kill objectives and produces their delivery loot. */
         fun satisfyQuest(quest: Quest): Boolean {
             beginQuest()
-            val kills = quest.objectives.filterIsInstance<QuestObjective.KillCreature>().groupBy { it.creature }
+            val required = quest.objectives.filterNot { it.optional }
+            val kills = required.filterIsInstance<QuestObjective.KillCreature>().groupBy { it.creature }
             if (!kills.all { (creature, objectives) -> observeKill(creature, objectives.maxOf { it.count }) }) return false
-            if (!quest.objectives.filterIsInstance<QuestObjective.ActivateMechanic>().all(::satisfy)) return false
-            return quest.objectives.filterIsInstance<QuestObjective.DeliverItem>().all(::satisfy)
+            if (!required.filterIsInstance<QuestObjective.ActivateMechanic>().all(::satisfy)) return false
+            return required.filterIsInstance<QuestObjective.DeliverItem>().all(::satisfy)
         }
 
         fun beginQuest() { questKillCredits.clear() }
@@ -281,6 +291,8 @@ object WorldMechanicReachability {
             if (needed.any { (key, count) -> available(key) < count }) return false
             consumed.forEach { (key, count) -> consume(key, count) }
             rule.actions.forEach { action -> when (action) {
+                // Dynamic program effects are not statically claimed as item/creature producers.
+                is MechanicAction.RunProgram -> Unit
                 is MechanicAction.GiveItem -> logicalItem(action.item)?.let { grant(it, action.count.toLong()) }
                 is MechanicAction.SetBlock -> if (cells[action.offset]?.block?.block != action.block.block) logicalItem(action.block.block)?.let { grant(it, 1) }
                 is MechanicAction.SpawnCreature -> creatureStock[action.creature] = ((creatureStock[action.creature] ?: 0L) + 1).coerceAtMost(MAX_SUPPLY)
@@ -292,6 +304,7 @@ object WorldMechanicReachability {
         private fun enabled(rule: WorldMechanicRule): Boolean = rule.biomes.isEmpty() || rule.biomes.any(biomes::contains)
         private fun consume(key: ContentKey, count: Long) { if (key !in repeatable) stock[key] = (stock[key] ?: 0L) - count }
         private fun produces(action: MechanicAction, key: ContentKey): Boolean = when (action) {
+            is MechanicAction.RunProgram -> false
             is MechanicAction.GiveItem -> logicalItem(action.item) == key
             is MechanicAction.SetBlock -> logicalItem(action.block.block) == key
             is MechanicAction.SpawnCreature -> false

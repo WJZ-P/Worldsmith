@@ -20,7 +20,7 @@ import java.util.zip.ZipFile
 /** Bounded configuration reads for the browser; never decodes PNGs, geometry or executable source. */
 internal object ResourcePackMetadata {
     private const val MANIFEST_LIMIT=512*1024
-    private val kinds=listOf("biomes","structures","features","blocks","creatures","items","quests","mechanics")
+    private val kinds=listOf("biomes","structures","features","blocks","creatures","items","quests","mechanics","abilities")
 
     fun directory(directory:Path,manifest:WorldsmithPackManifest):ResourcePackDetails {
         var remaining=WorldContentBundleIO.MAX_TEXT_BYTES
@@ -65,10 +65,17 @@ internal object ResourcePackMetadata {
         for(kind in kinds) {
             val module=manifest.modules[kind]
             counts[kind]=if(module==null)0 else {
-                val entries=document(module.path)[kind]
+                val entries=document(module.path)[if(kind=="abilities") "programs" else kind]
                 require(entries==null || entries is JsonArray) {"Invalid $kind configuration list"}
                 lists[kind]=(entries as? JsonArray).orEmpty().mapNotNull {it as? JsonObject}
                 (entries as? JsonArray)?.size ?: 0
+            }
+        }
+        manifest.modules["story"]?.let { module ->
+            val story=document(module.path)
+            com.wjz.worldsmith.core.story.StoryContentModule.collections.forEach { (kind,collection) ->
+                val entries=story[collection];require(entries==null||entries is JsonArray) { "Invalid story $collection list" }
+                counts[if(kind=="story_fact") "storyFacts" else collection]=(entries as? JsonArray)?.size ?: 0
             }
         }
         counts["pngAssets"]=manifest.assets.size
@@ -76,13 +83,13 @@ internal object ResourcePackMetadata {
             manifest.formatVersion,manifest.assets.size,path.toString()),counts,icon(manifest,lists))
     }
 
-    /** Explicit authorship wins; old worlds get a stable relic/quest-item choice without changing their bytes. */
+    /** Explicit authorship wins; unmarked current packs get a stable relic/quest-item choice. */
     private fun icon(manifest:WorldsmithPackManifest,lists:Map<String,List<JsonObject>>):ResourcePackIcon? {
         fun text(value:JsonObject,key:String)=value[key]?.jsonPrimitive?.contentOrNull
         val candidates=buildList {
             for(kind in listOf("item","block")) for(entry in lists["${kind}s"].orEmpty()) {
                 val id=text(entry,"id") ?: continue
-                val assetId=text(entry,"textureAsset") ?: continue
+                val assetId=(if(kind=="block") (entry["appearance"] as? JsonObject)?.let { text(it,"particle") } else text(entry,"textureAsset")) ?: continue
                 val asset=manifest.assets.firstOrNull {it.id==assetId} ?: continue
                 add(Triple(ContentKey(kind,id),asset,entry))
             }

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class ScopedNativeHostTest {
-    private val blocks = CustomBlockLibrary(blocks = listOf(CustomBlockDefinition("moon", "Moon", textureAsset = "a".repeat(64))))
+    private val blocks = CustomBlockLibrary(blocks = listOf(CustomBlockDefinition("moon", "Moon", appearance = com.wjz.worldsmith.core.content.BlockAppearance.uniform("a".repeat(64)))))
 
     @Test fun `legacy native inspection adapters accept empty content but never silently ignore custom blocks`() {
         val host = object : StructureNativeHost {

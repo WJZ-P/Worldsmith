@@ -68,4 +68,8 @@ sealed interface MechanicAction {
 
     @Serializable @SerialName("give_item")
     data class GiveItem @JvmOverloads constructor(val item: String, val count: Int = 1) : MechanicAction
+
+    /** Reserves a shared ability invocation and launches it after this activation commits. */
+    @Serializable @SerialName("run_program")
+    data class RunProgram(val program: String) : MechanicAction
 }

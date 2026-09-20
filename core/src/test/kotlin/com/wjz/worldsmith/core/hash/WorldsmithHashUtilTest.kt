@@ -30,7 +30,7 @@ class WorldsmithHashUtilTest {
     }
 
     @Test fun `explicit default fields and omitted defaults have one semantic identity`() {
-        val emptyBlocks = files.texts + ("blocks.json" to "{\"schemaVersion\":1}")
+        val emptyBlocks = files.texts + ("blocks.json" to "{\"schemaVersion\":2}")
         assertEquals(files.manifest.id, WorldsmithHashUtil.computeGenerationId(files.manifest, emptyBlocks))
     }
 }

@@ -21,7 +21,7 @@ class ResourcePackIconPreviewTest {
         val relic=ContentTextureMcp.pixels(listOf("#dbb766"),List(16) {List(16) {0}})
         return WorldContentBundleIO.create("The Ember Road","Follow the ember beacons through the mountains.",base.terrain,base.biomes,base.features,base.structures,base.theme,
             assets=mapOf(ordinary.descriptor.id to ordinary.bytes,relic.descriptor.id to relic.bytes),
-            blocks=CustomBlockLibrary(blocks=listOf(CustomBlockDefinition("beacon_stone","Beacon Stone",textureAsset=ordinary.descriptor.id))),
+            blocks=CustomBlockLibrary(blocks=listOf(CustomBlockDefinition("beacon_stone","Beacon Stone",appearance = com.wjz.worldsmith.core.content.BlockAppearance.uniform(ordinary.descriptor.id)))),
             items=CustomItemLibrary(items=listOf(
                 CustomItemDefinition("leaf","River Leaf",ordinary.descriptor.id),
                 CustomItemDefinition("oath_seal","Ember Oath",relic.descriptor.id,kind=CustomItemKind.RELIC,rarity=CustomItemRarity.EPIC)

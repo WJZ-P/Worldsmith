@@ -1,0 +1,48 @@
+// One program is shared by a creature, a hand-held item and a mechanic.
+// Marks are values captured now, not a target that silently follows the player.
+fn focus() {
+    if (entity.alive(target)) { return entity.position(target); }
+    return world.aim(6);
+}
+
+fn pulse(mark, power) {
+    let region = shape.sphere(mark, 1.8);
+    for victim in world.entities(region) {
+        if (world.visible(self, victim)) { combat.damage(victim, power); }
+    }
+}
+
+on start {
+    // Only a creature needs an AI-control token; the same source still works in a player's hand.
+    let movement = 0;
+    if (entity.kind(self) == "creature") {
+        movement = control.claim(60, 100);
+        if (movement == 0) { return; }
+    }
+    if (state.starts == null) { state.starts = 0; }
+    state.starts = state.starts + 1;
+    state.completed = false;
+    motion.stop(self);
+    fx.pose("windup", 40);
+    fx.caption("Echoes remember positions. Move away from the marks!", 40);
+    let marks = [];
+    repeat 3 {
+        let mark = focus();
+        marks = list.append(marks, mark);
+        fx.telegraph(shape.sphere(mark, 1.8), 36, "amber");
+        fx.sound("minecraft:block.note_block.bell", mark, 0.6, 1.2);
+        wait 12;
+        if (movement != 0 && !control.held(movement)) { return; }
+    }
+    for mark in marks {
+        fx.pose("strike", 4);
+        fx.telegraph(shape.sphere(mark, 1.8), 4, "white");
+        pulse(mark, 3);
+        wait 8;
+        if (movement != 0 && !control.held(movement)) { return; }
+    }
+    state.completed = true;
+    fx.pose("recovery", 20);
+    wait 20;
+    if (movement != 0) { control.release(movement); }
+}

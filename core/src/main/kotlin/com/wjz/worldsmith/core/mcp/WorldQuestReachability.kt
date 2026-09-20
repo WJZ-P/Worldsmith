@@ -11,6 +11,7 @@ object WorldQuestReachability {
         val structural = QuestValidation.validate(pack.quests)
         if (structural.isNotEmpty()) return structural.map { it.copy(path = "quests.${it.path}") }
         val ordered = QuestValidation.ordered(pack.quests)
+        if (QuestMaterialRoutes.needsGraphProof(ordered)) return validateGraph(pack, inventory, plannedItems)
         val definitions = pack.quests.quests.withIndex().associate { it.value.id to it.index }
         val planner = WorldMechanicReachability.planner(pack, inventory)
         val initialSupply = planner.initialSupply
@@ -32,6 +33,7 @@ object WorldQuestReachability {
                 is QuestObjective.KillCreature -> 0
                 is QuestObjective.ActivateMechanic -> 1
                 is QuestObjective.DeliverItem -> 2
+                is QuestObjective.Fact -> 3
             } }.forEach objectives@{ (objectiveIndex, objective) ->
                 val path = "quests.quests[${definitions.getValue(quest.id)}].objectives[$objectiveIndex]"
                 when (objective) {
@@ -65,6 +67,7 @@ object WorldQuestReachability {
                             "Quest '${quest.id}' needs ${objective.count} ${objective.item}, but at most $available unconsumed earlier rewards and fixed-site supplies are available, with no affordable world or mechanic producer covering the shortfall. Later/self candidates: $candidates.",
                             hint = "Add a positive reachable producer, place its actual materials before use, move rewards to an already-claimable predecessor, or lower total deliveries. Mechanic offerings and earlier deliveries share the same finite stock; a task's own reward arrives only after its objectives.")
                     }
+                    is QuestObjective.Fact -> Unit
                 }
             }
             if (errors.isEmpty()) {
@@ -77,5 +80,25 @@ object WorldQuestReachability {
                 "Planned item '${key.id}' has no positive affordable world, mechanic or already-claimable quest producer. A summon/drop/offering cycle without an initial source does not make the item obtainable.")
         }
         return errors
+    }
+
+    /** Each exclusive alternative gets its own inventory; rejected-route rewards never fund another route. */
+    private fun validateGraph(pack: WorldsmithPack, inventory: DesignInventory, plannedItems: Set<ContentKey>): List<Diagnostic> {
+        val proof = QuestMaterialRoutes.explore(pack, inventory, plannedItems)
+        val result = mutableListOf<Diagnostic>()
+        if (proof.exhausted) result += Diagnostic("quests.quests", "DESIGN_QUEST_PROOF_BUDGET", DiagnosticSeverity.ERROR,
+            "The branched material-route proof exceeded its bounded search. Reduce independent irreversible alternatives or make their supply paths explicit.")
+        else if (proof.completedRoutes == 0 && pack.quests.quests.any { !it.optional }) result += Diagnostic("quests.quests", "DESIGN_QUEST_ROUTE_BLOCKED", DiagnosticSeverity.ERROR,
+            "No bounded prerequisite-consistent material route finishes all non-excluded required quests. Stalled goals: ${proof.blocked.sorted().joinToString()}.",
+            hint = "Supply deliveries before rewards, keep exclusive branches separate, use ANY to merge alternatives, and do not require optional rewards without a prerequisite.")
+        if (!proof.exhausted) pack.quests.quests.filter { it.exclusiveGroup != null && !it.optional && it.id !in proof.completedBranches }.forEach {
+            result += Diagnostic("quests.quests", "DESIGN_QUEST_BRANCH_BLOCKED", DiagnosticSeverity.ERROR,
+                "Exclusive branch '${it.id}' has no complete material route; another branch's reward is not a producer for this choice.")
+        }
+        plannedItems.filter { it.kind == "item" && it !in proof.obtainableItems }.forEach {
+            result += Diagnostic("designPlan.targets", "DESIGN_ITEM_NO_REACHABLE_PRODUCER", DiagnosticSeverity.ERROR,
+                "Planned item '${it.id}' has no verified producer on any bounded prerequisite-consistent branch.")
+        }
+        return result
     }
 }

@@ -40,7 +40,7 @@ object CreatureAuthoring {
     private fun definition(recipe: CreatureRecipe, rig: Rig, texture: String): CreatureDefinition {
         val result = CreatureDefinition(recipe.id, recipe.displayName, recipe.category,
             CreatureModel(texture, recipe.atlasWidth, recipe.atlasHeight, rig.bones), recipe.attributes, recipe.behavior,
-            recipe.spawn.copy(biomes = recipe.spawn.biomes.toList()), recipe.themeRole,recipe.drops.toList(),recipe.boss,recipe.sounds)
+            recipe.spawn.copy(biomes = recipe.spawn.biomes.toList()), recipe.themeRole,recipe.drops.toList(),recipe.boss,recipe.sounds,recipe.ability,recipe.abilityBindings)
         val library = CreatureLibrary(schemaVersion=recipe.schemaVersion,creatures = listOf(result))
         val errors = CustomCreatureValidator.validate(library)
         require(errors.isEmpty()) { errors.take(16).joinToString("; ") { "${it.path}: ${it.message}" } }
@@ -48,9 +48,12 @@ object CreatureAuthoring {
     }
 
     private fun rig(recipe: CreatureRecipe): Rig {
-        require(recipe.schemaVersion in 1..3) { "Creature authoring recipe schema must be 1, 2 or 3" }
-        require(recipe.boss == null || recipe.schemaVersion >= 2) { "Boss authoring requires recipe schemaVersion 2 or 3" }
-        require(recipe.sounds == null || recipe.schemaVersion == 3) { "Sound authoring requires explicit recipe schemaVersion 3" }
+        require(recipe.schemaVersion in 1..6) { "Creature authoring recipe schema must be 1 through 6" }
+        require(recipe.boss == null || recipe.schemaVersion >= 2) { "Boss authoring requires recipe schemaVersion 2 through 4" }
+        require(recipe.sounds == null || recipe.schemaVersion >= 3) { "Sound authoring requires recipe schemaVersion 3 or later" }
+        require(recipe.ability == null || recipe.schemaVersion >= 4) { "Ability authoring requires recipe schemaVersion 4" }
+        require(recipe.abilityBindings.isEmpty() || recipe.schemaVersion >= 5) { "Event bindings require recipe schemaVersion 5" }
+        require(recipe.abilityBindings.none { it.intervalTicks != 1 } || recipe.schemaVersion >= 6) { "Observation intervals require recipe schemaVersion 6" }
         require(listOf(recipe.atlasWidth, recipe.atlasHeight).all { it in 16..512 && it.countOneBits() == 1 }) { "Atlas dimensions must be powers of two, 16..512" }
         require(recipe.padding in 0..8 && recipe.mirrors.size <= 32) { "Use padding 0..8 and at most 32 mirror operations" }
         val bones = recipe.bones.map { it.copy(cubes = it.cubes.toList()) }.toMutableList()

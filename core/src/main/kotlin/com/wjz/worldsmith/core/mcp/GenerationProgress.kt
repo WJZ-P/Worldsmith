@@ -1,5 +1,8 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+
 import com.wjz.worldsmith.core.content.*
 import com.wjz.worldsmith.core.drawhost.DrawingJob
 import com.wjz.worldsmith.core.drawhost.DrawingJobStage
@@ -69,15 +72,15 @@ data class GenerationProgress(
 
 /** Read-only, bounded draft inspection. No drawing compilation, source execution, image decode or native reload. */
 object WorldGenerationProgress {
-    private val completeModules = listOf("theme", "terrain", "biomes", "features", "blocks", "items", "creatures", "quests", "mechanics")
+    private val completeModules = listOf("theme", "terrain", "biomes", "features", "blocks", "items", "creatures", "quests", "mechanics", "abilities", "story")
     private val worldgenModules = listOf("theme", "terrain", "biomes", "features")
     private val modulePriority = mapOf("theme" to 10, "terrain" to 20, "biomes" to 25, "features" to 30,
-        "blocks" to 35, "items" to 36, "creatures" to 45, "mechanics" to 65, "quests" to 75)
+        "abilities" to 34, "blocks" to 35, "items" to 36, "creatures" to 45, "mechanics" to 65, "story" to 70, "quests" to 75)
 
-    fun inspect(session: WorkflowSession, jobs: List<DrawingJob> = emptyList()): GenerationProgress =
-        inspectUsingInventory(session, jobs, WorldDesignCoverage.draft(session))
+    @JvmOverloads fun inspect(session: WorkflowSession, jobs: List<DrawingJob> = emptyList(), abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()): GenerationProgress =
+        inspectUsingInventory(session, jobs, WorldDesignCoverage.draft(session), abilityCapabilities)
 
-    internal fun inspectUsingInventory(session: WorkflowSession, jobs: List<DrawingJob>, inventory: DesignInventory): GenerationProgress {
+    internal fun inspectUsingInventory(session: WorkflowSession, jobs: List<DrawingJob>, inventory: DesignInventory, abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()): GenerationProgress {
         val issues = mutableListOf<GenerationIssue>()
         val sid = buildJsonObject { put("sessionId", session.id) }
         val cas = buildJsonObject { put("sessionId", session.id); put("expectedRevision", session.revision) }
@@ -130,7 +133,7 @@ object WorldGenerationProgress {
             "worldsmith_put_content_modules", modulePriority[module] ?: 40, authoring = listOf("modules.$module")) }
         inventory.moduleErrors.forEach { (module, message) -> issue("GENERATION_MODULE_UNREADABLE", "module", "$module: $message",
             "worldsmith_put_content_modules", modulePriority[module] ?: 40, authoring = listOf("modules.$module")) }
-        cheapDiagnostics(session).take(24).forEach { (module, diagnostic) -> issue(diagnostic.code, "module", "$module.${diagnostic.path}: ${diagnostic.message}",
+        cheapDiagnostics(session, abilityCapabilities).take(24).forEach { (module, diagnostic) -> issue(diagnostic.code, "module", "$module.${diagnostic.path}: ${diagnostic.message}",
             "worldsmith_put_content_modules", (modulePriority[module] ?: 40) + 1, authoring = listOf("modules.$module")) }
 
         inventory.textures.forEach { (owner, references) -> references.filter { it !in session.contentAssets }.forEach { id ->
@@ -176,7 +179,7 @@ object WorldGenerationProgress {
         }
         val ordered = issues.sortedWith(compareBy({ it.priority }, { it.code }, { it.message }))
         val counts = linkedMapOf<String, Int>()
-        listOf("biome", "structure", "creature", "block", "item", "quest", "mechanic").forEach { kind ->
+        (listOf("biome", "structure", "creature", "block", "item", "quest", "mechanic", "ability") + com.wjz.worldsmith.core.story.StoryContentModule.kinds).forEach { kind ->
             counts["${kind}Definitions"] = inventory.symbols.count { it.kind == kind }
             counts["${kind}Planned"] = session.designPlan?.targets?.count { it.key.kind == kind } ?: 0
         }
@@ -259,11 +262,11 @@ object WorldGenerationProgress {
     }
 
     private fun moduleFor(kind: String?) = when (kind) {
-        "biome" -> "biomes"; "feature" -> "features"; "creature" -> "creatures"; "block" -> "blocks"; "item" -> "items"; "quest" -> "quests"; "mechanic" -> "mechanics"
-        "theme", "narrative_beat" -> "theme"; "terrain", "anchor" -> "terrain"; else -> null
+        "biome" -> "biomes"; "feature" -> "features"; "creature" -> "creatures"; "block" -> "blocks"; "item" -> "items"; "quest" -> "quests"; "mechanic" -> "mechanics"; "ability" -> "abilities"
+        "theme", "narrative_beat" -> "theme"; "terrain", "anchor" -> "terrain"; in com.wjz.worldsmith.core.story.StoryContentModule.kinds -> "story"; else -> null
     }
 
-    private fun cheapDiagnostics(session: WorkflowSession): List<Pair<String, Diagnostic>> = buildList {
+    private fun cheapDiagnostics(session: WorkflowSession, abilityCapabilities: AbilityCapabilityRegistry): List<Pair<String, Diagnostic>> = buildList {
         session.contentModules.forEach { (id, raw) ->
             val result = runCatching { when (id) {
                 "theme" -> WorldThemeValidation.validate(McpJson.decode(raw))
@@ -271,6 +274,8 @@ object WorldGenerationProgress {
                 "items" -> CustomItemValidation.validate(McpJson.decode(raw))
                 "creatures" -> CustomCreatureValidator.validate(McpJson.decode(raw))
                 "quests" -> QuestValidation.validate(McpJson.decode(raw))
+                "abilities" -> com.wjz.worldsmith.core.ability.AbilityPrograms.validate(McpJson.decode(raw), abilityCapabilities)
+                "story" -> com.wjz.worldsmith.core.story.StoryValidation.validate(McpJson.decode(raw))
                 "mechanics" -> WorldMechanicValidation.validate(McpJson.decode(raw))
                 "terrain" -> TerrainPlanValidator.validate(McpJson.decode(raw))
                 "features" -> FeatureLibraryValidator.validate(McpJson.decode(raw))

@@ -57,7 +57,7 @@ class StructureMcpService(private val directory:Path,private val host:DrawingHos
             require(source.variants.size in 1..8)
             for(id in source.variants)if(id !in artifacts){val a=host.artifact(session,id,inspection||source.allowPreviousRevision);artifacts[id]=a.copy(sessionId="",jobId="",revision=0);assets[id]=host.drawing(a);sources[a.sourceHash]=host.source(a)}
         }
-        return library.copy(schemaVersion=if(artifacts.isEmpty())library.schemaVersion else 2,artifacts=artifacts,sources=sources,drawingAssets=assets)
+        return library.copy(schemaVersion=if(artifacts.isEmpty())library.schemaVersion else maxOf(2,library.schemaVersion),artifacts=artifacts,sources=sources,drawingAssets=assets)
     }
     private fun definition(sid:String,args:JsonObject):WorldStructureDefinition {
         require(listOf("structure","blueprint","drawingId").count {it in args}==1) {"Choose structure, blueprint OR drawingId"}

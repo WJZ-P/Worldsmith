@@ -58,8 +58,8 @@ object WorldMechanicValidation {
         fun predicate(value: MechanicBlockPredicate, path: String) {
             if (!validBlockReference(value.block)) error("$path.block", "block_reference", "Use an exact native block or logical world block id, without tags, inline states or raw hosts")
             if (value.properties.size > MAX_PROPERTIES) error("$path.properties", "property_count", "At most $MAX_PROPERTIES block-state properties")
-            if (value.block.startsWith(BLOCK_PREFIX) && value.properties.isNotEmpty())
-                error("$path.properties", "custom_block_properties", "Logical custom blocks use their immutable definition and have no authored state overrides")
+            if (value.block.startsWith(BLOCK_PREFIX) && value.properties.any { (key, entry) -> key != "facing" || entry !in setOf("north", "east", "south", "west") })
+                error("$path.properties", "custom_block_properties", "Logical custom blocks accept only cardinal facing on a declared HORIZONTAL appearance")
             value.properties.entries.take(MAX_PROPERTIES).forEach { (key, entry) ->
                 if (!PROPERTY.matches(key) || !PROPERTY_VALUE.matches(entry))
                     error("$path.properties", "property", "Property names and values must be bounded lowercase state tokens (1..64 characters)")
@@ -130,6 +130,9 @@ object WorldMechanicValidation {
                 rule.actions.take(MAX_ACTIONS).forEachIndexed { k, action ->
                     val actionPath = "$at.actions[$k]"
                     when (action) {
+                        is MechanicAction.RunProgram -> {
+                            if (!com.wjz.worldsmith.core.ability.AbilityPrograms.validId(action.program)) error("$actionPath.program", "program_reference", "Use a normalized local ability program id")
+                        }
                         is MechanicAction.SetBlock -> {
                             offset(action.offset, "$actionPath.offset")
                             predicate(action.block, "$actionPath.block")
@@ -150,6 +153,8 @@ object WorldMechanicValidation {
                         }
                     }
                 }
+                if (rule.actions.take(MAX_ACTIONS).count { it is MechanicAction.RunProgram } > 1)
+                    error("$at.actions", "program_count", "At most one program launch per activation; compose further flow inside the program")
                 if (spawns > 1) error("$at.actions", "spawn_count", "At most one creature may be spawned per activation")
                 if (spawns > 0 && rule.fromState == rule.toState) error("$at.toState", "spawn_state", "A creature spawn must advance to a different state")
                 if (rule.fromState == rule.toState && !hasCost(rule) && rule.actions.take(MAX_ACTIONS).any(::isReward))
@@ -199,6 +204,7 @@ object WorldMechanicValidation {
                             is MechanicAction.SetBlock -> action.copy(block = freezePredicate(action.block))
                             is MechanicAction.SpawnCreature -> action.copy()
                             is MechanicAction.GiveItem -> action.copy()
+                            is MechanicAction.RunProgram -> action.copy()
                         }
                     }),
                     biomes = java.util.List.copyOf(rule.biomes),

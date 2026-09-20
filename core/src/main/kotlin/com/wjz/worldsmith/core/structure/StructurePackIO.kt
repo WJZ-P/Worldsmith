@@ -14,7 +14,8 @@ object StructurePackIO {
         val contents=linkedMapOf<String,String>()
         fun save(blueprint:StructureBlueprint):String {
             require(ID.matches(blueprint.id)) { "Invalid blueprint identifier" }
-            require(library.schemaVersion==2 || blueprint.interactions.none { it is StructureInteraction.BossSpawner }) { "Boss spawners require structure library schema 2" }
+            require(library.schemaVersion>=3 || blueprint.interactions.none { it is StructureInteraction.StoryAnchor }) { "Story anchors require structure library schema 3" }
+            require(library.schemaVersion>=2 || blueprint.interactions.none { it is StructureInteraction.BossSpawner }) { "Boss spawners require structure library schema 2" }
             val file="structures/${blueprint.id}.json";val text=WorldsmithJson.encode(blueprint)
             val previous=contents.putIfAbsent(file,text)
             require(previous==null || previous==text) { "Conflicting blueprint ${blueprint.id}" }
@@ -48,7 +49,8 @@ object StructurePackIO {
         fun read(path:String):StructureBlueprint {
             val b=WorldsmithJson.decode<StructureBlueprint>(requireNotNull(contents[path]))
             require(path=="structures/${b.id}.json") { "Blueprint id must match its file name" }
-            require(index.schemaVersion==2 || b.interactions.none { it is StructureInteraction.BossSpawner }) { "Boss spawners require structure library schema 2" }
+            require(index.schemaVersion>=3 || b.interactions.none { it is StructureInteraction.StoryAnchor }) { "Story anchors require structure library schema 3" }
+            require(index.schemaVersion>=2 || b.interactions.none { it is StructureInteraction.BossSpawner }) { "Boss spawners require structure library schema 2" }
             return b
         }
         val definitions=index.structures.map { entry ->
@@ -58,7 +60,7 @@ object StructurePackIO {
         }
         require(index.artifacts.size<=512 && index.sources.size<=64) { "Drawing/source catalog budget exceeded" }
         require(index.sources.values.sumOf { s->s.files.values.sumOf { it.toByteArray(Charsets.UTF_8).size.toLong() } }<=8*1024*1024) { "Source provenance budget exceeded" }
-        require(index.schemaVersion==2 || index.artifacts.isEmpty()) { "SDK drawings require structure format 2" }
+        require(index.schemaVersion>=2 || index.artifacts.isEmpty()) { "SDK drawings require structure format 2" }
         val drawings=index.artifacts.mapValues { (id,meta)->
             require(id.matches(Regex("[0-9a-f]{64}")) && meta.id==id && meta.sourceHash in index.sources && meta.codecVersion==DrawSnapshotCodec.VERSION) { "Invalid drawing artifact manifest" }
             val bytes=requireNotNull(binaries[meta.path]) { "Missing drawing '${meta.path}'" }

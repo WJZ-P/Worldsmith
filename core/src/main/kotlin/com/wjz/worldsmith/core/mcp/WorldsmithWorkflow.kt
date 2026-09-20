@@ -47,7 +47,8 @@ internal fun WorkflowSession.structureLibrary(): StructureLibrary {
     val definitions = structures.values.toList()
     val hasBossSpawner = definitions.any { structure -> (listOf(structure.blueprint) + structure.assembly?.pieces.orEmpty().values)
         .any { blueprint -> blueprint.interactions.any { it is StructureInteraction.BossSpawner } } }
-    return StructureLibrary(schemaVersion = if (hasBossSpawner) 2 else 1, structures = definitions, architecture = architecture)
+    val hasStoryAnchor = definitions.any { s -> (listOf(s.blueprint)+s.assembly?.pieces.orEmpty().values).any { b -> b.interactions.any { it is StructureInteraction.StoryAnchor } } }
+    return StructureLibrary(schemaVersion = if (hasStoryAnchor) 3 else if (hasBossSpawner) 2 else 1, structures = definitions, architecture = architecture)
 }
 
 /**
@@ -85,10 +86,10 @@ object WorldsmithWorkflow {
         "You are designing one Minecraft world from the player's description. Work through `procedure` in " +
             "order and do not stop until $FINISH_TOOL answers complete=true.\n\n" +
             "Start with one persistent WorldTheme: premise, player role, world rules, conflict and narrative beats linked to actual content. " +
-            "Use worldsmith_get_content_contract for theme/blocks/creatures/items/quests/mechanics, then author real PNG textures and typed content modules. " +
+            "Use worldsmith_get_content_contract for theme/blocks/creatures/items/quests/mechanics/abilities, then author real PNG textures and typed content modules. " +
             "worldsmith_put_content_modules and texture tools use expectedRevision from worldsmith_get_content_draft; all edits share architecture's revision. " +
             "Custom blocks use worldsmith:content/<id>, fixed native profiles and immutable world slots. Creatures use grounded native hosts, cuboid rigs and bounded server behaviors. " +
-            "A bounded linear quests module can link narrative beats to kill, item-delivery and committed mechanic-activation objectives; narrative beats alone are not executable quests. Existing quests project into native world-specific advancements after reward claims; independent achievement authoring remains a future module. New bundles use format 7 with a required mechanics module; older formats are rejected. Event-driven mechanics compose typed block patterns, held-item costs, local state and fixed actions; narrative beats alone never execute these rules. Items schema 2 supports native equipment, consumables and server-owned ability combinations. " +
+            "A bounded branching quests module links narrative beats to fact, kill, item-delivery and committed mechanic-activation objectives; narrative beats alone are not executable quests. Existing quests project into native world-specific advancements after reward claims; independent achievement authoring remains a future module. New bundles use format 10 with required mechanics, abilities and story modules; older formats are rejected. Event-driven mechanics compose typed block patterns, held-item costs, local state and transactional actions, including shared program invocation; narrative beats alone never execute these rules. Items schema 2 supports native equipment and consumables; schema 3 invokes AbilityScript. Abilities are real source programs with functions, events, branches, loops, waits and state, not a closed skill catalogue. Author source against the abilities capability signatures; creature schema 4 and mechanics run_program use the same runtime. " +
             "Design terrain, biomes, features and world-specific architecture yourself. New guided worlds require at least two distinct building groups, " +
             "one independent structure, and at least one monumental theme-defining group. Read contract/architecture, plan required/optional members, " +
             "and light occupied interiors explicitly. Use designGuide to translate the theme into form and playable spaces; numerical gates are not design targets. " +
@@ -115,7 +116,7 @@ object WorldsmithWorkflow {
     val PROCEDURE: List<WorkflowStep> = (listOf(
         WorkflowStep(0,CONTRACT_TOOL,"Read id=grand_world (world-atlas first) and the returned authoringBudgets. Plan macro regions, route intent, content families and staged production using existing goal/purpose/theme/architecture fields; these planning labels are not new runtime regions or quest types."),
         WorkflowStep(0,"worldsmith_get_content_framework","Read installed modules and capacity/lifecycle boundaries; no planned module may be silently treated as implemented."),
-        WorkflowStep(0,"worldsmith_get_content_contract","Read theme, blocks, creatures, items, quests and mechanics contracts. Establish one shared premise/player role/rules/conflict and linked narrative beats before designing content."),
+        WorkflowStep(0,"worldsmith_get_content_contract","Read theme, blocks, creatures, items, quests, mechanics and abilities contracts. Establish one shared premise/player role/rules/conflict and linked narrative beats before designing content."),
         WorkflowStep(0,"worldsmith_put_content_modules","Commit complete theme and initial content drafts at expectedRevision. Use create_pixel_texture or put_texture_asset for actual PNGs, inspect their previews and bind the returned hash to custom blocks/creature rigs. Record each returned revision. Draft links may be repaired incrementally; all links must resolve at publication."),
     ) + listOf(
         WorkflowStep(
@@ -223,7 +224,7 @@ object WorldsmithWorkflow {
                 "worldsmith_put_world_design_plan" to "Commit prompt-specific names, roles, real relationship promises and Boss/quest links at expectedRevision.",
                 "worldsmith_put_module_briefs" to "Jointly plan the main line, regional ecology and resource/reward chain. Assign concrete targets, setting references, dependencies and evidence criteria to briefs. Drawings/textures use briefIds; do not produce unbriefed content.",
                 "worldsmith_get_generation_progress" to "Follow the highest-priority current gap. Read full contracts only for the domain being authored.",
-                "worldsmith_put_content_modules" to "Author theme/worldgen/content/quests/mechanics coherently. Promised interactions need actual mechanics rules, not only lore. Build real textures and creature rigs through the linked authoring tools; keep returned asset identities.",
+                "worldsmith_put_content_modules" to "Author theme/worldgen/content/quests/mechanics/abilities coherently. Promised interactions need actual mechanics rules, not only lore. Build real textures and creature rigs through the linked authoring tools; keep returned asset identities.",
                 STRUCTURE_TOOL to "Use the established SDK, preview, architecture and preflight loops for every planned building; preserve current jobs and shared revisions.",
                 "worldsmith_review_world_alignment" to "For each brief, first read get_authoring_review_context with its subjectId, then cite actual module/asset evidence against every required check. Reports bind current setting, briefs and content digests. A reference or a passing schema check alone is not semantic review.",
                 WRITE_TOOL to "Freeze the current revision and receive the single-file resourcePack .wspack receipt. Publication verifies real compiled-material/reward/spawn/objective links. Archive-only errors preserve the frozen draft and name an export-only retry.",
@@ -386,7 +387,7 @@ class WorkflowSessions @JvmOverloads constructor(
         assets:Map<String,com.wjz.worldsmith.core.content.ContentAsset> = emptyMap(),
         removeAssets:List<String> = emptyList()):WorkflowSession? = update(id) {
         require(it.revision==expectedRevision) { "DRAFT_REVISION_CONFLICT: expected $expectedRevision, current ${it.revision}" }
-        require(modules.keys.all { key -> key in setOf("theme","terrain","features","biomes","blocks","creatures","items","quests","mechanics") }) { "Use the architecture tools for structures; unknown content modules are not installed" }
+        require(modules.keys.all { key -> key in com.wjz.worldsmith.core.pack.WorldContentBundleIO.REQUIRED_MODULES - "structures" }) { "Use the architecture tools for structures; unknown content modules are not installed" }
         val nextModules=it.contentModules+modules
         val nextAssets=(it.contentAssets-removeAssets.toSet())+assets
         require(nextAssets.size<=com.wjz.worldsmith.core.content.ContentAssetValidation.MAX_ASSETS)

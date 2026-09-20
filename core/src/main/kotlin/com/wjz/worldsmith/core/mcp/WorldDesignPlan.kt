@@ -24,6 +24,8 @@ data class WorldDesignPlan(
 @Serializable data class DesignBoss(val creature: String, val quest: String)
 
 @Serializable enum class DesignRelation {
+    @SerialName("story_reference") STORY_REFERENCE,
+    @SerialName("invokes_ability") INVOKES_ABILITY,
     @SerialName("placed_in_biome") PLACED_IN_BIOME,
     @SerialName("spawns_in_biome") SPAWNS_IN_BIOME,
     @SerialName("uses_block") USES_BLOCK,
@@ -46,7 +48,7 @@ object WorldDesignPlans {
     const val MAX_TARGETS = 512
     const val MAX_LINKS = 2048
     private val requiredKinds = setOf("biome", "structure", "creature", "block", "item", "quest")
-    private val targetKinds = requiredKinds + setOf("mechanic", "terrain", "anchor", "feature", "blueprint", "theme", "narrative_beat")
+    private val targetKinds = requiredKinds + setOf("ability", "mechanic", "terrain", "anchor", "feature", "blueprint", "theme", "narrative_beat") + com.wjz.worldsmith.core.story.StoryContentModule.kinds
     private val ambientKinds = setOf("terrain", "anchor", "feature", "blueprint", "theme", "narrative_beat")
 
     fun validate(plan: WorldDesignPlan, completeWorld: Boolean = true, requireBoss: Boolean = true): List<Diagnostic> = buildList {
@@ -96,6 +98,8 @@ object WorldDesignPlans {
     private fun validRelation(link: DesignLink): Boolean {
         val from = link.from.kind; val to = link.to.kind
         return when (link.relation) {
+            DesignRelation.STORY_REFERENCE -> (from in com.wjz.worldsmith.core.story.StoryContentModule.kinds || to in com.wjz.worldsmith.core.story.StoryContentModule.kinds) && from in targetKinds + "block_item" && to in targetKinds + "block_item"
+            DesignRelation.INVOKES_ABILITY -> from in setOf("item", "creature", "mechanic", "dialogue") && to == "ability"
             DesignRelation.PLACED_IN_BIOME -> from == "structure" && to == "biome"
             DesignRelation.SPAWNS_IN_BIOME -> from == "creature" && to == "biome"
             DesignRelation.USES_BLOCK -> from in setOf("terrain", "biome", "feature", "structure", "mechanic") && to == "block"

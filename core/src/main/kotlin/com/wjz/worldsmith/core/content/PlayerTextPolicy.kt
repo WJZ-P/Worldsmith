@@ -13,7 +13,8 @@ object PlayerTextPolicy {
         Regex("(?:原生|服务端|客户端).{0,12}(?:校验|验证|绑定|快照|同步|编译|资源重载)"),
         Regex("(?i)(?:pack does not (?:contain|include|store)|no player (?:progress|save data)|subject to terrain (?:checks|validation)|not (?:implemented|installed)|native (?:validation|compilation)|server[- ](?:owned|authoritative))"),
     )
-    @JvmStatic fun validate(displayName: String, description: String, theme: WorldTheme, items: CustomItemLibrary, quests: QuestLibrary): List<Diagnostic> = buildList {
+    @JvmStatic @JvmOverloads fun validate(displayName: String, description: String, theme: WorldTheme, items: CustomItemLibrary, quests: QuestLibrary,
+        story: com.wjz.worldsmith.core.story.StoryLibrary = com.wjz.worldsmith.core.story.StoryLibrary()): List<Diagnostic> = buildList {
         fun check(path: String, text: String) {
             if (engineering.any { it.containsMatchIn(text) }) add(Diagnostic(path, "PLAYER_TEXT_ENGINEERING_LEAK", DiagnosticSeverity.ERROR,
                 "Player-visible writing must describe the world, its story or gameplay. Move implementation/validation notes to authoring diagnostics; revise this field without silently filtering its displayed text."))
@@ -24,5 +25,11 @@ object PlayerTextPolicy {
         theme.beats.forEachIndexed { i, beat -> check("theme.beats[$i].title", beat.title); check("theme.beats[$i].description", beat.description) }
         items.items.forEachIndexed { i, item -> check("items.items[$i].displayName", item.displayName); check("items.items[$i].description", item.description) }
         quests.quests.forEachIndexed { i, quest -> check("quests.quests[$i].title", quest.title); check("quests.quests[$i].description", quest.description) }
+        story.places.forEachIndexed { i,p -> check("story.places[$i].name",p.name);check("story.places[$i].description",p.description);check("story.places[$i].clue",p.clue) }
+        story.characters.forEachIndexed { i,c -> check("story.characters[$i].name",c.name);c.routines.forEachIndexed { j,r -> check("story.characters[$i].routines[$j].activity",r.activity) } }
+        story.dialogues.forEachIndexed { i,d -> d.nodes.forEachIndexed { j,n -> check("story.dialogues[$i].nodes[$j].text",n.text);n.options.forEachIndexed { k,o -> check("story.dialogues[$i].nodes[$j].options[$k].text",o.text) } } }
+        story.knowledge.forEachIndexed { i,k -> check("story.knowledge[$i].title",k.title);check("story.knowledge[$i].text",k.text) }
+        story.trades.forEachIndexed { i,t -> check("story.trades[$i].name",t.name) }
+        story.soundscapes.forEachIndexed { i,s -> s.layers.forEachIndexed { j,l -> check("story.soundscapes[$i].layers[$j].subtitle",l.subtitle) } }
     }
 }

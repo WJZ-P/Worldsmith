@@ -13,13 +13,13 @@ class ContractConsistencyTest {
     private val repository = ClasspathPromptTemplateRepository()
     private fun contract(id: String) = repository.load(PromptTemplateRef("contract/$id")).systemPrompt
 
-    @Test fun `publication contracts use the current ten-module format and reject old bundle formats`() {
-        assertEquals(10, WorldContentBundleIO.REQUIRED_MODULES.size)
+    @Test fun `publication contracts use the current twelve-module format and reject old bundle formats`() {
+        assertEquals(12, WorldContentBundleIO.REQUIRED_MODULES.size)
         val stalePublication = Regex("Published worlds use bundle format [3456]|New writes use format [3456]|(?m)^# .*bundle format [3456]")
         for (id in listOf("theme", "architecture", "items")) {
             val text = contract(id)
             assertTrue("format ${WorldContentBundleIO.FORMAT_VERSION}" in text, "$id must name the current bundle format")
-            assertTrue("ten typed modules" in text, "$id must not retain the old seven/eight-module publication promise")
+            assertTrue("twelve typed modules" in text, "$id must not retain the old seven/eight-module publication promise")
             assertTrue("Older bundle formats are rejected" in text, "$id must name the explicit old-format rejection")
             assertFalse(stalePublication.containsMatchIn(text), "$id advertises an obsolete current publication format")
         }
@@ -39,8 +39,10 @@ class ContractConsistencyTest {
         assertFalse(Regex("`quests` and `achievements` are future\\s+modules").containsMatchIn(theme))
         val quests = contract("quests")
         assertTrue("quests (0..${QuestValidation.MAX_QUESTS})" in quests)
-        assertTrue("exactly one root" in quests)
-        assertTrue("at most one successor" in quests)
+        assertTrue("multiple roots" in quests.lowercase())
+        assertTrue("ALL/ANY" in quests)
+        assertTrue("schemaVersion=2" in quests)
+        assertTrue("discoverWhen" in quests && "onClaim" in quests && "exclusiveGroup" in quests)
         assertTrue("kill_creature" in quests && "deliver_item" in quests && "activate_mechanic" in quests)
         val creatures = contract("creatures")
         assertTrue("${CustomCreatureValidator.MAX_CREATURES} definitions" in creatures)

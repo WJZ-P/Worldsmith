@@ -1,20 +1,27 @@
-# Worldsmith custom creature contract — module schemas 1, 2 and 3
+# Worldsmith custom creature contract — module schemas 1 through 6
 
-New publications use bundle format 7 with required mechanics. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
+New publications use bundle format 10 with required mechanics and abilities. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
 
 Create ground creatures whose silhouette, material and behavior belong to the
 same world theme. The installed runtime supports data-driven cuboid rigs,
 procedural role-based motion, passive wandering/fleeing, hostile melee, bounded
-death drops, and explicit schema-2 ground-melee Boss phases.
-It is not an arbitrary behavior-script executor or a GeckoLib animation-file
-loader. Flight, swimming-specialized movement, mounts, projectiles, inventories,
-and multipart bosses have no schema fields in this module.
+death drops, explicit schema-2 ground-melee Boss phases, and schema-4 shared
+AbilityScript bindings. The abilities module is the programmable behavior layer;
+this creature DTO carries the host policy, not closed skill presets. GeckoLib
+files, flight/swimming-specific host navigation, mounts, inventories and multipart
+body entities remain outside this DTO. Scripts can emit projectiles via capabilities.
+
+Schema 5 adds general native event bindings; schema 6 adds bounded, staggered
+`tick` observation intervals. Pure observation sources run beside native daily
+goals. Movement/turning source must explicitly own `control.claim`; active source
+alone is not a movement lock. See the ability contract for priorities, conversation
+yielding, read-only perception and resource/lifecycle limits.
 
 ## Exact library and definition fields
 
-`CreatureLibrary` has `schemaVersion` (1 by default, or 2/3) and `creatures`.
+`CreatureLibrary` has `schemaVersion` (1 by default, or 2/3/4/5/6) and `creatures`.
 Schema 1 preserves ordinary creature definitions and omits `boss`. A non-null
-`boss` requires schema 2 or 3 and current bundle format 7. Older bundle formats
+`boss` requires schema 2 through 6 and current bundle format 10. Older bundle formats
 are rejected rather than silently dropping fields. An empty library is valid outside
 a complete-world plan's named coverage promises; the maximum is 128 definitions.
 Each definition has exactly:
@@ -29,8 +36,7 @@ Each definition has exactly:
   ecological/narrative function; it is not executable behavior.
 - `drops`: optional bounded death-reward list; see Obtainable rewards below.
 - `boss`: optional `CreatureBossProfile` below; absent/null means ordinary behavior.
-- `sounds`: optional `CreatureSoundProfile` below; requires schema 3. Design one for new species.
-- `sounds`: optional `CreatureSoundProfile` below; requires schema 3. Author one for each new species; omission is legacy automatic matching.
+- `sounds`: optional `CreatureSoundProfile` below; requires schema 3 or later. Author one for each new species; omission is legacy automatic matching.
 
 ### Model and coordinates
 
@@ -94,7 +100,8 @@ native max_health limit is 1024. Author new playable definitions at health <=102
 Native preparation checks every requested attribute and Boss-derived speed/damage
 against the target game's actual attribute limits; a value that would be clamped
 is reported as an error, not silently changed. Boss Core validation also caps
-health at 1024 and requires positive base attackDamage.
+health at 1024; simple melee Bosses require positive base attackDamage. Ability-only
+Bosses may use zero base attackDamage because their program owns damage.
 
 `behavior` fields:
 
@@ -104,9 +111,10 @@ health at 1024 and requires positive base attackDamage.
 - `windupTicks`: integer 1..100, default 12.
 - `recoveryTicks`: integer 4..200, default 20.
 
-The server owns target validity, melee windup/strike/recovery and damage. A
-client's animation is not evidence that an attack landed. Do not invent custom
-state-machine, event, script, spell or animation-JSON fields.
+Without an ability binding the server owns the simple melee windup/strike/recovery
+state machine. With a schema-4 binding, the AbilityScript source owns combat flow.
+Client animation alone is not evidence that an attack landed. Use the documented
+ability field and separate abilities module; do not invent inline script fields.
 
 `spawn` fields:
 
@@ -118,11 +126,13 @@ state-machine, event, script, spell or animation-JSON fields.
 
 ## Schema 2 Boss profile
 
-Use `category: "HOSTILE"`, `CreatureLibrary.schemaVersion: 2` (3 with sounds), and an explicit
+Use `category: "HOSTILE"`, `CreatureLibrary.schemaVersion: 2` (3 with sounds, 4 with abilities), and an explicit
 `boss` object. A large model, name or health number alone does not create a Boss.
 The exact profile fields and defaults are:
 
-- `phases`: required list of 2..3 phase objects, in threshold order below.
+- `phases`: list of 2..3 phase objects, in threshold order below, or empty/default
+  when a schema-4 `ability` binding supplies behavior. The script's state is not
+  constrained to these simple stat phases.
 - `barTitle`: optional printable text <=128 characters, default `""` uses displayName.
 - `barColor`: `PINK`, `BLUE`, `RED`, `GREEN`, `YELLOW`, `PURPLE` (default), or `WHITE`.
 - `naturalSpawnChance`: finite 0.001..0.05, default 0.01; an extra acceptance roll
@@ -157,7 +167,8 @@ Example value for `boss` (choose the names and combat pacing from the world prom
 
 The server selects and saves the phase; healing does not reverse it. Phase changes
 apply real melee attributes/timings, and tracked players receive the native Boss
-health bar with phase name. This is grounded melee, not arbitrary spells/scripts.
+health bar with phase name. These optional simple phases are ground-melee stat
+phases; ability programs instead implement their own state transitions.
 Natural Boss habitats additionally require spawn weight 1..3 and minGroup=maxGroup=1.
 An empty spawn.biomes list disables natural spawning and may be used for a typed
 structure-only encounter. Natural rarity/spacing is local and repeatable, not a
@@ -167,7 +178,7 @@ For a real landmark encounter, use StructureProgram's
 `a.bossSpawner(at, creatureId[, respawnTicks, requiredPlayerRange, spawnRange])`;
 read `worldsmith_get_contract(id:"draw", section:"boss-encounters")` for both exact
 overloads, typed `boss_spawner` fields, room clearance and native checks. This route
-needs structure module schema 2 as well as creature schema 2 or 3. It uses a separate
+needs structure module schema 2 as well as creature schema 2 through 6. It uses a separate
 encounter host with a local cap, not natural habitat/light/chance/spacing selection.
 Declare `contains_encounter` (structure -> creature) and `kill_objective`
 (quest -> creature) in a complete-world design plan when those are actual promises.
@@ -215,18 +226,18 @@ authored sounds, and carries its actual `boss` profile. Merge into a library who
 schemaVersion is at least the build reply runtimeSchema; never downgrade a schema-3 library.
 Preview with `worldsmith_preview_creature(sessionId, buildId, mode:"sheet", bossPhase:1)`;
 the exact argument is `bossPhase`, zero-based and bounded by the actual 2..3 phases.
-Ordinary creatures accept only phase 0. Model/sheet previews use that phase's shared
+Ordinary creatures and ability Bosses without stat phases accept only phase 0. Model/sheet previews use that phase's shared
 pose evaluator; UV mode remains an atlas view. Inspect every authored phase, but
 do not treat a preview as combat, collision, native activation or playtest evidence.
 
 ## Obtainable rewards
 
-Bundle formats 4/5 support up to 16 `drops` entries per creature. Each has `item`
+Current bundles support up to 16 `drops` entries per creature. Each has `item`
 (a native item or logical `worldsmith:item/<id>` / `worldsmith:content/<blockId>`),
 `minCount`/`maxCount` (defaults 1/1, 1 <= min <= max <=64), `chance` (default 1,
 finite 0..1), and `requirePlayerKill` (default false). Each entry is an independent
 roll producing one stack; its maximum also respects the actual item's stack limit.
-Read the `items` content contract for alias rules. Format 3 rejects death drops.
+Read the `items` content contract for alias rules. Older bundle formats are rejected.
 Keep drops in the authoring recipe when rebuilding a creature. Main-line gameplay
 uses the separate `quests` module: a real kill_creature objective can target the
 Boss, and a claimed quest reward can guarantee a later delivery item independently
@@ -279,9 +290,53 @@ respect Silent and the neutral/hostile volume sliders; client death/hurt animati
 do not duplicate these vocals. Model previews preserve voices but do not audition them.
 
 Creature schema 1/2 definitions without sounds use a deterministic
-name/category/body-size fallback. Explicit sounds require bundle format 7 and
-creature schema 3;
-schema 3 also accepts Boss fields. Preserve sounds, geometry, texture, drops and
+name/category/body-size fallback. Explicit sounds require bundle format 10 and
+creature schema 3 or 4; both accept Boss fields. Preserve sounds, geometry, texture, drops and
 Boss phases during rebuilding. Merge libraries at the maximum required schema;
 never downgrade schema 3 when adding an ordinary definition. Java Builder.sounds
 accepts CreatureSoundProfile and automatically selects recipe schema 3.
+
+## Schema 4: program host policy
+
+`ability` is optional `CreatureAbilityBinding` with `program` (an existing local
+ability ID), `range` (default 8, finite 0.5..24), `cooldownTicks` (default 20,
+1..72000), and `cancelOnTargetLoss` (default true). It applies to HOSTILE species,
+including ordinary creatures. Present bindings replace automatic melee, not add
+a second concurrent attack loop. The program shares the runtime used by item
+`run_program` and mechanic `run_program`; read `contract/abilities` for actual
+source syntax, installed signatures, events, state, budgets and cleanup.
+Boss presentation can omit automatic phases (`boss.phases:[]`); phase counts and
+conditions then live in source. Changing spells/branches never needs a skill enum.
+Keep sounds, drops and ability bindings through rebuilds, with recipe/library
+schema 4. Java `CreatureBuilder.ability(program, range, cooldownTicks,
+cancelOnTargetLoss)` selects schema 4. Preview phase 0 is presentation only, not
+a simulation of the program.
+
+## Schema 5: generic event bindings on passive and hostile creatures
+
+`abilityBindings` is an optional list of at most 16 `AbilityEventBinding` records:
+`{id, program, startOn:[events], listenTo:[], cancelOn:[], cooldownTicks:20, range:8.0}`.
+Use distinct normalized local binding IDs, existing local program IDs, 1..8 start
+names, and at most 8 distinct names in each other list. All three event lists are
+disjoint. Cooldown is 1..72000 ticks; finite range is 0.5..24 blocks.
+Installed creature events: `spawn`, `tick`, `enter`, `exit`, `interact_entity`, `hurt`.
+`startOn` may start a missing owned invocation, `listenTo` only observes an already
+started invocation, and `cancelOn` hard-cancels that exact invocation UUID without
+executing its handler. Another binding's same-name program is not claimable.
+
+These bindings work on PASSIVE NPCs as well as HOSTILE hosts. Existing `ability`
+remains the hostile combat/chase policy, not a substitute for all event entry points.
+A bound program's self is the creature; an interaction target/event_entity is the
+interacting player. Native interaction range, same-world and spectator checks still
+apply. Enter/exit observe alive non-spectator players within the binding range.
+Spawn is the first runnable observation after load/spawn; tick can be a repeatable
+start condition if a persistent automatic role must restart after cooldown.
+Existing active programs receive the general post-damage hurt event once; this
+binding adds new hurt starts/cancels, not a second copy of the hit. It is not a
+pre-damage interception hook and native AFTER_DAMAGE omits fatal hits.
+
+CreatureRecipe accepts the same field at schema 5. Java Builder.abilityBinding or
+Builder.abilityBindings preserves it through geometry/texture rebuilds and selects
+schema 5. Binding lists are deeply frozen, hashed and linked to ability/<id>; review
+the actual source plus host routes, not a narrative NPC role alone. Submit through
+worldsmith_put_content_modules with the current expectedRevision.

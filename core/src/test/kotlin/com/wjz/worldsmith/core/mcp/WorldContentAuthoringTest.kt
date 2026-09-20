@@ -49,7 +49,7 @@ class WorldContentAuthoringTest {
         assertEquals(asset.sha256, asset.id)
         val template = template()
         val terrain = McpJson.decode<TerrainPlan>(template.getValue("terrain"))
-        val blocks = CustomBlockLibrary(blocks = listOf(CustomBlockDefinition("moonstone", "Moonstone", textureAsset = asset.id, light = 4)))
+        val blocks = CustomBlockLibrary(blocks = listOf(CustomBlockDefinition("moonstone", "Moonstone", appearance = com.wjz.worldsmith.core.content.BlockAppearance.uniform(asset.id), light = 4)))
         val biome = template.getValue("biomes").jsonObject.getValue("biomes").jsonArray.first().jsonObject.getValue("id").jsonPrimitive.content
         val creature = CreatureDefinition("guardian", "Moonstone Guardian", CreatureCategory.HOSTILE,
             CreatureModel(asset.id, 32, 32, listOf(CreatureBone("body", pivot = CreatureVector(0f, 24f, 0f),
@@ -63,6 +63,8 @@ class WorldContentAuthoringTest {
         val saved = put(id, mapOf("terrain" to McpJson.encode(terrain.copy(defaultBlock = terrain.defaultBlock.copy(preferredIds = listOf("worldsmith:content/moonstone")))).jsonObject,
             "biomes" to template.getValue("biomes").jsonObject, "features" to template.getValue("features").jsonObject,
             "theme" to McpJson.encode(theme).jsonObject, "blocks" to McpJson.encode(blocks).jsonObject,
+            "abilities" to template.getValue("abilities").jsonObject, "story" to template.getValue("story").jsonObject,
+            "items" to template.getValue("items").jsonObject, "quests" to template.getValue("quests").jsonObject, "mechanics" to template.getValue("mechanics").jsonObject,
             "creatures" to McpJson.encode(CreatureLibrary(creatures = listOf(creature))).jsonObject))
         assertFalse(saved.isError, saved.text)
         return id to asset.id
@@ -101,7 +103,7 @@ class WorldContentAuthoringTest {
         assertEquals(before, draft(id, restarted), "Preview is read-only after recovery")
     }
 
-    @Test fun `pixel texture blocks creature and linked theme publish and load one immutable format7 world`() {
+    @Test fun `pixel texture blocks creature and linked theme publish and load one immutable format10 world`() {
         val (id, assetId) = completeDraft()
         val plan = call("worldsmith_plan_world_content", buildJsonObject { put("sessionId", id) })
         assertFalse(plan.isError, plan.text)
@@ -111,7 +113,7 @@ class WorldContentAuthoringTest {
         })
         assertFalse(written.isError, written.text)
         val pack = WorldsmithPackLoader.loadDirectory(Path.of(written.structuredContent.getValue("path").jsonPrimitive.content))
-        assertEquals(7, pack.manifest.formatVersion)
+        assertEquals(10, pack.manifest.formatVersion)
         assertEquals(pack.manifest.id, pack.computedId)
         assertEquals("moon_courts", pack.theme.id)
         assertEquals("moonstone", pack.blocks.blocks.single().id)
@@ -182,13 +184,13 @@ class WorldContentAuthoringTest {
     }
 
     @Test fun `content contracts expose implemented fields and never invent future module support`() {
-        for (module in listOf("theme", "blocks", "creatures", "items", "quests", "mechanics")) {
+        for (module in listOf("theme", "blocks", "creatures", "items", "quests", "mechanics", "abilities", "story")) {
             val result = call("worldsmith_get_content_contract", buildJsonObject { put("module", module) })
             assertFalse(result.isError)
             val content = result.structuredContent.getValue("contract").jsonPrimitive.content
-            assertTrue(content.contains("expectedRevision"))
-            assertTrue(content.contains("worldsmith_put_content_modules"))
-            assertEquals(when (module) { "creatures" -> 3; "items" -> 2; else -> 1 }, result.structuredContent.getValue("schemaVersion").jsonPrimitive.int)
+            assertTrue(content.contains("expectedRevision"), "$module must document shared draft CAS")
+            assertTrue(content.contains("worldsmith_put_content_modules"), "$module must document its real authoring entry point")
+            assertEquals(when (module) { "creatures" -> 6; "items" -> 4; "quests", "blocks", "story" -> 2; else -> 1 }, result.structuredContent.getValue("schemaVersion").jsonPrimitive.int)
         }
         assertThrows(IllegalArgumentException::class.java) { call("worldsmith_get_content_contract", buildJsonObject { put("module", "achievements") }) }
     }

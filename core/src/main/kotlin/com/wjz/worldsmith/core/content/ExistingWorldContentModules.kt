@@ -1,6 +1,8 @@
 package com.wjz.worldsmith.core.content
 
 import com.wjz.worldsmith.core.model.*
+import com.wjz.worldsmith.core.ability.*
+import com.wjz.worldsmith.core.story.*
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.structure.StructureLibrary
 import com.wjz.worldsmith.core.structure.StructureInteraction
@@ -23,7 +25,15 @@ object ExistingWorldContentModules {
         }
     }
 
-    fun registry() = WorldContentRegistry(listOf(
+    @JvmOverloads fun registry(capabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()) = WorldContentRegistry(listOf(
+        StoryContentModule,
+        TypedModule(ContentModuleDescriptor("abilities", listOf("ability"), listOf(1), requirements = listOf(
+            ContentRequirement("abilities.runtime", 1, ContentLifecycle.WORLD_BINDING),
+        ), description = "Portable AbilityScript source compiled into bounded immutable programs, with extensible versioned capability calls"), AbilityLibrary.serializer()) { library, _ ->
+            ContentContribution(library.programs.mapIndexed { i, program ->
+                ContentEntry(ContentKey("ability", program.id), "abilities", "abilities.programs[$i]")
+            }, diagnostics = AbilityPrograms.validate(library, capabilities))
+        },
         TypedModule(descriptor("terrain", listOf("terrain", "anchor"), listOf("blocks")), TerrainPlan.serializer()) { terrain, raw ->
             val anchors = (terrain.shape as? TerrainShape.Procedural)?.anchors.orEmpty()
             val refs = (terrain.shape as? TerrainShape.Procedural)?.bands.orEmpty().mapIndexedNotNull { i, band ->
@@ -45,7 +55,7 @@ object ExistingWorldContentModules {
                 ContentEntry(ContentKey("biome", biome.id), "biomes", path, references + localBlockReferences(raw.getValue("biomes").jsonArray[i], path), nativeReferences = nativeReferences(raw.getValue("biomes").jsonArray[i]))
             })
         },
-        TypedModule(descriptor("structures", listOf("structure", "blueprint", "drawing"), listOf("terrain", "biomes", "creatures"), listOf(1, 2)), StructureLibrary.serializer()) { library, _ ->
+        TypedModule(descriptor("structures", listOf("structure", "blueprint", "drawing"), listOf("terrain", "biomes", "creatures"), listOf(1, 2, 3)), StructureLibrary.serializer()) { library, _ ->
             val entries = mutableListOf<ContentEntry>()
             val assets = library.artifacts.toSortedMap().values.map { a ->
                 entries += ContentEntry(ContentKey("drawing", a.id), "structures", "structures.artifacts.${a.id}", assets = listOf(a.id))
@@ -69,34 +79,38 @@ object ExistingWorldContentModules {
                         blueprint.drawing?.variants.orEmpty().mapIndexed { j, id -> ContentReference(ContentKey("drawing", id), "$location.drawing.variants[$j]") } +
                             blueprint.interactions.mapIndexedNotNull { j, interaction -> (interaction as? StructureInteraction.BossSpawner)?.let {
                                 ContentReference(ContentKey("creature", it.creatureId), "$location.interactions[$j].creatureId")
-                            } } + localBlockReferences(WorldsmithJson.format.encodeToJsonElement(blueprint), location),
+                            } } + blueprint.interactions.flatMapIndexed { j, interaction -> (interaction as? StructureInteraction.StoryAnchor)?.let { anchor ->
+                                listOf(ContentReference(ContentKey("place",anchor.place),"$location.interactions[$j].place")) + listOfNotNull(anchor.character?.let { ContentReference(ContentKey("character",it),"$location.interactions[$j].character") })
+                            }.orEmpty() } + localBlockReferences(WorldsmithJson.format.encodeToJsonElement(blueprint), location),
                         nativeReferences = nativeReferences(WorldsmithJson.format.encodeToJsonElement(blueprint)))
                 }
             }
             ContentContribution(entries, assets)
         },
-        TypedModule(ContentModuleDescriptor("blocks", listOf("block", "block_item"), listOf(1), requirements = listOf(
+        TypedModule(ContentModuleDescriptor("blocks", listOf("block", "block_item"), listOf(2), requirements = listOf(
             ContentRequirement("custom_blocks.native_hosts", 1, ContentLifecycle.BOOTSTRAP),
             ContentRequirement("world_content.client_resources", 1, ContentLifecycle.CLIENT_RESOURCES),
             ContentRequirement("world_content.world_binding", 1, ContentLifecycle.WORLD_BINDING),
         ), description = "Bounded native block profiles with immutable PNG textures and per-world bindings"), CustomBlockLibrary.serializer()) { library, _ ->
             ContentContribution(library.blocks.flatMapIndexed { i, block ->
                 val path = "blocks.blocks[$i]"
-                listOf(ContentEntry(ContentKey("block", block.id), "blocks", path, assets = listOf(block.textureAsset)),
+                listOf(ContentEntry(ContentKey("block", block.id), "blocks", path, assets = block.appearance.assetIds()),
                     ContentEntry(ContentKey("block_item", block.id), "blocks", path, references = listOf(ContentReference(ContentKey("block", block.id), "$path.id"))))
             }, diagnostics = CustomBlockValidation.validate(library).map { it.copy(path = "blocks.${it.path}") })
         },
-        TypedModule(ContentModuleDescriptor("items", listOf("item"), listOf(1, 2), requirements = listOf(
+        TypedModule(ContentModuleDescriptor("items", listOf("item"), listOf(1, 2, 3, 4), compileAfter = listOf("abilities"), requirements = listOf(
             ContentRequirement("custom_items.native_host", 1, ContentLifecycle.BOOTSTRAP),
             ContentRequirement("world_content.client_resources", 1, ContentLifecycle.CLIENT_RESOURCES),
             ContentRequirement("custom_items.world_stacks", 1, ContentLifecycle.WORLD_BINDING),
             ContentRequirement("custom_items.equipment", 1, ContentLifecycle.WORLD_BINDING),
             ContentRequirement("custom_items.actions", 1, ContentLifecycle.WORLD_BINDING),
-        ), description = "World-scoped item stacks; schema 2 adds equipment, consumption and server-owned ability combinations"), CustomItemLibrary.serializer()) { library, _ ->
-            ContentContribution(library.items.mapIndexed { i, item -> ContentEntry(ContentKey("item", item.id), "items", "items.items[$i]", assets = listOfNotNull(item.textureAsset, item.equipment?.textureAsset)) },
+        ), description = "World-scoped item stacks; schema 2 equipment and consumption; schema 3 invokes shared AbilityScript programs"), CustomItemLibrary.serializer()) { library, _ ->
+            ContentContribution(library.items.mapIndexed { i, item -> ContentEntry(ContentKey("item", item.id), "items", "items.items[$i]", references = item.actions.flatMapIndexed { j, action -> action.effects.mapIndexedNotNull { k, effect ->
+                (effect as? ItemEffect.RunProgram)?.let { ContentReference(ContentKey("ability", it.program), "items.items[$i].actions[$j].effects[$k].program") }
+            } } + item.abilityBindings.mapIndexed { j, binding -> ContentReference(ContentKey("ability", binding.program), "items.items[$i].abilityBindings[$j].program") }, assets = listOfNotNull(item.textureAsset, item.equipment?.textureAsset)) },
                 diagnostics = CustomItemValidation.validate(library).map { it.copy(path = "items.${it.path}") })
         },
-        TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1, 2, 3), compileAfter = listOf("biomes"), requirements = listOf(
+        TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1, 2, 3, 4, 5, 6), compileAfter = listOf("biomes", "abilities"), requirements = listOf(
             ContentRequirement("creatures.native_hosts", 1, ContentLifecycle.BOOTSTRAP),
             ContentRequirement("assets.entity_models", 1, ContentLifecycle.CLIENT_RESOURCES),
             ContentRequirement("creatures.world_behaviors", 1, ContentLifecycle.WORLD_BINDING),
@@ -105,12 +119,14 @@ object ExistingWorldContentModules {
                 val path = "creatures.creatures[$i]"
                 ContentEntry(ContentKey("creature", creature.id), "creatures", path,
                     creature.spawn.biomes.mapIndexed { j, biome -> ContentReference(ContentKey("biome", biome), "$path.spawn.biomes[$j]") } +
+                        listOfNotNull(creature.ability?.let { ContentReference(ContentKey("ability", it.program), "$path.ability.program") }) +
+                        creature.abilityBindings.mapIndexed { j, binding -> ContentReference(ContentKey("ability", binding.program), "$path.abilityBindings[$j].program") } +
                         localBlockReferences(raw.getValue("creatures").jsonArray[i], path),
                     assets = listOf(creature.model.texture), nativeReferences = nativeReferences(raw.getValue("creatures").jsonArray[i]))
             }, diagnostics = CustomCreatureValidator.validate(library).map { it.copy(path = "creatures.${it.path}") })
         },
         TypedModule(ContentModuleDescriptor("mechanics", listOf("mechanic", "mechanic_rule"), listOf(1),
-            compileAfter = listOf("blocks", "items", "biomes", "creatures"), requirements = listOf(
+            compileAfter = listOf("blocks", "items", "biomes", "creatures", "abilities"), requirements = listOf(
                 ContentRequirement("mechanics.anchor_interactions", 1, ContentLifecycle.WORLD_BINDING),
             ), description = "Bounded event-driven block patterns, anchor state transitions, explicit hand offerings and transactional native actions"), WorldMechanicLibrary.serializer()) { library, raw ->
             val entries = library.mechanics.flatMapIndexed { i, mechanic ->
@@ -124,6 +140,8 @@ object ExistingWorldContentModules {
                         val references = rule.biomes.mapIndexed { k, biome -> ContentReference(ContentKey("biome", biome), "$at.biomes[$k]") } +
                             rule.actions.mapIndexedNotNull { k, action -> (action as? MechanicAction.SpawnCreature)?.let {
                                 ContentReference(ContentKey("creature", it.creature), "$at.actions[$k].creature")
+                            } } + rule.actions.mapIndexedNotNull { k, action -> (action as? MechanicAction.RunProgram)?.let {
+                                ContentReference(ContentKey("ability", it.program), "$at.actions[$k].program")
                             } } + localBlockReferences(document, at)
                         ContentEntry(ruleKey(rule), "mechanics", at, references, nativeReferences = nativeReferences(document))
                     }
@@ -138,10 +156,10 @@ object ExistingWorldContentModules {
                     beat.content.mapIndexed { j, key -> ContentReference(key, "theme.beats[$i].content[$j]") }) },
                 diagnostics = WorldThemeValidation.validate(theme).map { it.copy(path = "theme.${it.path}") })
         },
-        TypedModule(ContentModuleDescriptor("quests", listOf("quest"), listOf(1), compileAfter = listOf("theme", "mechanics"), requirements = listOf(
-            ContentRequirement("quests.server_progress", 1, ContentLifecycle.WORLD_BINDING),
-            ContentRequirement("quests.client_journal", 1, ContentLifecycle.CLIENT_RESOURCES),
-        ), description = "A single linear main line observes verified creature kills, explicit item delivery and committed mechanic activations, with once-only rewards and native advancement projection after claiming"), QuestLibrary.serializer()) { library, raw ->
+        TypedModule(ContentModuleDescriptor("quests", listOf("quest"), listOf(2), compileAfter = listOf("theme", "mechanics", "story"), requirements = listOf(
+            ContentRequirement("quests.server_progress", 2, ContentLifecycle.WORLD_BINDING),
+            ContentRequirement("quests.client_journal", 2, ContentLifecycle.CLIENT_RESOURCES),
+        ), description = "A discovered story DAG with explicit branch acceptance, optional goals, shared fact conditions and atomic once-only consequences"), QuestLibrary.serializer()) { library, raw ->
             ContentContribution(library.quests.mapIndexed { i, quest ->
                 val path = "quests.quests[$i]"
                 val document = raw.getValue("quests").jsonArray[i]
@@ -150,10 +168,16 @@ object ExistingWorldContentModules {
                         when (objective) {
                             is QuestObjective.KillCreature -> ContentReference(ContentKey("creature", objective.creature), "$path.objectives[$j].creature")
                             is QuestObjective.ActivateMechanic -> ContentReference(ContentKey("mechanic", objective.mechanic), "$path.objectives[$j].mechanic")
-                            is QuestObjective.DeliverItem -> null
+                            is QuestObjective.DeliverItem, is QuestObjective.Fact -> null
                         }
                     } + listOfNotNull(quest.themeBeat?.let { ContentReference(ContentKey("narrative_beat", it), "$path.themeBeat") }) +
-                    localBlockReferences(document, path)
+                    listOfNotNull(quest.destination?.let { ContentReference(ContentKey("place", it), "$path.destination") }) +
+                    (com.wjz.worldsmith.core.story.StoryConditions.references(quest.discoverWhen) +
+                        com.wjz.worldsmith.core.story.StoryConditions.references(quest.availableWhen) +
+                        quest.objectives.filterIsInstance<QuestObjective.Fact>().flatMap { com.wjz.worldsmith.core.story.StoryConditions.references(it.condition) } +
+                        (quest.onAccept + quest.onClaim).map { it.fact }).distinct().map {
+                        ContentReference(ContentKey("story_fact", it.id), "$path.storyConditions")
+                    } + localBlockReferences(document, path)
                 ContentEntry(ContentKey("quest", quest.id), "quests", path, references, nativeReferences = nativeReferences(document))
             }, diagnostics = QuestValidation.validate(library).map { it.copy(path = "quests.${it.path}") })
         },
@@ -172,6 +196,8 @@ object ExistingWorldContentModules {
         put("items", WorldsmithJson.format.encodeToJsonElement(pack.items).jsonObject)
         put("quests", WorldsmithJson.format.encodeToJsonElement(pack.quests).jsonObject)
         put("mechanics", WorldsmithJson.format.encodeToJsonElement(pack.mechanics).jsonObject)
+        put("abilities", WorldsmithJson.format.encodeToJsonElement(pack.abilities).jsonObject)
+        put("story", WorldsmithJson.format.encodeToJsonElement(pack.story).jsonObject)
     }, pack.manifest.assets)
 
     /** Names describe installed adapter capabilities, not a successful native activation receipt. */
@@ -180,8 +206,8 @@ object ExistingWorldContentModules {
         "creatures.native_hosts" to 1, "assets.entity_models" to 1, "creatures.world_behaviors" to 1,
         "custom_items.native_host" to 1, "custom_items.world_stacks" to 1,
         "custom_items.equipment" to 1, "custom_items.actions" to 1,
-        "mechanics.anchor_interactions" to 1,
-        "quests.server_progress" to 1, "quests.client_journal" to 1, "quests.native_advancements" to 1,
+        "mechanics.anchor_interactions" to 1, "abilities.runtime" to 1, "story.runtime" to 1, "story.client" to 1,
+        "quests.server_progress" to 2, "quests.client_journal" to 2, "quests.native_advancements" to 2,
     )
 
     val plannedModules = listOf(

@@ -1,74 +1,78 @@
-# Worldsmith custom block contract — module schema 1
+# Worldsmith custom block contract — module schema 2
 
-Design materials that express the world's theme in terrain, settlements and
-landmarks. This module creates bounded full-cube block definitions with PNG
-textures and stable per-world bindings, not arbitrary executable block classes.
+Create recognizable full-cube materials with canonical six-face appearances and
+stable per-world native bindings. Bundle format 10 uses this current schema only.
+The appearance is not an executable model, arbitrary collision shape or block entity.
 
 ## Exact document
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "blocks": [{
-    "id": "moonstone",
-    "displayName": "Moonstone",
+    "id": "hearth_waystone",
+    "displayName": "归路刻石",
     "profile": "STONE",
-    "textureAsset": "<actual SHA-256 returned by the texture tool>",
-    "light": 8,
-    "themeRole": "A world-specific material and its geological or cultural role"
+    "appearance": {
+      "up":    {"textureAsset": "<actual top PNG SHA-256>", "quarterTurns": 0},
+      "down":  {"textureAsset": "<actual base PNG SHA-256>", "quarterTurns": 0},
+      "north": {"textureAsset": "<actual marked-front PNG SHA-256>", "quarterTurns": 0},
+      "south": {"textureAsset": "<actual back PNG SHA-256>", "quarterTurns": 0},
+      "west":  {"textureAsset": "<actual side PNG SHA-256>", "quarterTurns": 0},
+      "east":  {"textureAsset": "<actual side PNG SHA-256>", "quarterTurns": 0},
+      "particle": "<actual particle PNG SHA-256>",
+      "orientation": "HORIZONTAL"
+    },
+    "light": 0,
+    "themeRole": "A front-facing route mark with the village's shared copper-frame motif"
   }]
 }
 ```
 
-Replace the texture marker with a returned digest; a fabricated 64-digit string
-does not create an asset. `blocks` may be empty. IDs are unique lowercase local
-names matching `[a-z0-9][a-z0-9_.-]{0,63}`. Display names have 1..128 printable
-characters. `themeRole` is optional and at most 2048 characters.
+Replace each marker with a returned real digest. Faces may reference the same PNG;
+every face and particle reference is validated, included in bundle identity and
+exported. There is no block-level `textureAsset` field. The code helper
+`BlockAppearance.uniform(hash)` only constructs all six ordinary face entries and
+particle from one hash; it does not select a second legacy representation.
 
-`profile` is exactly `STONE`, `WOOD`, `METAL`, or `GLASS` (default STONE), with at
-most 32 definitions per profile. These are predeclared native physical presets;
-do not add hardness, arbitrary collision shapes, machines, fluids, inventories,
-procedural tick code or custom state-property fields. `light` is an integer
-0..15, default 0. Profile and light are part of the stable save binding, not
-values to change underneath already stored blocks.
+## Fields and boundaries
 
-`textureAsset` is the actual lowercase SHA-256 of a verified PNG. Its asset ID
-must equal its byte digest. The PNG is square, power-of-two, 16..256 pixels on
-each edge, at most 1 MiB encoded. Use GLASS for translucent designs; other profiles
-retain full-cube occlusion/culling semantics and do not promise arbitrary alpha
-visuals. A single texture currently covers all cube faces; this is not a model
-asset or a six-face texture dictionary.
+- IDs are unique local lowercase names matching `[a-z0-9][a-z0-9_.-]{0,63}`.
+  Names need 1..128 printable characters; themeRole supports at most 2048.
+- Profile is STONE, WOOD, METAL or GLASS, with at most 32 definitions per profile.
+  Physical strength, sounds and full-cube collision come from these native presets.
+- Every PNG is content-addressed, square power-of-two, 16..256 pixels, at most 1 MiB.
+  Use GLASS for translucency; other profiles retain opaque full-cube occlusion.
+- Each face has `textureAsset` and optional `quarterTurns` 0..3. The turns rotate UVs
+  clockwise within the native cube face plane, not the entire block in the world.
+- `particle` supplies break/placement particles independently of the marked front.
+- `orientation` is FIXED (default) or HORIZONTAL. Local north is the painted front.
+  HORIZONTAL placement points north/front toward the player; structure mirror and
+  quarter-turn rotation transform that facing. FIXED materials retain world axes.
+- Light is an integer 0..15. Profile, light and orientation belong to the stable
+  native binding. Do not mutate these under an already stored bound block.
+  Use distinct logical definitions for actual physical states such as a closed dark
+  lamp and an opened glowing lamp, then change them through a mechanic/projection.
 
-## Texture authoring and logical use
+## Authoring and actual review
 
-1. Read `worldsmith_get_content_contract(module: "blocks")` and
-   `worldsmith_get_content_draft(sessionId)` to obtain the shared revision.
-2. Create a texture using
-   `worldsmith_create_pixel_texture(sessionId, expectedRevision, palette, rows)`.
-   Palette: 1..256 exact `#RRGGBB` or `#RRGGBBAA` strings (last pair is alpha).
-   Rows: a rectangular two-dimensional array of zero-based palette indices,
-   1..256 pixels wide and high. For block use, choose 16/32/64/128/256 square
-   dimensions. Programmatic pixel grids are not AI-generated concept images.
-   Alternatively call
-   `worldsmith_put_texture_asset(sessionId, expectedRevision, pngBase64)` with
-   raw standard base64 of an actual PNG, without a data URL or whitespace.
-3. Inspect the returned image, use its returned asset ID, and advance to the
-   returned revision. Improve deliberate material motifs rather than random
-   noise, and consider how all six adjacent faces will meet in terrain/buildings.
-4. Save with `worldsmith_put_content_modules(sessionId, expectedRevision,
-   modules: {"blocks": <CustomBlockLibrary>, ...})`. Related theme/terrain/biome/
-   feature/creature changes can be committed in the same modules object.
-   Structures continue through the existing architecture and structure tools.
-5. In material `preferredIds`, explicit block fields and structure geometry use
-   `worldsmith:content/moonstone`. Do not append `[light=...]` or other properties;
-   the definition supplies immutable light. Do not use raw host-slot IDs such as
-   `worldsmith:content/block/stone/00` in authored content.
-6. Link the material in theme beats with `{"kind":"block","id":"moonstone"}`;
-   use the same logical definition in landscape and construction. Read fresh
-   draft state after revision conflicts instead of overwriting other modules.
-7. `worldsmith_write_pack` accepts inline `blocks` or the session's block module,
-   and binds the session's verified assets into the frozen pack. Publish only
-   after content references, asset bytes and native capacity checks succeed.
-
-Generic texture tools also support other dimensions and larger PNGs for other
-uses; their success does not override this block module's stricter contract.
+1. Read `worldsmith_get_content_draft` for the current shared revision.
+2. Use `worldsmith_build_texture`, `worldsmith_create_pixel_texture` or the explicit
+   PNG import tools. Design material roles: wood end grain versus bark, a marked
+   front versus plain backing, an opening versus closed shutters. Avoid six random
+   noisy pictures that have no common material vocabulary.
+3. Commit the entire block module with `worldsmith_put_content_modules` at the
+   returned expectedRevision. Preserve unrelated draft blocks and modules.
+4. Call `worldsmith_preview_content_appearance(sessionId, kind:"block", ids:[id])`.
+   Inspect real-PNG front/back cubes, six local planes, 3x3 tiling and small-scale
+   samples. The response is an offline authoring sheet, not a Minecraft screenshot;
+   edge-delta and alpha metrics are not an automatic aesthetic-quality verdict.
+5. In material selectors and geometry use `worldsmith:content/<id>`, never native
+   slot ids. For a HORIZONTAL block, structured BuildMaterial/MechanicBlockPredicate
+   properties may be exactly `{"facing":"north|east|south|west"}`. FIXED blocks
+   accept no authored properties. Never append inline `[light=...]`, override
+   `light`/`oriented`, or refer to `worldsmith:content/block/...` native slots.
+6. Theme beats link `{"kind":"block","id":"..."}`; terrain, architecture and
+   interaction effects should use the same coherent local definitions.
+7. Publish only after all face/particle bytes, references and capacity validate.
+   Native resource reload and gameplay screenshots remain separate verification.

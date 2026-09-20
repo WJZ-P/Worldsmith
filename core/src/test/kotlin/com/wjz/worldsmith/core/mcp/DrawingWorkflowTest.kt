@@ -83,7 +83,7 @@ class DrawingWorkflowTest {
                 val saved=rpc(endpoint,WorldsmithWorkflow.WRITE_TOOL,writeArgs());assertFalse(saved.get("isError")?.jsonPrimitive?.boolean == true,saved.toString())
                 savedPath=Path.of(body(saved).getValue("path").jsonPrimitive.content)
                 val pack=WorldsmithPackLoader.loadDirectory(savedPath!!)
-                assertEquals(7,pack.manifest.formatVersion);assertEquals(2,pack.structures.schemaVersion);assertEquals(pack.manifest.id,pack.computedId)
+                assertEquals(10, pack.manifest.formatVersion);assertEquals(2,pack.structures.schemaVersion);assertEquals(pack.manifest.id,pack.computedId)
                 assertEquals(80,pack.structures.drawingAssets.getValue(drawingId).bounds().width())
                 assertTrue(Files.exists(savedPath!!.resolve("drawings/$drawingId.wsdraw")))
                 fun finish()=rpc(endpoint,WorldsmithWorkflow.FINISH_TOOL,buildJsonObject {put("sessionId",session)})

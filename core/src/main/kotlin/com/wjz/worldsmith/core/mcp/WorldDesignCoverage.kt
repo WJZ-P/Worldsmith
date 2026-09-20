@@ -1,6 +1,9 @@
 package com.wjz.worldsmith.core.mcp
 
 import com.wjz.worldsmith.core.content.*
+import com.wjz.worldsmith.core.ability.AbilityLibrary
+import com.wjz.worldsmith.core.ability.AbilityValue
+import com.wjz.worldsmith.core.story.*
 import com.wjz.worldsmith.core.model.*
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
 import com.wjz.worldsmith.core.structure.*
@@ -38,13 +41,13 @@ object WorldDesignCoverage {
             read("features") { McpJson.decode<FeatureLibrary>(it) }, read("blocks") { McpJson.decode<CustomBlockLibrary>(it) },
             read("items") { McpJson.decode<CustomItemLibrary>(it) }, read("creatures") { McpJson.decode<CreatureLibrary>(it) },
             read("quests") { McpJson.decode<QuestLibrary>(it) }, read("theme") { McpJson.decode<WorldTheme>(it) },
-            session.structureLibrary(), false, errors, read("mechanics") { McpJson.decode<WorldMechanicLibrary>(it) },
+            session.structureLibrary(), false, errors, read("mechanics") { McpJson.decode<WorldMechanicLibrary>(it) }, read("abilities") { McpJson.decode<AbilityLibrary>(it) }, read("story") { McpJson.decode<com.wjz.worldsmith.core.story.StoryLibrary>(it) },
         )
     }
 
     fun frozen(pack: WorldsmithPack): DesignInventory {
         val raw = inventory(pack.terrain, pack.biomes, pack.features, pack.blocks,
-            pack.items, pack.creatures, pack.quests, pack.theme, pack.structures, true, emptyMap(), pack.mechanics)
+            pack.items, pack.creatures, pack.quests, pack.theme, pack.structures, true, emptyMap(), pack.mechanics, pack.abilities, pack.story)
         val proof = WorldMechanicReachability.analyze(pack, raw)
         return raw.copy(mechanicCreatures = proof.creatures, reachableMechanics = proof.mechanics)
     }
@@ -84,12 +87,14 @@ object WorldDesignCoverage {
         plan.targets.filter { it.key in actual.symbols }.forEach { target ->
             val key = target.key
             when (key.kind) {
+                "ability" -> if (actual.links.none { it.to == key && it.relation == DesignRelation.INVOKES_ABILITY })
+                    error("designPlan.targets", "DESIGN_ABILITY_UNBOUND", "Planned ability source must be invoked by a concrete creature, item or mechanic")
                 "mechanic" -> if (strictGeometry && key.id !in actual.reachableMechanics)
                     error("designPlan.targets[${plan.targets.indexOf(target)}]", "DESIGN_MECHANIC_UNREACHABLE", "Planned mechanic '${key.id}' has no reachable initial-state activation route with obtainable inputs; a rule declaration alone is not an executable encounter route")
                 "block" -> if (strictGeometry && actual.links.none { it.relation == DesignRelation.USES_BLOCK && it.to == key })
                     error("designPlan.targets", "DESIGN_BLOCK_UNUSED", "Planned block '${key.id}' is not used by a world material or compiled structure voxel; an unused palette entry does not count")
                 "creature" -> if (!hasEncounter(key.id))
-                    error("designPlan.targets", "DESIGN_CREATURE_UNPLACED", "Planned creature '${key.id}' has no positive natural habitat, valid structure encounter or reachable mechanic summon")
+                    error("designPlan.targets", "DESIGN_CREATURE_UNPLACED", "Planned creature '${key.id}' has no positive natural habitat, valid structure encounter, initially spawnable placed story character or reachable mechanic summon")
                 "item" -> {
                     val producers = actual.links.filter { it.to == key && it.relation in setOf(DesignRelation.DROPS_ITEM, DesignRelation.CONTAINS_REWARD, DesignRelation.QUEST_REWARD, DesignRelation.GRANTS_ITEM) }
                     if (strictGeometry && producers.isEmpty()) error("designPlan.targets", "DESIGN_ITEM_UNOBTAINABLE", "Planned item '${key.id}' has no configured creature, structure, quest or mechanic reward producer")
@@ -110,8 +115,14 @@ object WorldDesignCoverage {
 
     private fun inventory(terrain: TerrainPlan?, biomes: BiomePlan?, features: FeatureLibrary?, blocks: CustomBlockLibrary?,
         items: CustomItemLibrary?, creatures: CreatureLibrary?, quests: QuestLibrary?, theme: WorldTheme?, structures: StructureLibrary,
-        frozen: Boolean, errors: Map<String, String>, mechanics: WorldMechanicLibrary?): DesignInventory {
+        frozen: Boolean, errors: Map<String, String>, mechanics: WorldMechanicLibrary?, abilities: AbilityLibrary?, story: com.wjz.worldsmith.core.story.StoryLibrary?): DesignInventory {
         val symbols = linkedSetOf<ContentKey>(); val links = linkedSetOf<DesignLink>()
+        story?.let { com.wjz.worldsmith.core.story.StoryContentModule.describe(McpJson.encode(it).jsonObject).entries.forEach { e ->
+            symbols+=e.key
+            e.references.forEach { r -> links+=DesignLink(e.key,r.target,DesignRelation.STORY_REFERENCE)
+                if(r.target.kind=="ability" && e.key.kind=="dialogue") links+=DesignLink(e.key,r.target,DesignRelation.INVOKES_ABILITY)
+            }
+        } }
         val textures = linkedMapOf<ContentKey, Set<String>>(); val drawings = linkedSetOf<String>()
         val bosses = linkedSetOf<String>(); val spawned = linkedSetOf<String>(); val themed = linkedSetOf<String>()
         val structureSupplies = linkedMapOf<String, Map<ContentKey, Long>>()
@@ -156,16 +167,23 @@ object WorldDesignCoverage {
             value.features.forEach { link(owner, key("feature", it.feature), DesignRelation.USES_FEATURE) }
         }
         blocks?.blocks.orEmpty().forEach { value ->
-            val owner = key("block", value.id); symbols += owner; symbols += key("block_item", value.id); textures[owner] = setOf(value.textureAsset)
+            val owner = key("block", value.id); symbols += owner; symbols += key("block_item", value.id); textures[owner] = value.appearance.assetIds().toSet()
         }
-        items?.items.orEmpty().forEach { value -> val owner = key("item", value.id); symbols += owner; textures[owner] = setOf(value.textureAsset) }
+        abilities?.programs.orEmpty().forEach { symbols += key("ability", it.id) }
+        items?.items.orEmpty().forEach { value ->
+            val owner = key("item", value.id); symbols += owner; textures[owner] = setOf(value.textureAsset)
+            value.actions.flatMap { it.effects }.filterIsInstance<ItemEffect.RunProgram>().forEach { link(owner, key("ability", it.program), DesignRelation.INVOKES_ABILITY) }
+            value.abilityBindings.forEach { link(owner, key("ability", it.program), DesignRelation.INVOKES_ABILITY) }
+        }
         val biomeIds = biomes?.biomes.orEmpty().map { it.id }.toSet()
         creatures?.creatures.orEmpty().forEach { value ->
             val owner = key("creature", value.id); symbols += owner; textures[owner] = setOf(value.model.texture)
+            value.ability?.let { link(owner, key("ability", it.program), DesignRelation.INVOKES_ABILITY) }
+            value.abilityBindings.forEach { link(owner, key("ability", it.program), DesignRelation.INVOKES_ABILITY) }
             value.spawn.biomes.forEach { link(owner, key("biome", it), DesignRelation.SPAWNS_IN_BIOME) }
             if (value.spawn.weight > 0 && value.spawn.minGroup > 0 && value.spawn.biomes.any { it in biomeIds }) spawned += value.id
             val profile = McpJson.encode(value).jsonObject["boss"]
-            if (creatures?.schemaVersion in 2..3 && profile is JsonObject) bosses += value.id
+            if (creatures?.schemaVersion in 2..6 && profile is JsonObject) bosses += value.id
             value.drops.filter { it.chance > 0 && it.maxCount > 0 }.forEach { drop -> item(drop.item)?.let { link(owner, it, DesignRelation.DROPS_ITEM) } }
         }
         mechanics?.mechanics.orEmpty().forEach { value ->
@@ -177,6 +195,7 @@ object WorldDesignCoverage {
                 }
                 rule.heldItem?.let { cost -> item(cost.item)?.let { link(owner, it, DesignRelation.CONSUMES_ITEM) } }
                 rule.actions.forEach { action -> when (action) {
+                    is MechanicAction.RunProgram -> link(owner, key("ability", action.program), DesignRelation.INVOKES_ABILITY)
                     is MechanicAction.SetBlock -> block(action.block.block)?.let { link(owner, it, DesignRelation.USES_BLOCK) }
                     is MechanicAction.SpawnCreature -> link(owner, key("creature", action.creature), DesignRelation.SPAWNS_CREATURE)
                     is MechanicAction.GiveItem -> if (action.count > 0) item(action.item)?.let { link(owner, it, DesignRelation.GRANTS_ITEM) }
@@ -191,7 +210,15 @@ object WorldDesignCoverage {
                 is QuestObjective.KillCreature -> link(owner, key("creature", objective.creature), DesignRelation.KILL_OBJECTIVE)
                 is QuestObjective.ActivateMechanic -> link(owner, key("mechanic", objective.mechanic), DesignRelation.ACTIVATION_OBJECTIVE)
                 is QuestObjective.DeliverItem -> item(objective.item)?.let { link(owner, it, DesignRelation.DELIVERY_OBJECTIVE) }
+                is QuestObjective.Fact -> Unit // Shared story references are checked by the content registry and StoryValidation.
             } }
+            value.destination?.let { link(owner, key("place", it), DesignRelation.STORY_REFERENCE) }
+            story?.let { library ->
+                val conditions = listOf(value.discoverWhen, value.availableWhen) + value.objectives.filterIsInstance<QuestObjective.Fact>().map { it.condition }
+                val references = conditions.flatMap { com.wjz.worldsmith.core.story.StoryContentModule.conditionReferences(it, library, "quests.${value.id}") } +
+                    com.wjz.worldsmith.core.story.StoryContentModule.changeReferences(value.onAccept + value.onClaim, library, "quests.${value.id}")
+                references.forEach { link(owner, it.target, DesignRelation.STORY_REFERENCE) }
+            }
             value.rewards.filter { it.count > 0 }.forEach { reward -> item(reward.item)?.let { link(owner, it, DesignRelation.QUEST_REWARD) } }
             value.themeBeat?.takeIf { it in beatIds }?.let { themed += value.id; link(key("narrative_beat", it), owner, DesignRelation.THEME_ANCHOR) }
         }
@@ -205,11 +232,41 @@ object WorldDesignCoverage {
         val catalog = if (frozen) StructureCatalogCompiler.compile(structures) else null
         structures.structures.forEach { value ->
             val owner = key("structure", value.id); symbols += owner
+            fun residents(interactions: List<StructureInteraction>) {
+                if (story == null || structures.schemaVersion < 3 || (value.placement.region?.chance ?: 1.0) <= 0 || value.placement.biomes.none { it in biomeIds }) return
+                val markers = interactions.filterIsInstance<StructureInteraction.StoryAnchor>()
+                val homes = markers.filter { it.character == null }.map { it.place }.toSet()
+                markers.filter { it.character != null && it.place in homes }.forEach { marker ->
+                    val character = story.characters.singleOrNull { it.id == marker.character && it.place == marker.place } ?: return@forEach
+                    if (story.places.none { it.id == marker.place && it.structure == value.id } || creatures?.creatures.orEmpty().none { it.id == character.creature }) return@forEach
+                    // A configuration route, not proof of actual chunk placement. Only initial facts in
+                    // the resident's own context are known; future writes or ambiguous remote subjects
+                    // must not turn a permanently gated character into a claimed encounter source.
+                    val initiallySpawnable = StoryConditions.test(character.spawnWhen) { ref ->
+                        val fact = story.facts.singleOrNull { it.id == ref.id }
+                        val resolved = when (fact?.scope) {
+                            StoryFactScope.WORLD -> ref.subject == null
+                            StoryFactScope.CHARACTER -> ref.subject == null || ref.subject == character.id
+                            StoryFactScope.PLACE -> ref.subject == null || ref.subject == character.place
+                            else -> false
+                        }
+                        if (resolved) requireNotNull(fact).initial else AbilityValue.NullValue
+                    }
+                    if (initiallySpawnable) {
+                        structureCreatures += character.creature
+                        link(owner, key("creature", character.creature), DesignRelation.CONTAINS_ENCOUNTER)
+                    }
+                }
+            }
             fun encounters(interactions: List<StructureInteraction>) {
+                interactions.filterIsInstance<StructureInteraction.StoryAnchor>().forEach { marker ->
+                    link(owner,key("place",marker.place),DesignRelation.STORY_REFERENCE)
+                    marker.character?.let { link(owner,key("character",it),DesignRelation.STORY_REFERENCE) }
+                }
                 interactions.filterIsInstance<StructureInteraction.BossSpawner>().forEach { spawner ->
                     link(owner, key("creature", spawner.creatureId), DesignRelation.CONTAINS_ENCOUNTER)
                     val creature = creatures?.creatures?.find { it.id == spawner.creatureId }
-                    if (structures.schemaVersion == 2 && creatures?.schemaVersion in 2..3 && creature?.boss != null &&
+                    if (structures.schemaVersion >= 2 && creatures?.schemaVersion in 2..6 && creature?.boss != null &&
                         creature.category == CreatureCategory.HOSTILE && spawner.respawnTicks in 200..30000 &&
                         spawner.requiredPlayerRange in 8..32 && spawner.spawnRange in 1..8 &&
                         (value.placement.region?.chance ?: 1.0) > 0 && value.placement.biomes.any { it in biomeIds })
@@ -223,9 +280,11 @@ object WorldDesignCoverage {
                 drawings += blueprint.drawing?.variants.orEmpty()
                 if (!frozen) { materials(owner, McpJson.encode(blueprint.palette)); rewards(owner, blueprint.interactions); encounters(blueprint.interactions) }
             }
+            if (!frozen) residents(blueprints.flatMap { it.interactions })
             if (catalog != null) {
                 val upperBounds = linkedMapOf<ContentKey, Long>()
                 catalog.plans[value.id].orEmpty().forEach { plan ->
+                    residents(plan.parts.flatMap { it.geometry.interactions })
                     val supplies = linkedMapOf<ContentKey, Long>()
                     fun addSupply(key: ContentKey, count: Long) { supplies[key] = (supplies[key] ?: 0L) + count }
                     plan.parts.forEach { part ->

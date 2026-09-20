@@ -25,10 +25,10 @@ class WorldAuthoringPackCompatibilityTest {
 
     private val modules = WorldContentBundleIO.REQUIRED_MODULES
     private val versions = listOf(
-        Version(7, modules.associateWith { when (it) { "structures", "items" -> 2; "creatures" -> 3; else -> 1 } }),
+        Version(10, modules.associateWith { when (it) { "quests", "blocks", "story" -> 2; "structures" -> 3; "items" -> 3; "creatures" -> 4; else -> 1 } }),
     )
 
-    /** Format-7 schema combinations are derived in memory; retained user worlds are never inspected or rewritten. */
+    /** Format-10 schema combinations are derived in memory; retained user worlds are never inspected or rewritten. */
     private fun fixture(version: Version): WorldContentBundleFiles {
         val base = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
         val manifest = base.manifest.copy(formatVersion = version.format, id = "0".repeat(64),
@@ -63,7 +63,7 @@ class WorldAuthoringPackCompatibilityTest {
         assertEquals(source.computedId, restored.computedId)
     }
 
-    @Test fun `format seven preserves its exact module set and schemas on reencoding`() {
+    @Test fun `format ten preserves its exact module set and schemas on reencoding`() {
         val identities = mutableSetOf<String>()
         for (version in versions) {
             val first = fixture(version)
@@ -119,7 +119,7 @@ class WorldAuthoringPackCompatibilityTest {
     }
     @Test fun `former bundle formats fail on the manifest without opening module content`() {
         val base = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
-        for (version in 3..6) {
+        for (version in 3..9) {
             val old = base.manifest.copy(formatVersion = version, modules = base.manifest.modules - "mechanics")
             val reads = mutableListOf<String>()
             val source = WorldsmithPackSource { path ->
@@ -128,7 +128,7 @@ class WorldAuthoringPackCompatibilityTest {
                 WorldsmithJson.encode(old)
             }
             val failure = assertThrows(IllegalArgumentException::class.java) { WorldsmithPackLoader.load(source) }
-            assertTrue(failure.message.orEmpty().contains("requires format 7"), failure.message)
+            assertTrue(failure.message.orEmpty().contains("requires format 10"), failure.message)
             assertEquals(listOf("worldsmith.json"), reads)
             assertThrows(IllegalArgumentException::class.java) { WorldContentBundleIO.encode(base.copy(manifest = old)) }
         }

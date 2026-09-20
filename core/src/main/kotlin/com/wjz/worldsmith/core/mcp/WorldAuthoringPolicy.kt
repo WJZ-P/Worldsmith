@@ -308,6 +308,8 @@ object WorldAuthoringPolicy {
                 "creatures" -> McpJson.encode(McpJson.decode<CreatureLibrary>(raw))
                 "items" -> McpJson.encode(McpJson.decode<CustomItemLibrary>(raw))
                 "quests" -> McpJson.encode(McpJson.decode<QuestLibrary>(raw))
+                "story" -> McpJson.encode(McpJson.decode<com.wjz.worldsmith.core.story.StoryLibrary>(raw))
+                "abilities" -> McpJson.encode(McpJson.decode<com.wjz.worldsmith.core.ability.AbilityLibrary>(raw))
                 "mechanics" -> McpJson.encode(McpJson.decode<WorldMechanicLibrary>(raw))
                 else -> raw
             }.jsonObject }.getOrDefault(raw))
@@ -332,17 +334,20 @@ object WorldAuthoringPolicy {
         "creature" -> "creatures"
         "item" -> "items"
         "quest" -> "quests"
+        "ability" -> "abilities"
         "mechanic" -> "mechanics"
+        in com.wjz.worldsmith.core.story.StoryContentModule.kinds -> "story"
         "theme", "narrative_beat" -> "theme"
         else -> null
     }
 
     /** Nested anchors/beats/blueprints remain inside their owner's reviewed definition and digest. */
     private fun actualTargets(documents: Map<String, JsonObject>): Set<ContentKey> = buildSet {
+        com.wjz.worldsmith.core.story.StoryContentModule.collections.forEach { (kind,collection) -> (documents["story"]?.get(collection) as? JsonArray).orEmpty().forEach { v -> ((v as? JsonObject)?.get("id") as? JsonPrimitive)?.contentOrNull?.let { add(ContentKey(kind,it)) } } }
         if ("terrain" in documents) add(ContentKey("terrain", "main"))
         documents["theme"]?.get("id")?.let { (it as? JsonPrimitive)?.contentOrNull }?.let { add(ContentKey("theme", it)) }
-        mapOf("biomes" to "biome", "features" to "feature", "blocks" to "block", "creatures" to "creature", "items" to "item", "quests" to "quest", "mechanics" to "mechanic", "structures" to "structure").forEach { (module, kind) ->
-            (documents[module]?.get(module) as? JsonArray).orEmpty().forEach { value ->
+        mapOf("biomes" to "biome", "features" to "feature", "blocks" to "block", "creatures" to "creature", "items" to "item", "quests" to "quest", "mechanics" to "mechanic", "abilities" to "ability", "structures" to "structure").forEach { (module, kind) ->
+            (documents[module]?.get(if(module=="abilities") "programs" else module) as? JsonArray).orEmpty().forEach { value ->
                 ((value as? JsonObject)?.get("id") as? JsonPrimitive)?.contentOrNull?.let { add(ContentKey(kind, it)) }
             }
         }
@@ -360,6 +365,8 @@ object WorldAuthoringPolicy {
             "theme" -> if ((document["id"] as? JsonPrimitive)?.contentOrNull == target.id) listOf(base) else emptyList()
             "anchor" -> entries((document["shape"] as? JsonObject)?.get("anchors"), "$base/shape/anchors")
             "narrative_beat" -> entries(document["beats"], "$base/beats")
+            "ability" -> entries(document["programs"], "$base/programs")
+            in com.wjz.worldsmith.core.story.StoryContentModule.kinds -> com.wjz.worldsmith.core.story.StoryContentModule.collections.getValue(target.kind).let { entries(document[it],"$base/$it") }
             "blueprint" -> {
                 val structure = target.id.substringBefore('/'); val blueprint = target.id.substringAfter('/', "")
                 val root = entries(document["structures"], "$base/structures", structure).singleOrNull() ?: return emptyList()
@@ -388,7 +395,7 @@ object WorldAuthoringPolicy {
 
     private fun fallbackRoot(target: ContentKey, document: JsonObject): String {
         val id = module(target.kind) ?: return "/modules"
-        val candidates = listOf("/modules/$id/$id", "/modules/$id", "/modules")
+        val candidates = listOf("/modules/$id/${if(id=="abilities") "programs" else if(id=="story") com.wjz.worldsmith.core.story.StoryContentModule.collections.getValue(target.kind) else id}", "/modules/$id", "/modules")
         return candidates.first { resolve(document, it) != null }
     }
 

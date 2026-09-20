@@ -1,6 +1,6 @@
 # Portable texture production: item / block / creature
 
-New publications use bundle format 7 with required mechanics. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
+New publications use bundle format 10 with required mechanics and abilities. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
 
 Worldsmith provides PNG authoring/import, validation, content addressing and model
 preview. It does NOT contain or promise access to a hosted text-to-image model.
@@ -12,8 +12,10 @@ pixel recipe compiler. A different AI does not need Codex or its image tool.
 - Ordinary item: square power-of-two PNG, 16..256 pixels, <=1 MiB. Usually a clear
   icon on transparent background. Bind the hash to CustomItemDefinition.textureAsset.
 - Block: square power-of-two PNG, 16..256 pixels, <=1 MiB. Design for repetition.
-  The current cube_all profile uses ONE tile for all six faces; per-face skins,
-  PBR/normal maps and animated PNGs are not installed. Use GLASS for transparency.
+  Blocks schema 2 uses one canonical six-face appearance plus particle PNG; each
+  face can use its own actual asset and 0..3 clockwise UV quarter turns. FIXED or
+  HORIZONTAL controls native placement/model rotation. PBR/normal maps and animated
+  PNGs are not installed. Use GLASS for transparency.
 - Creature: an actual UV atlas matching the model's exact declared width/height
   (powers of two 16..512). Generate the bones/cubes/UV guide first. A concept image
   is not a valid replacement for the unwrapped atlas. Paint the same face rectangles,
@@ -79,7 +81,13 @@ SHA-256 in items/blocks/creature models, then run the normal content linking and
 publication flow. PNG validity does not imply correct UVs, attractive artwork,
 tileable block edges or completed native resource activation.
 
-`worldsmith_preview_texture_asset` returns the actual image. Creature builds use
+`worldsmith_preview_texture_asset` returns the actual image. After binding a block,
+`worldsmith_preview_content_appearance(sessionId,kind:"block",ids:[id])` returns
+actual-PNG cube, labelled face planes, tile repetition and small-scale review.
+For 1..8 ordinary item icons use kind:"item" and their local ids to compare actual
+16/32 px silhouettes and enlarged images on dark/light backgrounds. These offline
+sheets report alpha/edge metrics, not automatic artistic-quality approval and not
+Minecraft screenshots. Creature builds use
 `worldsmith_preview_creature` for geometry/UV/pose inspection. A vision-capable client
 or a person can judge the visible result; text-only clients can still inspect the
 metadata but should not claim they visually reviewed an image.

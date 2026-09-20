@@ -21,7 +21,13 @@ data class WorldsmithSettings(
 }
 
 @Serializable
-data class WorldsmithClientSettings(val showWorldArrival: Boolean = true)
+data class WorldsmithClientSettings @JvmOverloads constructor(
+    val showWorldArrival: Boolean = true,
+    val showStoryHints: Boolean = true,
+    val showStoryTracking: Boolean = true,
+    val storyAudio: Boolean = true,
+    val reducedEffects: Boolean = false,
+)
 
 /**
  * Reads and writes the settings file.

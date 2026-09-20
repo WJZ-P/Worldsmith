@@ -14,6 +14,8 @@ class CreatureBuilder private constructor(private val id: String, private val di
     private var drops:List<CreatureDrop> = emptyList()
     private var boss:CreatureBossProfile? = null
     private var sounds:CreatureSoundProfile? = null
+    private var ability:CreatureAbilityBinding? = null
+    private var abilityBindings:List<AbilityEventBinding> = emptyList()
     private val bones = linkedMapOf<String, BoneRecipe>()
     private val mirrors = mutableListOf<MirrorRecipe>()
 
@@ -35,6 +37,11 @@ class CreatureBuilder private constructor(private val id: String, private val di
     fun drops(value:List<CreatureDrop>) = apply { drops = value.toList() }
     fun boss(value:CreatureBossProfile?) = apply { boss = value?.copy(phases = value.phases.toList()) }
     fun sounds(value:CreatureSoundProfile?) = apply { sounds = value }
+    fun ability(value:CreatureAbilityBinding?) = apply { ability = value }
+    fun abilityBindings(value:List<AbilityEventBinding>) = apply { abilityBindings = AbilityEventBindings.freeze(value) }
+    fun abilityBinding(value:AbilityEventBinding) = abilityBindings(abilityBindings + value)
+    @JvmOverloads fun ability(program: String, range: Double = 8.0, cooldownTicks: Int = 20, cancelOnTargetLoss: Boolean = true) =
+        ability(CreatureAbilityBinding(program, range, cooldownTicks, cancelOnTargetLoss))
     fun spawn(biomes: List<String>, weight: Int, minGroup: Int, maxGroup: Int, minLight: Int, maxLight: Int) =
         spawn(CreatureSpawn(biomes.toList(), weight, minGroup, maxGroup, minLight, maxLight))
 
@@ -51,9 +58,9 @@ class CreatureBuilder private constructor(private val id: String, private val di
         mirrors += MirrorRecipe(sourceRoot, targetRoot, shareUv)
     }
 
-    fun recipe() = CreatureRecipe(id, displayName, category, schemaVersion = if(sounds != null) 3 else if(boss == null) 1 else 2, atlasWidth = atlasWidth, atlasHeight = atlasHeight,
+    fun recipe() = CreatureRecipe(id, displayName, category, schemaVersion = if(abilityBindings.any { it.intervalTicks != 1 }) 6 else if(abilityBindings.isNotEmpty()) 5 else if(ability != null) 4 else if(sounds != null) 3 else if(boss == null) 1 else 2, atlasWidth = atlasWidth, atlasHeight = atlasHeight,
         padding = padding, themeRole = themeRole, attributes = attributes, behavior = behavior,
-        spawn = spawn.copy(biomes = spawn.biomes.toList()), bones = bones.values.map { it.copy(cubes = it.cubes.toList()) }, mirrors = mirrors.toList(), drops=drops.toList(), boss=boss?.let {it.copy(phases=it.phases.toList())}, sounds=sounds)
+        spawn = spawn.copy(biomes = spawn.biomes.toList()), bones = bones.values.map { it.copy(cubes = it.cubes.toList()) }, mirrors = mirrors.toList(), drops=drops.toList(), boss=boss?.let {it.copy(phases=it.phases.toList())}, sounds=sounds, ability=ability, abilityBindings=AbilityEventBindings.freeze(abilityBindings))
     fun build(textureSha256: String) = CreatureAuthoring.compile(recipe(), textureSha256)
     fun guide() = CreatureAuthoring.guide(recipe())
 

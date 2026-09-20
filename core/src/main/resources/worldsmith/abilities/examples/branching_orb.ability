@@ -1,0 +1,29 @@
+// The generic projectile carries a tag; all hit behavior belongs to this source.
+on start {
+    state.hits = 0;
+    let start = vector.add(entity.position(self), vec(0, 1.1, 0));
+    let aim = world.aim(8);
+    if (entity.alive(target)) { aim = vector.add(entity.position(target), vec(0, 0.8, 0)); }
+    let velocity = vector.scale(vector.sub(aim, start), 0.10);
+    projectile.emit(start, velocity, 0.01, 80, "seed");
+    fx.caption("The first impact splits into two tagged sparks.", 40);
+}
+
+on projectile_hit {
+    state.hits = state.hits + 1;
+    if (entity.alive(event_entity) && world.visible(self, event_entity)) {
+        combat.damage(event_entity, 2);
+    }
+    if (event_tag == "seed") {
+        state.branch = "split";
+        fx.telegraph(shape.sphere(event_position, 1.2), 20, "blue");
+        // Step slightly back toward the caster so the new sparks are not born in the hit wall.
+        let back = vector.scale(vector.sub(entity.position(self), event_position), 0.05);
+        let start = vector.add(vector.add(event_position, back), vec(0, 0.3, 0));
+        projectile.emit(start, vec(0.40, 0.15, 0), 0.02, 30, "spark");
+        projectile.emit(start, vec(-0.40, 0.15, 0), 0.02, 30, "spark");
+    } else {
+        state.branch = "spark_finished";
+        fx.sound("minecraft:block.amethyst_block.hit", event_position, 0.6, 1.5);
+    }
+}

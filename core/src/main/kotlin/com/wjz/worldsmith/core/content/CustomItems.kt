@@ -4,6 +4,8 @@ import com.wjz.worldsmith.core.validation.Diagnostic
 import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 
 @Serializable enum class CustomItemKind { RESOURCE, RELIC }
 @Serializable enum class CustomItemRarity { COMMON, UNCOMMON, RARE, EPIC }
@@ -42,6 +44,7 @@ import kotlinx.serialization.SerialName
         val lifetimeTicks: Int = 80, val hitEffects: List<ItemStatusEffect> = emptyList(),
     ) : ItemEffect()
     @Serializable @SerialName("blink") data class Blink(val distance: Float = 6.0f) : ItemEffect()
+    @Serializable @SerialName("run_program") data class RunProgram(val program: String) : ItemEffect()
 }
 @Serializable data class ItemAction @JvmOverloads constructor(
     val trigger: ItemActionTrigger = ItemActionTrigger.USE,
@@ -50,7 +53,7 @@ import kotlinx.serialization.SerialName
     val durabilityCost: Int = 0,
     val effects: List<ItemEffect>,
 )
-@Serializable data class CustomItemDefinition @JvmOverloads constructor(
+@Serializable @OptIn(ExperimentalSerializationApi::class) data class CustomItemDefinition @JvmOverloads constructor(
     val id: String,
     val displayName: String,
     val textureAsset: String,
@@ -62,6 +65,12 @@ import kotlinx.serialization.SerialName
     val equipment: ItemEquipment? = null,
     val consumable: ItemConsumable? = null,
     val actions: List<ItemAction> = emptyList(),
+    /** Additional native event entry points; these have no implicit quantity or durability charge. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val abilityBindings: List<AbilityEventBinding> = emptyList(),
+    /** Zero is instant use; positive values enable a native held-use session. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val maxUseTicks: Int = 0,
 )
 @Serializable data class CustomItemLibrary @JvmOverloads constructor(
     val schemaVersion: Int = 1,
@@ -85,7 +94,7 @@ object CustomItemValidation {
             if (ticks !in 1..72000) error("$path.durationTicks", "items.duration", "Effect duration supports 1..72000 ticks")
             if (amplifier !in 0..9) error("$path.amplifier", "items.amplifier", "Effect amplifier supports 0..9")
         }
-        if (library.schemaVersion !in 1..2) error("schemaVersion", "items.schema", "Item library schema must be 1 or 2")
+        if (library.schemaVersion !in 1..4) error("schemaVersion", "items.schema", "Item library schema must be 1 through 4")
         if (library.items.size > MAX_ITEMS) {
             error("items", "items.capacity", "At most $MAX_ITEMS item definitions per world")
             return@buildList
@@ -102,6 +111,25 @@ object CustomItemValidation {
             if (item.description.lineSequence().count() > 256) error("$path.description", "items.description_lines", "Item lore supports at most 256 lines")
             if (item.themeRole.length > 2048) error("$path.themeRole", "items.theme_role", "Theme role is limited to 2048 characters")
             if (library.schemaVersion == 1 && (item.equipment != null || item.consumable != null || item.actions.isNotEmpty())) error(path, "items.schema", "Equipment, consumption and actions require items schema 2")
+            if ((item.abilityBindings.isNotEmpty() || item.maxUseTicks != 0) && library.schemaVersion < 4)
+                error(path, "items.schema", "Event bindings and held-use sessions require items schema 4")
+            addAll(AbilityEventBindings.validate(item.abilityBindings, "item", "$path.abilityBindings"))
+            if (item.maxUseTicks !in 0..12000) error("$path.maxUseTicks", "items.use_duration", "Use duration is 0 for instant use or 1..12000 native held-use ticks")
+            val events = item.abilityBindings.flatMap { AbilityEventBindings.events(it) }.toSet()
+            if ("melee_hit" in events && (item.equipment == null || item.equipment.isArmor()))
+                error("$path.abilityBindings", "items.melee_equipment", "The native post-hit hook requires non-armor weapon/tool equipment")
+            if (item.maxUseTicks == 0 && events.any { it in setOf("use_tick", "use_release", "use_cancel") })
+                error("$path.maxUseTicks", "items.held_events", "Held tick/release/cancel events need a positive maxUseTicks")
+            if (item.maxUseTicks > 0 && events.none { it.startsWith("use_") })
+                error("$path.maxUseTicks", "items.held_events", "A held-use session needs an actual use event binding")
+            if (events.any { it.startsWith("use_") } && item.consumable != null)
+                error(path, "items.use_conflict", "Consumable use and event-program use are separate activation models")
+            if (item.maxUseTicks > 0 && item.actions.any { it.trigger == ItemActionTrigger.USE })
+                error(path, "items.use_conflict", "Held-use event programs are separate from consumables and immediate USE actions")
+            if ("use_start" in events && item.actions.any { it.trigger == ItemActionTrigger.USE })
+                error(path, "items.use_conflict", "Choose one USE activation model: an ItemAction or event bindings, not both")
+            if ("melee_hit" in events && item.actions.any { it.trigger == ItemActionTrigger.MELEE_HIT })
+                error(path, "items.use_conflict", "Choose one MELEE_HIT activation model: an ItemAction or event bindings, not both")
             item.equipment?.let { e ->
                 if (item.maxStackSize != 1) error("$path.maxStackSize", "items.equipment_stack", "Equipment is non-stackable")
                 if (e.durability !in 1..100000) error("$path.equipment.durability", "items.durability", "Durability supports 1..100000")
@@ -137,6 +165,12 @@ object CustomItemValidation {
                 action.effects.forEachIndexed { k, effect ->
                     val ep = "$ap.effects[$k]"
                     when (effect) {
+                        is ItemEffect.RunProgram -> {
+                            if (library.schemaVersion < 3) error(ep, "items.schema", "Program invocation requires items schema 3")
+                            if (!com.wjz.worldsmith.core.ability.AbilityPrograms.validId(effect.program)) error("$ep.program", "items.program", "Use a normalized local ability program id")
+                            if (action.trigger != ItemActionTrigger.USE || action.effects.size != 1 || item.consumable != null)
+                                error(ep, "items.program_action", "A program is the sole effect of a non-consumable USE action")
+                        }
                         is ItemEffect.Heal -> { number("$ep.amount", effect.amount.toDouble(), 0.1, 100.0); if (effect.target == ItemEffectTarget.TARGET && action.trigger != ItemActionTrigger.MELEE_HIT) error(ep, "items.target", "TARGET requires a melee hit") }
                         is ItemEffect.Feed -> { if (effect.nutrition !in 0..20) error(ep, "items.nutrition", "Nutrition supports 0..20"); number("$ep.saturation", effect.saturation.toDouble(), 0.0, 20.0) }
                         is ItemEffect.Status -> { status(ep, effect.effect, effect.durationTicks, effect.amplifier); if (effect.target == ItemEffectTarget.TARGET && action.trigger != ItemActionTrigger.MELEE_HIT) error(ep, "items.target", "TARGET requires a melee hit") }
@@ -148,7 +182,7 @@ object CustomItemValidation {
         }
     }
     @JvmStatic fun freeze(library: CustomItemLibrary) = library.copy(items = java.util.List.copyOf(library.items.map { item ->
-        item.copy(consumable = item.consumable?.copy(effects = java.util.List.copyOf(item.consumable.effects)), actions = java.util.List.copyOf(item.actions.map { a ->
+        item.copy(abilityBindings = AbilityEventBindings.freeze(item.abilityBindings), consumable = item.consumable?.copy(effects = java.util.List.copyOf(item.consumable.effects)), actions = java.util.List.copyOf(item.actions.map { a ->
             a.copy(effects = java.util.List.copyOf(a.effects.map { e -> if (e is ItemEffect.Projectile) e.copy(hitEffects = java.util.List.copyOf(e.hitEffects)) else e }))
         }))
     }))

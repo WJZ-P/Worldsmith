@@ -23,9 +23,9 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
         val str=McpJson.type("string");val obj=McpJson.type("object")
         return listOf(
             McpTool("worldsmith_get_creature_authoring_contract","Read creature construction and preview contract",
-                "Read the version-independent bone/cube builder recipe, mirroring, automatic UV layout and frozen preview flow. Optional Boss profiles use the installed bounded phase system, never arbitrary Java tick code.",McpJson.schema(emptyMap(),emptyList()),true,handler={
+                "Read the version-independent bone/cube builder recipe, mirroring, automatic UV layout and frozen preview flow. Optional schema-4 ability bindings invoke shared AbilityScript; Boss presentation may omit automatic stat phases.",McpJson.schema(emptyMap(),emptyList()),true,handler={
                     val text=javaClass.classLoader.getResourceAsStream("prompts/contract/creature_authoring.system.md")?.bufferedReader()?.use {it.readText()} ?: error("Missing creature authoring contract")
-                    McpToolResult.success(buildJsonObject {put("contract",text);put("views",McpJson.encode(CreaturePreview.VIEWS));put("poses",McpJson.encode(CreaturePose.POSES));put("runtimeSchemas",McpJson.encode(listOf(1,2,3)));put("soundVocabulary",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.vocabulary()));put("soundVoices",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.voices()))})
+                    McpToolResult.success(buildJsonObject {put("contract",text);put("views",McpJson.encode(CreaturePreview.VIEWS));put("poses",McpJson.encode(CreaturePose.POSES));put("runtimeSchemas",McpJson.encode(listOf(1,2,3,4,5,6)));put("soundVocabulary",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.vocabulary()));put("soundVoices",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.voices()))})
                 }),
             McpTool("worldsmith_build_creature","Build a frozen creature model candidate",
                 "Compile a CreatureRecipe: named bones/cubes, mirrored limbs and automatic box UVs. Optional textureAsset must already be attached to the session. Without it the output is a diagnostic UV guide, not a final skin. Saves an immutable build artifact, but never changes content drafts or activates a world.",
@@ -79,7 +79,7 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
         val sid=session(a).id;val id=McpJson.string(a,"buildId");val record=read(sid,id)
         val png=readTexture(sid,id,record);val mode=a["mode"]?.jsonPrimitive?.content ?: "model"
         val bossPhase=a["bossPhase"]?.jsonPrimitive?.int ?: 0
-        require(bossPhase in 0 until (record.definition.boss?.phases?.size ?: 1)) {"bossPhase must select an existing Boss phase; ordinary creatures only have phase 0"}
+        require(bossPhase in 0 until maxOf(1, record.definition.boss?.phases?.size ?: 1)) {"bossPhase must select an existing Boss phase; ordinary creatures only have phase 0"}
         val rendered=when(mode) {
             "model"->CreaturePreview.png(record.definition,png,CreaturePreview.Options.defaults(a["view"]?.jsonPrimitive?.content ?: "isometric",a["pose"]?.jsonPrimitive?.content ?: "idle").withBossPhase(bossPhase))
             "sheet"->CreaturePreview.sheet(record.definition,png,bossPhase)

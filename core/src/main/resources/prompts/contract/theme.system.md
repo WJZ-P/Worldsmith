@@ -1,4 +1,4 @@
-# Worldsmith unified world theme contract — module schema 1, bundle format 7
+# Worldsmith unified world theme contract — module schema 1, bundle format 10
 
 Design one world from the player's prompt, not unrelated content catalogs.
 For new COMPLETE_WORLD authoring, the session's WorldBible is the single source
@@ -9,9 +9,9 @@ records its owning brief and reviews the actual projection against current
 setting/content digests. Do not maintain contradictory facts in two documents.
 Legacy and lightweight sessions retain their existing direct-theme workflow.
 It is not an executable quest state machine or an achievement definition.
-Current publications use bundle format 7 with ten typed modules: `theme`,
+Current publications use bundle format 10 with twelve typed modules: `theme`,
 `terrain`, `features`, `biomes`, `structures`, `blocks`, `creatures`, `items`,
-`quests`, and `mechanics`. Older bundle formats are rejected.
+`quests`, `mechanics`, `abilities`, and `story`. Older bundle formats are rejected.
 Local packs and saves are not automatically migrated or rewritten.
 Theme remains schema 1; items schema 2 adds equipment, consumables and fixed
 actions without introducing another theme field or another module.
@@ -73,8 +73,8 @@ as concrete content anchors. Missing references are publication errors.
 Choose distinct ecological, material, settlement and creature consequences of
 the premise, then link the beats to the resulting definitions. Theme links
 describe intended exploration; they do not create objectives, rewards, dialogue,
-scripted triggers, or progression locks. The `quests` module is installed as one
-bounded linear main line with `kill_creature` and `deliver_item` objectives,
+scripted triggers, or progression locks. The `quests` module is installed as a
+bounded branching DAG with `fact`, `kill_creature`, `deliver_item` and `activate_mechanic` objectives,
 explicit delivery and reward claiming; read contract/quests for its own fields.
 Existing quests project into native world-specific advancements after reward claims.
 `achievements` is not installed as a separately authored module. Do not invent quest or achievement fields in the
@@ -124,7 +124,7 @@ an architecture plan, satisfy that plan's own contract and visual review loop.
    link resolving is engineering evidence, not proof of semantic consistency.
 7. `worldsmith_write_pack` accepts `theme`, `blocks`, `creatures`, `items`, and `quests` inline or
    uses their session module drafts. Publication binds all session assets to
-   the frozen format-7 pack; assets must exist and their bytes must validate.
+   the frozen format-10 pack; assets must exist and their bytes must validate.
    Empty optional libraries are valid only when they satisfy the session mode and
    its named complete-world coverage promises. A successful
    draft write is not a claim of native preparation or actual world activation.
@@ -143,3 +143,5 @@ The world's browser card reuses that content's real PNG without world activation
 Use `worldsmith:content/<blockId>` without properties in existing material or
 structure fields that refer to custom blocks. Source never chooses native host
 slots or raw `worldsmith:content/block/...` addresses. The world binding owns them.
+
+The required `abilities` module carries portable AbilityScript programs (empty is valid when unpromised). Read contract/abilities for source and host bindings.

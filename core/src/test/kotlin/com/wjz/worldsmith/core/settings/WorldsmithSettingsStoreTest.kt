@@ -15,6 +15,22 @@ class WorldsmithSettingsStoreTest {
     lateinit var directory: Path
 
     @Test
+    fun `story comfort preferences round trip independently without changing narrative state`() {
+        val path = directory.resolve("comfort.json")
+        val preferences = WorldsmithClientSettings(showWorldArrival = true, showStoryHints = false,
+            showStoryTracking = false, storyAudio = false, reducedEffects = true)
+        WorldsmithSettingsStore.save(path, WorldsmithSettings(client = preferences))
+        assertEquals(preferences, WorldsmithSettingsStore.load(path).client)
+        val json = Files.readString(path)
+        assertFalse(json.contains("knowledge"))
+        assertFalse(json.contains("dialogue"))
+        assertTrue(WorldsmithClientSettings().showStoryHints)
+        assertTrue(WorldsmithClientSettings().showStoryTracking)
+        assertTrue(WorldsmithClientSettings().storyAudio)
+        assertFalse(WorldsmithClientSettings().reducedEffects)
+    }
+
+    @Test
     fun `existing settings enable arrival by default and an explicit preference round trips`() {
         val path=directory.resolve("worldsmith.json")
         Files.writeString(path,"""{"schemaVersion":1}""")

@@ -116,13 +116,15 @@ and a reachable progression idea before designing remote spectacles. Distinguish
 scarcity from chores: repeating one long trip is not additional world depth.
 
 Narrative societies and historical tensions may shape ruins, materials and theme
-text. They do not install NPCs, faction allegiance, dialogue, reputation, territory
-control or dynamic wars. Regional difficulty is an authored distribution of the
+text. Actual inhabitants require story character/place markers and dialogue/routine
+definitions; reputation can use declared player facts. Prose alone does not install
+these systems, faction territory control or dynamic wars. Regional difficulty is an authored distribution of the
 supported creature attributes/behavior and resources, not automatic level scaling.
 
-Main-line gameplay currently supports linear kill/delivery objectives with
-prerequisites and explicit reward claims. Use optional journeys as exploration
-intent, not invented visit-region or branching quest types. Check that every
+Quest schema 2 supports branching kill/delivery/activation/fact objectives with
+conditions, acceptance and explicit reward claims. Optional journeys can use actual
+place discovery facts; do not invent a visit-region objective or infer discovery
+from a declared place without a generated marker. Check that every
 delivery has an obtainable earlier producer; earlier rewards and fixed/line
 supplies are finite and consumed by prior deliveries. Exclude the task's own and
 future rewards as prerequisites. A positive random loot chance is not a guaranteed

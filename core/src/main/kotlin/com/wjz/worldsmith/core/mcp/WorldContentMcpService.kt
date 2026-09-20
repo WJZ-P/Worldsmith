@@ -1,6 +1,11 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+
 import com.wjz.worldsmith.core.content.*
+import com.wjz.worldsmith.core.ability.AbilityLibrary
+import com.wjz.worldsmith.core.story.StoryLibrary
 import com.wjz.worldsmith.core.model.*
 import com.wjz.worldsmith.core.pack.WorldContentBundleIO
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
@@ -16,36 +21,42 @@ import com.wjz.worldsmith.core.drawhost.DrawingJob
 /** Durable modular authoring; planning, semantic validation and activation are separate receipts. */
 class WorldContentMcpService(private val store:ManagedPackStore, private val nativeAdapterPresent:Boolean,
     private val sessions:WorkflowSessions=WorkflowSessions(), assetDirectory:Path?=null,
-    private val drawingJobs:(String)->List<DrawingJob> = { emptyList() }) {
-    private val registry=ExistingWorldContentModules.registry()
+    private val drawingJobs:(String)->List<DrawingJob> = { emptyList() },
+    private val abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()) {
+    private val registry=ExistingWorldContentModules.registry(abilityCapabilities)
     private val assets=assetDirectory?.let {ContentAssetStore(it,ContentAssetValidation.MAX_ASSET_BYTES)}
     private val textureInbox=assetDirectory?.resolveSibling("texture-inbox")?.let {
         Files.createDirectories(it);require(!Files.isSymbolicLink(it)) {"Texture inbox must be a regular directory"};it.toRealPath()
     }
     fun capabilities():JsonObject=buildJsonObject {
-        put("frameworkVersion",6);put("packFormat",WorldContentBundleIO.FORMAT_VERSION)
+        put("frameworkVersion",8);put("packFormat",WorldContentBundleIO.FORMAT_VERSION)
         put("authoringBudgets",WorldsmithAuthoringBudgets.snapshot())
-        put("implementedLayer","typed ten-module bundles, event-driven mechanics, linear quest progress, world-bound items and portable texture authoring")
+        put("implementedLayer","typed twelve-module bundles, directed six-face materials, durable story projections, explicit source-control leases, persistent facts, dialogue, branching quests and portable texture authoring")
         put("installedModules",McpJson.encode(registry.descriptors));put("plannedModules",McpJson.encode(ExistingWorldContentModules.plannedModules))
         put("customBlockRuntime",nativeAdapterPresent);put("customCreatureRuntime",nativeAdapterPresent)
         put("customItemRuntime",nativeAdapterPresent);put("creatureDrops",nativeAdapterPresent)
         put("geckoLibIntegration",false);put("nativeAdapterPresent",nativeAdapterPresent)
         put("newPackFormatEnabled",true);put("legacyPackFormats",McpJson.encode(emptyList<Int>()));put("legacyFormatsReadOnly",false);put("activationVerified",false)
-        put("linearQuestRuntime",nativeAdapterPresent)
-        put("questObjectives",McpJson.encode(listOf("kill_creature","deliver_item","activate_mechanic")))
-        put("mechanicsRuntime",nativeAdapterPresent);put("mechanicsContract","mechanics")
+        put("branchingQuestRuntime",nativeAdapterPresent)
+        put("questObjectives",McpJson.encode(listOf("kill_creature","deliver_item","activate_mechanic","fact")))
+        put("questSchemaVersion",2);put("questDiscovery","server-filtered durable discovery; ALL/ANY prerequisites; explicit exclusive choices")
+        put("storyRuntime",nativeAdapterPresent);put("storyContract","story");put("storySchemaVersion",2);put("storyProjections","bounded once-per-actual-place expected/desired states with durable receipts");put("mechanicsRuntime",nativeAdapterPresent);put("mechanicsContract","mechanics")
         put("mechanicsEvents",McpJson.encode(listOf("BLOCK_PLACED","USE_BLOCK")))
-        put("mechanicsActions",McpJson.encode(listOf("set_block","spawn_creature","give_item")))
-        put("mechanicsStateScope","BUNDLE_DIMENSION_ANCHOR_MECHANIC");put("arbitraryMechanicsScripts",false)
+        put("mechanicsActions",McpJson.encode(listOf("set_block","spawn_creature","give_item","run_program")))
+        put("mechanicsStateScope","BUNDLE_DIMENSION_ANCHOR_MECHANIC");put("arbitraryMechanicsScripts",false);put("programmableAbilities",true);put("abilityRuntime",nativeAdapterPresent);put("abilitiesContract","abilities");put("abilityCapabilities",AbilityAuthoringContract.capabilities(abilityCapabilities))
+        put("itemAbilityEvents",McpJson.encode(AbilityEventBindings.itemEvents().sorted()))
+        put("creatureAbilityEvents",McpJson.encode(AbilityEventBindings.creatureEvents().sorted()))
         put("runtimeScope","one local integrated-server world; remote multiplayer content negotiation is not installed")
         put("assetAuthoring","actual PNG upload or indexed-pixel texture authoring; not a hosted image-generation service")
         put("textureWorkflowContract","worldsmith_get_texture_workflow")
         put("modelIndependentTextureRecipes",true)
+        put("contentAppearancePreviewTool","worldsmith_preview_content_appearance")
+        put("blockSchemaVersion",2);put("blockAppearance","canonical six-face PNGs, particle texture, per-face UV quarter turns and FIXED/HORIZONTAL orientation")
         put("creatureAuthoring", "deterministic bone/cube recipes, mirroring, automatic UVs and frozen textured pose previews")
         put("creatureAuthoringContract", "worldsmith_get_creature_authoring_contract")
         put("creativeModeContentTab", nativeAdapterPresent)
         put("customBlockReference","worldsmith:content/<blockId>; no arbitrary state properties or raw host slot ids")
-        put("customItemReference","worldsmith:item/<itemId>; resources/relics or items schema 2 equipment, consumables and fixed actions")
+        put("customItemReference","worldsmith:item/<itemId>; resources/relics or items schema 2 equipment and consumables; schema 3 invokes portable ability source")
         put("nextTool","worldsmith_get_content_contract")
         put("generationModes",McpJson.encode(WorkflowMode.entries.map { it.name }))
         put("worldBibleAuthoring",true);put("authoringContractVersion",1);put("automaticAfterAiReview",true)
@@ -72,8 +83,8 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
                 result.copy(structuredContent=JsonObject(result.structuredContent+buildJsonObject {put("recipeVersion",TextureRecipes.VERSION);put("seed",recipe.seed);put("imageModelUsed",false)}))
             }),
             McpTool("worldsmith_import_texture_file","Import a PNG from the dedicated texture inbox","Read a single PNG filename from the configured host-local texture inbox, avoiding base64 through the model. No arbitrary paths, URLs or symlinks. Optional fitWidth/fitHeight plus resample=nearest explicitly resizes the entire image, preserving the original file.",McpJson.schema(revision+mapOf("filename" to str,"fitWidth" to integer,"fitHeight" to integer,"resample" to str),listOf("sessionId","expectedRevision","filename")),false,handler=::importTexture),
-            McpTool("worldsmith_get_content_contract","Read a typed content contract","Read exact theme, blocks, creatures, items, quests or mechanics fields, or world_design for complete-world authoring plans. Existing worldgen domain contracts remain separate.",McpJson.schema(mapOf("module" to str),listOf("module")),true,handler={contract(McpJson.string(it,"module"))}),
-            McpTool("worldsmith_put_content_modules","Commit a world content draft","Atomically merge complete typed module documents at expectedRevision: theme, blocks, creatures, items, quests, mechanics, terrain, biomes, features. Structure tools own architecture. removeAssets detaches obsolete handles without deleting their stored bytes. Repairable links may remain in drafts. Invalidates publication.",McpJson.schema(revision+mapOf("modules" to obj,"removeAssets" to McpJson.array()),listOf("sessionId","expectedRevision","modules")),false,handler=::putModules),
+            McpTool("worldsmith_get_content_contract","Read a typed content contract","Read exact theme, blocks, creatures, items, quests, mechanics, story or abilities fields, or world_design for complete-world authoring plans. Existing worldgen domain contracts remain separate.",McpJson.schema(mapOf("module" to str),listOf("module")),true,handler={contract(McpJson.string(it,"module"))}),
+            McpTool("worldsmith_put_content_modules","Commit a world content draft","Atomically merge complete typed module documents at expectedRevision: theme, blocks, creatures, items, quests, mechanics, abilities, story, terrain, biomes, features. Structure tools own architecture. removeAssets detaches obsolete handles without deleting their stored bytes. Repairable links may remain in drafts. Invalidates publication.",McpJson.schema(revision+mapOf("modules" to obj,"removeAssets" to McpJson.array()),listOf("sessionId","expectedRevision","modules")),false,handler=::putModules),
             McpTool("worldsmith_get_content_draft","Read current world content draft","Read durable modules, immutable asset handles and shared revision without executing sources.",McpJson.schema(mapOf("sessionId" to str),listOf("sessionId")),true,handler={draft(session(it))}),
             McpTool("worldsmith_put_texture_asset","Attach an immutable PNG texture","Upload actual PNG bytes as base64. Validates bytes and dimensions and attaches its content address at expectedRevision. No filesystem path or URL is accepted.",McpJson.schema(revision+mapOf("pngBase64" to str),listOf("sessionId","expectedRevision","pngBase64")),false,handler={a->current(a);attach(a,ContentTextureMcp.upload(McpJson.string(a,"pngBase64")))}),
             McpTool("worldsmith_create_pixel_texture","Author an indexed-pixel PNG","Create a real PNG from palette colors (#RRGGBB/#RRGGBBAA) and rectangular rows of zero-based color indices, up to 256x256. Return the actual preview and durable handle.",McpJson.schema(revision+mapOf("palette" to McpJson.array(),"rows" to buildJsonObject {put("type","array");put("items",buildJsonObject {put("type","array");put("items",integer)})}),listOf("sessionId","expectedRevision","palette","rows")),false,handler={a->current(a);attach(a,ContentTextureMcp.pixels(McpJson.strings(a,"palette"),a.getValue("rows").jsonArray.map {row->row.jsonArray.map {it.jsonPrimitive.int}}))}),
@@ -82,10 +93,12 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
                 val bytes=requireNotNull(assets) {"Asset storage is not installed"}.read(handle)
                 McpToolResult.success(buildJsonObject {put("asset",McpJson.encode(portable(handle)));put("verified",true)},images=listOf(McpImage(Base64.getEncoder().encodeToString(bytes))))
             }),
+            McpTool("worldsmith_preview_content_appearance","Review actual block and item appearances","Read-only actual-PNG contact sheet: one block's textured cube, six local faces and tile repetition, or 1..8 item silhouettes on dark/light backgrounds. Offline preview, not a Minecraft screenshot or automatic art-quality judgement.",
+                McpJson.schema(mapOf("sessionId" to str,"kind" to str,"ids" to McpJson.array()),listOf("sessionId","kind","ids")),true,handler=::previewAppearance),
             McpTool("worldsmith_plan_world_content","Plan a modular world draft","Read-only symbols, links and capabilities. Accept scope/modules/assets or sessionId for durable drafts. Not full semantic validation or activation.",McpJson.schema(mapOf("sessionId" to str,"scope" to str,"modules" to obj,"assets" to buildJsonObject {put("type","array");put("items",obj)}),emptyList()),true,handler={a->result(registry.plan(if("sessionId" in a) input(session(a)) else McpJson.decode<WorldContentInput>(a),availableCapabilities()))}),
-            McpTool("worldsmith_inspect_world_content","Inspect a saved content bundle","Re-read and validate a format-7 bundle, then report its catalog and compile order. Does not assert successful game resource reload.",McpJson.schema(mapOf("id" to str),listOf("id")),true,handler={a->
+            McpTool("worldsmith_inspect_world_content","Inspect a saved content bundle","Re-read and validate a format-10 bundle, then report its catalog and compile order. Does not assert successful game resource reload.",McpJson.schema(mapOf("id" to str),listOf("id")),true,handler={a->
                 val path=store.managed(McpJson.string(a,"id")) ?: return@McpTool McpToolResult.error("Unknown managed pack")
-                val pack=WorldsmithPackLoader.loadDirectory(path);val diagnostics=WorldsmithPackValidator.validate(pack)
+                val pack=WorldsmithPackLoader.loadDirectory(path);val diagnostics=WorldsmithPackValidator.validate(pack, abilityCapabilities)
                 if(diagnostics.any {it.severity==DiagnosticSeverity.ERROR}) McpToolResult.error("Saved bundle needs repair",buildJsonObject {put("diagnostics",McpJson.encode(diagnostics))})
                 else result(registry.plan(ExistingWorldContentModules.input(pack),availableCapabilities()))
             })
@@ -94,6 +107,33 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
     fun assetBytes(session:WorkflowSession?):Map<String,ByteArray> = session?.contentAssets?.mapValues {(_,asset)->requireNotNull(assets) {"Asset storage is not installed"}.read(asset)}.orEmpty()
     fun textureBytes(session:WorkflowSession,id:String):ByteArray = requireNotNull(assets) {"Asset storage is not installed"}
         .read(requireNotNull(session.contentAssets[id]) {"Texture is not attached to this session"})
+    private fun previewAppearance(a:JsonObject):McpToolResult {
+        val s=session(a);val ids=McpJson.strings(a,"ids")
+        require(ids.size in 1..8 && ids.distinct().size==ids.size) {"Select 1..8 distinct local content ids"}
+        val rendered=when(McpJson.string(a,"kind")) {
+            "block"->{
+                require(ids.size==1) {"A block appearance sheet reviews exactly one block"}
+                val library=McpJson.decode<CustomBlockLibrary>(requireNotNull(s.contentModules["blocks"]) {"The draft has no block module"})
+                val definition=requireNotNull(library.blocks.singleOrNull {it.id==ids.single()}) {"Unknown draft block"}
+                ContentAppearancePreview.block(definition,definition.appearance.assetIds().associateWith {textureBytes(s,it)})
+            }
+            "item"->{
+                val library=McpJson.decode<CustomItemLibrary>(requireNotNull(s.contentModules["items"]) {"The draft has no item module"})
+                val definitions=ids.map {id->requireNotNull(library.items.singleOrNull {it.id==id}) {"Unknown draft item: $id"}}
+                ContentAppearancePreview.items(definitions,definitions.map {it.textureAsset}.distinct().associateWith {textureBytes(s,it)})
+            }
+            else->error("Appearance kind must be block or item")
+        }
+        return McpToolResult.success(buildJsonObject {
+            put("sessionId",s.id);put("revision",s.revision);put("draftUpdated",false);put("worldActivated",false)
+            put("preview",previewValue(rendered.metadata()))
+        },images=listOf(McpImage(Base64.getEncoder().encodeToString(rendered.png()))))
+    }
+    private fun previewValue(value:Any?):JsonElement=when(value) {
+        null->JsonNull;is String->JsonPrimitive(value);is Boolean->JsonPrimitive(value);is Number->JsonPrimitive(value)
+        is Map<*,*>->JsonObject(value.entries.associate {it.key.toString() to previewValue(it.value)})
+        is List<*>->JsonArray(value.map(::previewValue));else->error("Unsupported appearance metadata value")
+    }
     /** Attach verified saved-pack PNGs in one shared CAS; this never imports module documents or source jobs. */
     fun attachPackTextures(sessionId:String,expectedRevision:Long,pack:WorldsmithPack,assetIds:List<String>?=null):PackTextureAttachmentReceipt {
         require(pack.manifest.id==pack.computedId && WorldContentRegistry.SHA256.matches(pack.manifest.id)) {"Saved texture source must retain its verified bundle identity"}
@@ -115,7 +155,7 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         val saved=requireNotNull(sessions.putContent(sessionId,expectedRevision,assets=attached)) {"Draft is no longer active"}
         return PackTextureAttachmentReceipt(sessionId,saved.revision,pack.manifest.id,attached.values.map(::portable),selected.count {it in current.contentAssets})
     }
-    fun progress(session:WorkflowSession):GenerationProgress=WorldGenerationProgress.inspect(session,drawingJobs(session.id))
+    fun progress(session:WorkflowSession):GenerationProgress=WorldGenerationProgress.inspect(session,drawingJobs(session.id),abilityCapabilities)
     private fun session(a:JsonObject)=requireNotNull(sessions.find(McpJson.string(a,"sessionId"))) {"Unknown session; begin or resume a world draft"}
     private fun current(a:JsonObject)=session(a).also {
         require(!it.archived) {"Resume the archived draft before editing"}
@@ -126,7 +166,7 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         val remove=McpJson.strings(a,"removeAssets");require(remove.all {it in s.contentAssets}) {"Unknown attached asset"}
         require(modules.isNotEmpty() || remove.isNotEmpty());require(modules.values.sumOf {it.toString().toByteArray().size.toLong()}<=4*1024*1024) {"Module edit exceeds 4 MiB"}
         modules.forEach {(id,document)->when(id) {
-            "theme"->McpJson.decode<WorldTheme>(document);"blocks"->McpJson.decode<CustomBlockLibrary>(document);"creatures"->McpJson.decode<CreatureLibrary>(document);"items"->McpJson.decode<CustomItemLibrary>(document);"quests"->McpJson.decode<QuestLibrary>(document);"mechanics"->McpJson.decode<WorldMechanicLibrary>(document)
+            "theme"->McpJson.decode<WorldTheme>(document);"blocks"->McpJson.decode<CustomBlockLibrary>(document);"creatures"->McpJson.decode<CreatureLibrary>(document);"items"->McpJson.decode<CustomItemLibrary>(document);"quests"->McpJson.decode<QuestLibrary>(document);"mechanics"->McpJson.decode<WorldMechanicLibrary>(document);"abilities"->McpJson.decode<AbilityLibrary>(document);"story"->McpJson.decode<StoryLibrary>(document)
             "terrain"->McpJson.decode<TerrainPlan>(document);"biomes"->McpJson.decode<BiomePlan>(document);"features"->McpJson.decode<FeatureLibrary>(document)
             else->error("Unknown authorable module '$id'; structure tools own architecture; independent achievement modules are not installed; existing quests have a native advancement projection")
         }}
@@ -195,12 +235,14 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         return if(plan.catalogValid) McpToolResult.success(body) else McpToolResult.error("World content plan needs repair",body)
     }
     private fun contract(module:String):McpToolResult {
-        require(module in setOf("theme","blocks","creatures","items","quests","mechanics","world_design")) {"Use worldsmith_get_contract for other worldgen domains"}
+        require(module in setOf("theme","blocks","creatures","items","quests","mechanics","abilities","story","world_design")) {"Use worldsmith_get_contract for other worldgen domains"}
         val text=javaClass.classLoader.getResourceAsStream("prompts/contract/$module.system.md")?.bufferedReader()?.use {it.readText()} ?: error("Missing content contract: $module")
         return McpToolResult.success(buildJsonObject {
-            put("module",module);put("schemaVersion",when(module){"creatures"->3;"items"->2;else->1});put("contract",text)
+            put("module",module);put("schemaVersion",registry.descriptors.firstOrNull { it.id==module }?.schemaVersions?.maxOrNull() ?: 1);put("contract",text)
+            if(module=="abilities") put("capabilities",AbilityAuthoringContract.capabilities(abilityCapabilities))
             if(module=="creatures"){put("soundVocabulary",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.vocabulary()));put("soundVoices",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.voices()))}
-            if(module=="creatures") {put("supportedSchemaVersions",McpJson.encode(listOf(1,2,3)));put("defaultSchemaVersion",1)}
+            if(module=="creatures") {put("supportedSchemaVersions",McpJson.encode(listOf(1,2,3,4,5,6)));put("defaultSchemaVersion",1);put("abilityEvents",McpJson.encode(AbilityEventBindings.creatureEvents().sorted()))}
+            if(module=="items") {put("supportedSchemaVersions",McpJson.encode(listOf(1,2,3,4)));put("abilityEvents",McpJson.encode(AbilityEventBindings.itemEvents().sorted()))}
         })
     }
 }

@@ -2,6 +2,7 @@ package com.wjz.worldsmith.core.mcp
 
 import com.wjz.worldsmith.core.content.*
 import com.wjz.worldsmith.core.pack.WorldsmithPackLoader
+import com.wjz.worldsmith.core.pack.WorldContentBundleIO
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -26,10 +27,10 @@ class MechanicsAuthoringTest {
 
     @Test fun `framework contract and write schema expose the real event driven module`() {
         val capabilities = call("worldsmith_get_content_framework").structuredContent
-        assertEquals(7, capabilities.getValue("packFormat").jsonPrimitive.int)
+        assertEquals(WorldContentBundleIO.FORMAT_VERSION, capabilities.getValue("packFormat").jsonPrimitive.int)
         val status = call("worldsmith_status").structuredContent
-        assertEquals(7, status.getValue("packFormatVersion").jsonPrimitive.int)
-        assertEquals(listOf(7), status.getValue("supportedPackFormats").jsonArray.map { it.jsonPrimitive.int })
+        assertEquals(WorldContentBundleIO.FORMAT_VERSION, status.getValue("packFormatVersion").jsonPrimitive.int)
+        assertEquals(listOf(WorldContentBundleIO.FORMAT_VERSION), status.getValue("supportedPackFormats").jsonArray.map { it.jsonPrimitive.int })
         assertTrue(status.getValue("readOnlyPackFormats").jsonArray.isEmpty())
         assertTrue(capabilities.getValue("installedModules").jsonArray.any { it.jsonObject["id"]?.jsonPrimitive?.content == "mechanics" })
         assertFalse(capabilities.getValue("mechanicsRuntime").jsonPrimitive.boolean)
@@ -96,7 +97,7 @@ class MechanicsAuthoringTest {
         })
         assertFalse(write.isError, write.text)
         val pack = WorldsmithPackLoader.loadDirectory(Path.of(write.structuredContent.getValue("path").jsonPrimitive.content))
-        assertEquals(7, pack.manifest.formatVersion)
+        assertEquals(10, pack.manifest.formatVersion)
         assertEquals(library, pack.mechanics)
         assertEquals("mechanics.json", pack.manifest.modules.getValue("mechanics").path)
         assertTrue(write.structuredContent.getValue("resourcePackReady").jsonPrimitive.boolean)

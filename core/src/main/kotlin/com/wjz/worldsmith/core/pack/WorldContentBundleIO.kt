@@ -1,6 +1,8 @@
 package com.wjz.worldsmith.core.pack
 
 import com.wjz.worldsmith.core.content.*
+import com.wjz.worldsmith.core.ability.AbilityLibrary
+import com.wjz.worldsmith.core.story.StoryLibrary
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import com.wjz.worldsmith.core.model.*
 import com.wjz.worldsmith.core.serialization.WorldsmithJson
@@ -13,10 +15,10 @@ data class WorldContentBundleFiles(
     val binaries: Map<String, ByteArray>,
 )
 
-/** Current-only immutable bundle boundary. Format 7 makes anchor-scoped mechanics a required module. */
+/** Current-only immutable bundle boundary. Format 10 unifies directed materials and durable story consequences. */
 object WorldContentBundleIO {
-    const val FORMAT_VERSION = 7
-    val REQUIRED_MODULES = setOf("theme", "terrain", "features", "biomes", "structures", "blocks", "creatures", "items", "quests", "mechanics")
+    const val FORMAT_VERSION = 10
+    val REQUIRED_MODULES = setOf("theme", "terrain", "features", "biomes", "structures", "blocks", "creatures", "items", "quests", "mechanics", "abilities", "story")
     const val MAX_TEXT_BYTES = 24 * 1024 * 1024
     const val MAX_DRAWING_BYTES = 256L * 1024 * 1024
 
@@ -25,18 +27,18 @@ object WorldContentBundleIO {
         features: FeatureLibrary, structures: StructureLibrary = StructureLibrary(), theme: WorldTheme,
         blocks: CustomBlockLibrary = CustomBlockLibrary(), creatures: CreatureLibrary = CreatureLibrary(),
         assets: Map<String, ByteArray> = emptyMap(), items: CustomItemLibrary = CustomItemLibrary(), quests: QuestLibrary = QuestLibrary(),
-        representativeContent: ContentKey? = null, mechanics: WorldMechanicLibrary = WorldMechanicLibrary()): WorldsmithPack {
+        representativeContent: ContentKey? = null, mechanics: WorldMechanicLibrary = WorldMechanicLibrary(), abilities: AbilityLibrary = AbilityLibrary(), story: StoryLibrary = StoryLibrary()): WorldsmithPack {
         val descriptors = assets.toSortedMap().map { (id, bytes) ->
             val hash = ContentAssetValidation.hash(bytes)
             ContentAsset(id, hash, "image/png", bytes.size.toLong(), ContentAssetValidation.path(hash))
         }
         ContentAssetValidation.verifyAll(descriptors, assets)
         val modules = REQUIRED_MODULES.sorted().associateWith { id ->
-            WorldsmithModuleFile(when(id) {"structures"->structures.schemaVersion;"creatures"->creatures.schemaVersion;"items"->items.schemaVersion;"mechanics"->mechanics.schemaVersion;else->1}, "$id.json")
+            WorldsmithModuleFile(when(id) {"structures"->structures.schemaVersion;"blocks"->blocks.schemaVersion;"creatures"->creatures.schemaVersion;"items"->items.schemaVersion;"mechanics"->mechanics.schemaVersion;"abilities"->abilities.schemaVersion;"quests"->quests.schemaVersion;"story"->story.schemaVersion;else->1}, if (id in setOf("abilities","story")) "$id/$id.json" else "$id.json")
         }
         val manifest = WorldsmithPackManifest(FORMAT_VERSION, "0".repeat(64), displayName, description,
             modules = modules, assets = descriptors, representativeContent = representativeContent)
-        val draft = WorldsmithPack(manifest, terrain, biomes, features, manifest.id, structures, theme, blocks, creatures, assets, items, quests, mechanics)
+        val draft = WorldsmithPack(manifest, terrain, biomes, features, manifest.id, structures, theme, blocks, creatures, assets, items, quests, mechanics, abilities, story)
         val files = encode(draft)
         return draft.copy(manifest = files.manifest, computedId = files.manifest.id)
     }
@@ -44,9 +46,14 @@ object WorldContentBundleIO {
     @JvmStatic
     fun encode(pack: WorldsmithPack): WorldContentBundleFiles {
         validateManifest(pack.manifest)
-        require(pack.creatures.creatures.none { it.sounds != null } || pack.creatures.schemaVersion == 3) {
-            "Authored creature sounds require creature module schema 3"
+        require(pack.creatures.creatures.none { it.sounds != null } || pack.creatures.schemaVersion >= 3) {
+            "Authored creature sounds require creature module schema 3 or later"
         }
+        require(pack.creatures.creatures.none { it.ability != null } || pack.creatures.schemaVersion >= 4) { "Ability bindings require creature module schema 4" }
+        require(pack.items.items.none { i -> i.actions.any { a -> a.effects.any { it is ItemEffect.RunProgram } } } || pack.items.schemaVersion >= 3) { "Program item actions require items schema 3" }
+        require(pack.creatures.creatures.none { it.abilityBindings.isNotEmpty() } || pack.creatures.schemaVersion >= 5) { "Event bindings require creature module schema 5" }
+        require(pack.creatures.creatures.none { c -> c.abilityBindings.any { it.intervalTicks != 1 } } || pack.creatures.schemaVersion >= 6) { "Observation intervals require creature module schema 6" }
+        require(pack.items.items.none { it.abilityBindings.isNotEmpty() || it.maxUseTicks != 0 } || pack.items.schemaVersion >= 4) { "Event bindings and held use require items schema 4" }
         ContentAssetValidation.verifyAll(pack.manifest.assets, pack.assets)
         val texts = linkedMapOf<String, String>()
         fun put(module: String, text: String) { texts[pack.manifest.modulePath(module)] = text }
@@ -59,6 +66,8 @@ object WorldContentBundleIO {
         put("items", WorldsmithJson.encode(pack.items))
         put("quests", WorldsmithJson.encode(pack.quests))
         put("mechanics", WorldsmithJson.encode(pack.mechanics))
+        put("abilities", WorldsmithJson.encode(pack.abilities))
+        put("story", WorldsmithJson.encode(pack.story))
         val structureFiles = StructurePackIO.files(pack.structures)
         texts.putAll(structureFiles - StructurePackIO.INDEX_FILE)
         put("structures", structureFiles.getValue(StructurePackIO.INDEX_FILE))
@@ -74,13 +83,13 @@ object WorldContentBundleIO {
     @JvmStatic
     fun validateManifest(manifest: WorldsmithPackManifest) {
         require(manifest.formatVersion == FORMAT_VERSION) {
-            "Unsupported bundle format ${manifest.formatVersion}; Worldsmith requires format $FORMAT_VERSION with the mechanics module. Older formats 3/4/5/6 must be authored again; existing files are left unchanged."
+            "Unsupported bundle format ${manifest.formatVersion}; Worldsmith requires format $FORMAT_VERSION with blocks/story schema 2 and explicit source control. Older formats must be authored again; existing files are left unchanged."
         }
         require(manifest.modules.keys == REQUIRED_MODULES) { "Format $FORMAT_VERSION requires exactly ${REQUIRED_MODULES.sorted()}" }
         require(manifest.displayName.isNotBlank() && manifest.displayName.length <= 160 && manifest.description.length <= 8192) { "Invalid bundle display metadata" }
         require(manifest.modules.values.map { it.path }.distinct().size == manifest.modules.size) { "Module documents must have distinct paths" }
         manifest.modules.forEach { (id, file) ->
-            val versions = when (id) { "creatures" -> 1..3; "structures", "items" -> 1..2; else -> 1..1 }
+            val versions = when (id) { "creatures" -> 1..6; "items" -> 1..4; "structures" -> 1..3; "quests", "blocks", "story" -> 2..2; else -> 1..1 }
             require(file.schemaVersion in versions) { "Unsupported schema for module '$id' in bundle format ${manifest.formatVersion}" }
             require(WorldContentRegistry.validRelativePath(file.path) && file.path.endsWith(".json") &&
                 file.path != "worldsmith.json" && !file.path.startsWith("structures/") && !file.path.startsWith("assets/") && !file.path.startsWith("drawings/")) { "Invalid or reserved module document path" }

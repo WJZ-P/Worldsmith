@@ -76,12 +76,18 @@ public final class CreaturePreview {
         metadata.put("cameraYawDegrees", scene.camera.yaw); metadata.put("cameraElevationDegrees", scene.camera.elevation);
         metadata.put("pixelsPerModelUnit", scene.camera.scale); metadata.put("sharedPoseEvaluator", "CreaturePose"); metadata.put("uvMapping", "native_box_uv");
         metadata.put("boss",frozen.getBoss()!=null);
-        if(frozen.getBoss()!=null) {
+        if (frozen.getAbility() != null) {
+            metadata.put("abilityProgram", frozen.getAbility().getProgram());
+            metadata.put("abilitySourceExecuted", false);
+        }
+        if(hasStatPhases(frozen)) {
             var phase=frozen.getBoss().getPhases().get(options.bossPhase);
             metadata.put("bossPhase",options.bossPhase);metadata.put("bossPhaseName",phase.getName());
             metadata.put("declaredPhaseParameters",Map.of("movementSpeed",frozen.getAttributes().getSpeed()*phase.getSpeedMultiplier(),
                 "attackDamage",frozen.getAttributes().getAttackDamage()*phase.getDamageMultiplier(),"windupTicks",phase.getWindupTicks(),
                 "recoveryTicks",phase.getRecoveryTicks(),"poseIntensity",phase.getPoseIntensity()));
+        } else if (frozen.getBoss() != null) {
+            metadata.put("bossPhaseMode", "program-driven; no indexed stat phases");
         }
         metadata.put("cutoutAlphaThreshold", 26); metadata.put("limitations", List.of("Simplified studio illumination", "No Minecraft render pipeline", "No server AI or combat simulation"));
         return new Result(encode(scene.image), metadata);
@@ -100,7 +106,7 @@ public final class CreaturePreview {
         BufferedImage sheet = new BufferedImage(1600, 1160, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = sheet.createGraphics(); quality(g); g.setColor(new Color(0xF5F5F7)); g.fillRect(0, 0, 1600, 1160);
         g.setColor(INK); g.setFont(font(30, true)); g.drawString(frozen.getDisplayName()
-            +(frozen.getBoss()==null?"":" — "+frozen.getBoss().getPhases().get(bossPhase).getName()), 34, 46);
+            +(hasStatPhases(frozen)?" — "+frozen.getBoss().getPhases().get(bossPhase).getName():frozen.getAbility()==null?"":" — PROGRAM " + frozen.getAbility().getProgram()), 34, 46);
         g.setColor(MUTED); g.setFont(font(13, false));
         g.drawString("CREATURE AUTHORING  /  FIXED CAMERAS  /  SHARED RUNTIME POSES  /  ACTUAL TEXTURE", 35, 69);
         List<String[]> cells = List.of(new String[]{"isometric", "idle"}, new String[]{"front", "idle"}, new String[]{"back", "idle"}, new String[]{"isometric_back", "idle"},
@@ -231,7 +237,7 @@ public final class CreaturePreview {
             g.setColor(INK); g.setFont(font(Math.max(18, options.width / 39), true)); g.drawString(definition.getDisplayName(), 34, 47);
             g.setColor(MUTED); g.setFont(font(12, false));
             g.drawString(options.view.toUpperCase(Locale.ROOT).replace('_', ' ') + "   /   " + options.pose.toUpperCase(Locale.ROOT) + "   /   " + (options.clay ? "CLAY GEOMETRY" : "ACTUAL TEXTURE")
-                + (definition.getBoss()==null?"":"   /   BOSS PHASE "+(options.bossPhase+1)), 35, 69);
+                + (hasStatPhases(definition)?"   /   BOSS PHASE "+(options.bossPhase+1):definition.getAbility()==null?"":"   /   PROGRAM-DRIVEN"), 35, 69);
             g.drawLine(34, options.height - 65, options.width - 34, options.height - 65);
             g.drawString(definition.getId() + "  ·  " + definition.getModel().getBones().size() + " bones  /  " + cubeCount(definition) + " cubes  ·  "
                 + texture.getWidth() + " × " + texture.getHeight() + " PNG  ·  " + definition.getModel().getTexture().substring(0, 12), 35, options.height - 39);
@@ -322,7 +328,7 @@ public final class CreaturePreview {
     /** One shared frame across all standard action poses and a sampled complete gait cycle. */
     private static Bounds comparisonFrame(CreatureDefinition definition, Options options) {
         Bounds frame = new Bounds();
-        int phases=definition.getBoss()==null?1:definition.getBoss().getPhases().size();
+        int phases=hasStatPhases(definition)?definition.getBoss().getPhases().size():1;
         for(int phase=0;phase<phases;phase++)for (String pose : POSES) for (int sample = 0; sample < 17; sample++) {
             float tick = sample == 16 ? options.tick : (float)(sample * Math.PI * 2 / (16 * (pose.equals("walk") ? .6662 : .08)));
             for (var face : faces(definition, poseFrame(definition,options.withPose(pose).withTime(tick).withBossPhase(phase))))
@@ -335,6 +341,10 @@ public final class CreaturePreview {
 
     private static CreaturePose.Frame poseFrame(CreatureDefinition definition,Options options) {
         return CreaturePose.withBossPhase(CreaturePose.preview(options.pose,options.tick,options.headYaw,options.headPitch,options.seed),definition,options.bossPhase);
+    }
+
+    private static boolean hasStatPhases(CreatureDefinition definition) {
+        return definition.getBoss() != null && !definition.getBoss().getPhases().isEmpty();
     }
 
     private static void drawCollision(Graphics2D g, CreatureDefinition definition, Camera camera) {

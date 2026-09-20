@@ -70,6 +70,9 @@ No command activates a world or executes embedded authoring sources.
                             put("bosses", pack.creatures.creatures.count { it.boss != null })
                             put("quests", pack.quests.quests.size)
                             put("mechanics", pack.mechanics.mechanics.size)
+                            put("abilities", pack.abilities.programs.size)
+                            put("storyFacts", pack.story.facts.size);put("places",pack.story.places.size);put("characters",pack.story.characters.size)
+                            put("dialogues",pack.story.dialogues.size);put("knowledge",pack.story.knowledge.size);put("trades",pack.story.trades.size);put("soundscapes",pack.story.soundscapes.size)
                             put("pngAssets", pack.manifest.assets.size)
                         }
                         put("validated", true)

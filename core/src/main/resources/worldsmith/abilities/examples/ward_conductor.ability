@@ -1,0 +1,73 @@
+// Player entry point. Child programs receive data, not a hard-coded skill kind.
+on start {
+    state.completed = false;
+    state.failed = false;
+    state.refunded = false;
+    state.last_prevented = 0;
+    let mark = vector.add(origin, vec(2, 0, 0));
+    let previous = world.block(mark);
+    if (previous != "minecraft:air" && previous != "minecraft:cave_air" && previous != "minecraft:void_air") {
+        fx.message("请在东侧两格留出空位，再唤起灯石。");
+        return;
+    }
+    resource.define("oath_light", 12, 12, 0.05);
+    if (!resource.pay(map.of([["oath_light", 3]]))) {
+        fx.message("灯息不足，请稍候恢复。");
+        return;
+    }
+    scene.join("oath_workshop", origin);
+    shared.scene_set("ward_pulses", 0);
+    shared.scene_set("ward_built", false);
+    let uses = shared.actor_get("ward_casts");
+    if (uses == null) { uses = 0; }
+    shared.actor_set("ward_casts", uses + 1);
+    let parent = program.self();
+    let builder = program.start("ward_builder", map.of([["parent", parent], ["mark", mark]]));
+    if (builder == null) {
+        resource.give("oath_light", 3);
+        state.refunded = true;
+        state.failed = true;
+        fx.message("回声正忙，请稍后再试。");
+        return;
+    }
+    let witness = program.start("ward_witness", map.of([["parent", parent], ["mark", mark]]));
+    if (witness == null) {
+        program.cancel(builder);
+        resource.give("oath_light", 3);
+        state.refunded = true;
+        state.failed = true;
+        return;
+    }
+    let elapsed = 0;
+    while (!state.completed && !state.failed && elapsed < 110) {
+        wait 1;
+        elapsed = elapsed + 1;
+    }
+    if (!state.completed) {
+        state.failed = true;
+        program.cancel(builder);
+        program.cancel(witness);
+        if (!state.refunded) {
+            resource.give("oath_light", 3);
+            state.refunded = true;
+        }
+        fx.message("灯石未能回应，灯息已返还。");
+    }
+    // An idle parent stays alive for its child and guard leases; no polling of JVM objects.
+}
+
+on signal {
+    if (event_tag == "ward_blocked") { state.failed = true; }
+    if (event_tag == "ward_ready" && !state.failed && !state.completed) {
+        combat.guard(map.of([["pool", "oath_light"], ["multiplier", 0.5], ["absorb", 1],
+                             ["maxHits", 3], ["tag", "oath_ward"]]), 80);
+        // The VM may yield between any instructions: publish readiness only after the native guard exists.
+        state.completed = true;
+        fx.message("三次回声已会合；余下灯息将护住你。");
+    }
+}
+
+on damage_guarded {
+    state.last_prevented = event_amount;
+    scene.emit("ward_absorbed", event_amount);
+}

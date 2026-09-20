@@ -1,11 +1,15 @@
 # Creature authoring foundation
 
-New publications use bundle format 7 with required mechanics. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
+New publications use bundle format 10 with required mechanics and abilities. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
 
-The creature authoring layer compiles data into runtime schema 1, 2 or 3. Ordinary
+The creature authoring layer compiles data into runtime schema 1 through 6. Ordinary
 recipes default to schema 1; explicit schema 2 adds the installed bounded Boss
 profile and 2..3 melee phases. Schema 3 adds vanilla sound selection and modulation
-for both ordinary creatures and Bosses. A Boss-looking model alone remains ordinary behavior.
+for both ordinary creatures and Bosses. Schema 4 binds shared AbilityScript source. A Boss-looking model alone remains ordinary behavior.
+Schema 5 adds event bindings and schema 6 admits a creature tick binding's
+`intervalTicks` greater than 1. The builder selects schema 6 for such intervals.
+Source movement requires explicit control ownership; an observer is not a native
+AI lock. The installed ability signatures are the authoring authority.
 Recipes are data, not Java tick code or an arbitrary gameplay interpreter. World
 placement is a separate natural habitat or typed structure encounter declaration.
 
@@ -27,8 +31,8 @@ placement is a separate natural habitat or typed structure encounter declaration
 7. Merge the returned definition into the current `CreatureLibrary` using
    `worldsmith_put_content_modules` at expectedRevision. Preserve other species;
    use a CreatureLibrary.schemaVersion at least as high as every definition
-   runtimeSchema (sounds=3, Boss without sounds=2, ordinary without sounds=1).
-   Never downgrade an existing schema-3 envelope when merging an ordinary creature.
+   runtimeSchema (abilityBindings=5, ability=4, sounds=3, Boss without sounds=2, ordinary without sounds=1).
+   Never downgrade an existing higher-schema envelope when merging an ordinary creature.
 8. Publish with the normal whole-bundle write/finish flow. A build artifact is not
    an active world or an automatically committed creature draft.
 
@@ -76,10 +80,10 @@ pose views for matching markings, a clear face and readability at game distance.
 }
 ```
 
-Optional `attributes`, `behavior`, `spawn`, `drops`, `boss`, and `sounds` are exactly the fields
+Optional `attributes`, `behavior`, `spawn`, `drops`, `boss`, `sounds`, and `ability` are exactly the fields
 from the creature runtime contract; they do not become new behavior scripts. A
-non-null `boss` requires recipe.schemaVersion=2 or 3; non-null `sounds` requires
-recipe.schemaVersion=3. Keep sounds, boss and drops when
+non-null `boss` requires recipe.schemaVersion>=2; non-null `sounds` requires
+recipe.schemaVersion>=3; ability requires schema 4. Keep sounds, boss, ability and drops when
 rebuilding a textured model. Defaults are
 provided by the current runtime DTOs. The illustrated model is a field-shape example,
 not a complete art-directed creature.
@@ -88,7 +92,7 @@ Read `worldsmith_get_content_contract(module:"creatures")` for the exact
 CreatureBossProfile grammar, health thresholds, native attribute bounds, habitat
 rules and a two-phase example. Authoring validates the profile; it does not invent
 phases from the name or increase the number of supported mechanics. Schema-2 Boss
-publication requires bundle format 5. A landmark can use the drawing contract's
+publication uses current bundle format 10. A landmark can use the drawing contract's
 `boss-encounters` section after the actual Boss definition exists.
 
 - Bone: `id`, optional `parent`, `pivot`, `rotation`, `role`, `gaitPhase`, `cubes`.
@@ -146,3 +150,23 @@ then optional per-role overrides. Keep sounds when rebuilding with painted textu
 it is independent of UVs and needs no audio asset. Offline model previews preserve
 sound metadata but do not audition audio. Builder.sounds(CreatureSoundProfile)
 automatically selects schema 3, including recipes that also contain a Boss profile.
+
+## Shared ability bindings (schema 4)
+
+CreatureRecipe additionally accepts `ability:{program,range:8.0,cooldownTicks:20,
+cancelOnTargetLoss:true}` under schemaVersion 4; the returned definition preserves
+it alongside sounds/drops. `CreatureBuilder.ability(CreatureAbilityBinding)` or
+`.ability(program[,range,cooldownTicks,cancelOnTargetLoss])` selects schema 4.
+A Boss profile may omit phases when bound to an ability; preview it with
+bossPhase 0. The abilities source module supplies programmable behavior, not this
+rig recipe. Read `worldsmith_get_content_contract(module:"abilities")` and its
+actual capability signatures; model previews do not execute programs.
+
+## Generic event programs (schema 5)
+
+CreatureRecipe.abilityBindings is the same typed list as CreatureDefinition.
+Use recipe schema 5 and Builder.abilityBinding(AbilityEventBinding) or
+Builder.abilityBindings(list). This works for PASSIVE and HOSTILE categories;
+existing .ability remains the hostile combat policy. Preserve both fields and
+sounds/drops during rebuilds. Source programs remain in the abilities module;
+model and texture preview does not execute spawn/tick/interact callbacks.

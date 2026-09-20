@@ -1,5 +1,10 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+import com.wjz.worldsmith.core.ability.debug.AbilityRuntimeDebugHost
+import com.wjz.worldsmith.core.ability.extension.AbilityExtensionService
+
 import com.wjz.worldsmith.core.structure.*
 import com.wjz.worldsmith.core.drawhost.*
 import com.wjz.worldsmith.core.draw.DrawPreview
@@ -72,21 +77,26 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private val publicationHost: PublicationHost = PublicationHost.UNAVAILABLE,
     private val drawingExport: DrawingExportHost? = null,
     private val nativeChecks:StructureNativeHost? = null,
+    private val abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard(),
+    private val abilityDebugHost: AbilityRuntimeDebugHost = AbilityRuntimeDebugHost.UNAVAILABLE,
+    private val abilityExtensions: AbilityExtensionService? = null,
 ) {
     private val packDirectory = packDirectory.toAbsolutePath().normalize()
 
     private val previewService=StructurePreviewService()
     private val drawingService=DrawingMcpService(drawings,sessions,previewService)
     private val structureService=StructureMcpService(this.packDirectory.resolveSibling("structure-previews"),drawings,sessions,nativeChecks,previewService,drawingService)
-    private val packStore=ManagedPackStore(this.packDirectory)
-    private val publicationService=PackPublicationService(packStore,sessions,publicationHost,drawingService)
-    private val contentService=WorldContentMcpService(packStore,nativeChecks!=null,sessions,this.packDirectory.resolveSibling("content-assets"),drawings::list)
+    private val packStore=ManagedPackStore(this.packDirectory, abilityCapabilities)
+    private val publicationService=PackPublicationService(packStore,sessions,publicationHost,drawingService,abilityCapabilities)
+    private val contentService=WorldContentMcpService(packStore,nativeChecks!=null,sessions,this.packDirectory.resolveSibling("content-assets"),drawings::list,abilityCapabilities)
     private val authoringService=WorldAuthoringMcpService(sessions)
     private val materialPalette=PreviewMaterialPalette(contentService::textureBytes)
     private val creatureAuthoringService=CreatureAuthoringMcpService(sessions,contentService,this.packDirectory.resolveSibling("creature-work"))
-    private val resourcePackExchange=ResourcePackExchange(this.packDirectory)
+    private val resourcePackExchange=ResourcePackExchange(this.packDirectory, abilityCapabilities)
     private val resourcePackService=ResourcePackMcpService(resourcePackExchange,contentService)
-    private val progressGateway=GenerationProgressGateway(sessions::all,drawings::liveJobs)
+    private val abilitySimulationService=AbilitySimulationMcpService(abilityCapabilities,abilityDebugHost)
+    private val abilityExtensionService=AbilityExtensionMcpService(abilityExtensions)
+    private val progressGateway=GenerationProgressGateway(sessions::all,drawings::liveJobs,abilityCapabilities)
     init {
         drawings.completionChecks=structureService::completed;drawingService.inspectDrawing=structureService::inspectDrawing
         previewService.paletteForSession = { sid -> materialPalette.resolve(sessions.find(sid)) }
@@ -97,7 +107,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
 
     fun all(): List<McpTool> = rawTools().map { WorldAuthoringFlow.guard(it,sessions) }.map(progressGateway::observe)
 
-    private fun rawTools(): List<McpTool> = authoringService.tools()+resourcePackService.tools()+contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+listOf(
+    private fun rawTools(): List<McpTool> = authoringService.tools()+resourcePackService.tools()+contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+abilitySimulationService.tools()+abilityExtensionService.tools()+listOf(
         McpTool("worldsmith_get_generation_progress_view", "Read the native progress view", "Read the same bounded in-memory session catalog and progress view shown in Create World. No draft edits, selection changes, source execution or archived-file scan.",
             objectSchema(mapOf("sessionId" to stringSchema()),emptyList()),true,handler={ a ->
                 McpToolResult.success(encode(progressSnapshot((a["sessionId"] as? JsonPrimitive)?.contentOrNull)).jsonObject)
@@ -301,7 +311,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             name = "worldsmith_write_pack",
             title = "Write Worldsmith pack",
             description =
-                "Validate all ten modules, quest/reward references and attached PNG assets, freeze a format-7 bundle, atomically save it and return a ready single-file .wspack resourcePack receipt. resourcePackFilename optionally names the export; default is <id>.wspack. Inline modules override drafts for publication; guided writes require expectedRevision. Core/package readiness is separate from native activation. Export failure preserves the frozen pack and names an export-only retry.",
+                "Validate all twelve modules, quest/reward references and attached PNG assets, freeze a format-10 bundle, atomically save it and return a ready single-file .wspack resourcePack receipt. resourcePackFilename optionally names the export; default is <id>.wspack. Inline modules override drafts for publication; guided writes require expectedRevision. Core/package readiness is separate from native activation. Export failure preserves the frozen pack and names an export-only retry.",
             inputSchema = writePackSchema(),
             readOnly = false,
             idempotent = true,
@@ -600,7 +610,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             put("tool",WorldsmithWorkflow.CONTRACT_TOOL)
             putJsonObject("arguments") {put("id",PromptSet.CONTRACT_GRAND_WORLD);put("detail","index")}
         }
-        listOf("world_design","theme","blocks","creatures","items","quests","mechanics").forEach { module ->
+        listOf("world_design","theme","blocks","creatures","items","quests","mechanics","abilities","story").forEach { module ->
             putJsonObject(module) { put("tool","worldsmith_get_content_contract");putJsonObject("arguments") {put("module",module)} }
         }
         mapOf("terrain" to "terrain","biomes" to "biome","features" to "feature","structures" to "structure","architecture" to "architecture","drawing" to "draw").forEach { (name,id) ->
@@ -865,7 +875,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
 
     private fun packSummary(directory: Path): JsonObject = runCatching {
         val pack = WorldsmithPackLoader.loadDirectory(directory)
-        val diagnostics = WorldsmithPackValidator.validate(pack)
+        val diagnostics = WorldsmithPackValidator.validate(pack, abilityCapabilities)
         buildJsonObject {
             put("directory", directory.fileName.toString())
             put("id", pack.manifest.id)
@@ -889,7 +899,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         }
         val directory = managedPack(id) ?: return McpToolResult.error("Managed pack '$id' does not exist")
         val pack = WorldsmithPackLoader.loadDirectory(directory)
-        val diagnostics = WorldsmithPackValidator.validate(pack)
+        val diagnostics = WorldsmithPackValidator.validate(pack, abilityCapabilities)
         val valid = diagnostics.none { it.severity == DiagnosticSeverity.ERROR }
         val structured = buildJsonObject {
             put("id", id)
@@ -915,7 +925,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val receipt = PackValidationReceipt.bounded(revision, diagnostics,
             (arguments["displayName"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
             (arguments["description"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
-            listOf("terrain", "biomes", "features", "theme", "blocks", "creatures", "items", "quests", "mechanics", "structures", "architecture").filter { it in arguments })
+            listOf("terrain", "biomes", "features", "theme", "blocks", "creatures", "items", "quests", "mechanics", "abilities", "story", "structures", "architecture").filter { it in arguments })
         val current = sessions.recordWriteFailureAtRevision(id, receipt)
         val progress = current?.let(contentService::progress)
         return result.copy(structuredContent = JsonObject(result.structuredContent + buildJsonObject {
@@ -982,6 +992,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val items = (arguments["items"] ?: session?.contentModules?.get("items"))?.let {decode<CustomItemLibrary>(it)} ?: CustomItemLibrary()
         val quests = (arguments["quests"] ?: session?.contentModules?.get("quests"))?.let {decode<QuestLibrary>(it)} ?: QuestLibrary()
         val mechanics = (arguments["mechanics"] ?: session?.contentModules?.get("mechanics"))?.let {decode<WorldMechanicLibrary>(it)} ?: WorldMechanicLibrary()
+        val story = (arguments["story"] ?: session?.contentModules?.get("story"))?.let {decode<com.wjz.worldsmith.core.story.StoryLibrary>(it)} ?: com.wjz.worldsmith.core.story.StoryLibrary()
+        val abilities = (arguments["abilities"] ?: session?.contentModules?.get("abilities"))?.let {decode<com.wjz.worldsmith.core.ability.AbilityLibrary>(it)} ?: com.wjz.worldsmith.core.ability.AbilityLibrary()
         val structures = structureDrafts(arguments, session)
         if (guidedSession && structures.architecture == null) return McpToolResult.error("Architecture planning is required", buildJsonObject {
             put("valid", false); put("diagnostics", diagnosticsJson(listOf(StructureArchitectureValidator.missingPlan())))
@@ -991,15 +1003,15 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         if (structureDiagnostics.any { it.severity == DiagnosticSeverity.ERROR }) return McpToolResult.error(
             "Structure documents need repair", buildJsonObject { put("valid", false); put("diagnostics", diagnosticsJson(structureDiagnostics)) },
         )
-        val proseDiagnostics = PlayerTextPolicy.validate(displayName, description, theme, items, quests)
+        val proseDiagnostics = PlayerTextPolicy.validate(displayName, description, theme, items, quests, story)
         if (proseDiagnostics.isNotEmpty()) return McpToolResult.error("Player-facing writing needs revision", buildJsonObject {
             put("valid", false); put("diagnostics", diagnosticsJson(proseDiagnostics)); put("nextTool", "worldsmith_put_content_modules")
         })
         val representativeContent = arguments["representativeContent"]?.takeUnless { it is JsonNull }?.let { decode<ContentKey>(it) }
-        val pack = WorldContentBundleIO.create(displayName,description,terrain,biomes,features,structures,theme,blocks,creatures,contentService.assetBytes(session),items,quests,representativeContent,mechanics=mechanics)
+        val pack = WorldContentBundleIO.create(displayName,description,terrain,biomes,features,structures,theme,blocks,creatures,contentService.assetBytes(session),items,quests,representativeContent,mechanics=mechanics,abilities=abilities,story=story)
         val bundle=WorldContentBundleIO.encode(pack)
         val manifest=bundle.manifest
-        val diagnostics = WorldsmithPackValidator.validate(pack).toMutableList()
+        val diagnostics = WorldsmithPackValidator.validate(pack, abilityCapabilities).toMutableList()
         if (guidedSession && terrain.shape !is TerrainShape.Procedural) {
             diagnostics += Diagnostic(
                 path = "terrain.shape",
@@ -1164,7 +1176,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         put("features", encode(pack.features))
         put("structures", encode(pack.structures))
         put("theme", encode(pack.theme));put("blocks",encode(pack.blocks));put("creatures",encode(pack.creatures));put("items",encode(pack.items))
-        put("quests",encode(pack.quests));put("mechanics",encode(pack.mechanics))
+        put("quests",encode(pack.quests));put("mechanics",encode(pack.mechanics));put("abilities",encode(pack.abilities));put("story",encode(pack.story))
         put("assets",encode(pack.manifest.assets))
         put("computedId", pack.computedId)
     }
@@ -1245,10 +1257,12 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             "theme" to documentSchema("Required WorldTheme inline or in session draft; read worldsmith_get_content_contract module=theme."),
             "blocks" to documentSchema("CustomBlockLibrary; omitted uses draft or an explicit empty library."),
             "creatures" to documentSchema("CreatureLibrary; omitted uses draft or an explicit empty library."),
-            "items" to documentSchema("CustomItemLibrary schema 1 ordinary items or schema 2 equipment/consumables/actions; omitted uses draft. Current bundles use format 7."),
+            "items" to documentSchema("CustomItemLibrary schema 1 ordinary items or schema 2 equipment/consumables/actions; omitted uses draft. Current bundles use format 10; schema 3 adds shared ability program invocation."),
             "representativeContent" to documentSchema("Optional player-facing icon reference: {kind:item|block,id:<existing local id>}. Uses that content's existing PNG without activating the world."),
-            "mechanics" to documentSchema("WorldMechanicLibrary schema 1: event-driven block patterns, main-hand costs, anchor states and typed set_block/spawn_creature/give_item actions; omitted uses draft or an explicit empty library. Required module in format 7."),
-            "quests" to documentSchema("QuestLibrary for one linear main quest chain, kill_creature/deliver_item/activate_mechanic objectives and ordinary item rewards; omitted uses draft or an explicit empty library."),
+            "story" to documentSchema("StoryLibrary schema 2: scoped facts, actual places/characters, conditional dialogue, atomic trades, routines, soundscapes and bounded durable actual-place projections. Required format-10 module; omitted uses the current draft or an explicit empty library. Read story contract."),
+            "abilities" to documentSchema("AbilityLibrary schema 1: programs with id, name, actual AbilityScript source, maxTicks, maxOperations and required capability versions. Required format-10 module; omitted uses draft or explicit empty library. Read abilities contract for extensible signatures and source syntax."),
+            "mechanics" to documentSchema("WorldMechanicLibrary schema 1: event-driven block patterns, main-hand costs, anchor states and typed set_block/spawn_creature/give_item actions; omitted uses draft or an explicit empty library. Required module in format 10. run_program reserves a shared ability launch for after transaction commit."),
+            "quests" to documentSchema("QuestLibrary schema 2 for branching DAG quests with discovery, acceptance, fact conditions, destinations and transactional story changes; omitted uses draft or an explicit empty library."),
             "terrain" to documentSchema(
                 "A TerrainPlan matching the template, with procedural terrain and hydrology controls derived from the player's prompt.",
             ),

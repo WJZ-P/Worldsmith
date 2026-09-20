@@ -1,7 +1,7 @@
 # Worldsmith World Design
 
-One current Worldsmith format 7 pack freezes ten typed modules: `theme`, `terrain`,
-`biomes`, `features`, `structures`, `blocks`, `creatures`, `items`, `quests`, and `mechanics`.
+One current Worldsmith format 10 pack freezes twelve typed modules: `theme`, `terrain`,
+`biomes`, `features`, `structures`, `blocks`, `creatures`, `items`, `quests`, `mechanics`, and `abilities`.
 Each has its own contract. Mechanics compose actual player placement or main-hand
 use with a block pattern, item cost, anchor state and typed actions; read
 `worldsmith_get_content_contract(module="mechanics")` for executable interactions.
@@ -86,7 +86,7 @@ worker, inspect returned model images, revise, and attach frozen drawing ids to
 contract/structure metadata. Required and optional roles must match actual assembly variants;
 every occupied indoor space needs authored readable night lighting. Blueprints own
 geometry/material choices; placement references real biome ids. Validate the complete
-architecture before publication. Format 7 freezes all ten typed modules, PNG assets, SDK geometry, metadata and source provenance. Older bundle formats are rejected; local packs and saves are not rewritten. Native export/readback and activation precede completion. No network or AI calls occur during chunk generation. A validated
+architecture before publication. Format 10 freezes all twelve typed modules, PNG assets, SDK geometry, metadata and source provenance. Older bundle formats are rejected; local packs and saves are not rewritten. Native export/readback and activation precede completion. No network or AI calls occur during chunk generation. A validated
 landmark plan is not proof of a placed instance.
 
 
@@ -114,7 +114,7 @@ new complete-world flow, derive theme from the reviewed WorldBible: the existing
 runtime theme is a bounded projection, not a second editable fact source. Its
 premise, player role, rules, conflict and beats must agree with the authoring
 basis and link to actual content. Review that projection through its owning brief.
-Narrative beats preserve creative intent; a separate linear quests module can make explicit kill/delivery/committed-activation goals executable; existing quests project into native advancements after reward claims; independent achievement authoring remains uninstalled.
+Narrative beats preserve creative intent; the separate quests schema 2 and story modules make branching fact/kill/delivery/committed-activation goals and actual marker-bound inhabitants executable; existing quests project into native advancements after reward claims; independent achievement authoring remains uninstalled.
 
 Use `worldsmith_put_content_modules` for complete typed theme, terrain, features,
 biomes, blocks, creatures, world-bound items, quests and mechanics documents. Architecture and frozen Java drawings keep
@@ -136,7 +136,7 @@ reviews against actual modules, drawings and referenced assets, not just plans.
 `worldsmith_write_pack` and `worldsmith_finish_world` recheck authoring provenance
 and the existing engineering gates. Repeated identical blockers on the same input
 have at most three automatic repair attempts; report the unresolved decision
-instead of repeatedly self-approving. `worldsmith_write_pack` freezes a format-7 bundle with all ten
+instead of repeatedly self-approving. `worldsmith_write_pack` freezes a format-10 bundle with all twelve
 modules and its verified PNGs at expectedRevision. `worldsmith_finish_world`
 reports native preparation/activation separately; a real Create World selection
 owns any required data/resource reload and preset activation. Do not reload the
@@ -159,7 +159,9 @@ structures: `worldsmith:item/<id>` names a real world-bound item, not a raw regi
 host. Items schema 1 keeps ordinary resources/relics; schema 2 adds native melee
 weapons, tiered mining tools, four armor slots, consumables and composed USE /
 MELEE_HIT actions from heal/feed/status/projectile/blink. Read contract/items for
-the actual DTO, independent armor UV atlas and fixed action bounds. Choose useful
+the actual DTO and independent armor UV atlas; schema 3 run_program uses the
+shared abilities source runtime. Read contract/abilities and its live capability
+signatures for events, waits, functions, branches and state, not a skill catalogue. Choose useful
 gear or interactive rewards proactively rather than making every custom item a
 delivery token. Link real sources and actual quests; lore alone installs no recipe,
 passive worn effect, arbitrary spell script or new objective type.

@@ -1,5 +1,8 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+
 import com.wjz.worldsmith.core.content.ContentKey
 import com.wjz.worldsmith.core.drawhost.DrawingJob
 import com.wjz.worldsmith.core.drawhost.DrawingJobStage
@@ -45,10 +48,10 @@ object GenerationProgressViews {
     const val MAX_AUTHORING_MARKDOWN=64*1024
     private const val MAX_INPUT_JOBS=256
     private val mainKinds=listOf("biome","structure","creature","block","item","quest")
-    private val moduleKinds=mapOf("biomes" to "biome","features" to "feature","blocks" to "block","items" to "item","creatures" to "creature","quests" to "quest","mechanics" to "mechanic")
+    private val moduleKinds=mapOf("biomes" to "biome","features" to "feature","blocks" to "block","items" to "item","creatures" to "creature","quests" to "quest","mechanics" to "mechanic","abilities" to "ability")
     private val activeStages=setOf(DrawingJobStage.WAITING_APPROVAL,DrawingJobStage.QUEUED,DrawingJobStage.COMPILING,DrawingJobStage.DRAWING,DrawingJobStage.VALIDATING)
 
-    @JvmStatic @JvmOverloads fun inspect(session:WorkflowSession,jobs:List<DrawingJob> = emptyList()):GenerationProgressView {
+    @JvmStatic @JvmOverloads fun inspect(session:WorkflowSession,jobs:List<DrawingJob> = emptyList(),abilityCapabilities:AbilityCapabilityRegistry = AbilityCapabilities.standard()):GenerationProgressView {
         val originalPlan=session.designPlan
         val targetsTruncated=(originalPlan?.targets?.size ?: 0)>MAX_TARGETS
         // Invalid oversized plans remain visible as truncated, never as a fabricated completed denominator.
@@ -57,7 +60,7 @@ object GenerationProgressViews {
         val suppliedJobs=jobs.asSequence().filter {it.sessionId==session.id}.take(MAX_INPUT_JOBS+1).toList()
         val knownJobs=suppliedJobs.take(MAX_INPUT_JOBS).distinctBy {it.id}
         val inventory=WorldDesignCoverage.draft(current)
-        val progress=WorldGenerationProgress.inspectUsingInventory(current,knownJobs,inventory)
+        val progress=WorldGenerationProgress.inspectUsingInventory(current,knownJobs,inventory,abilityCapabilities)
         val uniqueTargets=plan?.targets.orEmpty().distinctBy {it.key}
         val plannedKeys=uniqueTargets.map {it.key}.toSet()
         val declared=plannedKeys.count {it in inventory.symbols}
@@ -169,9 +172,17 @@ object GenerationProgressViews {
             if(code=="DESIGN_BOSS_QUEST_MISSING")ContentKey("quest",it.quest) else ContentKey("creature",it.creature)
         }}
         index("^(?:structures\\.)*structures\\[(\\d+)]")?.let {return session.structures.values.elementAtOrNull(it)?.let {s->ContentKey("structure",s.id)}}
+        com.wjz.worldsmith.core.story.StoryContentModule.collections.forEach { (kind,collection) ->
+            index("^(?:story\\.)*$collection\\[(\\d+)]")?.let { i ->
+                val values=session.contentModules["story"]?.get(collection) as? JsonArray
+                val id=((values?.getOrNull(i) as? JsonObject)?.get("id") as? JsonPrimitive)?.contentOrNull
+                return id?.let { ContentKey(kind,it) }
+            }
+        }
         moduleKinds.forEach {(module,kind)->
-            index("^(?:$module\\.)*$module\\[(\\d+)]")?.let {i->
-                val values=session.contentModules[module]?.get(module) as? JsonArray
+            val listName=if(module=="abilities") "programs" else module
+            index("^(?:$module\\.)*$listName\\[(\\d+)]")?.let {i->
+                val values=session.contentModules[module]?.get(listName) as? JsonArray
                 val id=((values?.getOrNull(i) as? JsonObject)?.get("id") as? JsonPrimitive)?.contentOrNull
                 return id?.let {ContentKey(kind,it)}
             }

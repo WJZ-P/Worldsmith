@@ -65,7 +65,7 @@ object TextureRecipes {
                     budget(w.toLong()*h)
                     op.rows.forEachIndexed {y,row->row.forEachIndexed {x,c->if(c!='.'){val color=requireNotNull(op.glyphs[c.toString()]) {"Unmapped stamp glyph"};for(dy in 0 until op.scale)for(dx in 0 until op.scale)paint(op.x+x*op.scale+dx,op.y+y*op.scale+dy,color)}}}
                 }
-                else->error("Unsupported texture operation '${op.kind}'; use fill, noise, checker, line or stamp")
+                else->throw IllegalArgumentException("Unsupported texture operation '${op.kind}'; use fill, noise, checker, line or stamp")
             }
         }
         return encode(image)

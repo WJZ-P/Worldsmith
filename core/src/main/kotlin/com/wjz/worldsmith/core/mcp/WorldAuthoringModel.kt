@@ -92,7 +92,7 @@ data class ReviewCheck(
 /** Pure structural checks and provenance; reference presence never proves semantic correctness. */
 object WorldAuthoringModel {
     /** Bump when installed authoring/runtime capability contracts change; existing evidence then expires. */
-    const val CAPABILITY_CONTRACT = "minecraft26.2-pack7-items2-creatures3-quests1-activation1-mechanics1-authoring1"
+    const val CAPABILITY_CONTRACT = "minecraft26.2-pack10-blocks2-items4-creatures6-abilities1-control1-events2-quests2-story2-structures3-activation1-mechanics1-authoring1"
     const val MAX_BIBLE_BYTES = 512 * 1024
     const val MAX_BRIEF_EDIT_BYTES = 1024 * 1024
     const val MAX_REVIEW_BYTES = 512 * 1024
@@ -108,7 +108,7 @@ object WorldAuthoringModel {
     private val localId = Regex("[a-z0-9][a-z0-9_.-]{0,63}")
     private val referenceId = Regex("[a-z0-9][a-z0-9_./-]{0,191}")
     private val sha256 = Regex("[a-f0-9]{64}")
-    private val targetKinds = setOf("terrain", "anchor", "feature", "biome", "structure", "blueprint", "drawing", "block", "block_item", "item", "creature", "quest", "mechanic", "theme", "narrative_beat")
+    private val targetKinds = setOf("terrain", "anchor", "feature", "biome", "structure", "blueprint", "drawing", "block", "block_item", "item", "creature", "quest", "mechanic", "ability", "theme", "narrative_beat") + com.wjz.worldsmith.core.story.StoryContentModule.kinds
 
     fun validateBible(bible: WorldBible, originalPrompt: String): List<Diagnostic> = buildList {
         fun error(path: String, code: String, message: String) { add(diagnostic("authoring.bible.$path", code, message)) }

@@ -16,7 +16,7 @@ class PreviewMaterialPalette(private val texture:(WorkflowSession,String)->ByteA
         val colors=linkedMapOf<String,Int>();val warnings=mutableListOf<String>()
         val library=runCatching {McpJson.decode<CustomBlockLibrary>(raw)}.getOrElse {return Palette(warnings=listOf("Custom block draft did not decode; showing generic material colours"))}
         for(block in library.blocks.take(128))runCatching {
-            val bytes=texture(session,block.textureAsset);require(bytes.size<=1024*1024) {"Block texture exceeds 1 MiB"}
+            val bytes=texture(session,block.appearance.particle);require(bytes.size<=1024*1024) {"Block texture exceeds 1 MiB"}
             val image=ImageIO.read(ByteArrayInputStream(bytes)) ?: error("PNG did not decode")
             require(image.width==image.height && image.width in 16..256 && image.width.countOneBits()==1) {"Block texture dimensions must be square powers of two, 16..256"}
             var red=0L;var green=0L;var blue=0L;var weight=0L

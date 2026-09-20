@@ -17,16 +17,16 @@ class WorldContentMcpTest {
     private val tools by lazy { WorldsmithMcpTools(root.resolve("packs")) }
     private fun call(name: String, args: JsonObject = JsonObject(emptyMap())) = StructureTestWorld.call(tools, name, args)
 
-    @Test fun `capabilities distinguish installed format7 modules from absent native host and future achievement modules`() {
+    @Test fun `capabilities distinguish installed format10 modules from absent native host and future achievement modules`() {
         val result = call("worldsmith_get_content_framework")
         assertFalse(result.isError)
         val data = result.structuredContent
         assertFalse(data.getValue("customBlockRuntime").jsonPrimitive.boolean)
         assertFalse(data.getValue("customCreatureRuntime").jsonPrimitive.boolean)
         assertTrue(data.getValue("newPackFormatEnabled").jsonPrimitive.boolean)
-        assertEquals(7, data.getValue("packFormat").jsonPrimitive.int)
+        assertEquals(10, data.getValue("packFormat").jsonPrimitive.int)
         assertTrue(data.getValue("legacyPackFormats").jsonArray.isEmpty())
-        assertEquals(10, data.getValue("installedModules").jsonArray.size)
+        assertEquals(12, data.getValue("installedModules").jsonArray.size)
         assertEquals(setOf("achievements"), data.getValue("plannedModules").jsonArray.map { it.jsonObject.getValue("id").jsonPrimitive.content }.toSet())
         for (tool in tools.all().filter { it.name in setOf("worldsmith_get_content_framework", "worldsmith_plan_world_content", "worldsmith_inspect_world_content") }) assertTrue(tool.readOnly)
     }
@@ -76,9 +76,9 @@ class WorldContentMcpTest {
                 assertEquals(200, response.statusCode())
                 val result = Json.parseToJsonElement(response.body()).jsonObject.getValue("result").jsonObject
                 val data = result.getValue("structuredContent").jsonObject
-                assertEquals(6, data.getValue("frameworkVersion").jsonPrimitive.int)
+                assertEquals(8, data.getValue("frameworkVersion").jsonPrimitive.int)
                 assertFalse(data.getValue("customCreatureRuntime").jsonPrimitive.boolean)
-                assertEquals(10, data.getValue("installedModules").jsonArray.size)
+                assertEquals(12, data.getValue("installedModules").jsonArray.size)
             }
         }
     }

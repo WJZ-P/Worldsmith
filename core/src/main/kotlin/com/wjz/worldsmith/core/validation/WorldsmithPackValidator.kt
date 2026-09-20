@@ -8,13 +8,15 @@ import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.WorldsmithPack
 import com.wjz.worldsmith.core.structure.StructureValidator
 import com.wjz.worldsmith.core.content.*
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
 import com.wjz.worldsmith.core.pack.WorldContentBundleIO
 import com.wjz.worldsmith.core.structure.StructureInteraction
 
 object WorldsmithPackValidator {
     private val ID = Regex("^[0-9a-f]{64}$")
 
-    fun validate(pack: WorldsmithPack): List<Diagnostic> = buildList {
+    @JvmOverloads fun validate(pack: WorldsmithPack, capabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()): List<Diagnostic> = buildList {
         val manifest = pack.manifest
         if (manifest.formatVersion != WorldContentBundleIO.FORMAT_VERSION) {
             add(error("manifest.formatVersion", "UNSUPPORTED_PACK_FORMAT", "Unsupported pack format ${manifest.formatVersion}"))
@@ -35,8 +37,10 @@ object WorldsmithPackValidator {
             if (!exists) add(error("manifest.representativeContent", "REPRESENTATIVE_CONTENT_MISSING", "Representative icon must refer to an existing local item or block"))
         }
 
-        val contentPlan = ExistingWorldContentModules.registry().plan(ExistingWorldContentModules.input(pack))
+        val contentPlan = ExistingWorldContentModules.registry(capabilities).plan(ExistingWorldContentModules.input(pack))
         addAll(contentPlan.diagnostics)
+        addAll(com.wjz.worldsmith.core.story.StoryPackValidation.validate(pack))
+        addAll(QuestValidation.validateStory(pack.quests, pack.story))
         val assets = try { ContentAssetValidation.verifyAll(manifest.assets, pack.assets) } catch (e: Exception) {
             add(error("assets", "CONTENT_ASSET_INTEGRITY", e.message ?: "Asset integrity check failed")); emptyMap()
         }
@@ -48,12 +52,16 @@ object WorldsmithPackValidator {
             }
         }
         pack.blocks.blocks.forEachIndexed { i, block ->
-            checkTextureAddress(block.textureAsset, "blocks.blocks[$i].textureAsset")
-            if ((descriptors[block.textureAsset]?.byteLength ?: 0L) > 1024 * 1024)
-                add(error("blocks.blocks[$i].textureAsset", "BLOCK_TEXTURE_BYTE_BUDGET", "Native block PNG textures must be at most 1 MiB"))
-            assets[block.textureAsset]?.let { size ->
-                if (size.width != size.height || size.width !in 16..256 || size.width and (size.width - 1) != 0)
-                    add(error("blocks.blocks[$i].textureAsset", "BLOCK_TEXTURE_DIMENSIONS", "Block textures must be square power-of-two PNGs, 16..256 pixels"))
+            val references = block.appearance.faces().map { (face, texture) -> "appearance.$face.textureAsset" to texture.textureAsset } + ("appearance.particle" to block.appearance.particle)
+            references.forEach { (field, hash) ->
+                val path = "blocks.blocks[$i].$field"
+                checkTextureAddress(hash, path)
+                if ((descriptors[hash]?.byteLength ?: 0L) > 1024 * 1024)
+                    add(error(path, "BLOCK_TEXTURE_BYTE_BUDGET", "Native block PNG textures must be at most 1 MiB"))
+                assets[hash]?.let { size ->
+                    if (size.width != size.height || size.width !in 16..256 || size.width and (size.width - 1) != 0)
+                        add(error(path, "BLOCK_TEXTURE_DIMENSIONS", "Block textures must be square power-of-two PNGs, 16..256 pixels"))
+                }
             }
         }
         pack.items.items.forEachIndexed { i, item ->
@@ -109,8 +117,8 @@ object WorldsmithPackValidator {
             blueprints.forEach { (blueprint, path) -> blueprint.interactions.forEachIndexed { j, interaction ->
                 if (interaction is StructureInteraction.BossSpawner) {
                     val at = "$path.interactions[$j]"
-                    if (pack.structures.schemaVersion != 2 || pack.creatures.schemaVersion !in 2..3)
-                        add(error(at, "BOSS_SPAWNER_MODULE_SCHEMAS", "Boss spawners require structure schema 2 and creature schema 2 or 3"))
+                    if (pack.structures.schemaVersion < 2 || pack.creatures.schemaVersion !in 2..6)
+                        add(error(at, "BOSS_SPAWNER_MODULE_SCHEMAS", "Boss spawners require structure schema 2 and creature schema 2 through 6"))
                     val target = pack.creatures.creatures.find { it.id == interaction.creatureId }
                     if (target == null || target.boss == null || target.category != CreatureCategory.HOSTILE)
                         add(error("$at.creatureId", "BOSS_SPAWNER_TARGET_INVALID", "Boss spawner '${interaction.creatureId}' must resolve to an actual hostile Boss definition in this world"))

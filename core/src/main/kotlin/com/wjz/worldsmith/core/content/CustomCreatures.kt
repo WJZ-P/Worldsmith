@@ -3,12 +3,15 @@ package com.wjz.worldsmith.core.content
 import com.wjz.worldsmith.core.validation.Diagnostic
 import com.wjz.worldsmith.core.validation.DiagnosticSeverity
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 
-/** Ground creatures are data, never generated executable tick code. Model units are 1/16 block. */
+/** Ground creature host data; optional ability source is compiled by the shared bounded runtime. */
 @Serializable
 data class CreatureLibrary(val schemaVersion: Int = 1, val creatures: List<CreatureDefinition> = emptyList())
 
 @Serializable
+@OptIn(ExperimentalSerializationApi::class)
 data class CreatureDefinition @JvmOverloads constructor(
     val id: String,
     val displayName: String,
@@ -20,10 +23,15 @@ data class CreatureDefinition @JvmOverloads constructor(
     val themeRole: String = "",
     /** Bounded item drops are part of the current canonical content. */
     val drops: List<CreatureDrop> = emptyList(),
-    /** Boss behavior requires creature schema 2 or 3. */
+    /** Boss behavior requires creature schema 2 through 4. */
     val boss: CreatureBossProfile? = null,
     /** Authored voices require creature schema 3; null selects the native default profile. */
     val sounds: CreatureSoundProfile? = null,
+    /** Shared AbilityScript invocation requires creature schema 4. */
+    val ability: CreatureAbilityBinding? = null,
+    /** Passive and hostile hosts share these additional event bindings (schema 5). */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val abilityBindings: List<AbilityEventBinding> = emptyList(),
 )
 
 /** Independent bounded rolls; each successful entry produces one complete item stack. */
@@ -105,13 +113,13 @@ object CustomCreatureValidator {
     @JvmStatic fun freeze(library: CreatureLibrary): CreatureLibrary = library.copy(creatures = java.util.List.copyOf(library.creatures.map { c ->
         c.copy(model = c.model.copy(bones = java.util.List.copyOf(c.model.bones.map { b -> b.copy(cubes = java.util.List.copyOf(b.cubes)) })),
             spawn = c.spawn.copy(biomes = java.util.List.copyOf(c.spawn.biomes)), drops = java.util.List.copyOf(c.drops),
-            boss = c.boss?.let {it.copy(phases = java.util.List.copyOf(it.phases))})
+            boss = c.boss?.let {it.copy(phases = java.util.List.copyOf(it.phases))}, abilityBindings = AbilityEventBindings.freeze(c.abilityBindings))
     }))
 
     @JvmStatic fun validate(library: CreatureLibrary): List<Diagnostic> {
         val result = mutableListOf<Diagnostic>()
         fun error(path: String, message: String) { result += Diagnostic(path, "creature.invalid", DiagnosticSeverity.ERROR, message) }
-        if (library.schemaVersion !in 1..3) error("creatures.schemaVersion", "Supported creature schemaVersions are 1, 2 and 3")
+        if (library.schemaVersion !in 1..6) error("creatures.schemaVersion", "Supported creature schemaVersions are 1 through 6")
         if (library.creatures.size > MAX_CREATURES) error("creatures.creatures", "At most $MAX_CREATURES creature definitions are supported")
         val ids = mutableSetOf<String>()
         library.creatures.forEachIndexed { i, c ->
@@ -120,9 +128,19 @@ object CustomCreatureValidator {
             if (!ids.add(c.id)) error("$p.id", "Duplicate creature id '${c.id}'")
             if (c.displayName.isBlank() || c.displayName.length > 128) error("$p.displayName", "Display name must contain 1 to 128 characters")
             if (c.themeRole.length > 2048) error("$p.themeRole", "Theme role is limited to 2048 characters")
-            if (c.boss != null && library.schemaVersion < 2) error("$p.boss", "Boss profiles require creature schemaVersion 2 or 3")
-            if (c.sounds != null && library.schemaVersion != 3) error("$p.sounds", "Authored sounds require explicit creature schemaVersion 3")
+            if (c.boss != null && library.schemaVersion < 2) error("$p.boss", "Boss profiles require creature schemaVersion 2 through 4")
+            if (c.sounds != null && library.schemaVersion < 3) error("$p.sounds", "Authored sounds require creature schemaVersion 3 or later")
+            c.ability?.let { binding ->
+                if (library.schemaVersion < 4) error("$p.ability", "Ability bindings require creature schemaVersion 4")
+                if (c.category != CreatureCategory.HOSTILE) error("$p.ability", "Combat ability bindings require a hostile creature host")
+                if (!com.wjz.worldsmith.core.ability.AbilityPrograms.validId(binding.program)) error("$p.ability.program", "Use a normalized local ability program id")
+                if (!binding.range.isFinite() || binding.range !in 0.5..24.0) error("$p.ability.range", "Ability activation range must be finite and 0.5..24 blocks")
+                if (binding.cooldownTicks !in 1..72000) error("$p.ability.cooldownTicks", "Ability cooldown must be 1..72000 ticks")
+            }
             c.sounds?.let { result += CreatureSounds.validate(it, "$p.sounds") }
+            if (c.abilityBindings.isNotEmpty() && library.schemaVersion < 5) error("$p.abilityBindings", "Event bindings require creature schemaVersion 5")
+            if (c.abilityBindings.any { it.intervalTicks != 1 } && library.schemaVersion < 6) error("$p.abilityBindings", "Periodic observation intervals require creature schemaVersion 6")
+            result += AbilityEventBindings.validate(c.abilityBindings, "creature", "$p.abilityBindings")
             result += CreatureBosses.validate(c, p)
             if (c.drops.size > MAX_DROPS) error("$p.drops", "At most $MAX_DROPS independent drop entries are supported")
             c.drops.forEachIndexed { j, drop ->

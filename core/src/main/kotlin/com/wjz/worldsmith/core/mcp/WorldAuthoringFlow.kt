@@ -58,7 +58,7 @@ object WorldAuthoringFlow {
             val repair=report!=null || problem.code=="AUTHORING_ALIGNMENT_THEME_TITLE_MISMATCH"
             val affected=brief?.criteria?.filter {c->report?.checks?.any {it.criterionId==c.id && it.status==ReviewCheckStatus.BLOCKED}==true}?.map {it.target}.orEmpty().ifEmpty {brief?.targets.orEmpty()}
             val modules=affected.mapNotNull {target->mapOf("theme" to "theme","terrain" to "terrain","biome" to "biomes","feature" to "features",
-                "block" to "blocks","block_item" to "blocks","item" to "items","creature" to "creatures","quest" to "quests","mechanic" to "mechanics")[target.kind]}.distinct()
+                "block" to "blocks","block_item" to "blocks","item" to "items","creature" to "creatures","quest" to "quests","mechanic" to "mechanics","ability" to "abilities").plus(com.wjz.worldsmith.core.story.StoryContentModule.kinds.associateWith { "story" })[target.kind]}.distinct()
             val tool=if(repair) {
                 if(problem.code=="AUTHORING_ALIGNMENT_THEME_TITLE_MISMATCH" || modules.isNotEmpty())"worldsmith_put_content_modules" else "worldsmith_put_architecture_draft"
             } else if(subject==null)"worldsmith_put_module_briefs" else "worldsmith_get_authoring_review_context"
@@ -84,10 +84,13 @@ object WorldAuthoringFlow {
                 put("type","array");put("items",McpJson.type("string"));put("maxItems",WorldAuthoringModel.MAX_BRIEFS)
                 put("description","For new COMPLETE_WORLD runs, name the current module briefs this drawing or texture implements. Legacy/focused calls remain unchanged.")
             }))))
-        return tool.copy(inputSchema=schema,handler={arguments->
-            val sid=arguments["sessionId"]?.jsonPrimitive?.contentOrNull
-            val session=sid?.let(sessions::find)
-            if(session?.authoring==null || session.mode!=WorkflowMode.COMPLETE_WORLD)tool.handler(arguments)
+          return tool.copy(inputSchema=schema,handler={arguments->
+              // Brief selection belongs to this orchestration gate, not the worker's strict DTO.
+              // Validate it here, then keep the delegate's original argument contract intact.
+              val delegatedArguments=if(opaque)JsonObject(arguments-"briefIds") else arguments
+              val sid=arguments["sessionId"]?.jsonPrimitive?.contentOrNull
+              val session=sid?.let(sessions::find)
+              if(session?.authoring==null || session.mode!=WorkflowMode.COMPLETE_WORLD)tool.handler(delegatedArguments)
             else {
                 val problems:List<Diagnostic> = if(tool.name=="worldsmith_put_world_design_plan")WorldAuthoringPolicy.bibleProblems(session)
                     else WorldAuthoringPolicy.productionProblems(session)
@@ -101,7 +104,7 @@ object WorldAuthoringFlow {
                     else {
                         val targets=argumentTargets(tool.name,arguments)+ids.flatMap {known[it]?.brief?.targets.orEmpty()}
                         val targetProblems=if(targets.isEmpty())emptyList() else WorldAuthoringPolicy.productionProblems(session,targets.toSet())
-                        if(targetProblems.isNotEmpty())WorldAuthoringMcpService.blocked(session,targetProblems,"worldsmith_put_module_briefs") else tool.handler(arguments)
+                          if(targetProblems.isNotEmpty())WorldAuthoringMcpService.blocked(session,targetProblems,"worldsmith_put_module_briefs") else tool.handler(delegatedArguments)
                     }
                 }
             }
@@ -117,10 +120,11 @@ object WorldAuthoringFlow {
                 val document=raw.jsonObject
                 when(module) {
                     "terrain" -> add(ContentKey("terrain","main"))
+                    "story" -> com.wjz.worldsmith.core.story.StoryContentModule.collections.forEach { (kind,collection) -> (document[collection] as? JsonArray).orEmpty().forEach { v -> (v as? JsonObject)?.get("id")?.jsonPrimitive?.content?.let { add(ContentKey(kind,it)) } } }
                     "theme" -> add(ContentKey("theme",document["id"]?.jsonPrimitive?.content ?: "main"))
                     else -> {
-                        val kind=mapOf("biomes" to "biome","features" to "feature","blocks" to "block","items" to "item","creatures" to "creature","quests" to "quest","mechanics" to "mechanic")[module]
-                        if(kind!=null)document[module]?.jsonArray?.forEach {it.jsonObject["id"]?.jsonPrimitive?.content?.let {id->add(ContentKey(kind,id))}}
+                        val kind=mapOf("biomes" to "biome","features" to "feature","blocks" to "block","items" to "item","creatures" to "creature","quests" to "quest","mechanics" to "mechanic","abilities" to "ability")[module]
+                        if(kind!=null)document[if(module=="abilities") "programs" else module]?.jsonArray?.forEach {it.jsonObject["id"]?.jsonPrimitive?.content?.let {id->add(ContentKey(kind,id))}}
                     }
                 }
             }

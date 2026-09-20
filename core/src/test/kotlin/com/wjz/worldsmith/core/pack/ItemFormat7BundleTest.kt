@@ -17,12 +17,12 @@ class ItemFormat7BundleTest {
         val invalid = item.copy(actions = listOf(ItemAction(effects = listOf(ItemEffect.Blink(9f)))))
         assertTrue(CustomItemValidation.validate(CustomItemLibrary(2, listOf(invalid))).any { it.code == "items.range" })
     }
-    @Test fun `new writes use seven including the required mechanics module`() {
+    @Test fun `new writes use eight including required mechanics and abilities modules`() {
         val base = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
         val pack = WorldContentBundleIO.create("An island", "The mist carries old songs.", base.terrain, base.biomes, base.features,
             base.structures, base.theme, base.blocks, base.creatures, base.assets, base.items, base.quests)
-        assertEquals(7, pack.manifest.formatVersion)
-        assertEquals(10, pack.manifest.modules.size)
+        assertEquals(10, pack.manifest.formatVersion)
+        assertEquals(12, pack.manifest.modules.size)
         val files = WorldContentBundleIO.encode(pack)
         assertEquals(pack.manifest.id, WorldsmithHashUtil.computeGenerationId(files.manifest, files.texts, files.binaries))
     }

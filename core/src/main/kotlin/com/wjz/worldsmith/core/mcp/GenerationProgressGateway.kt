@@ -1,5 +1,8 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+
 import com.wjz.worldsmith.core.drawhost.DrawingJob
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
@@ -58,6 +61,7 @@ object GenerationAuthoringDrafts {
 internal class GenerationProgressGateway(
     private val sessions: () -> List<WorkflowSession>,
     private val jobs: (String) -> List<DrawingJob>,
+    private val abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard(),
 ) {
     private data class Activity(val sequence: Long, val tool: String, val pending: Map<Long, String>, val runningCount: Int, val error: String? = null) {
         val running: Boolean get() = runningCount > 0
@@ -119,7 +123,7 @@ internal class GenerationProgressGateway(
                 }, last?.sequence ?: 0, last?.displayedTool, running, last?.error, session.authoring?.bible != null)
         }.sortedWith(compareBy<GenerationSessionSummary> { it.mode == WorkflowMode.STANDALONE }.thenByDescending { it.lastActivitySequence }.thenBy { it.sessionId })
         val last = selected?.let { observed[it.id] }
-        val view = selected?.let { GenerationProgressViews.inspect(it, jobs(it.id)) }
+        val view = selected?.let { GenerationProgressViews.inspect(it, jobs(it.id), abilityCapabilities) }
         return GenerationProgressSnapshot(java.util.List.copyOf(summaries), default, selected?.id, view,
             last?.displayedTool, last?.running == true, last?.error)
     }

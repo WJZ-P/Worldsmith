@@ -27,7 +27,7 @@ class WorldContentBundleTest {
     private fun bundle(bytes: ByteArray = png()): WorldsmithPack {
         val base = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
         val texture = ContentAssetValidation.hash(bytes)
-        val blocks = CustomBlockLibrary(blocks = listOf(CustomBlockDefinition("moonstone", "Moonstone", textureAsset = texture, light = 8)))
+        val blocks = CustomBlockLibrary(blocks = listOf(CustomBlockDefinition("moonstone", "Moonstone", appearance = com.wjz.worldsmith.core.content.BlockAppearance.uniform(texture), light = 8)))
         val creatures = CreatureLibrary(creatures = listOf(CreatureDefinition("guardian", "Moonstone Guardian", CreatureCategory.HOSTILE,
             CreatureModel(texture, 32, 32, listOf(CreatureBone("body", pivot = CreatureVector(0f, 24f, 0f),
                 cubes = listOf(CreatureCube(CreatureVector(-2f, -8f, -2f), CreatureVector(4f, 8f, 4f)))))),
@@ -47,11 +47,11 @@ class WorldContentBundleTest {
         return files
     }
 
-    @Test fun `ten typed modules and verified assets survive portable round trip`() {
+    @Test fun `twelve typed modules and verified assets survive portable round trip`() {
         val pack = bundle()
         val files = write(pack)
         val loaded = WorldsmithPackLoader.loadDirectory(temp)
-        assertEquals(7, loaded.manifest.formatVersion)
+        assertEquals(10, loaded.manifest.formatVersion)
         assertEquals(WorldContentBundleIO.REQUIRED_MODULES, loaded.manifest.modules.keys)
         assertFalse(WorldsmithJson.encode(files.manifest).contains("\"files\""))
         assertEquals(pack.manifest.id, loaded.computedId)
@@ -128,7 +128,7 @@ class WorldContentBundleTest {
         assertThrows(IllegalArgumentException::class.java) { WorldContentBundleIO.validateManifest(pack.manifest.copy(modules = pack.manifest.modules - "theme")) }
         val traversal = pack.manifest.modules + ("theme" to pack.manifest.modules.getValue("theme").copy(path = "../theme.json"))
         assertThrows(IllegalArgumentException::class.java) { WorldContentBundleIO.validateManifest(pack.manifest.copy(modules = traversal)) }
-        val schema = files.texts + ("blocks.json" to "{\"schemaVersion\":2,\"blocks\":[]}")
+        val schema = files.texts + ("blocks.json" to "{\"schemaVersion\":3,\"blocks\":[]}")
         assertThrows(IllegalArgumentException::class.java) { WorldsmithHashUtil.computeGenerationId(files.manifest, schema, files.binaries) }
         assertThrows(IllegalArgumentException::class.java) { WorldsmithHashUtil.computeGenerationId(files.manifest, files.texts + ("untracked.json" to "{}"), files.binaries) }
     }
@@ -158,12 +158,12 @@ class WorldContentBundleTest {
         val alias = "a".repeat(64)
         val changed = pack.copy(
             manifest = pack.manifest.copy(assets = pack.manifest.assets.map { it.copy(id = alias) }),
-            blocks = pack.blocks.copy(blocks = pack.blocks.blocks.map { it.copy(textureAsset = alias) }),
+            blocks = pack.blocks.copy(blocks = pack.blocks.blocks.map { it.copy(appearance = BlockAppearance.uniform(alias)) }),
             creatures = pack.creatures.copy(creatures = pack.creatures.creatures.map { it.copy(model = it.model.copy(texture = alias)) }),
             assets = mapOf(alias to pack.assets.values.single()),
         )
         val errors = WorldsmithPackValidator.validate(freeze(changed)).filter { it.code == "CONTENT_TEXTURE_ADDRESS_MISMATCH" }
-        assertEquals(2, errors.size)
+        assertEquals(8, errors.size, "All six faces, particle and creature atlas must resolve their actual digest")
         assertTrue(errors.any { it.path.startsWith("blocks.") })
         assertTrue(errors.any { it.path.startsWith("creatures.") })
     }

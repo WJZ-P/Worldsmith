@@ -1,0 +1,17 @@
+// Temporary world edits are owned leases. A changed player block is never blindly overwritten on restore.
+on start {
+    let parent = map.get(args, "parent");
+    let mark = map.get(args, "mark");
+    let existing = world.block(mark);
+    if (existing != "minecraft:air" && existing != "minecraft:cave_air" && existing != "minecraft:void_air") {
+        signal.send(parent, "ward_blocked", null);
+        return;
+    }
+    let block = world.set_block(mark, "minecraft:glass", map.of([]), 100);
+    shared.scene_set("ward_built", true);
+    fx.telegraph(shape.box(mark, vec(0.6, 0.6, 0.6)), 80, "blue");
+    signal.send(parent, "ward_built", mark);
+    wait 80;
+    world.restore(block);
+    shared.scene_set("ward_built", false);
+}

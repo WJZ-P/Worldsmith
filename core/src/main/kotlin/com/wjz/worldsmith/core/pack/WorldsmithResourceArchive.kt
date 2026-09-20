@@ -1,5 +1,8 @@
 package com.wjz.worldsmith.core.pack
 
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+
 import com.wjz.worldsmith.core.content.ContentAssetValidation
 import com.wjz.worldsmith.core.content.WorldContentRegistry
 import com.wjz.worldsmith.core.draw.DrawSnapshotCodec
@@ -41,7 +44,7 @@ data class ResourceArchiveInfo(
 
 data class ResourceArchiveRead(val pack: WorldsmithPack, val info: ResourceArchiveInfo)
 
-/** A data-only, single-file envelope. Source provenance is preserved as text, never compiled or executed. */
+/** A data-only, single-file envelope. Drawing provenance is inert text; ability source is validated by the pure compiler, never executed. */
 object WorldsmithResourceArchive {
     const val VERSION = 1
     const val MAX_ENTRIES = 4096
@@ -60,7 +63,7 @@ object WorldsmithResourceArchive {
                              val compressed: Long, val size: Long, val offset: Long)
 
     /** No archive pathname is ever resolved onto the filesystem; only bounded byte buffers reach the loader. */
-    @JvmStatic fun read(path: Path): ResourceArchiveRead {
+    @JvmStatic @JvmOverloads fun read(path: Path, abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()): ResourceArchiveRead {
         require(Files.isRegularFile(path, NOFOLLOW_LINKS) && !Files.isSymbolicLink(path)) { "Resource archive must be a regular, non-linked file" }
         return FileChannel.open(path, READ, NOFOLLOW_LINKS).use { channel ->
             val length = channel.size()
@@ -110,14 +113,14 @@ object WorldsmithResourceArchive {
             val pack = WorldsmithPackLoader.load(source)
             require(buffers.keys == consumed + HEADER) { "Resource archive contains undeclared entries: ${buffers.keys - consumed - HEADER}" }
             require(pack.manifest.id == header.bundleId && pack.computedId == header.bundleId) { "Resource archive and bundle content identities differ" }
-            validate(pack)
+            validate(pack, abilityCapabilities)
             ResourceArchiveRead(pack, ResourceArchiveInfo(VERSION, header.bundleId, sha256, length, entries.size, entries.sumOf { it.size }))
         }
     }
 
     /** Validate a sibling temporary archive before publishing. An existing different file is never replaced. */
-    @JvmStatic fun write(pack: WorldsmithPack, path: Path): ResourceArchiveInfo {
-        validate(pack)
+    @JvmStatic @JvmOverloads fun write(pack: WorldsmithPack, path: Path, abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()): ResourceArchiveInfo {
+        validate(pack, abilityCapabilities)
         val bundle = WorldContentBundleIO.encode(pack)
         require(bundle.manifest.id == pack.manifest.id && bundle.manifest.id == pack.computedId) { "Export requires a frozen, validated bundle identity" }
         val files = sortedMapOf<String, ByteArray>()
@@ -146,10 +149,10 @@ object WorldsmithResourceArchive {
                     zip.putNextEntry(entry); zip.write(bytes); zip.closeEntry()
                 }
             }
-            val verified = read(temporary).info
+            val verified = read(temporary, abilityCapabilities).info
             require(verified.bundleId == bundle.manifest.id) { "Resource archive readback changed its bundle identity" }
             fun reuse(): ResourceArchiveInfo {
-                val existing = read(target).info
+                val existing = read(target, abilityCapabilities).info
                 require(existing.archiveSha256 == verified.archiveSha256) { "A different resource archive already exists at the target" }
                 return existing
             }
@@ -161,8 +164,8 @@ object WorldsmithResourceArchive {
         }
     }
 
-    private fun validate(pack: WorldsmithPack) {
-        val errors = WorldsmithPackValidator.validate(pack).filter { it.severity == DiagnosticSeverity.ERROR }
+    private fun validate(pack: WorldsmithPack, abilityCapabilities: AbilityCapabilityRegistry) {
+        val errors = WorldsmithPackValidator.validate(pack, abilityCapabilities).filter { it.severity == DiagnosticSeverity.ERROR }
         require(errors.isEmpty()) {
             fun bounded(value: String, limit: Int) = if (value.length <= limit) value else value.take(limit - 3) + "..."
             val shown = errors.take(16)

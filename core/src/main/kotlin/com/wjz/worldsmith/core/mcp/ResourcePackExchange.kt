@@ -1,5 +1,8 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+
 import com.wjz.worldsmith.core.content.ContentAssetStore
 import com.wjz.worldsmith.core.content.ContentAssetValidation
 import com.wjz.worldsmith.core.model.WorldsmithPack
@@ -29,7 +32,8 @@ import java.nio.file.Path
 )
 
 /** Java/UI/MCP shared exchange. Only inbox basenames and managed hashes cross this API, never arbitrary import paths. */
-class ResourcePackExchange(packDirectory:Path) {
+class ResourcePackExchange @JvmOverloads constructor(packDirectory:Path,
+    private val abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()) {
     private val packDirectory:Path
     private val exchangeDirectory:Path
     private val inbox:Path
@@ -44,7 +48,7 @@ class ResourcePackExchange(packDirectory:Path) {
         exchangeDirectory=regularDirectory(parent.resolve("resource-packs"))
         inbox=regularDirectory(exchangeDirectory.resolve("inbox"))
         exports=regularDirectory(exchangeDirectory.resolve("exports"))
-        store=ManagedPackStore(this.packDirectory)
+        store=ManagedPackStore(this.packDirectory, abilityCapabilities)
         assets=ContentAssetStore(regularDirectory(parent.resolve("content-assets")),ContentAssetValidation.MAX_ASSET_BYTES)
     }
 
@@ -90,14 +94,14 @@ class ResourcePackExchange(packDirectory:Path) {
 
     fun inspect(filename:String):ResourcePackReceipt {
         val path=inboxFile(filename)
-        val read=WorldsmithResourceArchive.read(path)
+        val read=WorldsmithResourceArchive.read(path, abilityCapabilities)
         return receipt("inspect","INSPECTED",path,read.pack,read.info)
     }
 
     /** Immutable PNG blobs may remain after a failed publication, but no partial pack/session becomes visible. */
     @Synchronized fun importPack(filename:String):ResourcePackReceipt {
         val path=inboxFile(filename)
-        val read=WorldsmithResourceArchive.read(path)
+        val read=WorldsmithResourceArchive.read(path, abilityCapabilities)
         val pack=read.pack
         val existed=store.managed(pack.manifest.id)!=null
         val bytes=pack.assets
@@ -121,7 +125,7 @@ class ResourcePackExchange(packDirectory:Path) {
         val target=exports.resolve(name)
         val existed=Files.exists(target,NOFOLLOW_LINKS)
         if(existed)require(regularFile(target,exports)) {"Existing export must be a regular unlinked file"}
-        val info=WorldsmithResourceArchive.write(pack,target)
+        val info=WorldsmithResourceArchive.write(pack,target,abilityCapabilities)
         return receipt("export","EXPORTED",target,pack,info).copy(savedPackPath=store.managed(id)?.toString(),reusedExisting=existed)
     }
 
@@ -140,7 +144,7 @@ class ResourcePackExchange(packDirectory:Path) {
         pack.manifest.formatVersion,info,pack.manifest.modules.keys.sorted(),pack.manifest.assets.map {it.id}.sorted(),linkedMapOf(
             "biomes" to pack.biomes.biomes.size,"features" to pack.features.features.size,"structures" to pack.structures.structures.size,
             "blocks" to pack.blocks.blocks.size,"items" to pack.items.items.size,"creatures" to pack.creatures.creatures.size,
-            "quests" to pack.quests.quests.size,"mechanics" to pack.mechanics.mechanics.size,"pngAssets" to pack.manifest.assets.size,"frozenDrawings" to pack.structures.artifacts.size,
+            "quests" to pack.quests.quests.size,"mechanics" to pack.mechanics.mechanics.size,"abilities" to pack.abilities.programs.size,"pngAssets" to pack.manifest.assets.size,"frozenDrawings" to pack.structures.artifacts.size,
         ))
 
     private fun inboxFile(filename:String):Path {

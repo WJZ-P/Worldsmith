@@ -28,7 +28,7 @@ internal object WorldAuthoringPolicyFixtures {
             CreatureModel(textureId, 16, 16, listOf(CreatureBone("body", cubes = listOf(CreatureCube(CreatureVector(), CreatureVector(1f, 1f, 1f)))))))
         return base.copy(manifest = base.manifest.copy(displayName = bible().title), theme = base.theme.copy(title = bible().title),
             structures = StructureLibrary(structures = listOf(hall)),
-            blocks = CustomBlockLibrary(blocks = listOf(CustomBlockDefinition("stone", "Living stone", textureAsset = textureId))),
+            blocks = CustomBlockLibrary(blocks = listOf(CustomBlockDefinition("stone", "Living stone", appearance = com.wjz.worldsmith.core.content.BlockAppearance.uniform(textureId)))),
             creatures = CreatureLibrary(creatures = listOf(keeper)),
             items = CustomItemLibrary(items = listOf(CustomItemDefinition("token", "Memory token", textureId))),
             quests = QuestLibrary(quests = listOf(Quest("return", "Remember", "Return the remembered branch",

@@ -1,0 +1,52 @@
+// Real hurt and nearby block-break events change the running invocation's branch.
+on hurt { state.interrupted = true; state.reason = "hurt"; }
+on block_break {
+    if (vector.distance(event_position, origin) <= 6) {
+        state.interrupted = true;
+        state.reason = "block_break";
+    }
+}
+
+fn strike(center) {
+    for victim in world.entities(shape.sphere(center, 3)) {
+        if (world.visible(self, victim)) { combat.damage(victim, 5); }
+    }
+}
+
+on start {
+    let movement = 0;
+    if (entity.kind(self) == "creature") {
+        movement = control.claim(60, 120);
+        if (movement == 0) { return; }
+    }
+    state.interrupted = false;
+    state.reason = "none";
+    state.branch = "channeling";
+    motion.stop(self);
+    let center = entity.position(self);
+    let warning = fx.telegraph(shape.sphere(center, 3), 64, "blue");
+    fx.caption("Interrupt by striking the caster or breaking a nearby block.", 64);
+    fx.message("Channeling: take damage or break a nearby block to interrupt.");
+    fx.pose("windup", 64);
+    let elapsed = 0;
+    while (elapsed < 60 && !state.interrupted) {
+        wait 4;
+        if (movement != 0 && !control.held(movement)) { return; }
+        elapsed = elapsed + 4;
+    }
+    fx.clear(warning);
+    if (state.interrupted) {
+        state.branch = "weakened";
+        status.apply(self, "minecraft:weakness", 100, 0);
+        fx.caption("Channel broken: vulnerable recovery.", 30);
+        fx.message("Channel interrupted: weakness instead of the blast.");
+        fx.pose("recovery", 30);
+    } else {
+        state.branch = "released";
+        fx.pose("strike", 4);
+        fx.telegraph(shape.sphere(center, 3), 4, "white");
+        strike(center);
+    }
+    wait 30;
+    if (movement != 0) { control.release(movement); }
+}

@@ -128,6 +128,11 @@ adds missing authoring work around existing results; it does not regenerate them
 
 The complete bible, briefs and review evidence persist in the session only.
 WorldTheme is a bounded, reviewed projection for the existing runtime. `.wspack`
-format 7 freezes ten typed gameplay modules, including mechanics; a shared pack
+format 10 freezes twelve typed gameplay modules, including mechanics and abilities; a shared pack
 is not a full portable authoring archive. Older formats are rejected without
 rewriting local pack or save files. Reading the bible never triggers resource activation.
+
+The installed `ability/<id>` content kind is programmable AbilityScript source,
+not a fixed move template. Tie ability mechanics, counterplay and encounter rules
+to setting facts, then implement source plus actual creature/item/mechanic host
+bindings in reviewed briefs. Use the separate abilities contract for exact APIs.

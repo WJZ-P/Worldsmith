@@ -27,11 +27,11 @@ class McpHttpServerTest {
      */
     @Test
     fun `a busy preferred port moves the bridge to the next free one`() {
-        McpHttpServer(WorldsmithMcpTools(packDirectory).all(), "test").use { squatter ->
+        McpHttpServer(WorldsmithMcpTools(packDirectory.resolve("packs")).all(), "test").use { squatter ->
             val taken = squatter.start(0)
             val busyPort = taken.port
 
-            McpHttpServer(WorldsmithMcpTools(packDirectory).all(), "test").use { moved ->
+            McpHttpServer(WorldsmithMcpTools(packDirectory.resolve("packs")).all(), "test").use { moved ->
                 val endpoint = moved.start(busyPort)
 
                 assertTrue(endpoint.port > busyPort, "expected a port past $busyPort, got ${endpoint.port}")
@@ -44,10 +44,10 @@ class McpHttpServerTest {
 
     @Test
     fun `giving up on every candidate port reports the range it tried`() {
-        McpHttpServer(WorldsmithMcpTools(packDirectory).all(), "test").use { squatter ->
+        McpHttpServer(WorldsmithMcpTools(packDirectory.resolve("packs")).all(), "test").use { squatter ->
             val busyPort = squatter.start(0).port
 
-            McpHttpServer(WorldsmithMcpTools(packDirectory).all(), "test").use { crowded ->
+            McpHttpServer(WorldsmithMcpTools(packDirectory.resolve("packs")).all(), "test").use { crowded ->
                 val failure = assertThrows(IOException::class.java) { crowded.start(busyPort, 1) }
 
                 assertTrue(busyPort.toString() in failure.message.orEmpty(), failure.message.orEmpty())
@@ -57,7 +57,7 @@ class McpHttpServerTest {
 
     @Test
     fun `streamable http exposes the guided Worldsmith workflow`() {
-        McpHttpServer(WorldsmithMcpTools(packDirectory).all(), "test").use { server ->
+        McpHttpServer(WorldsmithMcpTools(packDirectory.resolve("packs")).all(), "test").use { server ->
             val endpoint = server.start(0)
             val initialized = post(
                 endpoint,
@@ -87,7 +87,9 @@ class McpHttpServerTest {
                 endpoint,
                 """{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"${WorldsmithWorkflow.BEGIN_TOOL}","arguments":{"prompt":"a glass desert"}}}""",
             )
-            val structured = begun.getValue("result").jsonObject.getValue("structuredContent").jsonObject
+            val reply = begun.getValue("result").jsonObject
+            assertTrue(reply["isError"]?.jsonPrimitive?.boolean != true, reply.toString())
+            val structured = reply.getValue("structuredContent").jsonObject
             assertEquals(WorldsmithWorkflow.CONTRACT_TOOL, structured.getValue("nextTool").jsonPrimitive.content)
             val next = structured.getValue("nextArguments").jsonObject
             assertEquals("grand_world", next.getValue("id").jsonPrimitive.content)

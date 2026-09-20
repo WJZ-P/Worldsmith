@@ -25,7 +25,7 @@ class MechanicDiscoveryExampleTest {
         assertEquals(pack.mechanics, read.pack.mechanics)
         assertEquals(pack.quests, read.pack.quests)
         assertEquals(pack.structures.structures, read.pack.structures.structures)
-        assertEquals(7, read.pack.manifest.formatVersion)
+        assertEquals(10, read.pack.manifest.formatVersion)
     }
 
     @Test fun `missing material comes from a real container and guides reproduce the executable rules`() {

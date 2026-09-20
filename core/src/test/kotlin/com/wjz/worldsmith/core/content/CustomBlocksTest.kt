@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test
 
 class CustomBlocksTest {
     private fun block(id: String, profile: CustomBlockProfile = CustomBlockProfile.STONE, light: Int = 0) =
-        CustomBlockDefinition(id, "Moon $id", profile, "a".repeat(64), light, "Moonstone culture")
+        CustomBlockDefinition(id, "Moon $id", profile, BlockAppearance.uniform("a".repeat(64)), light, "Moonstone culture")
 
     @Test fun `native allocation is deterministic independent of declaration order`() {
         val first = CustomBlockBindings.plan("realm", CustomBlockLibrary(blocks = listOf(block("zinc"), block("amber"))))
@@ -37,7 +37,8 @@ class CustomBlocksTest {
         val definition = block("moon", light = 7)
         val initial = CustomBlockBindings.plan("realm", CustomBlockLibrary(blocks = listOf(definition)))
         for (library in listOf(CustomBlockLibrary(), CustomBlockLibrary(blocks = listOf(definition.copy(light = 15))),
-            CustomBlockLibrary(blocks = listOf(definition.copy(profile = CustomBlockProfile.METAL))))) {
+            CustomBlockLibrary(blocks = listOf(definition.copy(profile = CustomBlockProfile.METAL))),
+            CustomBlockLibrary(blocks = listOf(definition.copy(appearance = definition.appearance.copy(orientation = BlockOrientation.HORIZONTAL)))))) {
             assertThrows(IllegalArgumentException::class.java) { CustomBlockBindings.plan("realm", library, initial) }
         }
         assertThrows(IllegalArgumentException::class.java) { CustomBlockBindings.plan("other", CustomBlockLibrary(blocks = listOf(definition)), initial) }
@@ -46,11 +47,11 @@ class CustomBlocksTest {
     @Test fun `visual and story edits preserve saved state identity`() {
         val original = block("moon")
         val initial = CustomBlockBindings.plan("realm", CustomBlockLibrary(blocks = listOf(original)))
-        assertEquals(initial, CustomBlockBindings.plan("realm", CustomBlockLibrary(blocks = listOf(original.copy(displayName = "New moon", textureAsset = "b".repeat(64), themeRole = "New theme"))), initial))
+        assertEquals(initial, CustomBlockBindings.plan("realm", CustomBlockLibrary(blocks = listOf(original.copy(displayName = "New moon", appearance = BlockAppearance.uniform("b".repeat(64)), themeRole = "New theme"))), initial))
     }
 
     @Test fun `malformed documents have field-specific diagnostics`() {
-        val library = CustomBlockLibrary(2, listOf(block("../bad").copy(displayName = "", textureAsset = "../texture", light = 16), block("../bad")))
+        val library = CustomBlockLibrary(1, listOf(block("../bad").copy(displayName = "", appearance = BlockAppearance.uniform("../texture"), light = 16), block("../bad")))
         val codes = CustomBlockValidation.validate(library).map { it.code }.toSet()
         assertTrue(codes.containsAll(listOf("blocks.schema", "blocks.id", "blocks.name", "blocks.texture", "blocks.light", "blocks.duplicate")))
     }
@@ -67,6 +68,21 @@ class CustomBlocksTest {
         val restored = CustomBlockBindings.decode(CustomBlockBindings.encode(snapshot))
         assertEquals(snapshot, restored)
         assertThrows(UnsupportedOperationException::class.java) { (restored.bindings as MutableList).clear() }
-        assertThrows(IllegalArgumentException::class.java) { CustomBlockBindings.decode(CustomBlockBindings.encode(snapshot).replace("\"schemaVersion\":1", "\"schemaVersion\":1,\"mystery\":true")) }
+        assertThrows(IllegalArgumentException::class.java) { CustomBlockBindings.decode(CustomBlockBindings.encode(snapshot).replace("\"schemaVersion\":2", "\"schemaVersion\":2,\"mystery\":true")) }
+    }
+
+    @Test fun `every face particle and UV turn is validated and participates in canonical serialization`() {
+        val appearance = BlockAppearance.uniform("a".repeat(64)).copy(north = BlockFaceTexture("b".repeat(64), 3), particle = "c".repeat(64))
+        assertEquals(listOf("a".repeat(64), "b".repeat(64), "c".repeat(64)), appearance.assetIds())
+        val definition = block("sign").copy(appearance = appearance)
+        assertTrue(CustomBlockValidation.validate(CustomBlockLibrary(blocks = listOf(definition))).isEmpty())
+        val broken = definition.copy(appearance = appearance.copy(east = BlockFaceTexture("bad",4),particle = "missing"))
+        val errors = CustomBlockValidation.validate(CustomBlockLibrary(blocks = listOf(broken)))
+        assertTrue(errors.any { it.path == "blocks[0].appearance.east.textureAsset" })
+        assertTrue(errors.any { it.path == "blocks[0].appearance.east.quarterTurns" })
+        assertTrue(errors.any { it.path == "blocks[0].appearance.particle" })
+        val document = com.wjz.worldsmith.core.serialization.WorldsmithJson.encode(definition)
+        assertTrue(document.contains("\"appearance\"")); assertTrue(document.contains("\"north\"")); assertTrue(document.contains("\"particle\""))
+        assertEquals(definition, com.wjz.worldsmith.core.serialization.WorldsmithJson.decode<CustomBlockDefinition>(document))
     }
 }

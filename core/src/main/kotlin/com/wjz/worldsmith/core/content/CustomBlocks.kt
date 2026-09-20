@@ -14,26 +14,27 @@ data class CustomBlockDefinition @JvmOverloads constructor(
     val id: String,
     val displayName: String,
     val profile: CustomBlockProfile = CustomBlockProfile.STONE,
-    val textureAsset: String,
+    val appearance: BlockAppearance,
     val light: Int = 0,
     val themeRole: String = "",
 )
 
 @Serializable
 data class CustomBlockLibrary @JvmOverloads constructor(
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = 2,
     val blocks: List<CustomBlockDefinition> = emptyList(),
 )
 
 @Serializable
-data class CustomBlockBinding(val id: String, val profile: CustomBlockProfile, val slot: Int, val light: Int) {
+data class CustomBlockBinding @JvmOverloads constructor(val id: String, val profile: CustomBlockProfile, val slot: Int, val light: Int,
+    val orientation: BlockOrientation = BlockOrientation.FIXED) {
     fun nativeId(): String = "worldsmith:content/block/${profile.name.lowercase()}/${slot.toString().padStart(2, '0')}"
     fun logicalId(): String = "worldsmith:content/$id"
 }
 
 /** Store with the save, not independently per dimension. This mapping is part of chunk identity. */
 @Serializable
-data class CustomBlockBindingSnapshot(val schemaVersion: Int = 1, val scope: String, val bindings: List<CustomBlockBinding>)
+data class CustomBlockBindingSnapshot(val schemaVersion: Int = 2, val scope: String, val bindings: List<CustomBlockBinding>)
 
 object CustomBlockValidation {
     const val SLOTS_PER_PROFILE = 32
@@ -41,7 +42,7 @@ object CustomBlockValidation {
     private val sha = Regex("[0-9a-f]{64}")
     @JvmStatic fun validate(library: CustomBlockLibrary): List<Diagnostic> = buildList {
         fun error(path: String, code: String, message: String) { add(Diagnostic(path, code, DiagnosticSeverity.ERROR, message)) }
-        if (library.schemaVersion != 1) error("schemaVersion", "blocks.schema", "Custom blocks require schema version 1")
+        if (library.schemaVersion != 2) error("schemaVersion", "blocks.schema", "Custom blocks require schema version 2 with canonical six-face appearances")
         val seen = mutableSetOf<String>()
         library.blocks.forEachIndexed { index, block ->
             val path = "blocks[$index]"
@@ -49,7 +50,11 @@ object CustomBlockValidation {
             if (!seen.add(block.id)) error("$path.id", "blocks.duplicate", "Duplicate custom block id: ${block.id}")
             if (block.displayName.isBlank() || block.displayName.length > 128 || block.displayName.any { it.isISOControl() })
                 error("$path.displayName", "blocks.name", "A display name must have 1 to 128 printable characters")
-            if (!sha.matches(block.textureAsset)) error("$path.textureAsset", "blocks.texture", "Texture asset must be a lowercase SHA-256 id")
+            block.appearance.faces().forEach { (face, texture) ->
+                if (!sha.matches(texture.textureAsset)) error("$path.appearance.$face.textureAsset", "blocks.texture", "Texture asset must be a lowercase SHA-256 id")
+                if (texture.quarterTurns !in 0..3) error("$path.appearance.$face.quarterTurns", "blocks.uv_rotation", "Face UV rotation uses 0 through 3 clockwise quarter turns")
+            }
+            if (!sha.matches(block.appearance.particle)) error("$path.appearance.particle", "blocks.texture", "Particle texture must be a lowercase SHA-256 id")
             if (block.light !in 0..15) error("$path.light", "blocks.light", "Light must be 0 through 15; native hosts predeclare these states")
             if (block.themeRole.length > 2048) error("$path.themeRole", "blocks.theme_role", "Theme role exceeds 2048 characters")
         }
@@ -76,8 +81,8 @@ object CustomBlockBindings {
         val assigned = previous?.bindings?.associateBy { it.id }?.toMutableMap() ?: mutableMapOf()
         assigned.values.forEach { binding ->
             val block = requireNotNull(definitions[binding.id]) { "Removing bound block ${binding.id} requires an explicit save migration" }
-            require(block.profile == binding.profile && block.light == binding.light) {
-                "Changing native profile or light for bound block ${binding.id} requires an explicit save migration"
+            require(block.profile == binding.profile && block.light == binding.light && block.appearance.orientation == binding.orientation) {
+                "Changing native profile, light or orientation for bound block ${binding.id} requires an explicit save migration"
             }
         }
         for (block in library.blocks.sortedBy { it.id }) {
@@ -85,13 +90,13 @@ object CustomBlockBindings {
             val used = assigned.values.filter { it.profile == block.profile }.map { it.slot }.toSet()
             val slot = (0 until CustomBlockValidation.SLOTS_PER_PROFILE).firstOrNull { it !in used }
             requireNotNull(slot) { "Native slot capacity exhausted for ${block.profile}" }
-            assigned[block.id] = CustomBlockBinding(block.id, block.profile, slot, block.light)
+            assigned[block.id] = CustomBlockBinding(block.id, block.profile, slot, block.light, block.appearance.orientation)
         }
         return CustomBlockBindingSnapshot(scope = scope, bindings = java.util.List.copyOf(assigned.values.sortedBy { it.id }))
     }
 
     @JvmStatic fun validateSnapshot(snapshot: CustomBlockBindingSnapshot) {
-        require(snapshot.schemaVersion == 1 && snapshot.scope.isNotBlank() && snapshot.scope.length <= 256) { "Invalid block binding snapshot header" }
+        require(snapshot.schemaVersion == 2 && snapshot.scope.isNotBlank() && snapshot.scope.length <= 256) { "Invalid block binding snapshot header" }
         val ids = mutableSetOf<String>()
         val hosts = mutableSetOf<String>()
         snapshot.bindings.forEach {

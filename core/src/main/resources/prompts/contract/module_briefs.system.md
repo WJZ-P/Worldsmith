@@ -129,5 +129,12 @@ The review loop does not bypass independent worker source-execution approvals.
 
 Briefs and review evidence remain session data, not extra runtime modules or
 fields in `.wspack`. Existing packs, legacy sessions and lightweight modes retain
-their session recovery paths; published bundles must use format 7. Browsing the read-only progress/bible screens starts
+their session recovery paths; published bundles must use format 10. Browsing the read-only progress/bible screens starts
 no content generation and performs no resource reload.
+
+Ability programs use `ability/<id>` targets. Review actual code at
+`/modules/abilities/programs/<index>/source`, required capabilities and the bound
+item/creature/mechanic definition. Criteria should describe timing, branches,
+interruptions, cleanup and player counterplay. Do not accept an attack name or
+lore paragraph as implementation evidence. Add invokes_ability to the design
+plan for each promised host binding.

@@ -247,7 +247,34 @@ class WorldAuthoringMcpServiceTest {
                 assertEquals(before, modern.current)
             }
             val selected = JsonObject(modernArgs + ("briefIds" to McpJson.encode(listOf(selectedId))))
-            ok(guarded.handler(selected)); assertEquals(2, calls); assertEquals(selected, received)
+            ok(guarded.handler(selected)); assertEquals(2, calls); assertEquals(modernArgs, received)
+            assertFalse("briefIds" in requireNotNull(received), "The orchestration-only selection must not leak into a strict delegate DTO")
+        }
+    }
+
+    @Test fun `reviewed drawing build selection is consumed before strict request decoding`() {
+        val h = Harness("strict_drawing_delegate")
+        h.productionReady()
+        val selectedId = h.current.authoring!!.briefs.first().brief.id
+        var decoded: com.wjz.worldsmith.core.drawhost.DrawingRequest? = null
+        val probe = McpTool("worldsmith_build_drawing", "Strict drawing delegate", "Decode the same request type as the real drawing service",
+            McpJson.schema(mapOf("sessionId" to McpJson.type("string")), listOf("sessionId")), false,
+            handler = { args ->
+                decoded = McpJson.decode<com.wjz.worldsmith.core.drawhost.DrawingRequest>(JsonObject(args - "sessionId"))
+                McpToolResult.success(buildJsonObject { put("decoded", true) })
+            })
+        val guarded = WorldAuthoringFlow.guard(probe, h.sessions)
+        val arguments = buildJsonObject {
+            put("sessionId", h.id); put("briefIds", McpJson.encode(listOf(selectedId)))
+            put("name", "hall"); put("requestId", "strict-drawing-check"); put("entryClass", "Hall")
+            put("sources", buildJsonObject { put("Hall.java", "class Hall {}") })
+            put("parameters", buildJsonObject { put("kind", "hall") })
+        }
+        ok(guarded.handler(arguments))
+        assertEquals("Hall", decoded!!.entryClass)
+        assertEquals(mapOf("kind" to "hall"), decoded!!.parameters)
+        assertThrows(kotlinx.serialization.SerializationException::class.java) {
+            guarded.handler(JsonObject(arguments + ("unexpectedWorkerField" to JsonPrimitive(true))))
         }
     }
 

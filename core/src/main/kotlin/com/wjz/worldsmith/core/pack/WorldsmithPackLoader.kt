@@ -13,6 +13,8 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import com.wjz.worldsmith.core.content.*
+import com.wjz.worldsmith.core.ability.AbilityLibrary
+import com.wjz.worldsmith.core.story.StoryLibrary
 import com.wjz.worldsmith.core.structure.StructureLibrary
 
 fun interface WorldsmithPackSource {
@@ -91,6 +93,8 @@ object WorldsmithPackLoader {
         val items = WorldsmithJson.decode<CustomItemLibrary>(contents.getValue(manifest.modulePath("items")))
         val quests = WorldsmithJson.decode<QuestLibrary>(contents.getValue(manifest.modulePath("quests")))
         val mechanics = WorldsmithJson.decode<WorldMechanicLibrary>(contents.getValue(manifest.modulePath("mechanics")))
+        val abilities = WorldsmithJson.decode<AbilityLibrary>(contents.getValue(manifest.modulePath("abilities")))
+        val story = WorldsmithJson.decode<StoryLibrary>(contents.getValue(manifest.modulePath("story")))
         require(index.artifacts.size<=512 && index.artifacts.all { (id,v)->id.matches(Regex("[a-f0-9]{64}")) && v.id==id })
         var drawingBytes = 0L
         val binaries=index.artifacts.values.associate { artifact ->
@@ -102,6 +106,6 @@ object WorldsmithPackLoader {
         manifest.assets.forEach { asset -> binaries.getOrPut(requireNotNull(asset.path)) { source.readBytes(asset.path) } }
         val computedId = WorldsmithHashUtil.computeGenerationId(manifest, contents,binaries)
         return WorldsmithPack(manifest, terrain, biomes, features, computedId, StructurePackIO.load(index, contents,binaries),
-            theme, blocks, creatures, manifest.assets.associate { it.id to binaries.getValue(requireNotNull(it.path)) }, items, quests, mechanics)
+            theme, blocks, creatures, manifest.assets.associate { it.id to binaries.getValue(requireNotNull(it.path)) }, items, quests, mechanics, abilities, story)
     }
 }

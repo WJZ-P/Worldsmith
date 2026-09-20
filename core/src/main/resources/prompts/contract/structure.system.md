@@ -9,7 +9,7 @@ group and readable occupied interiors. Empty libraries remain valid for legacy o
 standalone pack workflows, not new guided publications.
 Examples teach grammar, not a mandatory architectural style. Blueprint schema remains
 1; structure libraries containing SDK frozen data or typed BossSpawner use module
-schema 2. New worlds use bundle format 5; these are distinct version numbers.
+schema 2; story place/character markers require schema 3. New worlds use bundle format 10; these are distinct version numbers.
 
 ## SDK geometry and semantic metadata
 
@@ -47,16 +47,26 @@ rejection names the exceeded limit; preview/native NBT export remains available 
 larger drawings, without shrinking or scattering them.
 
 The structure module freezes palette/RLE geometry and versioned source provenance in
-module schema 2 inside a current format-5 world bundle. Legacy bundles 3/4 remain
-readable under their older rules and reject BossSpawner semantics. Manual structure
-libraries without BossSpawner may use module schema 1; world bundle formats 1/2 are
-rejected. Native validation checks real states,
+module schema 2 or 3 inside a current format-10 world bundle. Older bundle formats
+1..8 are rejected without rewriting existing files. Manual structures without
+BossSpawner or StoryAnchor may use module schema 1; story markers require schema 3. Native validation checks real states,
 mirrors/rotations, door/bed/double-plant pairs, emitter levels and typed block entities
 before publication. No source execution occurs on loading a published pack or in worldgen.
 
+## Story place and resident markers
+
+Structure schema 3 adds typed `story_anchor` interactions with `at` (feet), `place`
+and optional `character` IDs. Every story place needs a pure marker without
+character; resident markers reference that place. Feet/head cells are explicitly
+traversable with a supporting floor. `a.storyAnchor(at,place)` and
+`a.storyAnchor(at,place,character)` preserve IDs through component transforms.
+Native export supplies immutable scope and marker entity tags, never arbitrary
+entity NBT. Read contract/story for actual-instance identity, discovery, dialogue,
+trades and routines. A declaration is not a successful generated instance.
+
 ## Workflow and documents
 
-A `StructureLibrary` is `{ "schemaVersion": 1 or 2, "structures": [], "architecture": ... }`.
+A `StructureLibrary` is `{ "schemaVersion": 1 or 2 or 3, "structures": [], "architecture": ... }`.
 The host attaches drawing assets/provenance from session-owned ids; do not fabricate artifact records.
 Architecture follows contract/architecture; a guided session can inherit its saved
 worldsmith_plan_architecture object when this field is omitted.

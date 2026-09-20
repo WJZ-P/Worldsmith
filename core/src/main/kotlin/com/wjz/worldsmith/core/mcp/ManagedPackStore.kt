@@ -1,5 +1,8 @@
 package com.wjz.worldsmith.core.mcp
 
+import com.wjz.worldsmith.core.ability.AbilityCapabilityRegistry
+import com.wjz.worldsmith.core.ability.AbilityCapabilities
+
 import com.wjz.worldsmith.core.model.WorldsmithPackManifest
 import com.wjz.worldsmith.core.model.WorldsmithPack
 import com.wjz.worldsmith.core.pack.WorldContentBundleIO
@@ -11,7 +14,8 @@ import java.nio.file.*
 import java.nio.charset.StandardCharsets
 
 /** One owner for portable content-addressed pack persistence. */
-class ManagedPackStore(packDirectory:Path) {
+class ManagedPackStore @JvmOverloads constructor(packDirectory:Path,
+    private val abilityCapabilities: AbilityCapabilityRegistry = AbilityCapabilities.standard()) {
     private val packDirectory=packDirectory.toAbsolutePath().normalize()
     private val PACK_ID=Regex("[a-f0-9]{64}")
     fun managed(id: String): Path? {
@@ -26,13 +30,13 @@ class ManagedPackStore(packDirectory:Path) {
     }
 
     fun persist(manifest: WorldsmithPackManifest, contents: Map<String, String>, binaries: Map<String,ByteArray> = emptyMap()): Path {
-        require(manifest.formatVersion==com.wjz.worldsmith.core.pack.WorldContentBundleIO.FORMAT_VERSION) { "Managed bundles must use current format 7; older formats are rejected" }
+        require(manifest.formatVersion==com.wjz.worldsmith.core.pack.WorldContentBundleIO.FORMAT_VERSION) { "Managed bundles must use current format 10; older formats are rejected" }
         return persistVerified(manifest,contents,binaries)
     }
 
     /** Import preserves a validated current-format archive and its content identity. */
     fun importValidated(pack:WorldsmithPack):Path {
-        val diagnostics=WorldsmithPackValidator.validate(pack)
+        val diagnostics=WorldsmithPackValidator.validate(pack, abilityCapabilities)
         require(diagnostics.none {it.severity==DiagnosticSeverity.ERROR}) {
             diagnostics.filter {it.severity==DiagnosticSeverity.ERROR}.take(16).joinToString("; ") {"${it.path}: ${it.message}"}
         }

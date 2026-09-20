@@ -37,6 +37,10 @@ public final class CreaturePose {
             if (phase != 0) throw new IllegalArgumentException("A non-boss has no later phase");
             return frame;
         }
+        if (definition.getBoss().getPhases().isEmpty()) {
+            if (phase != 0) throw new IllegalArgumentException("A program-driven boss has no indexed stat phases");
+            return new Frame(frame.ageInTicks,frame.walkPosition,frame.walkSpeed,frame.headYaw,frame.headPitch,frame.appearanceSeed,frame.action,0,1.0F);
+        }
         if (phase < 0 || phase >= definition.getBoss().getPhases().size()) throw new IllegalArgumentException("Unknown boss phase");
         return new Frame(frame.ageInTicks,frame.walkPosition,frame.walkSpeed,frame.headYaw,frame.headPitch,frame.appearanceSeed,frame.action,
             phase,definition.getBoss().getPhases().get(phase).getPoseIntensity());

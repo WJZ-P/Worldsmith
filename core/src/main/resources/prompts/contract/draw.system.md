@@ -269,7 +269,7 @@ material(name,state), room(id,interior,floor), indoorPassage(id,interior,floor),
 entrance(id,feet,facing,floor,headroom), lightFixture(id,at,state,level), support(at),
 protect(region), component(id,region), instance(id,authoredComponent,transform),
 container(at,state,items), bossSpawner(at,creatureId),
-bossSpawner(at,creatureId,respawnTicks,requiredPlayerRange,spawnRange) and snapshot().
+bossSpawner(at,creatureId,respawnTicks,requiredPlayerRange,spawnRange), storyAnchor(at,place), storyAnchor(at,place,character) and snapshot().
 Item is AuthoringContext.Item(slot,item,count). Read section boss-encounters for the
 spawner's exact bounds, world binding and arena-clearance responsibilities.
 
@@ -387,7 +387,7 @@ The logical `creatureId` is preserved, not renamed by a component's id prefix.
 This requires bundle format 5, structure library schema 2, and creature library
 schema 2 containing that `category:"HOSTILE"` definition with a valid `boss` profile.
 Read `worldsmith_get_content_contract(module:"creatures")` and
-`worldsmith_get_creature_authoring_contract` for its rig, PNG and 2..3 phases.
+`worldsmith_get_creature_authoring_contract` for its rig, PNG and simple 2..3 stat phases, or schema-4 ability binding with no automatic phases.
 Normal session structure assembly derives schema 2 from typed content; an explicit
 inline library must declare schemaVersion 2. World scope and native host identity
 come from the immutable bundle at native export. Authors supply no entity NBT,

@@ -28,6 +28,10 @@ data class CreatureRecipe(
     val boss: CreatureBossProfile? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val sounds: CreatureSoundProfile? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val ability: CreatureAbilityBinding? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val abilityBindings: List<AbilityEventBinding> = emptyList(),
 )
 
 @Serializable

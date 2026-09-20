@@ -73,6 +73,9 @@ import kotlinx.serialization.SerialName
         override val at:BuildPos, val creatureId:String, val respawnTicks:Int=2400,
         val requiredPlayerRange:Int=16, val spawnRange:Int=4,
     ) : StructureInteraction
+    /** Feet position for a native marker. Stable story identities are not renamed by component transforms. */
+    @Serializable @SerialName("story_anchor")
+    data class StoryAnchor @JvmOverloads constructor(override val at:BuildPos, val place:String, val character:String?=null) : StructureInteraction
 }
 @Serializable data class StructureItem(val slot:Int, val item:String, val count:Int=1)
 @Serializable data class StructureBannerLayer(val pattern:String, val color:String)
