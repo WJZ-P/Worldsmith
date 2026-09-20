@@ -4,8 +4,8 @@ Worldsmith 提供可复用的 MCP 创作和原生运行时，不内置调用某�
 外部 AI 先将玩家的一句话展开为持久世界观，完成 AI 自检，再派生设计计划与任务书，
 通过同一套类型化接口生成、预览、修正和保存。详见 [世界观驱动创作](world-bible-authoring.md)。
 因此“一句话”是玩家入口，不是省略中间设计与验证步骤的承诺。
-当前新写入为**格式7的十模块**；theme/quests仍为schema1，物品能力使用items schema2。
-格式1–6被显式拒绝，生成流程不自动迁移或改写本地旧包和存档。
+当前新写入为**格式10的十二模块**；theme为schema1、quests为schema2、story为schema2，物品固定效果使用items schema2，程序调用使用items schema3，生物程序绑定使用creatures schema4。
+格式1–7被显式拒绝，生成流程不自动迁移或改写本地旧包和存档。
 
 ## 完整模式
 
@@ -15,9 +15,9 @@ Worldsmith 提供可复用的 MCP 创作和原生运行时，不内置调用某�
 1. 新完整会话先读取 `world_bible` 契约，保存并 AI 自检 WorldBible；通过后自动继续。
    用 `worldsmith_put_world_design_plan` 和 `worldsmith_put_module_briefs` 声明世界目标、
    真实 ID、跨模块关系、来源与验收项；Boss 按明确范围承诺，不强套和平世界。
-2. 编写 theme、terrain、biomes、features、blocks、items、creatures、quests。
+2. 编写 theme、terrain、biomes、features、blocks、items、creatures、quests、mechanics、abilities。
    使用 `worldsmith_build_texture` 或 PNG 导入绑定真实素材；生物构建返回 UV 后绘制皮肤。
-   根据世界体验主动安排武器／工具、护甲、消耗品或固定动作遗物，不把所有自定义物品都做成提交凭证。
+   根据世界体验主动安排武器／工具、护甲、消耗品、固定效果或源码编程遗物，不把所有自定义物品都做成提交凭证。
    items schema2的准确字段见 [物品契约](../core/src/main/resources/prompts/contract/items.system.md)，普通资源仍可没有能力。
 3. 通过 SDK worker 生成结构，查看实际预览，提交建筑组装计划。Boss 地标使用
    [typed boss_spawner](creature-bosses.md)，不是一段任意实体 NBT。
@@ -97,9 +97,9 @@ node docs/examples/complete-world/run-mcp.mjs --phase architecture --reuse-drawi
 ## 当前边界
 
 支持的 Boss 是地面近战、血条和 2–3 个生命阶段；自然稀有刷新与可重复地标刷怪笼是两条路线。
-没有世界唯一性账本、任意技能脚本、分支 NPC 对话或独立成就创作模块；现有任务会映射为世界专属原版进度树。
+世界地点与居民使用持久实例身份，分支对话与任务读取 story 事实；局部技能使用既有 AbilityScript。独立成就创作模块尚未安装，任务映射为世界专属原版进度树。
 当前完整内容仍面向本地整合服务器世界；不是可直接分发的远程多人同步方案。
 
 ## 可执行交互
 
-需要仪式、钥匙或兑换时，使用 [mechanics 模块](mechanics.md)：WorldBible RULE → mechanic 目标与任务书 → 实际 pattern/cost/state/actions → 当前审核证据。叙事规则不代替执行规则；十模块中 mechanics 可为空，但显式承诺过的装置必须有真实定义。
+需要仪式、钥匙或兑换时，使用 [mechanics 模块](mechanics.md)：WorldBible RULE → mechanic 目标与任务书 → 实际 pattern/cost/state/actions → 当前审核证据。叙事规则不代替执行规则；十二模块中 mechanics 可为空，但显式承诺过的装置必须有真实定义。

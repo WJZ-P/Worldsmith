@@ -79,7 +79,7 @@
           "biomes": "$BIOMES",
           "features": "$FEATURES",
           "blocks": {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "blocks": []
           },
           "creatures": {

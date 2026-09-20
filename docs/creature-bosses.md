@@ -1,7 +1,7 @@
 # 地面近战 Boss 基座
 
 Boss 使用 `creatures.schemaVersion = 2`。`CreatureDefinition.boss` 是显式声明，不由生命值、名字或模型大小推断。
-旧 schema 1 的无 Boss 文档仍省略该可选字段；旧格式 3/4 继续走各自的兼容限制，不把新字段混入旧哈希。
+旧 schema 1 的无 Boss 文档仍省略该可选字段；当前包格式为 10；旧包格式显式拒绝，不迁移或改写已有本地文件。
 
 ```json
 "boss": {
@@ -27,7 +27,8 @@ Boss 使用 `creatures.schemaVersion = 2`。`CreatureDefinition.boss` 是显式�
 - 自然生成的 Boss 保留原版怪物容量计数，但禁止距离/闲置自然消失。和平难度仍按敌对宿主的原生规则处理。
 
 基础生命上限为原生 `max_health` 的 1024；派生速度保持 0.01..1.0、派生攻击伤害不超过 100。
-攻击仍是有前摇的地面近战，不包含任意脚本、飞行、多部位破坏或通用技能解释器。
+本页的简单数值阶段仍采用地面近战。通用程序化战斗使用独立 abilities 模块与 creatures schema 4；
+绑定程序的 Boss 可以省略自动阶段，玩法通过源码函数、事件和状态实现。飞行专用导航与多部位实体不由此添加。
 
 发布准备会以当前游戏的真实 `Attribute.sanitizeValue` 核对所有生物的生命、速度、跟随距离、攻击力、击退抗性，
 以及每个 Boss 阶段的派生速度/攻击力。任何原生裁剪均给出字段、请求值和实际原生范围错误，绝不静默改值。
@@ -65,3 +66,5 @@ Java 作者接口为 `a.bossSpawner(at, creatureId)` 或 `a.bossSpawner(at, crea
 `CreatureBuilder.boss(profile)` 自动产生 schema 2 recipe；手写 recipe 需显式声明 schemaVersion 2。
 离线预览使用 `Options.withBossPhase(0..2)` 或 `sheet(definition, png, phase)`，共享原生骨骼姿态计算，
 并用所有阶段共同的相机包围范围比较动作强度。离线图只是外观与姿态检查，不是战斗或游戏内验收。
+
+通用能力的字段、扩展接口和持久化边界见 [能力运行时与 SDK](abilities.md)。此页的数值阶段不是可编程技能的目录或阶段数量上限。

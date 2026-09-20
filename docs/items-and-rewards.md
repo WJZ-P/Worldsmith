@@ -1,6 +1,6 @@
 # 世界物品、装备能力与奖励获取链路
 
-当前新发布使用 **世界包格式 7**、十个模块。`items.schemaVersion=1` 保留资源／遗物；
+当前新发布使用 **世界包格式 10**、十二个模块。`items.schemaVersion=1` 保留资源／遗物；
 显式使用 **schemaVersion=2** 可组合原生装备、消耗品与固定动作库。物品仍是同一套世界身份，
 不是每件生成独立 Java 类。准确字段和可提交示例见 [items 创作契约](../core/src/main/resources/prompts/contract/items.system.md)。
 
@@ -98,5 +98,7 @@ MELEE_HIT 在原生近战处理之后执行，这不回滚已经发生的普通�
 新创作发布通过 `PlayerTextPolicy` 检查已知泄漏形式，返回 `PLAYER_TEXT_ENGINEERING_LEAK` 及字段路径，
 由作者修正文案；不是展示时偷偷删句，也不把新文案规则施加给旧包加载。
 
-新写入为格式 7 的十模块；物品可选择 schema1 或 schema2，机制使用 mechanics schema1。
-旧格式 1–6 被拒绝；本地旧世界包、嵌入内容、玩家进度均不自动迁移或改写。
+新写入为格式 10 的十二模块；物品可选择 schema1、schema2 或支持 run_program 的 schema3，机制使用 mechanics schema1。
+旧格式 1–9 被拒绝；本地旧世界包、嵌入内容、玩家进度均不自动迁移或改写。
+
+`items.schemaVersion=3` 支持 `{kind:"run_program",program:"local_id"}`：必须是非消耗品 USE 动作的唯一效果，沿用动作冷却与费用。程序定义存入 abilities，与生物和机关共用同一个可编程运行时；详见 [通用能力](abilities.md)。

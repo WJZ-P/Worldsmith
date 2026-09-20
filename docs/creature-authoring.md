@@ -45,5 +45,12 @@ Java 源码只在开发者显式调用本地 CLI 时执行；MCP 编译的是配
 ## 生物声音
 
 Creature schema 3 支持原版声线选择与音高／音量调制，覆盖环境、受伤、死亡、攻击。
-旧包在运行时自动匹配默认声音，不重写包或存档。新配方请显式设计 sounds；
+当前格式的 schema 1/2 定义可使用自动匹配默认声音；旧包格式仍按版本策略拒绝。新配方请显式设计 sounds；
 详见 [生物声音词汇表与创作参数](creature-sounds.md)。
+
+## 通用程序绑定
+
+CreatureRecipe/CreatureLibrary schema 4 增加 `ability`；Java Builder 支持
+`.ability(program, range, cooldownTicks, cancelOnTargetLoss)` 并自动选择 schema 4，
+与 sounds、drops、boss 一起透传，不改变 UV。Boss 可使用空自动阶段，行为改由单独
+abilities 模块中的源码控制。读取 [通用能力与 SDK](abilities.md)；模型预览仍不是程序实玩。

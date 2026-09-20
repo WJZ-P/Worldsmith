@@ -21,7 +21,7 @@
    创作配方，经现有生物/贴图工具构建；或显式换成自己的已定义 creature ID。
    其余两个例子只引用原版方块和物品。不要仅修改 displayName 来伪造另一种生物。
 5. 审查实际规则的 event、pattern、heldItem、actions、fromState/toState；保存证据后正常
-   `write_pack`。格式 7 冻结十模块；存档中的锚点状态由原生运行时保存。
+   `write_pack`。格式 10 冻结十二模块；存档中的锚点状态由原生运行时保存。
 
 ## 构型与验证动作
 

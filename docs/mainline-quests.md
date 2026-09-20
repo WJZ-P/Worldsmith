@@ -1,66 +1,49 @@
-# 世界主线与原版进度树
+# Discovered quest journeys
 
-本层只有单条线性主线，三种目标：**击败指定自定义生物**、**主动交付指定物品**、**成功激活指定机制**。
-每个世界最多 64 个任务，任务可关联现有主题叙事节点，并在新导出的原生数据包中映射成
-以世界包名称命名的原版进度树。没有 NPC 对话、任意脚本、复杂分支或独立成就创作模块。
+Worldsmith's current quest module is schema 2: a bounded prerequisite DAG rather
+than a single mandatory chain. See the packaged [quest authoring contract](../core/src/main/resources/prompts/contract/quests.system.md) for exact fields and limits.
 
-## 原版进度页
+## Player experience
 
-原版进度页中的根节点使用世界包名称，地图图标；任务使用书本图标，涉及真实 Boss
-击杀的任务使用挑战样式。后续任务按原版规则逐渐显露，空任务库不生成空页签。
+- Undiscovered content is omitted server-side; unknown future titles, rewards,
+  objectives and destinations do not appear in the journal or advancement gallery.
+- Prerequisites have ALL/ANY semantics. Use ANY to reunite mutually exclusive branches.
+- Manual offers can be accepted or deferred. Choosing an exclusive branch asks for
+  explicit confirmation and persists the selected alternative.
+- Optional journeys and optional goals are labelled. All required goals must finish;
+  optional goals never block the reward claim.
+- Story fact objectives observe the shared fact ledger instead of storing a second
+  copy. Kill and delivery counters are player-owned; mechanic facts are retrospective.
+- Journal tracking links only to actual discovered place instances. World knowledge,
+  residents and places are reached through the adjacent world-journal button.
 
-每个任务节点包含“目标已达成”和“奖励已领取”两个 AND 条件。目标满足后仍需在 J 日志
-领取奖励，节点才点亮并弹出原版完成提示；领奖失败不点亮。根节点不弹提示，任务不重复
-发送聊天播报。数量型击杀、分次交付和“可领取”状态继续由 J 日志展示。
+## Transition semantics
 
-进度节点不配置经验、物品、配方或函数奖励。`QuestPlayerState` 是唯一任务事实来源，
-进度页只接收服务端投影；手动授予原版进度不会完成任务或发放任务奖励。
-玩家加入、重生、成功数据重载以及任务变更后会重新对齐。显示同步失败不会回滚已提交
-的物品事务，服务端做有界重试，后续任务/日志更新也能继续同步。
+Each quest may declare discoverWhen, availableWhen, onAccept, onClaim and destination.
+Discovery requires satisfied prerequisites plus discoverWhen and is then durable.
+availableWhen gates acceptance, active kill credit, delivery and reward claims.
+Accepted promises are not undone by DECLINE; that action only defers an unaccepted
+manual offer. Exclusive branches require manualAccept=true and are selected on ACCEPT.
+A rejected branch's descendants are excluded; an ANY merge stays available through
+its chosen predecessor. The server computes completion from the entire required DAG,
+not just whichever entries are currently visible.
 
-节点按 bundle ID 隔离，随原生数据包进入新世界；玩家完成状态仍保存在各自存档。
-无需增加 `.wspack` 模块或字段。旧存档中未生成这些原生定义的情况不自动迁移，缺失时
-仅记录诊断，现有任务账本和物品保持原样。独立探索/收集成就不在本轮范围内。
+Story changes and inventory are prepared before mutation and committed together with
+the quest attachment on the server thread. Errors roll back that transaction; packet
+failure after a commit never causes a repeated reward. Individual Minecraft save files
+are not claimed to provide database crash atomicity. There is no schema-1 migration.
 
-## 创作
+## Verification checklist
 
-通过 `worldsmith_get_content_contract(module="quests")` 读取精确字段，再用
-`worldsmith_put_content_modules` 原子提交完整 QuestLibrary。前置、目标、奖励与主题引用都会校验。
-新包为格式 7；旧格式 1–6 被拒绝，不自动改写本地旧包与存档。
+1. Start without future quest names in journal or native advancements.
+2. Discover through a real fact, actual interaction or claimed predecessor.
+3. Accept/decline; confirm a branch and verify the other branch stops accepting actions.
+4. Complete optional and necessary objectives in different orders.
+5. Fill inventory, attempt a claim, and verify neither facts nor rewards partially commit.
+6. Retry an old nonce/revision and verify no duplicate effects.
+7. Return to the world after save/reload; discovery, branch, tracking and consequences remain.
+8. Finish one branch and its ANY merge; verify full campaignComplete despite the rejected path.
 
-任务链按前置顺序决定，非 JSON 数组顺序。非空链必须唯一起点、无环、无分叉并全连通。
-上一任务实际领取奖励后，下一任务才解锁；未解锁时的击杀不追溯计数。
-
-`{"kind":"activate_mechanic","mechanic":"local_mechanic_id","count":1}` 观察真实提交成功的
-机制激活事实。机制本身独立执行，不由任务触发；失败尝试不计数。玩家提前成功激活的一次性
-装置在后续目标解锁后可以追溯入账，不需要再次触发。计划使用 `activation_objective` 链接，
-实际装置规则见 [mechanics](mechanics.md)。
-
-## 玩家的两种操作
-
-- **提交物品**：只消耗主背包中目标物品，可以分次交付；真实扣除多少才记录多少进度。
- 单纯持有／捡起物品不等于完成交付，护甲和副手不会被偷偷扣除。
-- **领取奖励**：所有目标完成后单独领取；材料不会重复扣。背包容量不足时整次领奖不变，
-  不把奖励丢到地上。一项任务只可正常领取一次。
-
-此外，已解锁／可领奖／已领取任务中的每个机制目标都提供**机关说明**入口。
-即使构型尚未完成，也能查看同一规则生成的材料表与分层图；多个机制目标不会互相覆盖。
-锁定任务不显示深链，机关已使用后仍可复查。说明里的现场检查只读，不等于提交物品或激活。
-参见[机关说明与探索样板](mechanics.md#玩家如何读懂机关)。
-
-击杀记录来自服务端真实死亡与玩家归属，不受生物掉落开关影响，也不依据客户端动画。
-客户端任务日志只显示服务器快照并提交操作意图；版本过期、缺材料、背包满等由服务器反馈。
-
-进度按玩家与不可变世界身份保存，通过持久玩家附件与背包一起写入玩家数据，正常死亡重生保留。
-此边界针对正常有效存档，不宣称覆盖外部回滚／手改 NBT／其他模组独立存储的全局事务。
-
-## 素材复用不是绑定某个 AI
-
-任务所引用的物品／方块／生物仍是现有内容域。贴图来自任意外部绘图来源或 Mod 的确定性像素配方，
-统一进入 PNG 校验、哈希和资源管线。参见 [贴图生产与跨 AI 复用](texture-authoring.md)。
-
-默认按 **J** 打开任务日志，可在按键设置中修改。打开时请求服务器快照，之后由交付／领奖回复和任务变化推送更新，
-没有空闲轮询；显示锁定／进行中／可领奖／已领取，以及提交和领奖反馈。
-
-入场主线提示在每次实际连接世界后显示一次，持续 **5 秒**（包含淡入淡出），也可按 Esc 提前收起。
-重生、切换维度和任务缓存刷新不会重复弹出；该提示不暂停游戏。
+Static supply proof keeps branch inventories separate and reports bounded search
+exhaustion rather than claiming success. It does not prove arbitrary dialogue facts
+or generated coordinates: those need native runtime coverage of the authored slice.

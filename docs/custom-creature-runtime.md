@@ -9,15 +9,15 @@ Worldsmith creatures are world-bound content definitions, not subclasses generat
 - Arbitrary bounded cuboid skeletons, parent-relative pivots, rotations, explicit box UVs, SHA-256 PNG texture references and per-bone animation roles. This is not a reskin of a hard-coded vanilla model.
 - Procedural head tracking, paired arms/legs, adjustable gait phase for quadrupeds, tail motion, and server-synchronized windup/strike/recovery poses. Model baking is cached by immutable bundle identity and species, not repeated each tick.
 - Ground navigation, wandering, player avoidance for passive creatures, retaliation/player targeting for hostile creatures, a bounded territory and return-to-origin goal.
-- A pure deterministic melee state machine: idle/chase → windup → three-tick strike pose → recovery. Damage is applied once, by the server, with fresh range and line-of-sight checks on the strike frame. Target loss cancels attacks. No model calls or generated code run during gameplay.
-- Explicit schema-2 Bosses add a tracking-player boss bar and 2–3 monotonic health phases changing speed, damage, windup/recovery and shared poses. These remain ground-melee encounters, not a general skill engine; see [Boss mechanics and spawners](creature-bosses.md).
+- A pure deterministic melee state machine: idle/chase → windup → three-tick strike pose → recovery. Damage is applied once, by the server, with fresh range and line-of-sight checks on the strike frame. Target loss cancels attacks. No model calls or JVM source compilation run during gameplay. Schema-4 ability bindings instead execute shared bounded bytecode.
+- Explicit schema-2 Bosses add a tracking-player boss bar and 2–3 monotonic health phases changing speed, damage, windup/recovery and shared poses. These optional simple stat phases remain ground-melee encounters; schema-4 ability bindings provide programmable combat with an empty-phase presentation profile; see [Boss mechanics and spawners](creature-bosses.md).
 - Logical biome references, weighted species choice, configurable brightness intervals, native category spawn caps, same-species spawn groups and a species maximum group cap.
 - Entity NBT and synchronized data preserve immutable bundle hash, logical creature ID and appearance seed. Origin is saved. Health and ordinary vanilla attributes continue through the vanilla save path.
 - A missing or category-mismatched definition suspends AI and logs its identity; rendering shows an unmistakable missing-content marker/name rather than silently replacing it with a vanilla creature. The missing-content suspension does not permanently overwrite a user's explicit `NoAI` value.
 
 ## Domain and asset conventions
 
-`CreatureLibrary(schemaVersion=1, creatures=[...])` contains ordinary definitions with model, attributes, behavior, spawn, themeRole and optional drops. A non-null `CreatureDefinition.boss` requires creature schema 2 or 3 and bundle format >=5; schema-1 serialization omits that field.
+`CreatureLibrary(schemaVersion=1, creatures=[...])` contains ordinary definitions with model, attributes, behavior, spawn, themeRole and optional drops. A non-null `CreatureDefinition.boss` requires creature schema 2 through 4 and current bundle format 10; schema-1 serialization omits that field.
 
 `model.texture` is the lowercase SHA-256 asset ID, not a URL or filesystem path. The common bundle asset validator checks PNG integrity and declared dimensions before publication. The generated client resource mount supplies it at `assets/worldsmith/textures/content/<sha256>.png`.
 
@@ -43,7 +43,7 @@ The generic native host's group-size entry uses the category's aggregate min/max
 The preferred integration surface is now the aggregate lifecycle service, not independent block and creature commits:
 
 - `WorldContentRuntime.prepare(compiledPack)` validates content integrity, reuses `compiledPack.blockBindings()`, generates both resource domains and freezes the creature snapshot. Preparing has no live effects.
-- `prepared.serverResources()` includes native block loot/tool tags **and the complete world-content bundle** under `worldsmith-content/`, with exact native slots stored separately at `worldsmith-runtime/block-bindings.json`. New authored bundles use format 7 with ten modules including mechanics; older bundle formats are rejected without migrating local files. Export these into the generated datapack that travels with the save; reopening must not depend on an author's config directory.
+- `prepared.serverResources()` includes native block loot/tool tags **and the complete world-content bundle** under `worldsmith-content/`, with exact native slots stored separately at `worldsmith-runtime/block-bindings.json`. New authored bundles use format 10 with twelve modules including mechanics and abilities; older bundle formats are rejected without migrating local files. Export these into the generated datapack that travels with the save; reopening must not depend on an author's config directory.
 - `WorldContentRuntime.loadSelected(resourceManager)` reads only currently selected datapacks, through bounded `PackResources.getRootResource` streams. Incomplete embedded content, corrupt assets and conflicting world bundles are errors. Directory/ZIP `loadEmbedded(path)` is available without extraction or writes. `prepare(embeddedWorld)` restores bindings and resources without recompiling structures.
 - `WorldContentClientRuntime.prepare(prepared).activate()` awaits verified resource reload before publishing the matching native bindings and creature definitions. Its rollback restores the previous complete client world. `whenIdle()` is the shared asynchronous barrier for creation-screen publication, saved-world restoration and disconnect cleanup.
 - `WorldContentRuntime.bindLevel(level, prepared)`, `unbindLevel(level)` and `clearServer(server)` give the server and each dimension explicit ownership. Integrated client/server share one native mapping rather than consuming two block transactions. Client cleanup does not remove a still-running server's mapping; the last owner releases it.
@@ -61,7 +61,7 @@ Low-level creature APIs, used by the aggregate service:
 
 ## Gameplay boundaries
 
-Flying, swimming navigation, taming, breeding, riding, multipart bosses, projectiles, equipment, scripted keyframe timelines, inverse kinematics, arbitrary keyframe-triggered sound events, runtime code generation and automatic per-world network asset transfer are not implemented by this module. The installed linear quests module independently validates player-credited `kill_creature` objectives using logical IDs, including typed landmark Bosses; achievements are not installed. The common world lifecycle decides which client/server deployment modes are currently available.
+Flying, swimming navigation, taming, breeding, riding, multipart bodies, equipment, scripted keyframe timelines, inverse kinematics, arbitrary keyframe-triggered sound events, runtime code generation and automatic per-world network asset transfer are not implemented by this module. The installed branching quests module independently validates player-credited `kill_creature` objectives using logical IDs, including typed landmark Bosses; achievements are not installed. The common world lifecycle decides which client/server deployment modes are currently available.
 
 ## Offline creature authoring preview
 
@@ -105,3 +105,15 @@ See [items and rewards](items-and-rewards.md) for the actual contract.
 Creature schema 3 支持原版声线选择与音高／音量调制，覆盖环境、受伤、死亡、攻击。
 旧包在运行时自动匹配默认声音，不重写包或存档。新配方请显式设计 sounds；
 详见 [生物声音词汇表与创作参数](creature-sounds.md)。
+
+## Shared programmed combat
+
+Creature schema 4 adds `ability: {program, range, cooldownTicks, cancelOnTargetLoss}`.
+Present bindings replace the automatic melee loop; all hostile species can use
+them, not only Bosses. A Boss may have empty automatic phases when its program
+owns phase state. The exact same ability definition can also run from an item
+or committed mechanic activation. [AbilityScript SDK](abilities.md) covers
+source control flow, projectile callbacks, interruption, providers and lifecycle.
+Script state and cooldown debt persist; active instruction stacks and transient
+resources do not resume after reload. Offline model previews remain presentation
+previews and do not prove script execution.

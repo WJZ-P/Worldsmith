@@ -3,9 +3,9 @@
 Worldsmith is being built as a Fabric mod that turns a prompt into a
 deterministic Minecraft world-generation blueprint.
 
-The [content framework](docs/world-content-framework.md) provides ten typed
+The [content framework](docs/world-content-framework.md) provides twelve typed
 modules spanning world themes, terrain, biomes, features, structures, blocks,
-creatures, items, linear quests and event-driven mechanics, with logical references, shared
+creatures, items, branching quests, story facts/dialogue and event-driven mechanics, with logical references, shared
 assets and a local-world lifecycle. Custom content uses bounded native hosts;
 Independent achievement authoring remains a future module; existing quests also project into world-specific vanilla advancements after reward claims.
 
@@ -47,7 +47,7 @@ The current player-facing flow is:
 ```text
 Player prompt
   -> MCP theme, content and worldgen contracts
-  -> version-7 bundle (10 typed modules + immutable PNG/drawing assets)
+  -> version-9 bundle (12 typed modules + immutable PNG/drawing assets)
   -> deterministic validation
   -> Minecraft 26.2 target compiler
   -> verified native data + client resources + selected Create World preset
@@ -68,7 +68,7 @@ NBT export. It remains separate from architecture composition and placement.
 The [Structure Agent](docs/structure-agent.md) connects Java submission, hidden
 worker compilation, model-image preview, composition and native publication through MCP.
 
-The format-7 world bundle freezes Java drawing geometry, structure metadata and source provenance. Structure module schemas 1/2 select bounded JSON or frozen drawing data; they are not backward-compatible world-bundle formats. Both routes compile into native templates with biome placement and terrain fitting.
+The format-10 world bundle freezes Java drawing geometry, structure metadata and source provenance. Structure module schemas 1/2 select bounded JSON or frozen drawing data; they are not backward-compatible world-bundle formats. Both routes compile into native templates with biome placement and terrain fitting.
 
 See [structure building and MCP previews](docs/structure-building.md).
 New guided worlds also follow [the architecture-agent policy](docs/architecture-agent.md):
@@ -90,8 +90,8 @@ The executable AI contract is
 
 ## Unified world content
 
-[World content framework](docs/world-content-framework.md) describes the ten
-installed modules: theme, terrain, features, biomes, structures, blocks, creatures, items, quests, mechanics.
+[World content framework](docs/world-content-framework.md) describes the twelve
+installed modules: theme, terrain, features, biomes, structures, blocks, creatures, items, quests, mechanics, abilities.
 MCP has revision-checked drafts, genuine PNG upload/indexed-pixel authoring, linked
 narrative beats, immutable bundle hashing and full publication gates.
 
@@ -104,8 +104,8 @@ Generated datapacks carry the complete bundle and stable block bindings with the
 save; reopening never depends on an AI, authoring drafts or a config pack copy.
 Client resources are prepared before local-server startup and publication.
 Current scope is local integrated-server worlds. Remote content negotiation,
-branching NPC dialogue, independent achievement authoring, free-form behavior scripts and arbitrary block
-physical shapes are not installed. Older bundle formats 1–6 are rejected; existing local files are not silently migrated.
+faction wars, independent achievement authoring and arbitrary block physical shapes
+are not installed. Older bundle formats 1–8 are rejected; existing local files are not silently migrated.
 
 ## Creature authoring and creative inventory
 
@@ -129,14 +129,14 @@ native health bars and repeatable, world-bound landmark spawners.
 [Items and rewards](docs/items-and-rewards.md) adds world-bound resources/relics,
 server-side creature death drops and native structure-container rewards. Canonical
 ItemStacks retain their world identity, model, name, rarity and stack limits through
-loot export, persistence and the creative catalog. Items schema 2 adds native weapons, tools, armor, food and server-owned combinations of healing, status, projectiles and short-range blink. New bundles use format 7 with ten modules including event-driven mechanics; older formats are rejected without rewriting local saves. Independent crafting and arbitrary skill scripts are not part of this layer.
+loot export, persistence and the creative catalog. Items schema 2 adds native weapons, tools, armor, food and server-owned combinations of healing, status, projectiles and short-range blink. New bundles use format 10 with twelve modules including event-driven mechanics and portable abilities; older formats are rejected without rewriting local saves. Items schema 3, creature schema 4 and mechanic run_program invoke the same programmable AbilityScript runtime. Independent crafting remains outside this layer.
 
 ## Main-line journal and reusable textures
 
 [Main-line quests](docs/mainline-quests.md) adds server-owned kill/delivery progress,
 partial explicit item submission, once-only item rewards and a lightweight journal
 (default J, rebindable in Controls). Client requests never supply progress values.
-Tasks also appear in a vanilla advancement tree named after the world bundle; nodes complete after claiming rewards. Independent achievement authoring and branching NPC dialogue remain out of scope.
+Claimed tasks also populate a hidden vanilla advancement completion gallery named after the world bundle; future branches are not exposed by the gallery. Independent achievement authoring remains out of scope. [Story runtime](docs/story-runtime.md) supplies actual marker-bound residents, conditional dialogue, shared facts, discoveries, trades, routines and soundscapes.
 
 [Texture production](docs/texture-authoring.md) explains the vendor-independent
 pipeline for ordinary icons, shared-face block tiles and creature UV atlases.
@@ -148,3 +148,19 @@ whole-image nearest resampling is explicit and preserves the original file.
 ### Event-driven mechanics
 
 [Mechanics](docs/mechanics.md) compose block placement/main-hand use, bounded patterns, explicit item costs, anchor-scoped state and typed block/spawn/reward actions. [Three executable-schema examples](docs/examples/mechanics/README.md) cover last-component summoning, a key-operated gate and material exchange without thrown-item detection or tick scripts.
+
+## Programmable abilities
+
+The runtime also exposes [native event bindings](docs/ability-events.md),
+[world edits, summons, shared scenes, resource pools and damage guards](docs/ability-gameplay.md),
+and [source-authored particles, displays and bone animation](docs/examples/abilities/visuals.md).
+Offline execution uses explicit host fixtures; live inspection records opt-in source traces.
+Additional JVM providers have a separate compile/static-ABI/review/install workflow and load only
+after an explicit native confirmation and restart, not as executable code embedded in world packs.
+
+The [ability runtime and SDK](docs/abilities.md) exposes source-authored handlers,
+functions, waits, branches, loops and persistent state over versioned capability
+providers. Creature/item/mechanic hosts share it; attacks are programs rather than
+a closed SWEEP/SLAM/LINE catalogue. AbilityScript is embedded in format-10 packs and
+compiled once at preparation, with bounded execution and cleanup. Read the MCP
+`abilities` contract for exact dynamically generated function signatures.

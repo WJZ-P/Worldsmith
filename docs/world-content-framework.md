@@ -1,57 +1,65 @@
-# Worldsmith 世界内容地基：格式 7
+# Worldsmith 世界内容地基：格式 10
 
 ## 目标与真实边界
 
 一个世界拥有一个持续保存的主线主题；地形、群系、生态装饰、建筑、自定义方块和自定义生物引用同一套内容身份与冻结资产。
-创作阶段可以迭代任意模块，发布阶段必须形成可校验的完整内容快照。游戏运行阶段消费冻结数据和原生实现，不在方块、区块或实体 tick 中执行作者源码或调用大模型。
+创作阶段可以迭代任意模块，发布阶段必须形成可校验的完整内容快照。游戏运行阶段消费冻结数据和原生实现，不在方块、区块或实体 tick 中重新编译源码或调用大模型；abilities 的有界字节码由共享服务端运行时执行。
 
-当前读写仅接受**格式 7**；旧格式 1–6 被显式拒绝。旧模型 `WorldsmithPackFiles` 已移除，存储和加载统一读取 `manifest.modules`。不遍历、迁移或改写本地旧包与存档。
+当前读写仅接受**格式 10**；旧格式 1–9 被显式拒绝。旧模型 `WorldsmithPackFiles` 已移除，存储和加载统一读取 `manifest.modules`。不遍历、迁移或改写本地旧包与存档。
 
 公共层已经实现：
 
-- 十个有类型的模块：`theme`、`blocks`、`terrain`、`features`、`biomes`、`creatures`、`structures`、`items`、`quests`、`mechanics`。
+- 十二个有类型的模块：`theme`、`blocks`、`terrain`、`features`、`biomes`、`creatures`、`structures`、`items`、`quests`、`mechanics`、`abilities`、`story`。
 - 本地符号、跨模块引用、确定性编译依赖、能力与生命周期要求。
 - PNG 字节验证、内容寻址、资源预算，以及包含全部模块和资产的不可变内容哈希。
 - 新格式加载、统一编码、类型化内存投影、主题持久化与损坏诊断。
-- 有界单线 quests 模块已安装，并派生世界专属原版进度树；独立 achievements 创作模块仍未安装，不新增该模块数据。
-- items schema 2 支持原生装备、独立护甲贴图、消耗品及固定动作组合；theme/quests 仍为 schema 1。
+- 有界分支 quests 模块已安装，并派生世界专属原版进度树；独立 achievements 创作模块仍未安装，不新增该模块数据。
+- items schema 2 支持原生装备、独立护甲贴图、消耗品及固定动作组合；theme 为 schema 1，quests 使用 schema 2。story schema 2 统一持久事实、地点角色、对话、知识、交易和环境音。
 
 **内容有效、具备宿主能力、完成准备、实际激活是四件不同的事。** 本文的编译计划和内容测试不等于游戏内验收。
 
 ## 模块与清单
 
-`worldsmith.json` 的结构如下；省略号仅供阅读，新格式实际文件必须给出十个模块及完整哈希：
+`worldsmith.json` 的结构如下；省略号仅供阅读，新格式实际文件必须给出十二个模块及完整哈希：
 
 ```json
 {
-  "formatVersion": 7,
+  "formatVersion": 10,
   "id": "<64 位小写 SHA-256>",
   "displayName": "月石诸国",
   "description": "月石沉眠于群山之间，重燃旧日烽火的旅人将连接失散的诸国。",
   "representativeContent": {"kind":"item","id":"moonstone_seal"},
   "modules": {
     "theme": {"schemaVersion": 1, "path": "theme.json"},
-    "blocks": {"schemaVersion": 1, "path": "blocks.json"},
+    "blocks": {"schemaVersion": 2, "path": "blocks.json"},
     "terrain": {"schemaVersion": 1, "path": "terrain.json"},
     "features": {"schemaVersion": 1, "path": "features.json"},
     "biomes": {"schemaVersion": 1, "path": "biomes.json"},
     "creatures": {"schemaVersion": 1, "path": "creatures.json"},
     "items": {"schemaVersion": 2, "path": "items.json"},
-    "quests": {"schemaVersion": 1, "path": "quests.json"},
+    "quests": {"schemaVersion": 2, "path": "quests.json"},
     "mechanics": {"schemaVersion": 1, "path": "mechanics.json"},
-    "structures": {"schemaVersion": 2, "path": "structures.json"}
+    "abilities": {"schemaVersion": 1, "path": "abilities/abilities.json"},
+    "story": {"schemaVersion": 2, "path": "story/story.json"},
+    "structures": {"schemaVersion": 3, "path": "structures.json"}
   },
   "assets": []
 }
 ```
 
-十个模块都出现；非引导的底层内容包允许空方块、生物和建筑库。MCP 的引导创作仍保留现有建筑质量契约：至少两个建筑群、独立建筑与一个主题地标，发布时再次验证；底层格式与引导流程的约束不是同一层。
+十二个模块都出现；非引导的底层内容包允许空方块、生物和建筑库。MCP 的引导创作仍保留现有建筑质量契约：至少两个建筑群、独立建筑与一个主题地标，发布时再次验证；底层格式与引导流程的约束不是同一层。
 结构模块继续以 `StructureIndex` 加独立蓝图文件和冻结绘图二进制保存，在内存中投影为 `StructureLibrary`。其他模块各自保存类型化文档。
-items 只含普通物品时仍可使用 schema 1；装备、消耗和动作要求 schema 2。
+items 只含普通物品时仍可使用 schema 1；装备、消耗和固定效果要求 schema 2；共享程序调用要求 schema 3。
 可选 `manifest.representativeContent` 必须指向本包真实 item 或 block；示例中的 moonstone_seal 应实际定义在 items 中。
 该字段选择已有内容PNG作为浏览器图标，不额外生成素材，也不为浏览预览激活世界。
 
 路径必须相对、无跳转、无冲突。模块文档不得占用 `worldsmith.json`、`assets/`、`drawings/`、`structures/` 等保留位置；目录读取也检查真实路径，阻止符号链接越过包根。
+
+## 持久故事与真实地点
+
+[Story 契约](../core/src/main/resources/prompts/contract/story.system.md)统一 WORLD/PLAYER/CHARACTER/PLACE 类型事实。地点与居民来自结构 schema3 的 StoryAnchor 标记；声明存在不代表实例已生成。对话、分支任务、交易、居民日程、知识发现和环境音读取同一事实系统，不复制玩家进度或发明另一个脚本虚拟机。
+
+story_reference 创作链接来自实际定义字段，界面仅展示已经发现的内容。场景内局部效果继续复用 abilities；长期状态、原子交易和实例身份由故事运行时管理。
 
 ## 统一主题与真实任务各自承担职责
 
@@ -97,7 +105,7 @@ worldsmith:content/moonstone
 - 方块／物品图标进一步要求 16..256 的方形、二次幂纹理，编码文件最多 1 MiB；护甲独立图集为64x32至512x256的二次幂倍数，最多1 MiB；生物纹理尺寸匹配模型UV声明。纹理引用直接使用实际资产SHA-256。
 - `WorldsmithPack.assets` 复制输入字节，并只返回独立字节数组，外部修改不会篡改已冻结资源。
 
-新哈希使用格式 7 独立域，包括模块身份、模式版本、路径、全部类型化文档、结构蓝图、冻结绘图及资产描述与已验证摘要。计算前先进行类型化反序列化与规范化序列化，再对对象键排序，因此 JSON 排版、对象键顺序和省略默认值不改变语义身份。
+新哈希使用格式 10 独立域，包括模块身份、模式版本、路径、全部类型化文档、结构蓝图、冻结绘图及资产描述与已验证摘要。计算前先进行类型化反序列化与规范化序列化，再对对象键排序，因此 JSON 排版、对象键顺序和省略默认值不改变语义身份。
 
 主题文字、纹理、行为、地形及源码出处变化会生成新 ID。清单展示用的 `displayName`/`description`/`representativeContent` 不参与生成身份，主题模块内的标题和设定参与。未声明的额外输入文件拒绝进入编码/哈希边界。验证时还会重新计算类型化内容哈希，发现冻结后修改会报 `PACK_CONTENT_MUTATED`。
 mechanics 的规则、成本、状态与动作参与新格式哈希；只有显示清单元数据被排除。旧格式哈希投影不再用于当前读写。
@@ -166,7 +174,7 @@ items schema 1 保持普通资源／遗物；schema 2 可选 equipment、consuma
 动作冷却按每玩家／世界／逻辑物品共享，不让所有自定义物品因宿主相同而互锁。blink最多8格，统一投射物不爆破地形。
 逻辑引用 `worldsmith:item/<id>` 连接创造分类、物种死亡掉落、建筑容器和任务奖励；原生堆栈保留世界身份与完整能力组件。参见 [物品与奖励](items-and-rewards.md)。
 
-当前包使用格式 7 的十模块，旧格式 1–6 被拒绝。域 schema 的版本独立于包版本：当前包内仍可使用支持的 items schema1/2、creatures schema1/2/3。
+当前包使用格式 10 的十二模块，旧格式 1–9 被拒绝。域 schema 的版本独立于包版本：当前包内使用支持的 items schema1..4、creatures schema1..6、structures schema1..3；quests 必须为 schema2，blocks 与 story 为 schema2。
 
 ## 玩家文案与作者诊断分离
 
@@ -179,12 +187,12 @@ items schema 1 保持普通资源／遗物；schema 2 可选 equipment、consuma
 
 ## 主线任务与素材复用
 
-第十模块 quests 定义单条线性主线，可关联 themeBeat，目标为 kill_creature、deliver_item 和 activate_mechanic。
+第十二模块 quests 定义单条线性主线，可关联 themeBeat，目标为 kill_creature、deliver_item 和 activate_mechanic。
 进度由服务器按玩家／世界保存；主动分次交付才消费物品并增加进度，所有目标完成后单独一次领奖，
 满背包时领奖无变化。玩家附件和 Inventory 一起保存，客户端只显示快照与发送意图。
-详见 [主线任务](mainline-quests.md)；这并非全局跨存储事务或完整任务树／NPC系统。
+详见 [主线任务](mainline-quests.md)；故事与分支任务定义仍不等于大陆规模居民社会模拟或跨文件磁盘崩溃事务。
 
-新内容使用格式 7，能力字段不回填旧文件。素材生成服务不与 AI 厂商绑定：确定性像素配方、专用 inbox 导入、实际 PNG
+新内容使用格式 10，能力字段不回填旧文件。素材生成服务不与 AI 厂商绑定：确定性像素配方、专用 inbox 导入、实际 PNG
 校验／哈希／模型预览都通过 MCP 公开。外部生图模型由调用方自己提供，参见 [贴图复用](texture-authoring.md)。
 
 
@@ -196,4 +204,14 @@ Creature schema 3 支持原版声线选择与音高／音量调制，覆盖环�
 
 ## 方块构型与交互
 
-第十模块 [mechanics](mechanics.md) 提供有界事件驱动状态机：玩家成功放置任一最后构件或主手右键锚点，匹配构型、成本与状态后事务性执行 set_block/spawn_creature/give_item。没有扔物检测、tick 脚本或命令解释器。
+第十二模块 [mechanics](mechanics.md) 提供有界事件驱动状态机：玩家成功放置任一最后构件或主手右键锚点，匹配构型、成本与状态后事务性执行 set_block/spawn_creature/give_item。没有扔物检测、tick 脚本或命令解释器。
+
+## 通用能力程序
+
+`abilities` 为必需模块，包含实际 AbilityScript source、名称、执行预算与能力版本需求。
+源码进入不可变哈希，prepare 阶段一次编译；编译后的指令由三个宿主共用。
+creatures schema 4 的 `ability`、items schema 3 的 `run_program`、mechanics 的
+`run_program` 都链接 `ability/<id>`，并在 abilities 之后编译。
+WorldBible/设计计划/创作审查通过 `invokes_ability` 验证真实宿主绑定，审查证据读取
+`/modules/abilities/programs/<index>/source` 而不是仅看招式名。
+详见 [通用能力运行时与 SDK](abilities.md)。
