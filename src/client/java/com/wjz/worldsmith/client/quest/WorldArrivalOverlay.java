@@ -54,6 +54,9 @@ public final class WorldArrivalOverlay {
         SESSION.dismiss(); return true;
     }
 
+    /** Shared overlay arbitration uses the same connection/scope/configuration predicate as the real renderer. */
+    public static boolean isVisible() { return visible(Minecraft.getInstance(), System.nanoTime()); }
+
     private static boolean visible(Minecraft client, long now) {
         return presentation != null && SESSION.active(now) && client.player != null && client.player.isAlive() && client.level != null
             && client.gui.screen() == null && client.gui.overlay() == null && client.isLocalServer()
@@ -84,7 +87,7 @@ public final class WorldArrivalOverlay {
                 add(lines, Component.translatable("worldsmith.quests.objective." + objective.kind(), objective.targetLabel(), objective.progress(), objective.required()),
                     textWidth, 1, 0xCCE0D4, false);
             }
-        } else add(lines, Component.translatable(WorldArrivalPresentation.complete(state.quests()) ? "worldsmith.arrival.complete" : "worldsmith.arrival.explore"), textWidth, 2, 0xF0D68F, false);
+        } else add(lines, Component.translatable(WorldArrivalPresentation.complete(state) ? "worldsmith.arrival.complete" : "worldsmith.arrival.explore"), textWidth, 2, 0xF0D68F, false);
         add(lines, Component.literal(presentation.background(quest)), textWidth, height < 240 ? 2 : 3, 0xD4DCD9, false);
         Component tip = Component.translatable(quest != null && quest.status() == QuestProtocol.Status.READY ? "worldsmith.arrival.claim" : "worldsmith.arrival.journal", QuestJournalClient.openKeyLabel());
         add(lines, tip, textWidth, 1, 0xAEC8B3, false);

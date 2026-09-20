@@ -782,7 +782,7 @@ public final class WorldsmithWorldCreationBridge {
 			throw new IllegalArgumentException("Managed Worldsmith pack does not exist: " + packId);
 		}
 		WorldsmithPack pack = WorldsmithPackLoader.loadDirectory(directory);
-		boolean invalid = WorldsmithPackValidator.INSTANCE.validate(pack).stream()
+		boolean invalid = WorldsmithPackValidator.INSTANCE.validate(pack, com.wjz.worldsmith.ability.WorldAbilityRuntime.capabilities()).stream()
 			.anyMatch(diagnostic -> diagnostic.getSeverity() == DiagnosticSeverity.ERROR);
 		if (invalid) {
 			throw new IllegalArgumentException("Managed Worldsmith pack is invalid: " + packId);
@@ -865,7 +865,7 @@ public final class WorldsmithWorldCreationBridge {
 
     /** File IO and validation only; called by the library worker and never changes a selection. */
     static CreationSelection prepareCreationSelection(String packId) {
-        var exchange=new com.wjz.worldsmith.core.mcp.ResourcePackExchange(WorldsmithMcpService.packDirectory());
+        var exchange=new com.wjz.worldsmith.core.mcp.ResourcePackExchange(WorldsmithMcpService.packDirectory(), com.wjz.worldsmith.ability.WorldAbilityRuntime.capabilities());
         var summary=exchange.listPacks(com.wjz.worldsmith.core.mcp.ResourcePackExchange.MAX_LISTED).stream()
             .filter(p->p.getBundleId().equals(packId)).findFirst().orElseThrow(()->new IllegalArgumentException("World pack is no longer in the library"));
         return new CreationSelection(summary.getBundleId(),summary.getDisplayName());

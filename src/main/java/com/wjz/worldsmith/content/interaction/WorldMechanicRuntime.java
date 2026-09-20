@@ -1,6 +1,7 @@
 package com.wjz.worldsmith.content.interaction;
 
 import com.wjz.worldsmith.Worldsmith;
+import com.wjz.worldsmith.ability.WorldAbilityRuntime;
 import com.wjz.worldsmith.content.WorldBlockBindings;
 import com.wjz.worldsmith.content.WorldRewardItems;
 import com.wjz.worldsmith.content.WorldsmithCustomBlocks;
@@ -84,7 +85,8 @@ public final class WorldMechanicRuntime {
             throw new IllegalArgumentException("Mechanic resolvers belong to different world bundles");
         var diagnostics = WorldMechanicValidation.validate(pack.getMechanics());
         if (!diagnostics.isEmpty()) throw new IllegalArgumentException("Invalid world mechanics: " + diagnostics);
-        return new Snapshot(scope, WorldMechanicValidation.freeze(pack.getMechanics()), blocks, items, creatures);
+        return new Snapshot(scope, WorldMechanicValidation.freeze(pack.getMechanics()), blocks, items, creatures,
+            pack.getAbilities().getPrograms().stream().map(program -> program.getId()).collect(java.util.stream.Collectors.toUnmodifiableSet()));
     }
 
     public static void bind(ServerLevel level, Snapshot snapshot) {
@@ -371,6 +373,12 @@ public final class WorldMechanicRuntime {
                 write.getValue().getCollisionShape(proposed, pos, CollisionContext.empty()).move(pos))) throw new Rejected(OBSTRUCTED);
         }
         inspectSpawn(level, snapshot, anchor, variant, proposed);
+        if (variant.program != null) {
+            var abilities = WorldAbilityRuntime.snapshot(level);
+            if (abilities == null || !snapshot.scope.equals(abilities.scope())
+                || !WorldAbilityRuntime.canStart(level, player, variant.program, Vec3.atCenterOf(anchor)))
+                throw new Rejected(UNAVAILABLE);
+        }
         return new Preflight(inventory, writes);
     }
     private record Preflight(MechanicInventoryTransaction inventory, Map<BlockPos, BlockState> writes) {}
@@ -386,40 +394,49 @@ public final class WorldMechanicRuntime {
         for (var entry : checked.entrySet()) if (level.getBlockState(entry.getKey()) != entry.getValue())
             throw new Rejected(UNAVAILABLE);
         List<BlockPos> changed = new ArrayList<>();
-        boolean inventoryStarted = false;
-        try {
-            for (var write : writes.entrySet()) {
-                if (level.getBlockState(write.getKey()) == write.getValue()) continue;
-                changed.add(write.getKey());
-                if (!level.setBlock(write.getKey(), write.getValue(), STAGED_FLAGS) || level.getBlockState(write.getKey()) != write.getValue())
-                    throw new Rejected(UNAVAILABLE);
+        // Reserve before writes/costs. Closing an uncommitted reservation has no game effects or memory writes.
+        try (var ability = prepareProgram(level, player, snapshot, anchor, variant)) {
+            boolean inventoryStarted = false;
+            try {
+                for (var write : writes.entrySet()) {
+                    if (level.getBlockState(write.getKey()) == write.getValue()) continue;
+                    changed.add(write.getKey());
+                    if (!level.setBlock(write.getKey(), write.getValue(), STAGED_FLAGS) || level.getBlockState(write.getKey()) != write.getValue())
+                        throw new Rejected(UNAVAILABLE);
+                }
+                if (creature != null) {
+                    // Collision is checked against the provisional, fully changed pattern, not the former altar.
+                    if (!creature.checkSpawnObstruction(level)) throw new Rejected(OBSTRUCTED);
+                    if (!level.addFreshEntity(creature)) throw new Rejected(UNAVAILABLE);
+                }
+                inventory.assertUnchanged(); stateUpdate.assertUnchanged();
+                inventoryStarted = true; inventory.apply();
+                stateUpdate.commit(); // Final fallible boundary. Feedback/neighbor propagation below never roll this back.
+            } catch (RuntimeException failure) {
+                boolean restored = true;
+                if (creature != null) restored &= compensate(failure, creature::discard);
+                if (inventoryStarted) restored &= compensate(failure, inventory::rollback);
+                Collections.reverse(changed);
+                for (BlockPos pos : changed) {
+                    BlockState original = checked.get(pos);
+                    restored &= compensate(failure, () -> {
+                        level.setBlock(pos, original, STAGED_FLAGS | Block.UPDATE_CLIENTS);
+                        if (level.getBlockState(pos) != original) throw new IllegalStateException("Mechanic rollback failed at " + pos);
+                    });
+                }
+                if (!restored) {
+                    bound.ledger.quarantine();
+                    Worldsmith.LOGGER.error("Mechanic ledger quarantined after incomplete rollback at {} in {}", anchor, level.dimension().identifier());
+                }
+                compensate(failure, () -> syncInventory(player));
+                throw failure;
             }
-            if (creature != null) {
-                // Collision is checked against the provisional, fully changed pattern, not the former altar.
-                if (!creature.checkSpawnObstruction(level)) throw new Rejected(OBSTRUCTED);
-                if (!level.addFreshEntity(creature)) throw new Rejected(UNAVAILABLE);
+            // The durable ledger is final. Subsequent program ticks are not part of this block/item transaction.
+            if (ability != null) try {
+                ability.commit();
+            } catch (RuntimeException launchFailure) {
+                Worldsmith.LOGGER.error("Mechanic {} committed but ability {} failed to launch", variant.mechanic.getId(), variant.program, launchFailure);
             }
-            inventory.assertUnchanged(); stateUpdate.assertUnchanged();
-            inventoryStarted = true; inventory.apply();
-            stateUpdate.commit(); // Final fallible boundary. Feedback/neighbor propagation below never roll this back.
-        } catch (RuntimeException failure) {
-            boolean restored = true;
-            if (creature != null) restored &= compensate(failure, creature::discard);
-            if (inventoryStarted) restored &= compensate(failure, inventory::rollback);
-            Collections.reverse(changed);
-            for (BlockPos pos : changed) {
-                BlockState original = checked.get(pos);
-                restored &= compensate(failure, () -> {
-                    level.setBlock(pos, original, STAGED_FLAGS | Block.UPDATE_CLIENTS);
-                    if (level.getBlockState(pos) != original) throw new IllegalStateException("Mechanic rollback failed at " + pos);
-                });
-            }
-            if (!restored) {
-                bound.ledger.quarantine();
-                Worldsmith.LOGGER.error("Mechanic ledger quarantined after incomplete rollback at {} in {}", anchor, level.dimension().identifier());
-            }
-            compensate(failure, () -> syncInventory(player));
-            throw failure;
         }
         // Durable success is not reclassified as a failed offering if an observer or cosmetic effect throws.
         com.wjz.worldsmith.content.quest.server.QuestRuntime.afterMechanicActivation(player, variant.mechanic.getId());
@@ -440,6 +457,17 @@ public final class WorldMechanicRuntime {
         } catch (RuntimeException observerFailure) {
             Worldsmith.LOGGER.warn("Mechanic {} committed; a post-commit notification failed", variant.mechanic.getId(), observerFailure);
         }
+    }
+
+    private static WorldAbilityRuntime.PreparedCast prepareProgram(ServerLevel level, ServerPlayer player,
+                                                                    Snapshot snapshot, BlockPos anchor, Variant variant) {
+        if (variant.program == null) return null;
+        var abilities = WorldAbilityRuntime.snapshot(level);
+        if (abilities == null || !snapshot.scope.equals(abilities.scope())) throw new Rejected(UNAVAILABLE);
+        var prepared = WorldAbilityRuntime.prepareStart(level, player, variant.program, Vec3.atCenterOf(anchor),
+            null, variant.rule.getCooldownTicks(), false);
+        if (prepared == null) throw new Rejected(UNAVAILABLE);
+        return prepared;
     }
 
     private static CreatureEntity prepareCreature(ServerLevel level, Snapshot snapshot, BlockPos anchor, Variant variant) {
@@ -548,8 +576,7 @@ public final class WorldMechanicRuntime {
         BlockState state;
         if (WorldsmithCustomBlocks.isReservedNativeId(reference)) throw new IllegalArgumentException("Mechanics use logical block aliases, never native hosts");
         if (reference.startsWith("worldsmith:content/")) {
-            if (!predicate.getProperties().isEmpty()) throw new IllegalArgumentException("Logical blocks retain their immutable world properties");
-            state = blocks.resolve(reference);
+            state = blocks.resolve(reference, predicate.getProperties());
         } else {
             var block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(reference)).orElseThrow(() -> new IllegalArgumentException("Unknown mechanic block: " + reference));
             state = block.defaultBlockState();
@@ -560,7 +587,7 @@ public final class WorldMechanicRuntime {
             if (property == null) throw new IllegalArgumentException("Unknown mechanic block property: " + reference + "." + entry.getKey());
             state = withProperty(state, property, entry.getValue()); properties.add(property);
         }
-        if (reference.startsWith("worldsmith:content/")) properties.add(WorldsmithCustomBlocks.LIGHT);
+        if (reference.startsWith("worldsmith:content/")) { properties.add(WorldsmithCustomBlocks.LIGHT); properties.add(WorldsmithCustomBlocks.ORIENTED); }
         return new NativePredicate(state, List.copyOf(properties));
     }
     private static <T extends Comparable<T>> BlockState withProperty(BlockState state, Property<T> property, String value) {
@@ -590,10 +617,11 @@ public final class WorldMechanicRuntime {
         final List<ItemStack> outputs;
         final ItemStack input;
         final Spawn spawn;
+        final String program;
         Variant(WorldMechanicDefinition mechanic, WorldMechanicRule rule, int rotation, Snapshot snapshot) {
             this.snapshot = snapshot; this.mechanic = mechanic; this.rule = rule; inverseRotation = ROTATIONS[(4 - rotation) % 4];
             cells = rule.getPattern().stream().map(cell -> new Cell(rotate(cell.getOffset(), rotation), resolve(cell.getBlock(), snapshot.blocks), cell.getConsume())).toList();
-            var changes = new ArrayList<Write>(); var rewards = new ArrayList<ItemStack>(); Spawn creature = null;
+            var changes = new ArrayList<Write>(); var rewards = new ArrayList<ItemStack>(); Spawn creature = null; String abilityProgram = null;
             for (Cell cell : cells) if (cell.consume && cell.predicate.state.hasBlockEntity())
                 throw new IllegalArgumentException("Mechanic pattern costs may not consume block entities");
             for (MechanicAction action : rule.getActions()) {
@@ -607,9 +635,13 @@ public final class WorldMechanicRuntime {
                 } else if (action instanceof MechanicAction.SpawnCreature spawn) {
                     if (!snapshot.creatures.definitions().containsKey(spawn.getCreature())) throw new IllegalArgumentException("Unknown mechanic creature: " + spawn.getCreature());
                     creature = new Spawn(spawn.getCreature(), rotate(spawn.getOffset(), rotation));
+                } else if (action instanceof MechanicAction.RunProgram run) {
+                    if (abilityProgram != null) throw new IllegalArgumentException("Only one program launch is allowed per mechanic rule");
+                    if (!snapshot.programs.contains(run.getProgram())) throw new IllegalArgumentException("Unknown mechanic ability: " + run.getProgram());
+                    abilityProgram = run.getProgram();
                 } else throw new IllegalArgumentException("Unsupported native mechanic action");
             }
-            writes = List.copyOf(changes); outputs = List.copyOf(rewards); spawn = creature;
+            writes = List.copyOf(changes); outputs = List.copyOf(rewards); spawn = creature; program = abilityProgram;
             input = rule.getHeldItem() == null ? ItemStack.EMPTY : WorldRewardItems.stack(rule.getHeldItem().getItem(), rule.getHeldItem().getCount(), snapshot.blocks, snapshot.items);
             for (String biome : rule.getBiomes()) if (!snapshot.creatures.biomeBindings().containsKey(biome))
                 throw new IllegalArgumentException("Unknown mechanic biome: " + biome);
@@ -633,11 +665,13 @@ public final class WorldMechanicRuntime {
         private final WorldBlockBindings.Resolver blocks;
         private final CustomItemRuntime.Snapshot items;
         private final CreatureRuntime.Snapshot creatures;
+        private final Set<String> programs;
         private final Map<Block, List<Trigger>> useIndex, placeIndex;
         private final Map<String, List<Variant>> inspectionIndex;
         private Snapshot(String scope, WorldMechanicLibrary library, WorldBlockBindings.Resolver blocks,
-                         CustomItemRuntime.Snapshot items, CreatureRuntime.Snapshot creatures) {
+                         CustomItemRuntime.Snapshot items, CreatureRuntime.Snapshot creatures, Set<String> programs) {
             this.scope = scope; this.library = library; this.blocks = blocks; this.items = items; this.creatures = creatures;
+            this.programs = Set.copyOf(programs);
             Map<String, WorldMechanicDefinition> definitions = new LinkedHashMap<>();
             Map<String, List<Variant>> inspection = new LinkedHashMap<>();
             Map<Block, List<Trigger>> use = new LinkedHashMap<>(), place = new LinkedHashMap<>();

@@ -55,7 +55,7 @@ public final class WorldsmithConfigScreen {
 			WorldsmithSettings.SCHEMA_VERSION,
 			draft.toLlmSettings(),
 			draft.toMcpSettings(),
-			new WorldsmithClientSettings(draft.showWorldArrival)
+			new WorldsmithClientSettings(draft.showWorldArrival, draft.showStoryHints, draft.showStoryTracking, draft.storyAudio, draft.reducedEffects)
 		));
 		WorldsmithMcpService.apply(WorldsmithConfig.get().getMcp());
 	}
@@ -65,7 +65,19 @@ public final class WorldsmithConfigScreen {
 			.addEntry(entries.startBooleanToggle(Component.translatable("worldsmith.config.arrival"), draft.showWorldArrival)
 				.setDefaultValue(true)
 				.setTooltip(Component.translatable("worldsmith.config.arrival.tooltip"))
-				.setSaveConsumer(value -> draft.showWorldArrival = value).build());
+				.setSaveConsumer(value -> draft.showWorldArrival = value).build())
+			.addEntry(entries.startBooleanToggle(Component.translatable("worldsmith.config.story_hints"), draft.showStoryHints)
+				.setDefaultValue(true).setTooltip(Component.translatable("worldsmith.config.story_hints.tooltip"))
+				.setSaveConsumer(value -> draft.showStoryHints = value).build())
+			.addEntry(entries.startBooleanToggle(Component.translatable("worldsmith.config.story_tracking"), draft.showStoryTracking)
+				.setDefaultValue(true).setTooltip(Component.translatable("worldsmith.config.story_tracking.tooltip"))
+				.setSaveConsumer(value -> draft.showStoryTracking = value).build())
+			.addEntry(entries.startBooleanToggle(Component.translatable("worldsmith.config.story_audio"), draft.storyAudio)
+				.setDefaultValue(true).setTooltip(Component.translatable("worldsmith.config.story_audio.tooltip"))
+				.setSaveConsumer(value -> draft.storyAudio = value).build())
+			.addEntry(entries.startBooleanToggle(Component.translatable("worldsmith.config.reduced_effects"), draft.reducedEffects)
+				.setDefaultValue(false).setTooltip(Component.translatable("worldsmith.config.reduced_effects.tooltip"))
+				.setSaveConsumer(value -> draft.reducedEffects = value).build());
 	}
 
 	private static void addModelCategory(ConfigBuilder builder, ConfigEntryBuilder entries, Draft draft) {
@@ -225,6 +237,7 @@ public final class WorldsmithConfigScreen {
 		private int mcpPort;
 		private boolean mcpAutoApprove;
 		private boolean showWorldArrival;
+		private boolean showStoryHints, showStoryTracking, storyAudio, reducedEffects;
 
 		private static Draft of(WorldsmithSettings settings) {
 			LlmSettings llm = settings.getLlm();
@@ -242,6 +255,10 @@ public final class WorldsmithConfigScreen {
 			draft.mcpPort = mcp.getPort();
 			draft.mcpAutoApprove = mcp.getAutoApproveSourceExecution();
 			draft.showWorldArrival = settings.getClient().getShowWorldArrival();
+			draft.showStoryHints = settings.getClient().getShowStoryHints();
+			draft.showStoryTracking = settings.getClient().getShowStoryTracking();
+			draft.storyAudio = settings.getClient().getStoryAudio();
+			draft.reducedEffects = settings.getClient().getReducedEffects();
 			return draft;
 		}
 

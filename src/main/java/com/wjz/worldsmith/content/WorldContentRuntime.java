@@ -1,5 +1,7 @@
 package com.wjz.worldsmith.content;
 
+import com.wjz.worldsmith.ability.WorldAbilityRuntime;
+import com.wjz.worldsmith.content.story.WorldStoryRuntime;
 import com.wjz.worldsmith.content.creature.CreatureRuntime;
 import com.wjz.worldsmith.content.item.CustomItemRuntime;
 import com.wjz.worldsmith.content.item.GeneratedItemResources;
@@ -58,11 +60,14 @@ public final class WorldContentRuntime {
         var items = CustomItemRuntime.prepare(pack.getManifest().getId(), pack.getItems());
         items.definitions().values().forEach(item -> items.stack(CustomItemRuntime.LOGICAL_PREFIX + item.getId(), 1));
         var creatures = CreatureRuntime.prepare(pack.getManifest().getId(), pack.getCreatures(), biomeBindings, items, WorldBlockBindings.resolver(bindings));
+        var abilities = WorldAbilityRuntime.prepare(pack, items, creatures, WorldBlockBindings.resolver(bindings));
+        var story = WorldStoryRuntime.prepare(pack, items, creatures, WorldBlockBindings.resolver(bindings));
         var quests = QuestRuntime.prepare(pack, creatures, items, WorldBlockBindings.resolver(bindings));
         var mechanics = WorldMechanicRuntime.prepare(pack, WorldBlockBindings.resolver(bindings), items, creatures);
         var assets = pack.getAssets();
         Map<String, byte[]> client = new LinkedHashMap<>(GeneratedBlockResources.clientResources(bindings, blocks, assets));
         GeneratedItemResources.clientResources(items, assets).forEach((path, bytes) -> putUnique(client, path, bytes));
+        com.wjz.worldsmith.ability.AbilityVisualRuntime.clientResources(pack).forEach((path, bytes) -> putUnique(client, path, bytes));
         for (var definition : creatures.definitions().values()) {
             String asset = definition.getModel().getTexture();
             byte[] png = Objects.requireNonNull(assets.get(asset), "Missing creature PNG asset " + asset);
@@ -78,7 +83,7 @@ public final class WorldContentRuntime {
         bundle.getTexts().forEach((path, text) -> putUnique(server, EMBEDDED_ROOT + path, text.getBytes(StandardCharsets.UTF_8)));
         bundle.getBinaries().forEach((path, bytes) -> putUnique(server, EMBEDDED_ROOT + path, bytes));
         putUnique(server, BINDINGS_PATH, CustomBlockBindings.encode(bindings).getBytes(StandardCharsets.UTF_8));
-        return new Prepared(pack.getManifest().getId(), blocks, bindings, creatures, items, quests, mechanics, WorldArrivalPresentation.from(pack), client, server);
+        return new Prepared(pack.getManifest().getId(), blocks, bindings, creatures, items, quests, mechanics, abilities, story, WorldArrivalPresentation.from(pack), client, server);
     }
 
     public static Prepared prepare(WorldsmithPack pack, Map<String, String> biomeBindings) { return prepare(pack, biomeBindings, null); }
@@ -98,7 +103,7 @@ public final class WorldContentRuntime {
     }
 
     private static void validate(WorldsmithPack pack) {
-        var errors = WorldsmithPackValidator.INSTANCE.validate(pack).stream().filter(d -> d.getSeverity() == DiagnosticSeverity.ERROR).toList();
+        var errors = WorldsmithPackValidator.INSTANCE.validate(pack, WorldAbilityRuntime.capabilities()).stream().filter(d -> d.getSeverity() == DiagnosticSeverity.ERROR).toList();
         if (!errors.isEmpty()) throw new IllegalArgumentException("World content validation failed: " + errors.stream().limit(12).toList());
     }
 
@@ -115,13 +120,19 @@ public final class WorldContentRuntime {
         var previousCreatures = CreatureRuntime.snapshot(level);
         var previousQuests = QuestRuntime.snapshot(level);
         var previousMechanics = WorldMechanicRuntime.snapshot(level);
+        var previousAbilities = WorldAbilityRuntime.snapshot(level);
+        var previousStory = WorldStoryRuntime.snapshot(level);
         try {
+            WorldStoryRuntime.bind(level, owner.prepared.story);
+            WorldAbilityRuntime.bind(level, owner.prepared.abilities);
             CustomItemRuntime.bind(level, owner.prepared.items);
             CreatureRuntime.bind(level, owner.prepared.creatures);
             QuestRuntime.bind(level, owner.prepared.quests);
             WorldMechanicRuntime.bind(level, owner.prepared.mechanics);
             owner.levels.add(level);
         } catch (RuntimeException failure) {
+            if (previousStory == null) WorldStoryRuntime.unbind(level);
+            if (previousAbilities == null) WorldAbilityRuntime.unbind(level);
             if (previousItems == null) CustomItemRuntime.unbind(level);
             if (previousCreatures == null) CreatureRuntime.unbind(level);
             if (previousQuests == null) QuestRuntime.unbind(level);
@@ -134,6 +145,8 @@ public final class WorldContentRuntime {
     }
 
     public static synchronized void unbindLevel(ServerLevel level) {
+        WorldStoryRuntime.unbind(level);
+        WorldAbilityRuntime.unbind(level);
         WorldMechanicRuntime.unbind(level);
         QuestRuntime.unbind(level);
         CustomItemRuntime.unbind(level);
@@ -146,7 +159,7 @@ public final class WorldContentRuntime {
     public static synchronized void clearServer(MinecraftServer server) {
         if (active == null) return;
         var owned = active.levels.stream().filter(level -> level.getServer() == server).toList();
-        for (var level : owned) { WorldMechanicRuntime.unbind(level); QuestRuntime.unbind(level); CreatureRuntime.unbind(level); CustomItemRuntime.unbind(level); active.levels.remove(level); }
+        for (var level : owned) { WorldStoryRuntime.unbind(level); WorldAbilityRuntime.unbind(level); WorldMechanicRuntime.unbind(level); QuestRuntime.unbind(level); CreatureRuntime.unbind(level); CustomItemRuntime.unbind(level); active.levels.remove(level); }
         releaseIfUnowned();
     }
 
@@ -188,7 +201,8 @@ public final class WorldContentRuntime {
     private static boolean equivalent(Prepared a, Prepared b) {
         return a.scope.equals(b.scope) && a.blockBindings.equals(b.blockBindings)
             && a.creatures.biomeBindings().equals(b.creatures.biomeBindings()) && a.items.definitions().equals(b.items.definitions())
-            && a.quests.definitions().equals(b.quests.definitions()) && a.mechanics.library().equals(b.mechanics.library());
+            && a.quests.definitions().equals(b.quests.definitions()) && a.mechanics.library().equals(b.mechanics.library())
+            && a.abilities.library().equals(b.abilities.library()) && a.story.library().equals(b.story.library());
     }
 
     private static void assertOwnedBindings(Active owner) {
@@ -239,12 +253,16 @@ public final class WorldContentRuntime {
                         CreatureRuntime.clearClient();
                         CustomItemRuntime.clearClient();
                         WorldMechanicRuntime.clearClient();
+                        WorldAbilityRuntime.clearClient();
+                        WorldStoryRuntime.clearClient();
                     } else {
                         Active owner = acquire(target, true);
                         next = new ClientLease(target); owner.client = next;
                         CreatureRuntime.activateClient(target.creatures);
                         CustomItemRuntime.activateClient(target.items);
                         WorldMechanicRuntime.activateClient(target.mechanics);
+                        WorldAbilityRuntime.activateClient(target.abilities);
+                        WorldStoryRuntime.activateClient(target.story);
                     }
                     if (previousClient != null) previousClient.closed = true;
                     finished = true; pendingClient = null;
@@ -274,12 +292,16 @@ public final class WorldContentRuntime {
         private final CustomItemRuntime.Snapshot items;
         private final QuestRuntime.Snapshot quests;
         private final WorldMechanicRuntime.Snapshot mechanics;
+        private final WorldAbilityRuntime.Snapshot abilities;
+        private final WorldStoryRuntime.Snapshot story;
         private final WorldArrivalPresentation presentation;
         private final Map<String, byte[]> clientResources;
         private final Map<String, byte[]> serverResources;
-        private Prepared(String scope, CustomBlockLibrary blocks, CustomBlockBindingSnapshot bindings, CreatureRuntime.Snapshot creatures, CustomItemRuntime.Snapshot items, QuestRuntime.Snapshot quests, WorldMechanicRuntime.Snapshot mechanics, WorldArrivalPresentation presentation,
+        private Prepared(String scope, CustomBlockLibrary blocks, CustomBlockBindingSnapshot bindings, CreatureRuntime.Snapshot creatures, CustomItemRuntime.Snapshot items, QuestRuntime.Snapshot quests, WorldMechanicRuntime.Snapshot mechanics, WorldAbilityRuntime.Snapshot abilities, WorldStoryRuntime.Snapshot story, WorldArrivalPresentation presentation,
                          Map<String, byte[]> client, Map<String, byte[]> server) {
             this.scope = scope; this.blocks = blocks; this.blockBindings = bindings; this.creatures = creatures; this.items = items; this.quests = quests; this.mechanics = mechanics;
+            this.abilities = abilities;
+            this.story = story;
             this.presentation = presentation;
             this.clientResources = freezeBytes(client); this.serverResources = freezeBytes(server);
         }
@@ -290,6 +312,8 @@ public final class WorldContentRuntime {
         public CustomItemRuntime.Snapshot items() { return items; }
         public QuestRuntime.Snapshot quests() { return quests; }
         public WorldMechanicRuntime.Snapshot mechanics() { return mechanics; }
+        public WorldAbilityRuntime.Snapshot abilities() { return abilities; }
+        public WorldStoryRuntime.Snapshot story() { return story; }
         public WorldArrivalPresentation presentation() { return presentation; }
         public Map<String, byte[]> clientResources() { return freezeBytes(clientResources); }
         /** Includes the complete immutable bundle and exact slot mapping for storage inside the save's datapack. */

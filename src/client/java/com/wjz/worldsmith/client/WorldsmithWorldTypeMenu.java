@@ -46,7 +46,7 @@ public final class WorldsmithWorldTypeMenu {
         if (!needsDetails && now < s.nextRead) return;
         s.loading = true; s.nextRead = now + 2_000_000_000L;
         CompletableFuture.supplyAsync(() -> {
-            var exchange = new ResourcePackExchange(WorldsmithMcpService.packDirectory());
+            var exchange = new ResourcePackExchange(WorldsmithMcpService.packDirectory(), com.wjz.worldsmith.ability.WorldAbilityRuntime.capabilities());
             var choices = exchange.listPacks(ResourcePackExchange.MAX_LISTED).stream()
                 .sorted(Comparator.comparing(ResourcePackSummary::getDisplayName).thenComparing(ResourcePackSummary::getBundleId)).toList();
             ResourcePackDetails detail = null;

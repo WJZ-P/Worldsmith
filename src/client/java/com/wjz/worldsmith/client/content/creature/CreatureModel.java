@@ -65,13 +65,23 @@ public final class CreatureModel extends EntityModel<CreatureRenderState> {
 
     @Override public void setupAnim(CreatureRenderState state) {
         super.setupAnim(state);
-        int phase=state.definition==null || state.definition.getBoss()==null ? 0
+        int phase=state.definition==null || state.definition.getBoss()==null || state.definition.getBoss().getPhases().isEmpty() ? 0
             : Math.max(0,Math.min(state.bossPhase,state.definition.getBoss().getPhases().size()-1));
         var frame = CreaturePose.withBossPhase(new CreaturePose.Frame(state.ageInTicks, state.walkAnimationPos, state.walkAnimationSpeed,
             state.yRot, state.xRot, state.appearanceSeed, state.action),state.definition,phase);
+        var clip = state.animationClip == null ? Map.<String, com.wjz.worldsmith.core.ability.visual.AbilityClip.Transform>of()
+            : state.animationClip.sample(state.animationTicks);
         for (var entry : animated) {
             var rotation = CreaturePose.rotation(entry.bone(), frame);
             var part = entry.part(); part.xRot = rotation.x(); part.yRot = rotation.y(); part.zRot = rotation.z();
+            var transform = clip.get(entry.bone().getId());
+            if (transform != null) {
+                part.x += transform.translation().x(); part.y += transform.translation().y(); part.z += transform.translation().z();
+                part.xRot += transform.rotation().x() * Mth.DEG_TO_RAD;
+                part.yRot += transform.rotation().y() * Mth.DEG_TO_RAD;
+                part.zRot += transform.rotation().z() * Mth.DEG_TO_RAD;
+                part.xScale *= transform.scale().x(); part.yScale *= transform.scale().y(); part.zScale *= transform.scale().z();
+            }
         }
     }
 }

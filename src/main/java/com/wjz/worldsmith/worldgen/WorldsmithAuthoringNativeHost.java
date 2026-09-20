@@ -25,7 +25,7 @@ public final class WorldsmithAuthoringNativeHost implements StructureNativeHost 
     @Override public StructureNativeHost forContent(String scope, CustomBlockLibrary blocks) {
         return new WorldsmithAuthoringNativeHost(WorldBlockBindings.resolver(CustomBlockBindings.plan(scope,blocks)));
     }
-    @Override public String getIdentity(){return SharedConstants.getCurrentVersion().dataVersion().version()+":"+System.identityHashCode(BuiltInRegistries.BLOCK)+":authoring-check-2:"+
+    @Override public String getIdentity(){return SharedConstants.getCurrentVersion().dataVersion().version()+":"+System.identityHashCode(BuiltInRegistries.BLOCK)+":authoring-check-3:"+
         (customBlocks==null?"native":com.wjz.worldsmith.content.GeneratedBlockResources.sha256(CustomBlockBindings.encode(customBlocks.snapshot()).getBytes(java.nio.charset.StandardCharsets.UTF_8)));}
     @Override public kotlinx.serialization.json.JsonObject query(List<String> ids,String search,int limit){
         if(limit<1||limit>64||ids.size()>64||search.length()>128)throw new IllegalArgumentException("Query supports at most 64 entries and a 128-character search");
@@ -39,7 +39,9 @@ public final class WorldsmithAuthoringNativeHost implements StructureNativeHost 
                 var source=BlockStateRef.parse(requested);var base=resolve(new BuildMaterial(source.id(),Map.of()));
                 item.addProperty("id",source.id());item.addProperty("defaultState",base.toString());
                 var properties=new JsonObject();boolean logical=source.id().startsWith("worldsmith:content/");
-                if(!logical)for(var property:base.getBlock().getStateDefinition().getProperties())properties.add(property.getName(),values(property));item.add("properties",properties);
+                if(!logical)for(var property:base.getBlock().getStateDefinition().getProperties())properties.add(property.getName(),values(property));
+                else if(base.getValue(WorldsmithCustomBlocks.ORIENTED))properties.add("facing",values(WorldsmithCustomBlocks.FACING));
+                item.add("properties",properties);
                 item.addProperty("immutableDefinition",logical);
                 var state=resolve(new BuildMaterial(source.id(),source.properties()));item.addProperty("state",state.toString());item.addProperty("lightEmission",state.getLightEmission());
             } catch(IllegalArgumentException e){item.addProperty("error",e.getMessage());}

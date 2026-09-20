@@ -4,6 +4,8 @@ import com.wjz.worldsmith.core.content.CustomBlockBinding;
 import com.wjz.worldsmith.core.content.CustomBlockBindings;
 import com.wjz.worldsmith.core.content.CustomBlockBindingSnapshot;
 import com.wjz.worldsmith.core.content.CustomBlockLibrary;
+import com.wjz.worldsmith.core.content.BlockOrientation;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -44,10 +46,13 @@ public final class WorldBlockBindings {
             return Map.copyOf(ids);
         }
         public BlockState resolve(String identifier) {
+            return resolve(identifier, Map.of());
+        }
+        public BlockState resolve(String identifier, Map<String, String> properties) {
             if (WorldsmithCustomBlocks.isReservedNativeId(identifier)) throw new IllegalArgumentException("Use a logical custom block alias, not a reserved native host: " + identifier);
             CustomBlockBinding binding = logical.get(identifier);
             if (binding == null) throw new IllegalArgumentException("Unknown or state-overridden custom block in world " + snapshot.getScope() + ": " + identifier);
-            return WorldsmithCustomBlocks.host(binding.nativeId()).defaultBlockState().setValue(WorldsmithCustomBlocks.LIGHT, binding.getLight());
+            return boundState(binding, properties);
         }
         public Item resolveItem(String logicalId) {
             var block = resolve(logicalId).getBlock();
@@ -64,9 +69,22 @@ public final class WorldBlockBindings {
         revision++;
     }
 
-    static synchronized Integer activeLight(String nativeId) {
+    static synchronized CustomBlockBinding activeBinding(String nativeId) {
         if (active == null) return null;
-        return active.getBindings().stream().filter(binding -> binding.nativeId().equals(nativeId)).map(CustomBlockBinding::getLight).findFirst().orElse(null);
+        return active.getBindings().stream().filter(binding -> binding.nativeId().equals(nativeId)).findFirst().orElse(null);
+    }
+
+    private static BlockState boundState(CustomBlockBinding binding, Map<String, String> properties) {
+        boolean oriented = binding.getOrientation() == BlockOrientation.HORIZONTAL;
+        if (properties.keySet().stream().anyMatch(key -> !key.equals("facing")) || (!oriented && !properties.isEmpty()))
+            throw new IllegalArgumentException("Custom blocks accept only facing on a declared HORIZONTAL appearance");
+        String facing = properties.getOrDefault("facing", "north");
+        Direction direction = switch (facing) {
+            case "north" -> Direction.NORTH; case "east" -> Direction.EAST; case "south" -> Direction.SOUTH; case "west" -> Direction.WEST;
+            default -> throw new IllegalArgumentException("Custom block facing must be north, east, south or west");
+        };
+        return WorldsmithCustomBlocks.host(binding.nativeId()).defaultBlockState().setValue(WorldsmithCustomBlocks.LIGHT, binding.getLight())
+            .setValue(WorldsmithCustomBlocks.ORIENTED, oriented).setValue(WorldsmithCustomBlocks.FACING, direction);
     }
 
     public static final class Prepared {
@@ -96,7 +114,7 @@ public final class WorldBlockBindings {
         public BlockState resolve(String identifier) {
             CustomBlockBinding binding = logical.get(identifier);
             if (binding == null) throw new IllegalArgumentException("Unbound custom block in world " + snapshot.getScope() + ": " + identifier);
-            return WorldsmithCustomBlocks.host(binding.nativeId()).defaultBlockState().setValue(WorldsmithCustomBlocks.LIGHT, binding.getLight());
+            return boundState(binding, Map.of());
         }
 
         public void commit() {

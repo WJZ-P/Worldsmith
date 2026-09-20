@@ -164,6 +164,11 @@ public final class WorldMechanicSmokeTests {
             check(use(level, player, gate, InteractionHand.MAIN_HAND) == InteractionResult.FAIL && customCount(level, player, "smoke_key") == 1, "Restored ledger replayed a spent gate");
             check(restored.progress(key("summon", summon)).activations() == 1 && restored.progress(key("exchange", exchange)).activations() == 2, "Restored activation counters changed");
             creatures(level, summon).forEach(CreatureEntity::discard);
+            level.getServer().getPlayerList().remove(player);
+            player.discard();
+            check(!level.getServer().getPlayerList().getPlayers().contains(player)
+                && level.getServer().getPlayerList().getPlayer(player.getUUID()) != player,
+                "Smoke fixture retained its mock player in the global player list");
             WorldContentRuntime.unbindLevel(level);
             System.out.println("[MechanicSmoke] Exchange rejection, cooldown, NBT restore and spent-state rebind passed");
             helper.succeed();
@@ -224,9 +229,7 @@ public final class WorldMechanicSmokeTests {
                 "cubes":[{"origin":{"x":-4,"y":-8,"z":-4},"size":{"x":8,"y":8,"z":8}}]}]},
               "attributes":{"width":0.6,"height":1.0}}]}
             """.formatted(hash));
-        var blocks = WorldsmithJson.INSTANCE.getFormat().decodeFromString(CustomBlockLibrary.Companion.serializer(), """
-            {"schemaVersion":1,"blocks":[{"id":"smoke_exchanger","displayName":"Exchange device","textureAsset":"%s","light":6}]}
-            """.formatted(hash));
+        var blocks = new CustomBlockLibrary(2,List.of(new CustomBlockDefinition("smoke_exchanger","Exchange device",CustomBlockProfile.STONE,BlockAppearance.uniform(hash),6,"")));
         var items = WorldsmithJson.INSTANCE.getFormat().decodeFromString(CustomItemLibrary.Companion.serializer(), """
             {"schemaVersion":1,"items":[{"id":"smoke_token","displayName":"Exchange token","textureAsset":"%s"},
               {"id":"smoke_key","displayName":"Gate key","textureAsset":"%s"}]}

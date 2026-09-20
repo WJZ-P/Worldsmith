@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.content.item;
 
+import com.wjz.worldsmith.ability.AbilityEventRuntime;
 import com.wjz.worldsmith.core.content.CustomItemDefinition;
 import com.wjz.worldsmith.core.content.CustomItemLibrary;
 import com.wjz.worldsmith.core.content.CustomItemValidation;
@@ -26,6 +27,7 @@ import com.wjz.worldsmith.core.content.ItemActionTrigger;
 import net.minecraft.world.item.component.UseCooldown;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemUseAnimation;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.item.context.UseOnContext;
@@ -51,6 +53,7 @@ public final class CustomItemRuntime {
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, Identifier.parse(HOST_ID));
         host = Registry.register(BuiltInRegistries.ITEM, key, new ResourceItem(new Item.Properties().setId(key).stacksTo(64)));
         ItemAbilityProjectile.register();
+        AbilityEventRuntime.register();
     }
 
     public static Item host() { return Objects.requireNonNull(host, "CustomItemRuntime.register must run during bootstrap"); }
@@ -180,11 +183,37 @@ public final class CustomItemRuntime {
             if (definition.getConsumable() != null) return super.use(level, player, hand);
             // Ordinary right-click equips armor; crouch-right-click invokes an optional active ability.
             if (definition.getEquipment() != null && definition.getEquipment().isArmor() && !player.isShiftKeyDown()) return super.use(level, player, hand);
+            if (AbilityEventRuntime.hasUseBindings(definition)) {
+                // Publication rejects two activation models sharing this input; never charge a fallback action.
+                if (ItemActions.action(definition, ItemActionTrigger.USE) != null) return InteractionResult.FAIL;
+                return AbilityEventRuntime.use(level, player, hand, definition);
+            }
             if (ItemActions.action(definition, ItemActionTrigger.USE) != null) return ItemActions.use(level, player, hand, definition);
             return super.use(level, player, hand);
         }
+        @Override public int getUseDuration(ItemStack stack, LivingEntity user) {
+            var definition = definition(user.level(), stack);
+            return definition != null && definition.getMaxUseTicks() > 0 ? definition.getMaxUseTicks() : super.getUseDuration(stack, user);
+        }
+        @Override public ItemUseAnimation getUseAnimation(ItemStack stack) {
+            // Held programs use the normal input state, not a fake food/shield component.
+            return stack.has(DataComponents.CONSUMABLE) ? super.getUseAnimation(stack) : ItemUseAnimation.NONE;
+        }
+        @Override public void onUseTick(Level level, LivingEntity user, ItemStack stack, int remaining) {
+            super.onUseTick(level, user, stack, remaining);
+            AbilityEventRuntime.useTick(level, user, stack, remaining);
+        }
+        @Override public boolean releaseUsing(ItemStack stack, Level level, LivingEntity user, int remaining) {
+            AbilityEventRuntime.releaseUse(level, user, stack, remaining);
+            // Binding activation has no implicit item component costs or second native cooldown application.
+            return false;
+        }
         @Override public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity user) {
             var definition = definition(level, stack);
+            if (definition != null && definition.getMaxUseTicks() > 0) {
+                AbilityEventRuntime.finishUse(level, user, stack);
+                return stack;
+            }
             if (definition == null || !ItemActions.consumed(level, user, stack, definition)) return stack;
             return super.finishUsingItem(stack, level, user);
         }

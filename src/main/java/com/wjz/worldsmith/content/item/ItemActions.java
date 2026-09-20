@@ -1,5 +1,7 @@
 package com.wjz.worldsmith.content.item;
 
+import com.wjz.worldsmith.ability.WorldAbilityRuntime;
+import com.wjz.worldsmith.ability.AbilityEventRuntime;
 import com.wjz.worldsmith.core.content.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +28,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
-/** A fixed server-owned effect vocabulary. No script source, commands or client-supplied effect data. */
+/** Immediate item effects and a deferred launch adapter for immutable, server-compiled programs. */
 public final class ItemActions {
     private ItemActions() {}
     public static Identifier cooldownGroup(String scope, String id) { return Identifier.fromNamespaceAndPath("worldsmith", "ability/" + scope + "/" + id); }
@@ -64,6 +66,7 @@ public final class ItemActions {
         if (definition == null) return;
         ItemAction action = action(definition, ItemActionTrigger.MELEE_HIT);
         if (action != null) execute(level, player, stack, action, target, EquipmentSlot.MAINHAND);
+        AbilityEventRuntime.melee(stack, target, attacker);
     }
 
     /** Called when native consumption completes, before it consumes its one stack unit. */
@@ -91,6 +94,16 @@ public final class ItemActions {
         if (action != action(definition, action.getTrigger())) return false;
         if (!player.isCreative() && (stack.getCount() < action.getConsumeCount()
             || action.getDurabilityCost() > 0 && (!stack.isDamageableItem() || stack.getMaxDamage() - stack.getDamageValue() < action.getDurabilityCost()))) return false;
+        if (action.getEffects().size() == 1 && action.getEffects().getFirst() instanceof ItemEffect.RunProgram program) {
+            if (action.getTrigger() != ItemActionTrigger.USE) return false;
+            try (var reservation = WorldAbilityRuntime.prepareStart(level, player, program.getProgram(), player.position(),
+                WorldAbilityRuntime.aimTarget(level, player, 16), action.getCooldownTicks(), false)) {
+                if (reservation == null) return false;
+                reservation.commit(); // Queues start; no program effect executes before the server tick.
+            }
+            charge(player, stack, action, hand, identity.bundleHash(), identity.itemId());
+            return true;
+        }
         // Resolve all capabilities and destinations before any effects/costs are applied.
         Vec3 destination = null;
         List<Holder<MobEffect>> statuses = new ArrayList<>();
@@ -133,16 +146,20 @@ public final class ItemActions {
                 player.resetFallDistance();
             }
         }
-        player.getCooldowns().addCooldown(cooldownGroup(identity.bundleHash(), identity.itemId()), action.getCooldownTicks());
+        charge(player, stack, action, hand, identity.bundleHash(), identity.itemId());
+        return true;
+    }
+
+    private static void charge(Player player, ItemStack stack, ItemAction action, EquipmentSlot hand, String scope, String item) {
+        player.getCooldowns().addCooldown(cooldownGroup(scope, item), action.getCooldownTicks());
         if (!player.isCreative()) {
             if (action.getDurabilityCost() > 0) stack.hurtAndBreak(action.getDurabilityCost(), player, hand);
             if (action.getConsumeCount() > 0) stack.shrink(action.getConsumeCount());
         }
-        return true;
     }
 
     /** No chunk loads or through-wall fallback. Probe nearest valid standing point behind the clipped endpoint. */
-    static Vec3 blinkDestination(ServerLevel level, Player player, float requested) {
+    public static Vec3 blinkDestination(ServerLevel level, Player player, float requested) {
         double distance = Math.min(8.0, Math.max(0.0, requested));
         Vec3 eye = player.getEyePosition(), direction = player.getLookAngle();
         if (!loaded(level, player.getBoundingBox().expandTowards(direction.scale(distance)).inflate(1.0))) return null;

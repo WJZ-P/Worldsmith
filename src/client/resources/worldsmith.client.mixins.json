@@ -13,6 +13,7 @@
 		"CreateWorldContentCancelMixin",
 		"CreateWorldCreationGuardMixin",
 		"WorldArrivalKeyboardMixin",
+		"ToastManagerAccessor",
 		"CreativeModeTabsContentMixin",
 		"WorldCreativeTabTitleMixin",
 		"WorldCreationUiStateAccessor",

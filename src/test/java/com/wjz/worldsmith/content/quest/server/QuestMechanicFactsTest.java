@@ -52,22 +52,23 @@ class QuestMechanicFactsTest {
         assertEquals(1024, state.mechanicActivationCount("altar"));
         assertSame(state, state.withMechanicActivation("altar"));
         var encoded = QuestPlayerState.CODEC.encodeStart(JsonOps.INSTANCE, state).getOrThrow();
-        assertEquals(2, encoded.getAsJsonObject().get("schemaVersion").getAsInt());
+        assertEquals(3, encoded.getAsJsonObject().get("schemaVersion").getAsInt());
         assertEquals(state, QuestPlayerState.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow());
         assertEquals(List.of(1), state.progressFor(activation("one", null, 1)).counts());
     }
 
     @Test void factsAreDeeplySnapshottedAndRejectInvalidOrOversizedMaps() {
         var facts = new LinkedHashMap<String, Integer>(); facts.put("altar", 1);
-        var state = new QuestPlayerState(2, SCOPE, 0, Map.of(), facts);
+        var state = new QuestPlayerState(3, SCOPE, 0, Map.of(), facts);
         facts.clear();
         assertEquals(1, state.mechanicActivationCount("altar"));
         assertThrows(UnsupportedOperationException.class, () -> state.mechanicActivations().put("altar", 2));
-        assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(2, SCOPE, 0, Map.of(), Map.of("../altar", 1)));
-        assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(2, SCOPE, 0, Map.of(), Map.of("altar", 0)));
-        assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(2, SCOPE, 0, Map.of(), Map.of("altar", 1025)));
+        assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(3, SCOPE, 0, Map.of(), Map.of("../altar", 1)));
+        assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(3, SCOPE, 0, Map.of(), Map.of("altar", 0)));
+        assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(3, SCOPE, 0, Map.of(), Map.of("altar", 1025)));
         for (int i = 0; i < 65; i++) facts.put("m" + i, 1);
-        assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(2, SCOPE, 0, Map.of(), facts));
+        assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(3, SCOPE, 0, Map.of(), facts));
+        assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(2, SCOPE, 0, Map.of(), Map.of()));
         assertThrows(IllegalArgumentException.class, () -> new QuestPlayerState(1, SCOPE, 0, Map.of(), Map.of()));
     }
 

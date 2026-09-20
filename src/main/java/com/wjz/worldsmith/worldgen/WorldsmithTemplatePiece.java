@@ -52,7 +52,7 @@ public final class WorldsmithTemplatePiece extends TemplateStructurePiece {
             this.boundingBox.encapsulate(box);
         }
     }
-    private static StructurePlaceSettings placement(Rotation rotation,boolean preserveShape){return new StructurePlaceSettings().setRotation(rotation).setIgnoreEntities(true).setKnownShape(preserveShape);}
+    private static StructurePlaceSettings placement(Rotation rotation,boolean preserveShape){return new StructurePlaceSettings().setRotation(rotation).setIgnoreEntities(false).setKnownShape(preserveShape);}
     private static List<BoundingBox> reserved(WorldsmithStructurePlan.Part part,BlockPos position,Rotation rotation) {
         return part.reserved().stream().map(b->BoundingBox.fromCorners(new BlockPos(b.minX(),b.minY(),b.minZ()).rotate(rotation).offset(position),new BlockPos(b.maxX(),b.maxY(),b.maxZ()).rotate(rotation).offset(position))).toList();
     }

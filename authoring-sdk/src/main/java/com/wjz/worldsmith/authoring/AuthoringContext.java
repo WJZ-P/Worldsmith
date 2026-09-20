@@ -84,6 +84,15 @@ public final class AuthoringContext {
     public AuthoringContext component(String id,Box region){named(id);components.put(id,region);return this;}
     public AuthoringContext container(Vec3i at,BlockStateRef state,List<Item> items){canvas().pen(Brush.solid(state)).set(at.x(),at.y(),at.z());interactions.add(Map.of("kind","container","at",AuthoredStructure.point(at),"items",items.stream().map(i->Map.of("slot",i.slot(),"item",i.item(),"count",i.count())).toList()));return this;}
     public record Item(int slot,String item,int count){}
+    /** Declare an actual place/character marker at authored walkable feet. Geometry is not overwritten. */
+    public AuthoringContext storyAnchor(Vec3i at,String place){return storyAnchor(at,place,null);}
+    public AuthoringContext storyAnchor(Vec3i at,String place,String character){
+        if(place==null||!place.matches("[a-z0-9][a-z0-9_.-]{0,63}")||place.contains("..")||place.endsWith(".")||character!=null&&(!character.matches("[a-z0-9][a-z0-9_.-]{0,63}")||character.contains("..")||character.endsWith(".")))throw new IllegalArgumentException("Stable story place/character IDs required");
+        Objects.requireNonNull(at);
+        if(!canvas().bounds().contains(at)||!canvas().bounds().contains(new Vec3i(at.x(),at.y()+1,at.z())))throw new IllegalArgumentException("Story anchor headroom outside canvas");
+        var marker=new TreeMap<String,Object>();marker.put("kind","story_anchor");marker.put("at",AuthoredStructure.point(at));marker.put("place",place);if(character!=null)marker.put("character",character);
+        interactions.add(marker);return this;
+    }
     /** Place a typed, repeatable Boss encounter; no entity NBT or executable commands are accepted. */
     public AuthoringContext bossSpawner(Vec3i at,String creatureId){return bossSpawner(at,creatureId,2400,16,4);}
     public AuthoringContext bossSpawner(Vec3i at,String creatureId,int respawnTicks,int requiredPlayerRange,int spawnRange){

@@ -19,7 +19,7 @@ final class WorldsmithLogicalBlockResolutionTest {
     @BeforeAll static void bootstrap() { WorldsmithTestBootstrap.bootStrap(); }
     private static MaterialSelector material(String id, List<String> tags) { return new MaterialSelector("test", List.of(id), tags, List.of()); }
     private static WorldBlockBindings.Resolver resolver() {
-        var library = new CustomBlockLibrary(1, List.of(new CustomBlockDefinition("moon", "Moon", CustomBlockProfile.STONE, "a".repeat(64), 7, "")));
+        var library = new CustomBlockLibrary(2, List.of(new CustomBlockDefinition("moon", "Moon", CustomBlockProfile.STONE, com.wjz.worldsmith.core.content.BlockAppearance.uniform("a".repeat(64)), 7, "")));
         return WorldBlockBindings.resolver(CustomBlockBindings.plan("realm", library));
     }
 
@@ -48,11 +48,11 @@ final class WorldsmithLogicalBlockResolutionTest {
     @Test void compiledPackKeepsItsOwnImmutablePlanAndCanRestoreNonLexicalSavedSlots() {
         var activeBefore=WorldBlockBindings.active();
         var base = WorldsmithPacks.builtin();
-        var zinc = new CustomBlockDefinition("zinc", "Zinc", CustomBlockProfile.STONE, "a".repeat(64), 0, "");
-        var amber = new CustomBlockDefinition("amber", "Amber", CustomBlockProfile.STONE, "b".repeat(64), 0, "");
-        var initialLibrary = new CustomBlockLibrary(1, List.of(zinc));
+        var zinc = new CustomBlockDefinition("zinc", "Zinc", CustomBlockProfile.STONE, com.wjz.worldsmith.core.content.BlockAppearance.uniform("a".repeat(64)), 0, "");
+        var amber = new CustomBlockDefinition("amber", "Amber", CustomBlockProfile.STONE, com.wjz.worldsmith.core.content.BlockAppearance.uniform("b".repeat(64)), 0, "");
+        var initialLibrary = new CustomBlockLibrary(2, List.of(zinc));
         var initial = CompiledPack.scoped(new WorldsmithPack(base.getManifest(),base.getTerrain(),base.getBiomes(),base.getFeatures(),base.getComputedId(),base.getStructures(),base.getTheme(),initialLibrary,base.getCreatures(),base.getAssets()));
-        var nextLibrary = new CustomBlockLibrary(1, List.of(amber,zinc));
+        var nextLibrary = new CustomBlockLibrary(2, List.of(amber,zinc));
         var nextPack = new WorldsmithPack(base.getManifest(),base.getTerrain(),base.getBiomes(),base.getFeatures(),base.getComputedId(),base.getStructures(),base.getTheme(),nextLibrary,base.getCreatures(),base.getAssets());
         var restored = CompiledPack.scoped(nextPack,initial.blockBindings());
         assertEquals(initial.blockResolver().nativeIds().get("worldsmith:content/zinc"),restored.blockResolver().nativeIds().get("worldsmith:content/zinc"));

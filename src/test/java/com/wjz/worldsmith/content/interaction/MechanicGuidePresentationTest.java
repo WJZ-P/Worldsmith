@@ -42,6 +42,8 @@ class MechanicGuidePresentationTest {
             assertEquals(List.of("altar", "gate"), MechanicGuideAccess.references(quest));
         }
         assertEquals(List.of(), MechanicGuideAccess.references(new QuestProtocol.Entry("route", "Route", "", QuestProtocol.Status.LOCKED, objectives, List.of())));
+        for (var status : List.of(QuestProtocol.Status.AVAILABLE, QuestProtocol.Status.DECLINED, QuestProtocol.Status.EXCLUDED))
+            assertEquals(List.of(), MechanicGuideAccess.references(new QuestProtocol.Entry("route", "Route", "", status, objectives, List.of())));
         assertEquals(List.of(), MechanicGuideAccess.references(null));
     }
 

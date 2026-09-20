@@ -11,9 +11,12 @@ import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 public final class WorldsmithClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
+		WorldsmithExtensionApproval.initialize();
+		com.wjz.worldsmith.client.ability.AbilityVisualClient.initialize();
 		com.wjz.worldsmith.client.content.WorldContentClientLifecycle.initialize();
 		com.wjz.worldsmith.client.content.WorldsmithCreativeContentClient.initialize();
 		com.wjz.worldsmith.client.quest.QuestJournalClient.initialize();
+		com.wjz.worldsmith.client.story.StoryJournalClient.initialize();
 		com.wjz.worldsmith.client.quest.WorldArrivalOverlay.initialize();
 		com.wjz.worldsmith.client.item.ItemAbilityProjectileRenderer.register();
 		Worldsmith.LOGGER.info("Worldsmith client initialized");

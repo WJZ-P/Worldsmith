@@ -172,7 +172,7 @@ public final class MechanicExplorationTests {
             helper.succeed();
         } finally {
             guardians(level, at(base, MechanicDiscoveryExample.ALTAR_POSITION)).forEach(CreatureEntity::discard);
-            if (player != null) level.getServer().getPlayerList().remove(player);
+            if (player != null) { level.getServer().getPlayerList().remove(player); player.discard(); }
             WorldContentRuntime.unbindLevel(level);
             level.getDataStorage().set(WorldMechanicSavedData.TYPE, previousLedger == null ? new WorldMechanicSavedData() : previousLedger);
         }

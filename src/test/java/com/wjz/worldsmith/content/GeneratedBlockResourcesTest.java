@@ -5,6 +5,9 @@ import com.wjz.worldsmith.core.content.CustomBlockBindings;
 import com.wjz.worldsmith.core.content.CustomBlockDefinition;
 import com.wjz.worldsmith.core.content.CustomBlockLibrary;
 import com.wjz.worldsmith.core.content.CustomBlockProfile;
+import com.wjz.worldsmith.core.content.BlockAppearance;
+import com.wjz.worldsmith.core.content.BlockFaceTexture;
+import com.wjz.worldsmith.core.content.BlockOrientation;
 import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -29,7 +32,7 @@ final class GeneratedBlockResourcesTest {
         ByteArrayOutputStream output = new ByteArrayOutputStream(); ImageIO.write(image, "png", output); return output.toByteArray();
     }
     private static CustomBlockLibrary library(String hash, CustomBlockProfile profile) {
-        return new CustomBlockLibrary(1, List.of(new CustomBlockDefinition("moon", "Moon \"stone\" 月晶", profile, hash, 7, "")));
+        return new CustomBlockLibrary(2, List.of(new CustomBlockDefinition("moon", "Moon \"stone\" 月晶", profile, BlockAppearance.uniform(hash), 7, "")));
     }
 
     @Test void generatedModelsItemsLootAndToolTagsUseTheSameNativeBinding() throws Exception {
@@ -55,7 +58,29 @@ final class GeneratedBlockResourcesTest {
         var library = library(hash, CustomBlockProfile.GLASS); var snapshot = CustomBlockBindings.plan("realm", library);
         var files = GeneratedBlockResources.clientResources(snapshot, library, Map.of(hash, png));
         var model = JsonParser.parseString(new String(files.get("assets/worldsmith/models/block/content/block/glass/00.json"), StandardCharsets.UTF_8)).getAsJsonObject();
-        assertTrue(model.getAsJsonObject("textures").getAsJsonObject("all").get("force_translucent").getAsBoolean());
+        for (String face : List.of("up", "down", "north", "south", "west", "east", "particle"))
+            assertTrue(model.getAsJsonObject("textures").getAsJsonObject(face).get("force_translucent").getAsBoolean());
+    }
+
+    @Test void sixFaceModelsKeepPerFaceUvTurnsParticleAndDirectionalVariants() throws Exception {
+        byte[] first = png(16,16), second = png(32,32);
+        String a = GeneratedBlockResources.sha256(first), b = GeneratedBlockResources.sha256(second);
+        var face = new BlockFaceTexture(a); var appearance = new BlockAppearance(face, face, new BlockFaceTexture(b, 1), face, face, face, b, BlockOrientation.HORIZONTAL);
+        var library = new CustomBlockLibrary(2, List.of(new CustomBlockDefinition("sign", "Sign", CustomBlockProfile.STONE, appearance, 0, "")));
+        var snapshot = CustomBlockBindings.plan("realm", library);
+        var files = GeneratedBlockResources.clientResources(snapshot, library, Map.of(a, first, b, second));
+        var model = JsonParser.parseString(new String(files.get("assets/worldsmith/models/block/content/block/stone/00.json"), StandardCharsets.UTF_8)).getAsJsonObject();
+        assertEquals("worldsmith:block/content/" + b, model.getAsJsonObject("textures").get("particle").getAsString());
+        var faces = model.getAsJsonArray("elements").get(0).getAsJsonObject().getAsJsonObject("faces");
+        assertEquals(6, faces.size()); assertEquals(90, faces.getAsJsonObject("north").get("rotation").getAsInt());
+        assertEquals("north", faces.getAsJsonObject("north").get("cullface").getAsString());
+        var variants = JsonParser.parseString(new String(files.get("assets/worldsmith/blockstates/content/block/stone/00.json"),StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("variants");
+        assertEquals(0, variants.getAsJsonObject("facing=north").get("y").getAsInt());
+        assertEquals(90, variants.getAsJsonObject("facing=east").get("y").getAsInt());
+        assertEquals(180, variants.getAsJsonObject("facing=south").get("y").getAsInt());
+        assertEquals(270, variants.getAsJsonObject("facing=west").get("y").getAsInt());
+        assertFalse(variants.getAsJsonObject("facing=east").get("uvlock").getAsBoolean());
+        assertThrows(IllegalArgumentException.class, () -> GeneratedBlockResources.clientResources(snapshot, library, Map.of(a,first)));
     }
 
     @Test void corruptHashInvalidPngAndImageDimensionBombsAreRejected() throws Exception {

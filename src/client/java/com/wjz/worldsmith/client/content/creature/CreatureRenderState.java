@@ -9,4 +9,6 @@ public final class CreatureRenderState extends LivingEntityRenderState {
     public long appearanceSeed;
     public int action;
     public int bossPhase;
+    public com.wjz.worldsmith.core.ability.visual.AbilityClip animationClip;
+    public double animationTicks;
 }

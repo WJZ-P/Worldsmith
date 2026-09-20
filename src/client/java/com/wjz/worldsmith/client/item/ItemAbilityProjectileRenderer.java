@@ -6,5 +6,8 @@ import net.minecraft.client.renderer.entity.ThrownItemRenderer;
 
 public final class ItemAbilityProjectileRenderer {
     private ItemAbilityProjectileRenderer() {}
-    public static void register() { EntityRendererRegistry.register(ItemAbilityProjectile.type(), context -> new ThrownItemRenderer<>(context, 0.65F, false)); }
+    public static void register() {
+        EntityRendererRegistry.register(ItemAbilityProjectile.type(), context -> new ThrownItemRenderer<>(context, 0.65F, false));
+        EntityRendererRegistry.register(com.wjz.worldsmith.ability.AbilityProjectile.type(), context -> new ThrownItemRenderer<>(context, 0.65F, false));
+    }
 }

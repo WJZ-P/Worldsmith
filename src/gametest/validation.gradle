@@ -5,21 +5,90 @@ def checkoutDir = new File(project.projectDir, 'src/gametest/resources/fabric.mo
 if (!new File(checkoutDir, 'src/gametest/resources/fabric.mod.json').isFile()) {
     throw new GradleException('Mechanic smoke configuration expects the checkout or its build/structure-efficiency-validation project')
 }
+def visualClient = project.hasProperty('abilityVisualClientTest')
+def storyClient = project.hasProperty('storyClientTest')
+def materialClient = project.hasProperty('materialClientTest')
+def immersionIteration = project.hasProperty('immersionIteration')
+def storyTest = project.hasProperty('storyTest')
+def controlTest = project.hasProperty('abilityControlTest')
+def perceptionTest = project.hasProperty('abilityPerceptionTest')
+def abilityClient = project.hasProperty('abilityClientTest') || visualClient || storyClient || materialClient
+def expansionTests = ['abilityVisualTest', 'abilityEventTest', 'abilityGameplayTest']
+def expansion = expansionTests.any { project.hasProperty(it) } || visualClient
 
 fabricApi.configureTests {
     createSourceSet = true
     modId = 'worldsmith_mechanics_smoke'
     enableGameTests = true
-    enableClientGameTests = project.hasProperty('mechanicGuideClientTest')
+    enableClientGameTests = project.hasProperty('mechanicGuideClientTest') || abilityClient
     clearRunDirectory = false
 }
 sourceSets.gametest {
-    java.setSrcDirs([new File(checkoutDir, 'src/gametest/java')] + (project.hasProperty('mechanicGuideClientTest') ? [new File(checkoutDir, 'src/clientGametest/java')] : []))
+    java.setSrcDirs([new File(checkoutDir, 'src/gametest/java')] + (project.hasProperty('mechanicGuideClientTest') || abilityClient ? [new File(checkoutDir, 'src/clientGametest/java')] : []))
     resources.setSrcDirs([new File(checkoutDir, 'src/gametest/resources')])
 }
 
-if (project.hasProperty('mechanicGuideClientTest')) {
-    def clientRoot = new File(checkoutDir, 'build/mechanic-discovery')
+// Only the opt-in test mod's generated manifest changes. The normal two-test suite
+// and production jar stay independent of the programmable-ability fixture.
+tasks.named(sourceSets.gametest.processResourcesTaskName).configure {
+    inputs.property('abilityRuntime', project.hasProperty('abilityRuntime'))
+    inputs.property('abilityClientTest', project.hasProperty('abilityClientTest'))
+    inputs.property('abilityVisualClientTest', visualClient)
+    inputs.property('storyClientTest', storyClient)
+    inputs.property('materialClientTest', materialClient)
+    inputs.property('storyTest', storyTest)
+    inputs.property('abilityControlTest', controlTest)
+    inputs.property('abilityPerceptionTest', perceptionTest)
+    expansionTests.each { propertyName -> inputs.property(propertyName, project.hasProperty(propertyName)) }
+    doLast {
+        def manifest = new File(destinationDir, 'fabric.mod.json')
+        def json = new groovy.json.JsonSlurper().parse(manifest)
+        if (project.hasProperty('abilityRuntime')) {
+            json.entrypoints['fabric-gametest'] += 'com.wjz.worldsmith.gametest.AbilityRuntimeGameTests'
+            json.entrypoints['main'] = (json.entrypoints['main'] ?: []) + 'com.wjz.worldsmith.gametest.AbilityRuntimeTestBootstrap'
+        }
+        if (project.hasProperty('abilityVisualTest')) json.entrypoints['fabric-gametest'] += 'com.wjz.worldsmith.gametest.AbilityVisualGameTests'
+        if (project.hasProperty('abilityEventTest')) json.entrypoints['fabric-gametest'] += 'com.wjz.worldsmith.gametest.AbilityEventBindingGameTests'
+        if (project.hasProperty('abilityGameplayTest')) json.entrypoints['fabric-gametest'] += 'com.wjz.worldsmith.gametest.AbilityGameplayGameTests'
+        if (controlTest) json.entrypoints['fabric-gametest'] += 'com.wjz.worldsmith.gametest.AbilityActorControlGameTests'
+        if (perceptionTest) json.entrypoints['fabric-gametest'] += 'com.wjz.worldsmith.gametest.AbilityPerceptionGameTests'
+        if (storyTest) json.entrypoints['fabric-gametest'] += ['com.wjz.worldsmith.gametest.QuestJourneyGameTests', 'com.wjz.worldsmith.gametest.StoryRuntimeGameTests']
+        if (abilityClient) {
+            json.entrypoints['fabric-client-gametest'] = [materialClient ? 'com.wjz.worldsmith.client.content.MaterialAppearanceClientGameTest' : storyClient ? 'com.wjz.worldsmith.client.story.StoryClientGameTest' : visualClient ? 'com.wjz.worldsmith.client.ability.AbilityVisualClientGameTest' : 'com.wjz.worldsmith.client.ability.AbilityRuntimeClientGameTest']
+            json.mixins = ['worldsmith-ability-clienttest.mixins.json']
+        }
+        manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json))
+    }
+}
+
+if (abilityClient) {
+    def clientRoot = new File(checkoutDir, immersionIteration || materialClient ? 'build/immersion-continuation' : storyClient ? 'build/immersion-runtime' : visualClient ? 'build/ability-runtime/expansion' : 'build/ability-runtime')
+    def reportName = materialClient ? 'client-material-report.txt' : storyClient ? 'client-story-report.txt' : visualClient ? 'client-visual-report.txt' : 'client-ability-report.txt'
+    def reportProperty = materialClient ? 'worldsmith.material.client-report' : storyClient ? 'worldsmith.story.client-report' : visualClient ? 'worldsmith.visual.client-report' : 'worldsmith.ability.client-report'
+    def success = materialClient ? 'PASS material appearances client' : storyClient ? 'PASS immersive story client' : visualClient ? 'PASS programmable visuals client' : 'PASS programmable ability client'
+    def clientRun = new File(clientRoot, 'client-gametest-' + System.currentTimeMillis())
+    loom.runs.clientGameTest {
+        runDir clientRun.absolutePath
+        vmArg '-D' + reportProperty + '=' + new File(clientRoot, reportName).absolutePath
+        ideConfigGenerated false
+    }
+    tasks.named('runClientGameTest').configure {
+        doFirst {
+            clientRoot.mkdirs()
+            java.nio.file.Files.deleteIfExists(new File(clientRoot, reportName).toPath())
+            println 'Isolated ability ClientGameTest directory: ' + clientRun.absolutePath
+        }
+        doLast {
+            def report = new File(clientRoot, reportName)
+            if (!report.isFile() || !report.text.contains(success))
+                throw new GradleException('The ability client test produced no successful fresh report')
+            println 'Verified ability client screenshots: ' + report.absolutePath
+        }
+    }
+}
+
+if (project.hasProperty('mechanicGuideClientTest') && !abilityClient) {
+    def clientRoot = new File(checkoutDir, immersionIteration ? 'build/immersion-continuation' : 'build/mechanic-discovery')
     def clientRun = new File(clientRoot, 'client-gametest-' + System.currentTimeMillis())
     loom.runs.clientGameTest {
         runDir clientRun.absolutePath
@@ -41,7 +110,7 @@ if (project.hasProperty('mechanicGuideClientTest')) {
     }
 }
 
-def smokeRoot = new File(checkoutDir, project.hasProperty('mechanicDiscovery') ? 'build/mechanic-discovery' : 'build/interaction-kernel')
+def smokeRoot = new File(checkoutDir, immersionIteration || controlTest ? 'build/immersion-continuation' : storyTest ? 'build/immersion-runtime' : expansion ? 'build/ability-runtime/expansion' : project.hasProperty('abilityRuntime') ? 'build/ability-runtime' : project.hasProperty('mechanicDiscovery') ? 'build/mechanic-discovery' : 'build/interaction-kernel')
 def freshRun = new File(smokeRoot, 'gametest-' + System.currentTimeMillis())
 def reportFile = new File(smokeRoot, 'native-gametest.xml')
 loom.runs.gameTest {
@@ -62,9 +131,10 @@ tasks.named('runGameTest').configure {
         def result = new groovy.xml.XmlSlurper().parse(reportFile)
         def cases = result.depthFirst().findAll { it.name() == 'testcase' }
         def failures = result.depthFirst().findAll { it.name() in ['failure', 'error', 'skipped'] }
-        if (cases.size() != 2 || !failures.isEmpty()) {
-            throw new GradleException('Expected two completed native mechanic tests and no failures: ' + reportFile.absolutePath)
+        def expected = (project.hasProperty('abilityRuntime') ? 3 : 2) + expansionTests.count { project.hasProperty(it) } + (storyTest ? 2 : 0) + (controlTest ? 1 : 0) + (perceptionTest ? 1 : 0)
+        if (cases.size() != expected || !failures.isEmpty()) {
+            throw new GradleException('Expected ' + expected + ' completed native tests and no failures: ' + reportFile.absolutePath)
         }
-        println 'Verified two executed native mechanic tests in separate environment batches: ' + reportFile.absolutePath
+        println 'Verified ' + expected + ' executed native tests in separate environment batches: ' + reportFile.absolutePath
     }
 }

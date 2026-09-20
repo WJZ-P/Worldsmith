@@ -10,6 +10,9 @@ import com.wjz.worldsmith.core.mcp.GenerationProgressSnapshot;
 import com.wjz.worldsmith.core.drawhost.DrawingExecutionLimits;
 import com.wjz.worldsmith.core.drawhost.DrawingHost;
 import com.wjz.worldsmith.core.drawhost.DrawingRuntime;
+import com.wjz.worldsmith.core.ability.extension.AbilityExtensionApproval;
+import com.wjz.worldsmith.core.ability.extension.AbilityExtensionRuntime;
+import com.wjz.worldsmith.core.ability.extension.AbilityExtensionService;
 import com.wjz.worldsmith.core.draw.DrawSnapshotCodec;
 import com.wjz.worldsmith.core.prompt.ClasspathPromptTemplateRepository;
 import com.wjz.worldsmith.core.prompt.ClasspathStyleCatalog;
@@ -52,6 +55,8 @@ public final class WorldsmithMcpService {
     private static Consumer<String> sourceApproval = id -> { };
     private static PublicationHost publicationHost = PublicationHost.UNAVAILABLE;
     private static DrawingHost drawingHost;
+    private static volatile AbilityExtensionService abilityExtensions;
+    private static Consumer<AbilityExtensionApproval> extensionApproval = approval -> { throw new IllegalStateException("Independent ability-extension confirmation UI is not connected"); };
     private record ProgressBridge(long epoch, WorldsmithMcpTools tools) {}
     private static volatile ProgressBridge progressBridge = new ProgressBridge(0, null);
     public record ProgressConnection(long epoch, boolean connected) {}
@@ -85,6 +90,7 @@ public final class WorldsmithMcpService {
     public static synchronized void stop() {
         // Invalidate UI requests before potentially slow worker shutdown/discovery cleanup.
         progressBridge = new ProgressBridge(progressBridge.epoch() + 1, null);
+        if(abilityExtensions!=null){abilityExtensions.close();abilityExtensions=null;}
         if(drawingHost!=null){drawingHost.close();drawingHost=null;}
 		if (server == null) {
 			requestedPort = 0;
@@ -137,6 +143,8 @@ public final class WorldsmithMcpService {
     public static synchronized void setSourceApprovalListener(Consumer<String> listener) { sourceApproval=Objects.requireNonNull(listener); }
     public static synchronized void setPublicationHost(PublicationHost host) { publicationHost=Objects.requireNonNull(host); }
     public static synchronized DrawingHost drawingHost() { return drawingHost; }
+    public static AbilityExtensionService abilityExtensions() { return abilityExtensions; }
+    public static synchronized void setExtensionApprovalListener(Consumer<AbilityExtensionApproval> listener) { extensionApproval=Objects.requireNonNull(listener); }
 
     /** Render-thread-safe metadata read: no service lock, disk access, HTTP call or draft projection. */
     public static ProgressConnection progressConnection() {
@@ -170,7 +178,22 @@ public final class WorldsmithMcpService {
 	private static void start(int port, boolean autoApprove) {
 		try {
             requestedAutoApprove=autoApprove;
-            drawingHost=new DrawingHost(packDirectory().resolveSibling("drawing-work"),drawingRuntime(),SharedConstants.getCurrentVersion().dataVersion().version(),sourceApproval,new DrawingExecutionLimits(),autoApprove);
+            DrawingRuntime workerRuntime=drawingRuntime();
+            drawingHost=new DrawingHost(packDirectory().resolveSibling("drawing-work"),workerRuntime,SharedConstants.getCurrentVersion().dataVersion().version(),sourceApproval,new DrawingExecutionLimits(),autoApprove);
+            try {
+                var nativeClasspath=new java.util.LinkedHashSet<Path>(net.fabricmc.loader.impl.launch.FabricLauncherBase.getLauncher().getClassPath());
+                for(Class<?> type:java.util.List.of(Worldsmith.class,SharedConstants.class)) {
+                    var location=type.getProtectionDomain().getCodeSource().getLocation();
+                    if("file".equals(location.getProtocol()))nativeClasspath.add(Path.of(location.toURI()));
+                }
+                var extensionRuntime=new AbilityExtensionRuntime(workerRuntime,AbilityExtensionRuntime.currentClasspath(),java.util.List.copyOf(nativeClasspath));
+                // This confirmation is independent of autoApproveSourceExecution and drawing grants.
+                abilityExtensions=new AbilityExtensionService(packDirectory().resolveSibling("ability-extension-work"),extensionRuntime,
+                    com.wjz.worldsmith.ability.NativeAbilityExtensions.directory(),extensionApproval);
+            } catch(Exception unavailable) {
+                abilityExtensions=null;
+                Worldsmith.LOGGER.warn("Ability extension compiler unavailable; other MCP tools remain active",unavailable);
+            }
             var sessions=new WorkflowSessions(8,()->java.util.UUID.randomUUID().toString().replace("-",""),packDirectory().resolveSibling("drafts"));
             WorldsmithMcpTools tools = new WorldsmithMcpTools(packDirectory(), runtimeInfo(), packFinished,new ClasspathPromptTemplateRepository(),new ClasspathStyleCatalog(),sessions,drawingHost,publicationHost,new com.wjz.worldsmith.core.mcp.DrawingExportHost(){
                 @Override public byte[] export(com.wjz.worldsmith.core.draw.DrawStructure drawing) { return encode(drawing,null); }
@@ -182,7 +205,8 @@ public final class WorldsmithMcpService {
                     try {var output=new java.io.ByteArrayOutputStream();net.minecraft.nbt.NbtIo.writeCompressed(com.wjz.worldsmith.worldgen.WorldsmithDrawExporter.encode(drawing,resolver),output);return output.toByteArray();}
                     catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
                 }
-            },new com.wjz.worldsmith.worldgen.WorldsmithAuthoringNativeHost());
+            },new com.wjz.worldsmith.worldgen.WorldsmithAuthoringNativeHost(),com.wjz.worldsmith.ability.WorldAbilityRuntime.capabilities(),
+                new com.wjz.worldsmith.ability.NativeAbilityDebug(),abilityExtensions);
 			McpHttpServer started = new McpHttpServer(tools.all(), modVersion());
 			URI endpoint = started.start(port);
 			server = started;
@@ -192,6 +216,7 @@ public final class WorldsmithMcpService {
 			Worldsmith.LOGGER.info("Worldsmith MCP bridge listening on {}, announced in {}", endpoint, discoveryFile());
         } catch (Exception e) {
             progressBridge = new ProgressBridge(progressBridge.epoch() + 1, null);
+            if(abilityExtensions!=null){abilityExtensions.close();abilityExtensions=null;}
             if(drawingHost!=null){drawingHost.close();drawingHost=null;}
 			// Broad on purpose: binding the port throws IOException, which Kotlin
 			// does not declare, so a narrower catch would not compile and would
@@ -210,6 +235,7 @@ public final class WorldsmithMcpService {
 			info.put("minecraft", version("minecraft"));
 			info.put("worldsmith", modVersion());
 			info.put("fabricLoader", version("fabricloader"));
+            info.put("abilityExtensions",com.wjz.worldsmith.ability.NativeAbilityExtensions.summary());
 			return info;
 		};
 	}

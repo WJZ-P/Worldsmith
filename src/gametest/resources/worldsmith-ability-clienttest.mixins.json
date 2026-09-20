@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "com.wjz.worldsmith.client.ability.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "client": ["IntegratedServerGametestCloseMixin"],
+  "injectors": { "defaultRequire": 1 }
+}

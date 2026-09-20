@@ -23,9 +23,10 @@ public record WorldArrivalPresentation(String scope, String premise, String play
         return quest == null ? fallback : questBackgrounds.getOrDefault(quest.id(), fallback);
     }
     public static QuestProtocol.Entry currentQuest(java.util.List<QuestProtocol.Entry> quests) {
-        return quests.stream().filter(quest -> quest.status() == QuestProtocol.Status.READY || quest.status() == QuestProtocol.Status.ACTIVE).findFirst().orElse(null);
+        return quests.stream().filter(quest -> quest.status() == QuestProtocol.Status.READY || quest.status() == QuestProtocol.Status.ACTIVE)
+            .findFirst().orElseGet(() -> quests.stream().filter(quest -> quest.status() == QuestProtocol.Status.AVAILABLE).findFirst().orElse(null));
     }
-    public static boolean complete(java.util.List<QuestProtocol.Entry> quests) {
-        return !quests.isEmpty() && quests.stream().allMatch(quest -> quest.status() == QuestProtocol.Status.CLAIMED);
+    public static boolean complete(QuestProtocol.Snapshot snapshot) {
+        return snapshot != null && snapshot.campaignComplete();
     }
 }

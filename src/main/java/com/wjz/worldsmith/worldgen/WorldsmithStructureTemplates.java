@@ -25,6 +25,9 @@ import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
+import net.minecraft.nbt.DoubleTag;
+import net.minecraft.nbt.FloatTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtUtils;
@@ -48,9 +51,8 @@ public final class WorldsmithStructureTemplates {
     public static BlockState resolve(BuildMaterial material, WorldBlockBindings.Resolver customBlocks) {
         if (WorldsmithCustomBlocks.isReservedNativeId(material.getBlock())) throw new IllegalArgumentException("Use a logical custom block alias, not a reserved native slot: " + material.getBlock());
         if (material.getBlock().startsWith("worldsmith:content/")) {
-            if (!material.getProperties().isEmpty()) throw new IllegalArgumentException("Custom block aliases have immutable definition properties: " + material.getBlock());
             if (customBlocks == null) throw new IllegalArgumentException("Custom block alias needs an explicit world compilation context: " + material.getBlock());
-            return customBlocks.resolve(material.getBlock());
+            return customBlocks.resolve(material.getBlock(), material.getProperties());
         }
         Identifier id = Identifier.tryParse(material.getBlock());
         Block block = id == null ? null : BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
@@ -82,13 +84,29 @@ public final class WorldsmithStructureTemplates {
         CompoundTag root = new CompoundTag();
         root.putInt("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());
         root.put("size", ints(geometry.getSize().getX(), geometry.getSize().getY(), geometry.getSize().getZ()));
-        root.put("entities", new ListTag());
+        ListTag entities=new ListTag();
+        for(var interaction:geometry.getInteractions())if(interaction instanceof StructureInteraction.StoryAnchor anchor) {
+            if(pack==null)throw new IllegalArgumentException("Story marker export requires an immutable world bundle");
+            var library=pack.pack().getStory();
+            var place=library.getPlaces().stream().filter(p -> p.getId().equals(anchor.getPlace())).findFirst().orElseThrow(() -> new IllegalArgumentException("Missing story place"));
+            if(anchor.getCharacter()!=null && library.getCharacters().stream().noneMatch(c -> c.getId().equals(anchor.getCharacter())&&c.getPlace().equals(place.getId())))
+                throw new IllegalArgumentException("Story marker has a foreign or missing character");
+            var at=anchor.getAt();
+            CompoundTag entity=new CompoundTag(),data=new CompoundTag();ListTag position=new ListTag(),rotation=new ListTag(),tags=new ListTag();
+            position.add(DoubleTag.valueOf(at.getX()+.5));position.add(DoubleTag.valueOf(at.getY()));position.add(DoubleTag.valueOf(at.getZ()+.5));
+            rotation.add(FloatTag.valueOf(0));rotation.add(FloatTag.valueOf(0));
+            tags.add(StringTag.valueOf("worldsmith.story"));tags.add(StringTag.valueOf("worldsmith.scope."+pack.pack().getComputedId()));tags.add(StringTag.valueOf("worldsmith.place."+place.getId()));
+            if(anchor.getCharacter()!=null)tags.add(StringTag.valueOf("worldsmith.character."+anchor.getCharacter()));
+            data.putString("id","minecraft:marker");data.put("Tags",tags);data.put("Rotation",rotation);data.put("Pos",position.copy());
+            entity.put("pos",position);entity.put("blockPos",ints(at.getX(),at.getY(),at.getZ()));entity.put("nbt",data);entities.add(entity);
+        }
+        root.put("entities", entities);
         ListTag palette = new ListTag();
         ListTag blocks = new ListTag();
         Map<BlockState, Integer> ids = new LinkedHashMap<>();
         Map<BuildMaterial, BlockState> states = new LinkedHashMap<>();
         Map<com.wjz.worldsmith.core.structure.BuildPos,Integer> interactions=new LinkedHashMap<>();
-        for(int i=0;i<geometry.getInteractions().size();i++)interactions.put(geometry.getInteractions().get(i).getAt(),i);
+        for(int i=0;i<geometry.getInteractions().size();i++)if(!(geometry.getInteractions().get(i) instanceof StructureInteraction.StoryAnchor))interactions.put(geometry.getInteractions().get(i).getAt(),i);
         for (StructureVoxel voxel : geometry.getVoxels()) {
             BlockState state = states.computeIfAbsent(voxel.getMaterial(), material -> resolve(material,pack==null?null:pack.blockResolver()))
                 .mirror(voxel.getMirrorX()?Mirror.FRONT_BACK:Mirror.NONE)

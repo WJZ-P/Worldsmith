@@ -137,7 +137,7 @@ public final class WorldsmithResourcePackScreen extends Screen {
         selectedId = id; detailScroll = 0; notice = Component.empty(); loadDetails(); rebuildWidgets();
     }
     private ResourcePackExchange exchange() {
-        if (exchange == null) exchange = new ResourcePackExchange(WorldsmithMcpService.packDirectory());
+        if (exchange == null) exchange = new ResourcePackExchange(WorldsmithMcpService.packDirectory(), com.wjz.worldsmith.ability.WorldAbilityRuntime.capabilities());
         return exchange;
     }
 

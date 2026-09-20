@@ -208,6 +208,10 @@ final class MechanicGuideScreen extends Screen {
     }
 
     private Component action(MechanicAction action) {
+        if (action instanceof MechanicAction.RunProgram run) {
+            var snapshot = com.wjz.worldsmith.ability.WorldAbilityRuntime.clientSnapshot();
+            return tr("run_program", snapshot != null && scope.equals(snapshot.scope()) ? snapshot.programName(run.getProgram()) : run.getProgram());
+        }
         if (action instanceof MechanicAction.GiveItem give) return tr("give", item(give.getItem()), give.getCount());
         if (action instanceof MechanicAction.SpawnCreature spawn) {
             var snapshot = CreatureRuntime.clientSnapshot();

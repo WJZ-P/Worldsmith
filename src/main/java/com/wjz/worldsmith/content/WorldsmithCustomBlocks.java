@@ -2,6 +2,7 @@ package com.wjz.worldsmith.content;
 
 import com.wjz.worldsmith.core.content.CustomBlockProfile;
 import com.wjz.worldsmith.core.content.CustomBlockValidation;
+import com.wjz.worldsmith.core.content.BlockOrientation;
 import net.minecraft.core.Registry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -15,10 +16,15 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -33,6 +39,9 @@ import java.util.Map;
 public final class WorldsmithCustomBlocks {
     public static final String HOST_ID_PREFIX = "worldsmith:content/block/";
     public static final IntegerProperty LIGHT = IntegerProperty.create("light", 0, 15);
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
+    /** Stored state, not an active-world lookup: template transforms also work before activation. */
+    public static final BooleanProperty ORIENTED = BooleanProperty.create("oriented");
     private static final Map<String, Block> HOSTS = new LinkedHashMap<>();
     private static boolean initialized;
 
@@ -84,10 +93,17 @@ public final class WorldsmithCustomBlocks {
             super(properties);
             this.nativeId = nativeId;
             this.profile = profile;
-            registerDefaultState(stateDefinition.any().setValue(LIGHT, 0));
+            registerDefaultState(stateDefinition.any().setValue(LIGHT, 0).setValue(FACING, Direction.NORTH).setValue(ORIENTED, false));
         }
 
-        @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) { builder.add(LIGHT); }
+        @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) { builder.add(LIGHT, FACING, ORIENTED); }
+
+        @Override protected BlockState rotate(BlockState state, Rotation rotation) {
+            return state.getValue(ORIENTED) ? state.setValue(FACING, rotation.rotate(state.getValue(FACING))) : state;
+        }
+        @Override protected BlockState mirror(BlockState state, Mirror mirror) {
+            return state.getValue(ORIENTED) ? state.rotate(mirror.getRotation(state.getValue(FACING))) : state;
+        }
 
         @Override protected boolean skipRendering(BlockState state, BlockState neighbor, Direction direction) {
             return profile == CustomBlockProfile.GLASS && neighbor.is(this) || super.skipRendering(state, neighbor, direction);
@@ -107,8 +123,11 @@ public final class WorldsmithCustomBlocks {
 
         @Override public BlockState getStateForPlacement(BlockPlaceContext context) {
             // Placement is gated on the active world mapping. An unbound slot item is not a new species.
-            Integer light = WorldBlockBindings.activeLight(nativeId);
-            return light == null ? null : defaultBlockState().setValue(LIGHT, light);
+            var binding = WorldBlockBindings.activeBinding(nativeId);
+            if (binding == null) return null;
+            boolean oriented = binding.getOrientation() == BlockOrientation.HORIZONTAL;
+            return defaultBlockState().setValue(LIGHT, binding.getLight()).setValue(ORIENTED, oriented)
+                .setValue(FACING, oriented ? context.getHorizontalDirection().getOpposite() : Direction.NORTH);
         }
     }
 }

@@ -4,13 +4,14 @@ import com.wjz.worldsmith.core.content.CustomBlockBindingSnapshot;
 import com.wjz.worldsmith.core.content.CustomBlockDefinition;
 import com.wjz.worldsmith.core.content.CustomBlockLibrary;
 import com.wjz.worldsmith.core.content.CustomBlockProfile;
+import com.wjz.worldsmith.core.content.BlockAppearance;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class WorldBlockBindingsTest {
-    private static CustomBlockLibrary library(String id) { return new CustomBlockLibrary(1, List.of(new CustomBlockDefinition(id, id, CustomBlockProfile.STONE, "a".repeat(64), 0, ""))); }
+    private static CustomBlockLibrary library(String id) { return new CustomBlockLibrary(2, List.of(new CustomBlockDefinition(id, id, CustomBlockProfile.STONE, BlockAppearance.uniform("a".repeat(64)), 0, ""))); }
     @AfterEach void clear() { var active = WorldBlockBindings.active(); if (active != null) WorldBlockBindings.clear(active.getScope()); }
 
     @Test void preparationHasNoActiveStateSideEffectsAndRollbackRestoresIdentity() {

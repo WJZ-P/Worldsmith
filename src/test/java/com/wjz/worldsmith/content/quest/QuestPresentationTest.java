@@ -50,14 +50,18 @@ class QuestPresentationTest {
         var ready = entry("second", QuestProtocol.Status.READY);
         var locked = entry("third", QuestProtocol.Status.LOCKED);
         assertEquals(ready, WorldArrivalPresentation.currentQuest(List.of(claimed, ready, locked)));
-        assertFalse(WorldArrivalPresentation.complete(List.of()));
-        assertFalse(WorldArrivalPresentation.complete(List.of(claimed, ready)));
-        assertTrue(WorldArrivalPresentation.complete(List.of(claimed)));
+        assertFalse(WorldArrivalPresentation.complete(snapshot(List.of(), false)));
+        assertFalse(WorldArrivalPresentation.complete(snapshot(List.of(claimed, ready), false)));
+        assertFalse(WorldArrivalPresentation.complete(snapshot(List.of(claimed), false)), "A filtered all-claimed list may hide a future chapter");
+        assertTrue(WorldArrivalPresentation.complete(snapshot(List.of(claimed), true)));
         assertNull(WorldArrivalPresentation.currentQuest(List.of(claimed)));
     }
 
     private static QuestProtocol.Entry entry(String id, QuestProtocol.Status status) {
         return new QuestProtocol.Entry(id, id, "A chapter of the journey", status,
             List.of(new QuestProtocol.Objective("deliver_item", "worldsmith:item/token", "Token", 0, 1)), List.of());
+    }
+    private static QuestProtocol.Snapshot snapshot(List<QuestProtocol.Entry> entries, boolean complete) {
+        return new QuestProtocol.Snapshot("a".repeat(64), "World", 0, 1, entries, QuestProtocol.Feedback.NONE, "", complete, null);
     }
 }

@@ -47,7 +47,10 @@ public final class GeneratedQuestAdvancements {
             boolean boss = quest.getObjectives().stream().anyMatch(objective -> objective instanceof QuestObjective.KillCreature kill && bosses.contains(kill.getCreature()));
             boolean mechanic = quest.getObjectives().stream().anyMatch(objective -> objective instanceof QuestObjective.ActivateMechanic);
             JsonObject node = advancement(quest.getTitle(), quest.getDescription(), mechanic ? "minecraft:lodestone" : "minecraft:book", true, boss, OBJECTIVES_MET, CLAIMED);
-            node.addProperty("parent", (quest.getPrerequisites().isEmpty() ? rootId(scope) : taskId(scope, quest.getPrerequisites().getFirst())).toString());
+            // Native advancements are a completion gallery, not a misleading single-parent projection of the DAG.
+            // Hidden leaf siblings reveal only upon claim; a completed child never exposes an unknown prerequisite's text.
+            node.addProperty("parent", rootId(scope).toString());
+            node.getAsJsonObject("display").addProperty("hidden", true);
             JsonArray extra = new JsonArray();
             extra.add(text("\n\n"));
             JsonObject hint = new JsonObject(); hint.addProperty("translate", "worldsmith.advancements.claim_hint"); extra.add(hint);

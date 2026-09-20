@@ -1,0 +1,12 @@
+// Opt-in only; no benchmark or timing threshold is added to the normal test/build tasks.
+// Usage: gradlew -I src/test/ability-persistence-benchmark.gradle abilityPersistenceBenchmark
+gradle.projectsEvaluated {
+    def target = gradle.rootProject
+    target.tasks.register('abilityPersistenceBenchmark', JavaExec) {
+        dependsOn target.tasks.named('testClasses')
+        classpath = target.sourceSets.test.runtimeClasspath
+        mainClass = 'com.wjz.worldsmith.ability.AbilityPersistenceBenchmark'
+        def report = target.findProperty('abilityBenchmarkOutput') ?: target.layout.buildDirectory.file('ability-runtime/persistence-performance.json').get().asFile
+        args target.file(report).absolutePath
+    }
+}

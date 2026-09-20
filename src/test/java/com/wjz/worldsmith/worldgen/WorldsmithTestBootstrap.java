@@ -12,10 +12,38 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
 
 /** Reproduces Fabric's registry-registration window for plain JVM tests. */
-final class WorldsmithTestBootstrap {
+public final class WorldsmithTestBootstrap {
 	private static boolean bootstrapped;
+	private static boolean customBlocksBootstrapped;
 
 	private WorldsmithTestBootstrap() {
+	}
+
+	/** Reopens only the native block/item registration window for direct HostBlock state tests. */
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	public static synchronized void bootStrapCustomBlocks() {
+		bootStrap();
+		if (customBlocksBootstrapped) return;
+		try {
+			Field frozen = MappedRegistry.class.getDeclaredField("frozen"); frozen.setAccessible(true);
+			Field intrusive = MappedRegistry.class.getDeclaredField("unregisteredIntrusiveHolders"); intrusive.setAccessible(true);
+			MappedRegistry<?> blocks = (MappedRegistry<?>)BuiltInRegistries.BLOCK, items = (MappedRegistry<?>)BuiltInRegistries.ITEM;
+			Object oldBlocks = intrusive.get(blocks), oldItems = intrusive.get(items);
+			frozen.setBoolean(blocks, false); frozen.setBoolean(items, false);
+			intrusive.set(blocks, new java.util.IdentityHashMap<>()); intrusive.set(items, new java.util.IdentityHashMap<>());
+			try {
+				com.wjz.worldsmith.content.WorldsmithCustomBlocks.initialize();
+				Method tags = Holder.Reference.class.getDeclaredMethod("bindTags", java.util.Collection.class); tags.setAccessible(true);
+				for (var block : com.wjz.worldsmith.content.WorldsmithCustomBlocks.hosts().values()) {
+					tags.invoke(block.builtInRegistryHolder(), java.util.List.of());
+					tags.invoke(block.asItem().builtInRegistryHolder(), java.util.List.of());
+				}
+			} finally {
+				frozen.setBoolean(blocks, true); frozen.setBoolean(items, true);
+				intrusive.set(blocks, oldBlocks); intrusive.set(items, oldItems);
+			}
+			customBlocksBootstrapped = true;
+		} catch (ReflectiveOperationException failure) { throw new IllegalStateException("Could not register native custom block hosts in test bootstrap", failure); }
 	}
 
 	@SuppressWarnings({"rawtypes", "unchecked"})

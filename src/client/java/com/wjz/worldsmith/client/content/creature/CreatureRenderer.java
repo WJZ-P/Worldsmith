@@ -38,6 +38,9 @@ public final class CreatureRenderer extends MobRenderer<CreatureEntity, Creature
         state.definition = entity.definition(); state.bundleHash = entity.bundleHash();
         state.action = entity.action(); state.appearanceSeed = entity.appearanceSeed();
         state.bossPhase = entity.bossPhase();
+        var animation = com.wjz.worldsmith.client.ability.AbilityVisualClient.animation(entity, partialTicks);
+        state.animationClip = animation == null ? null : animation.clip();
+        state.animationTicks = animation == null ? 0 : animation.elapsed();
     }
 
     @Override public Identifier getTextureLocation(CreatureRenderState state) {
@@ -57,8 +60,8 @@ public final class CreatureRenderer extends MobRenderer<CreatureEntity, Creature
     }
 
     @Override protected AABB getBoundingBoxForCulling(CreatureEntity entity) {
-        // Schema validation bounds accumulated pivot+cube radius at 256 model units (16 blocks).
-        return super.getBoundingBoxForCulling(entity).inflate(16);
+        // Static models fit 16 blocks; validated additive clips also bound compounded scale/translation at 32.
+        return super.getBoundingBoxForCulling(entity).inflate(32);
     }
 
     @Override protected boolean shouldShowName(CreatureEntity entity, double distanceSquared) {

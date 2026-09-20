@@ -7,7 +7,7 @@ import java.util.List;
 public final class MechanicGuideAccess {
     private MechanicGuideAccess() {}
     public static List<String> references(QuestProtocol.Entry quest) {
-        if (quest == null || quest.status() == QuestProtocol.Status.LOCKED) return List.of();
+        if (quest == null || !(quest.status() == QuestProtocol.Status.ACTIVE || quest.status() == QuestProtocol.Status.READY || quest.status() == QuestProtocol.Status.CLAIMED)) return List.of();
         return quest.objectives().stream().filter(objective -> objective.kind().equals("activate_mechanic"))
             .map(QuestProtocol.Objective::reference).distinct().toList();
     }

@@ -9,6 +9,7 @@ import com.wjz.worldsmith.core.content.CustomBlockBindingSnapshot;
 import com.wjz.worldsmith.core.content.CustomBlockDefinition;
 import com.wjz.worldsmith.core.content.CustomBlockLibrary;
 import com.wjz.worldsmith.core.content.CustomBlockProfile;
+import com.wjz.worldsmith.core.content.BlockOrientation;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -35,31 +36,39 @@ public final class GeneratedBlockResources {
         JsonObject names = new JsonObject();
         for (CustomBlockBinding binding : snapshot.getBindings()) {
             CustomBlockDefinition definition = definitions.get(binding.getId());
-            byte[] texture = assets.get(definition.getTextureAsset());
-            if (texture == null) throw new IllegalArgumentException("Missing texture asset for custom block " + definition.getId());
-            texture = texture.clone();
-            validateTexture(definition.getTextureAsset(), texture);
             String nativePath = binding.nativeId().substring("worldsmith:".length());
-            String texturePath = "block/content/" + definition.getTextureAsset();
-            files.put("assets/worldsmith/textures/" + texturePath + ".png", texture);
+            var appearance = definition.getAppearance();
+            for (String hash : appearance.assetIds()) {
+                byte[] texture = assets.get(hash);
+                if (texture == null) throw new IllegalArgumentException("Missing texture asset for custom block " + definition.getId() + ": " + hash);
+                texture = texture.clone(); validateTexture(hash, texture);
+                files.put("assets/worldsmith/textures/block/content/" + hash + ".png", texture);
+            }
 
             JsonObject model = new JsonObject();
-            model.addProperty("parent", "minecraft:block/cube_all");
+            model.addProperty("parent", "minecraft:block/block");
             JsonObject textures = new JsonObject();
-            if (definition.getProfile() == CustomBlockProfile.GLASS) {
-                // 26.2 chooses render layers from sprite material transparency, not BlockRenderLayerMap.
-                JsonObject material = new JsonObject();
-                material.addProperty("sprite", "worldsmith:" + texturePath);
-                material.addProperty("force_translucent", true);
-                textures.add("all", material);
-            } else textures.addProperty("all", "worldsmith:" + texturePath);
+            addTexture(textures, "particle", appearance.getParticle(), definition.getProfile());
+            JsonObject faces = new JsonObject();
+            appearance.faces().forEach((direction, texture) -> {
+                addTexture(textures, direction, texture.getTextureAsset(), definition.getProfile());
+                JsonObject face = new JsonObject(); face.addProperty("texture", "#" + direction);
+                face.addProperty("cullface", direction); face.add("uv", ints(0, 0, 16, 16));
+                face.addProperty("rotation", texture.getQuarterTurns() * 90); faces.add(direction, face);
+            });
             model.add("textures", textures);
+            JsonObject element = new JsonObject(); element.add("from", ints(0, 0, 0)); element.add("to", ints(16, 16, 16)); element.add("faces", faces);
+            JsonArray elements = new JsonArray(); elements.add(element); model.add("elements", elements);
             files.put("assets/worldsmith/models/block/" + nativePath + ".json", bytes(model));
 
-            JsonObject variant = new JsonObject();
-            variant.addProperty("model", "worldsmith:block/" + nativePath);
             JsonObject variants = new JsonObject();
-            variants.add("", variant);
+            String[] directions = {"north", "east", "south", "west"};
+            for (int turn = 0; turn < directions.length; turn++) {
+                JsonObject variant = new JsonObject(); variant.addProperty("model", "worldsmith:block/" + nativePath);
+                variant.addProperty("y", appearance.getOrientation() == BlockOrientation.HORIZONTAL ? turn * 90 : 0);
+                // Do not lock UVs: rotating a directional sign rotates its painted front with the block.
+                variant.addProperty("uvlock", false); variants.add("facing=" + directions[turn], variant);
+            }
             JsonObject blockstate = new JsonObject();
             blockstate.add("variants", variants);
             files.put("assets/worldsmith/blockstates/" + nativePath + ".json", bytes(blockstate));
@@ -78,6 +87,16 @@ public final class GeneratedBlockResources {
         }
         return Collections.unmodifiableMap(files);
     }
+
+    private static void addTexture(JsonObject textures, String name, String hash, CustomBlockProfile profile) {
+        String sprite = "worldsmith:block/content/" + hash;
+        if (profile == CustomBlockProfile.GLASS) {
+            // Native sprite material transparency applies consistently to every face and particle.
+            JsonObject material = new JsonObject(); material.addProperty("sprite", sprite); material.addProperty("force_translucent", true);
+            textures.add(name, material);
+        } else textures.addProperty(name, sprite);
+    }
+    private static JsonArray ints(int... values) { JsonArray array = new JsonArray(); for (int value : values) array.add(value); return array; }
 
     /** Loot and tool tags belong in the server data pack, alongside compiled biome/structure output. */
     public static Map<String, byte[]> serverResources(CustomBlockBindingSnapshot snapshot, CustomBlockLibrary library) {

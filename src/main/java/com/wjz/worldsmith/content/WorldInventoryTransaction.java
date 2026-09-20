@@ -1,4 +1,4 @@
-package com.wjz.worldsmith.content.quest.server;
+package com.wjz.worldsmith.content;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,15 +8,15 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
 /** A local simulation of slots 0..35 only: no cursor, equipment, offhand, crafting grid or ground drops. */
-final class QuestInventoryTransaction {
+public final class WorldInventoryTransaction {
     private static final int MAIN_SLOTS = 36;
     private final Inventory inventory;
     private final List<ItemStack> original;
     private final List<ItemStack> planned;
 
-    QuestInventoryTransaction(ServerPlayer player) {
+    public WorldInventoryTransaction(ServerPlayer player) {
         inventory = player.getInventory();
-        if (inventory.getNonEquipmentItems().size() < MAIN_SLOTS) throw new IllegalStateException("Quest actions require a 36-slot main inventory");
+        if (inventory.getNonEquipmentItems().size() < MAIN_SLOTS) throw new IllegalStateException("World transactions require a 36-slot main inventory");
         original = new ArrayList<>(MAIN_SLOTS); planned = new ArrayList<>(MAIN_SLOTS);
         for (int slot = 0; slot < MAIN_SLOTS; slot++) {
             ItemStack stack = inventory.getItem(slot);
@@ -24,7 +24,7 @@ final class QuestInventoryTransaction {
         }
     }
 
-    int consume(Predicate<ItemStack> matches, int maximum) {
+    public int consume(Predicate<ItemStack> matches, int maximum) {
         int remaining = maximum;
         for (int slot = 0; slot < MAIN_SLOTS && remaining > 0; slot++) {
             ItemStack stack = planned.get(slot);
@@ -36,7 +36,7 @@ final class QuestInventoryTransaction {
         return maximum - remaining;
     }
 
-    boolean insert(ItemStack reward) {
+    public boolean insert(ItemStack reward) {
         ItemStack remaining = reward.copy();
         for (int slot = 0; slot < MAIN_SLOTS && !remaining.isEmpty(); slot++) {
             ItemStack existing = planned.get(slot);
@@ -53,13 +53,13 @@ final class QuestInventoryTransaction {
         return remaining.isEmpty();
     }
 
-    void assertUnchanged() {
+    public void assertUnchanged() {
         for (int slot = 0; slot < MAIN_SLOTS; slot++) {
             if (!ItemStack.matches(original.get(slot), inventory.getItem(slot)))
-                throw new IllegalStateException("Main inventory changed while preparing a quest action");
+                throw new IllegalStateException("Main inventory changed while preparing a world transaction");
         }
     }
 
-    void apply() { for (int slot = 0; slot < MAIN_SLOTS; slot++) inventory.setItem(slot, planned.get(slot).copy()); }
-    void rollback() { for (int slot = 0; slot < MAIN_SLOTS; slot++) inventory.setItem(slot, original.get(slot).copy()); }
+    public void apply() { for (int slot = 0; slot < MAIN_SLOTS; slot++) inventory.setItem(slot, planned.get(slot).copy()); }
+    public void rollback() { for (int slot = 0; slot < MAIN_SLOTS; slot++) inventory.setItem(slot, original.get(slot).copy()); }
 }

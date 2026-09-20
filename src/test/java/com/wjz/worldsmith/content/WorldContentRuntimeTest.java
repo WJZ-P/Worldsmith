@@ -46,8 +46,7 @@ class WorldContentRuntimeTest {
         for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++) image.setRGB(x, y, 0xff9174be);
         var output = new ByteArrayOutputStream(); ImageIO.write(image, "png", output);
         byte[] png = output.toByteArray(); String hash = GeneratedBlockResources.sha256(png);
-        var blocks = WorldsmithJson.INSTANCE.getFormat().decodeFromString(CustomBlockLibrary.Companion.serializer(),
-            "{\"blocks\":[{\"id\":\"moonstone\",\"displayName\":\"Moonstone\",\"textureAsset\":\"" + hash + "\"}]}");
+        var blocks = new CustomBlockLibrary(2,List.of(new CustomBlockDefinition("moonstone","Moonstone",CustomBlockProfile.STONE,BlockAppearance.uniform(hash))));
         var creatures = WorldsmithJson.INSTANCE.getFormat().decodeFromString(CreatureLibrary.Companion.serializer(), """
             {"creatures":[{"id":"guardian","displayName":"%s Guardian","category":"HOSTILE","model":{
             "texture":"%s","textureWidth":32,"textureHeight":32,"bones":[{"id":"body","cubes":[{"origin":{},"size":{"x":4,"y":8,"z":4}}]}]}}]}
