@@ -80,7 +80,20 @@ public final class AuthoringContext {
         }
     }
     public AuthoringContext support(Vec3i at){supports.add(AuthoredStructure.point(at));return this;}
+    /** Protect authored cells from variation/decay; this is not vegetation or access clearance. */
     public AuthoringContext protect(Box region){protectedAreas.add(AuthoredStructure.box(region));return this;}
+    /**
+     * Declare a vegetation/access clearance volume in original drawing coordinates.
+     * This only records intent: it does not carve AIR, remove fixtures or create a route.
+     * Author the intended geometry explicitly; preflight checks required access clearance.
+     * Unlike protect, this writes semantics.keepClear rather than variation protection.
+     */
+    public AuthoringContext keepClear(Box region){
+        Objects.requireNonNull(region);
+        var bounds=canvas().bounds();
+        if(!bounds.contains(region.min())||!bounds.contains(region.max()))throw new IllegalArgumentException("Clearance volume must stay inside the drawing bounds");
+        clearance.add(AuthoredStructure.box(region));return this;
+    }
     public AuthoringContext component(String id,Box region){named(id);components.put(id,region);return this;}
     public AuthoringContext container(Vec3i at,BlockStateRef state,List<Item> items){canvas().pen(Brush.solid(state)).set(at.x(),at.y(),at.z());interactions.add(Map.of("kind","container","at",AuthoredStructure.point(at),"items",items.stream().map(i->Map.of("slot",i.slot(),"item",i.item(),"count",i.count())).toList()));return this;}
     public record Item(int slot,String item,int count){}

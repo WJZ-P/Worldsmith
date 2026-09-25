@@ -40,6 +40,7 @@ class StructurePreviewService {
         }
         val palette=if(renderMode=="material")paletteForSession(args["sessionId"]?.jsonPrimitive?.content ?: key.substringBefore(':'))else PreviewMaterialPalette.Palette()
         val images=views.map {view->McpImage(Base64.getEncoder().encodeToString(DrawPreview.png(selected,view,slice,frame,markers,renderMode,palette.colors)))}
+        val visualEvidence=StructureVisualEvidence.inspect(selected,views,slice,frame)
         return McpToolResult.success(buildJsonObject {
             put("previewType","voxel-model-not-game-screenshot");put("frame",McpJson.encode(buildBox(frame)));put("views",McpJson.encode(views))
             put("renderMode",renderMode);put("cutaway",cutaway);slice?.let {put("sliceY",it)}
@@ -48,6 +49,7 @@ class StructurePreviewService {
             put("imageLabels",McpJson.encode(views.map {"$it / $renderMode"+(if(cutaway)" / cutaway y <= $slice" else "")}))
             put("viewDirections","front: north (-Z); back: south (+Z); left: west (-X); right: east (+X); top/slice: above (+Y); isometric: NE; isometric_back: SW")
             put("visualAssessment","Not scored. Inspect form, proportions, depth, usable spaces and theme; material colours are approximate, not a texture or lighting proof. Clay top view shades height relative to the fixed frame.")
+            put("visualEvidence",McpJson.encode(visualEvidence))
             put("overlays",McpJson.encode(overlays));put("overlaySemantics","xray debug samples; simplified block shapes, not actual game lighting")
             put("components",McpJson.encode(components));put("visibleAuthoredCells",source.size);put("previewMillis",(System.nanoTime()-start)/1_000_000)
             inspection?.let {put("checks",McpJson.encode(it.report))}

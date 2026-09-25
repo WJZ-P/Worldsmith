@@ -134,6 +134,7 @@ class StructureVisualQualityTest {
             put("blueprint", sample.getValue("blueprint")); put("views", McpJson.encode(listOf("isometric", "isometric_back", "front", "top"))); put("renderMode", "clay")
         })
         assertEquals(4, massing.images.size)
+        assertTrue(massing.structuredContent.getValue("visualEvidence").jsonObject.getValue("nonAirCells").jsonPrimitive.int > 0)
         val exterior = call("worldsmith_preview_structure", buildJsonObject {
             put("blueprint", sample.getValue("blueprint")); put("frame", massing.structuredContent.getValue("frame"))
             put("views", McpJson.encode(listOf("front", "back", "left", "right"))); put("renderMode", "material")
@@ -153,6 +154,7 @@ class StructureVisualQualityTest {
         assertEquals(3, layout.images.size)
         assertEquals(5, layout.structuredContent.getValue("pieceCount").jsonPrimitive.int)
         assertFalse(layout.structuredContent.getValue("minecraftCompiled").jsonPrimitive.boolean)
+        assertTrue(layout.structuredContent.getValue("visualEvidence").jsonObject.getValue("footprintColumns").jsonPrimitive.int > 0)
         evidence("massing", massing); evidence("exterior", exterior); evidence("interior", interior); evidence("layout", layout)
     }
 
