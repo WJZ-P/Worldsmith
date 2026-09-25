@@ -11,12 +11,38 @@ import org.junit.jupiter.api.Test
 
 class TerrainShapeTest {
     @Test
+    fun `landmark relief round trips with only the fields its geometry consumes`() {
+        val profiles = listOf(
+            AnchorRelief.Offset(90.0),
+            AnchorRelief.Mesa(112, 0.6, 0.0),
+            AnchorRelief.Caldera(72, 148, 0.25, 0.65, 2.0),
+        )
+        for (profile in profiles) {
+            val anchor = Anchor("landmark", AnchorPlacement.Fixed(0, 0), 600, profile)
+            val encoded = WorldsmithJson.encode(anchor)
+            assertEquals(anchor, WorldsmithJson.decode<Anchor>(encoded))
+            assertTrue("\"relief\"" in encoded)
+            if (profile !is AnchorRelief.Offset) assertTrue("amplitude" !in encoded)
+        }
+    }
+
+    @Test
+    fun `anchor requires explicit typed relief rather than accepting a stale amplitude field`() {
+        assertThrows(SerializationException::class.java) {
+            WorldsmithJson.decode<Anchor>("""{"id":"peak","placement":{"kind":"fixed","x":0,"z":0},"radius":200,"amplitude":90} """)
+        }
+        assertThrows(SerializationException::class.java) {
+            WorldsmithJson.decode<Anchor>("""{"id":"peak","placement":{"kind":"fixed","x":0,"z":0},"radius":200} """)
+        }
+    }
+
+    @Test
     fun `the built in pack demonstrates prompt-facing procedural terrain`() {
         val terrain = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands").terrain
 
         val shape = assertInstanceOf(TerrainShape.Procedural::class.java, terrain.shape)
         assertEquals(0.55, shape.landRatio)
-        assertEquals(ReliefDistribution(0.65, 0.25, 0.10), shape.relief)
+        assertEquals(ReliefDistribution(0.65, 0.25, 0.10, transitionWidth = 0.0), shape.relief)
         assertEquals(RiverFill.DRY, shape.hydrology.riverFill)
         assertEquals(1.25, shape.hydrology.oceanDepth)
     }
@@ -62,6 +88,7 @@ class TerrainShapeTest {
 
         assertTrue("\"kind\": \"procedural\"" in encoded)
         assertTrue("\"riverFill\": \"DRY\"" in encoded)
+        assertTrue("\"transitionWidth\": 0.12" in encoded)
         assertTrue("NoiseRouter" !in encoded)
         assertEquals(shape, WorldsmithJson.decode<TerrainShape>(encoded))
     }

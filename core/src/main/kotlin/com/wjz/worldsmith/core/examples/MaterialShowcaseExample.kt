@@ -18,7 +18,7 @@ object MaterialShowcaseExample {
     @JvmStatic fun create(): WorldsmithPack {
         val base = MechanicDiscoveryExample.create(); val family = MaterialFamilyFactory.create()
         val terrain = base.terrain.copy(shape = (base.terrain.shape as TerrainShape.Procedural).let { it.copy(
-            anchors = it.anchors + Anchor(STRUCTURE, AnchorPlacement.Fixed(96,0), 32, 8.0)) })
+            anchors = it.anchors + Anchor(STRUCTURE, AnchorPlacement.Fixed(96,0), 32, AnchorRelief.Offset(8.0))) })
         val workshop = WorldStructureDefinition(STRUCTURE, blueprint(), StructurePlacement(biomes = base.biomes.biomes.map {it.id},
             rotations = listOf(BuildRotation.NONE), anchor = StructureAnchorTarget(STRUCTURE),
             terrainFit = StructureTerrainFit(maxHeightDifference=12, foundation=StructureFoundation(FoundationMode.FILL,"stone",16),earthwork=StructureEarthwork(8,8192))))

@@ -198,14 +198,14 @@ object BiomeDistributionAnalyzer {
             )
             shares.firstOrNull()?.let { top ->
                 if (top.share > DOMINANT_SHARE) {
-                    add("${top.id} takes ${percent(top.share)} of the world on its own.")
+                    add("${top.id} accounts for ${percent(top.share)} of these sampled climate points; deliberate theme dominance can be appropriate.")
                 }
             }
             val absent = shares.filter { it.share == 0.0 }
             if (absent.isNotEmpty()) {
                 add(
-                    "${absent.size} biome(s) are never chosen: another box wins everywhere theirs reaches, " +
-                        "so they exist in the document and nowhere in the world.",
+                    "${absent.size} biome(s) are never chosen in these $samples statistical samples. " +
+                        "They may be shadowed by another box, very rare, or local to an anchor omitted from this global estimate; this is not proof that they exist nowhere in the world.",
                 )
             }
             if (plan.spatial.regionScale != 1.0 || plan.spatial.boundaryRoughness != 0.0) {
@@ -216,6 +216,9 @@ object BiomeDistributionAnalyzer {
             }
             val procedural = terrain.shape as? TerrainShape.Procedural
             if (procedural != null) {
+                if (procedural.relief.transitionWidth > 0.0) add(
+                    "Relief transitionWidth smooths terrain height joins, not the dominant climate-family shares sampled here; this is not a slope, path or building-site analysis.",
+                )
                 if (procedural.anchors.any { it.climateBias != null }) {
                     add(
                         "Anchor climate biases create local landmark biomes that this global climate-space sample " +
@@ -313,12 +316,17 @@ object BiomeDistributionAnalyzer {
         if (total <= 0.0) {
             return normal(random, 0.0, LANDFORM_TEXTURE_SIGMA)
         }
-        val selected = random.nextDouble() * total
-        val texture = normal(random, 0.0, LANDFORM_TEXTURE_SIGMA)
+        // Normalize before drawing: multiplying by a subnormal but legal total can round to
+        // that total and accidentally fall through into a zero-weight last family.
+        val selected = random.nextDouble()
+        val flatShare = relief.flats / total
+        val highlandShare = relief.highlands / total
+        val rawTexture = normal(random, 0.0, LANDFORM_TEXTURE_SIGMA)
+        val texture = if (relief.flats == 0.0 || relief.highlands == 0.0 || relief.peaks == 0.0) rawTexture.coerceIn(-1.0, 1.0) else rawTexture
         return when {
-            selected < relief.flats ->
+            relief.flats > 0.0 && (selected < flatShare || relief.highlands <= 0.0 && relief.peaks <= 0.0) ->
                 FLATS_LANDFORM_CENTER + texture * FLATS_LANDFORM_TEXTURE
-            selected < relief.flats + relief.highlands ->
+            relief.highlands > 0.0 && (selected < flatShare + highlandShare || relief.peaks <= 0.0) ->
                 HIGHLANDS_LANDFORM_CENTER + texture * HIGHLANDS_LANDFORM_TEXTURE
             else ->
                 PEAKS_LANDFORM_CENTER + texture * PEAKS_LANDFORM_TEXTURE

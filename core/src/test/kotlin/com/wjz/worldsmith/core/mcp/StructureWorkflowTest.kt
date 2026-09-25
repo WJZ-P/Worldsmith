@@ -111,7 +111,7 @@ class StructureWorkflowTest {
         val template=call(WorldsmithWorkflow.TEMPLATE_TOOL).structuredContent
         val terrain=WorldsmithJson.format.decodeFromJsonElement<com.wjz.worldsmith.core.model.TerrainPlan>(template.getValue("terrain"))
         val shape=(terrain.shape as com.wjz.worldsmith.core.model.TerrainShape.Procedural).copy(anchors=listOf(
-            com.wjz.worldsmith.core.model.Anchor("holy_peak",com.wjz.worldsmith.core.model.AnchorPlacement.Fixed(-31,17),200,30.0)))
+            com.wjz.worldsmith.core.model.Anchor("holy_peak",com.wjz.worldsmith.core.model.AnchorPlacement.Fixed(-31,17),200,com.wjz.worldsmith.core.model.AnchorRelief.Offset(30.0))))
         val saved=call(WorldsmithWorkflow.WRITE_TOOL,buildJsonObject {
             put("sessionId",session);put("displayName","Anchored shrine")
             put("terrain",WorldsmithJson.format.encodeToJsonElement(terrain.copy(shape=shape)))

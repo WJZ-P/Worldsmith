@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.worldgen;
 
+import com.wjz.worldsmith.core.model.AnchorRelief;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -211,10 +212,13 @@ final class WorldsmithPackExporterTest {
 					"ridge",
 					new AnchorPlacement.Line(-900, 100, 900, -100),
 					180,
-					45.0,
+					new AnchorRelief.Offset(45.0),
 					1.2,
 					null
-				))
+				), new Anchor("mesa", new AnchorPlacement.Fixed(1_200, 0), 300,
+					new AnchorRelief.Mesa(120, 0.6, 2.0), 2.0, null),
+					new Anchor("caldera", new AnchorPlacement.Fixed(-1_200, 0), 400,
+						new AnchorRelief.Caldera(70, 160, 0.25, 0.65, 2.0), 0.7, null))
 			),
 			template.getAquifersEnabled(),
 			template.getOreVeinsEnabled(),

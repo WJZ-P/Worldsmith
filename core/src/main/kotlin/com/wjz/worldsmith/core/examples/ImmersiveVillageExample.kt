@@ -72,7 +72,7 @@ object ImmersiveVillageExample {
     @JvmStatic fun create(seed: Long): WorldsmithPack {
         val base = MechanicDiscoveryExample.create()
         val terrain = base.terrain.copy(seed = seed, shape = (base.terrain.shape as TerrainShape.Procedural).copy(
-            anchors = listOf(Anchor(STRUCTURE, AnchorPlacement.Fixed(0, 0), 160, 8.0,
+            anchors = listOf(Anchor(STRUCTURE, AnchorPlacement.Fixed(0, 0), 160, AnchorRelief.Mesa(80, 0.75, 0.0),
                 climateBias = AnchorClimateBias(continentalness = 0.6, erosion = 0.8)))))
         val keyTexture = base.items.items.single().textureAsset
         val assets = linkedMapOf(keyTexture to base.assets.getValue(keyTexture))

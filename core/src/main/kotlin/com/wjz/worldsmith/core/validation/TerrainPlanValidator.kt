@@ -4,6 +4,7 @@ import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.model.MaterialSelector
 import com.wjz.worldsmith.core.model.Anchor
 import com.wjz.worldsmith.core.model.AnchorPlacement
+import com.wjz.worldsmith.core.model.AnchorRelief
 import com.wjz.worldsmith.core.model.BandEffect
 import com.wjz.worldsmith.core.model.TerrainBand
 import com.wjz.worldsmith.core.model.TerrainPlan
@@ -68,6 +69,9 @@ object TerrainPlanValidator {
                 }
                 if (shape.relief.flats + shape.relief.highlands + shape.relief.peaks <= 0.0) {
                     add(error("shape.relief", "EMPTY_RELIEF_DISTRIBUTION", "At least one relief weight must be positive"))
+                }
+                if (shape.relief.transitionWidth !in 0.0..0.5) {
+                    add(error("shape.relief.transitionWidth", "RELIEF_TRANSITION_OUT_OF_RANGE", "Relief transition half-width must be between 0 and 0.5 noise units; zero selects sharp boundaries"))
                 }
                 if (shape.verticalScale !in 0.1..4.0) {
                     add(error("shape.verticalScale", "VERTICAL_SCALE_OUT_OF_RANGE", "Vertical scale must be between 0.1 and 4"))
@@ -237,9 +241,7 @@ object TerrainPlanValidator {
             if (anchor.falloff !in 0.05..8.0) {
                 add(error("$path.falloff", "ANCHOR_FALLOFF_OUT_OF_RANGE", "Anchor falloff must be between 0.05 and 8"))
             }
-            if (anchor.amplitude !in -plan.height.toDouble()..plan.height.toDouble()) {
-                add(error("$path.amplitude", "ANCHOR_AMPLITUDE_OUT_OF_RANGE", "Anchor amplitude must stay within plus or minus the world height (${plan.height})"))
-            }
+            addAll(validateAnchorRelief(anchor.relief, "$path.relief", plan))
             anchor.climateBias?.let { bias ->
                 if (bias.strength !in 0.0..1.0) {
                     add(error("$path.climateBias.strength", "ANCHOR_CLIMATE_STRENGTH_OUT_OF_RANGE", "Climate strength must be between 0 and 1"))
@@ -312,6 +314,54 @@ object TerrainPlanValidator {
                             ),
                         )
                     }
+                }
+            }
+        }
+    }
+
+    private fun validateAnchorRelief(relief: AnchorRelief, path: String, plan: TerrainPlan): List<Diagnostic> = buildList {
+        // The native router blends density near its sealed floor and ceiling.
+        // Keep absolute authored levels (including texture) inside the region
+        // where their requested Y remains an actual surface rather than a hint.
+        val minSurface = plan.minY + 24
+        val maxSurface = plan.minY.toLong() + plan.height - 80
+        fun level(field: String, value: Int, roughness: Double) {
+            if (value - roughness < minSurface || value + roughness > maxSurface) {
+                add(error("$path.$field", "ANCHOR_SURFACE_OUT_OF_RANGE",
+                    "Authored surface plus or minus roughness must stay inside $minSurface..$maxSurface, clear of the density floor and ceiling fades"))
+            }
+        }
+        fun roughness(value: Double) {
+            if (value !in 0.0..16.0) {
+                add(error("$path.roughness", "ANCHOR_ROUGHNESS_OUT_OF_RANGE", "Surface roughness must be between 0 and 16 blocks"))
+            }
+        }
+        when (relief) {
+            is AnchorRelief.Offset -> if (relief.amplitude !in -plan.height.toDouble()..plan.height.toDouble()) {
+                add(error("$path.amplitude", "ANCHOR_AMPLITUDE_OUT_OF_RANGE", "Anchor amplitude must stay within plus or minus the world height (${plan.height})"))
+            }
+            is AnchorRelief.Mesa -> {
+                level("surfaceY", relief.surfaceY, relief.roughness)
+                roughness(relief.roughness)
+                if (relief.topRadius !in 0.05..0.9) {
+                    add(error("$path.topRadius", "ANCHOR_TOP_RADIUS_OUT_OF_RANGE", "Mesa top radius must be between 0.05 and 0.9 of the anchor radius"))
+                }
+            }
+            is AnchorRelief.Caldera -> {
+                level("floorY", relief.floorY, relief.roughness)
+                level("rimY", relief.rimY, relief.roughness)
+                roughness(relief.roughness)
+                if (relief.floorY >= relief.rimY) {
+                    add(error("$path.rimY", "ANCHOR_CALDERA_REVERSED_LEVELS", "Caldera rimY must be above floorY"))
+                }
+                if (relief.floorRadius !in 0.05..0.8) {
+                    add(error("$path.floorRadius", "ANCHOR_FLOOR_RADIUS_OUT_OF_RANGE", "Caldera floor radius must be between 0.05 and 0.8 of the anchor radius"))
+                }
+                if (relief.rimRadius !in 0.15..0.9) {
+                    add(error("$path.rimRadius", "ANCHOR_RIM_RADIUS_OUT_OF_RANGE", "Caldera rim radius must be between 0.15 and 0.9 of the anchor radius"))
+                }
+                if (relief.rimRadius - relief.floorRadius < 0.1 - 1.0e-9) {
+                    add(error("$path.rimRadius", "ANCHOR_CALDERA_WALL_TOO_NARROW", "Caldera rim radius must exceed floor radius by at least 0.1 of the anchor radius"))
                 }
             }
         }

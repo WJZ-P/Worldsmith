@@ -4,6 +4,7 @@ import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.Anchor;
 import com.wjz.worldsmith.core.model.AnchorClimateBias;
 import com.wjz.worldsmith.core.model.AnchorPlacement;
+import com.wjz.worldsmith.core.model.AnchorRelief;
 import com.wjz.worldsmith.core.model.BandEffect;
 import com.wjz.worldsmith.core.model.BandRegion;
 import com.wjz.worldsmith.core.model.BiomeSpatialSettings;
@@ -211,6 +212,11 @@ public final class WorldsmithNoiseSettings {
 		DensityFunction reliefTexture = DensityFunctions.shiftedNoise2d(
 			shiftX, shiftZ, baseScale * 1.6, noises.getOrThrow(Noises.EROSION)
 		);
+		if (shape.getRelief().getFlats() == 0.0 || shape.getRelief().getHighlands() == 0.0 || shape.getRelief().getPeaks() == 0.0) {
+			// Rare noise tails must not let a selected family's climate texture
+			// cross into a biome family the author explicitly removed.
+			reliefTexture = reliefTexture.clamp(-1.0, 1.0);
+		}
 		DensityFunction reliefSelector = DensityFunctions.shiftedNoise2d(
 			shiftX, shiftZ, baseScale * 2.2, noises.getOrThrow(Noises.RIDGE)
 		);
@@ -227,15 +233,6 @@ public final class WorldsmithNoiseSettings {
 		DensityFunction localDetail = DensityFunctions.shiftedNoise2d(
 			shiftX, shiftZ, baseScale * 7.0, noises.getOrThrow(Noises.SURFACE_SECONDARY)
 		);
-
-		double reliefTotal = shape.getRelief().getFlats()
-			+ shape.getRelief().getHighlands()
-			+ shape.getRelief().getPeaks();
-		double flatShare = shape.getRelief().getFlats() / reliefTotal;
-		double highlandShare = shape.getRelief().getHighlands() / reliefTotal;
-		DoubleArrayList thresholds = new DoubleArrayList();
-		thresholds.add(reliefThreshold(flatShare));
-		thresholds.add(reliefThreshold(flatShare + highlandShare));
 
 		double verticalScale = shape.getVerticalScale();
 		DensityFunction flats = DensityFunctions.mul(localDetail, DensityFunctions.constant(7.0 * verticalScale));
@@ -265,29 +262,40 @@ public final class WorldsmithNoiseSettings {
 			DensityFunctions.constant(-0.68),
 			DensityFunctions.mul(reliefTexture, DensityFunctions.constant(0.18))
 		);
-		DensityFunction landform = DensityFunctions.intervalSelect(
-			reliefSelector,
-			thresholds,
-			List.of(flatsLandform, highlandsLandform, peaksLandform)
+		DensityFunction landform = WorldsmithReliefFields.select(
+			reliefSelector, shape.getRelief(), List.of(flatsLandform, highlandsLandform, peaksLandform), 0.0
 		);
 
 		Map<String, DensityFunction> anchorInfluence = new LinkedHashMap<>();
 		for (Anchor anchor : shape.getAnchors()) {
-			anchorInfluence.put(anchor.getId(), DensityFunctions.cache2d(anchorField(anchor, noises)));
+			anchorInfluence.put(anchor.getId(), DensityFunctions.cache2d(anchorField(anchor, anchor.getFalloff(), noises)));
 		}
-		// Erosion is Worldsmith's public landform axis. Applying its authored
-		// anchor bias before either consumer means a landmark changes its real
-		// relief and its biome identity together.
+		// Erosion labels the dominant landform family. Geometry and biome
+		// identity share authored anchor influence; smooth terrain blends the
+		// height response instead of recreating a cliff at a climate threshold.
 		landform = biasClimate(
 			landform, shape.getAnchors(), anchorInfluence, AnchorClimateBias::getErosion, noises);
 		DoubleArrayList landformEdges = new DoubleArrayList();
 		landformEdges.add(-0.375);
 		landformEdges.add(0.05);
-		DensityFunction reliefHeight = DensityFunctions.intervalSelect(
-			landform,
-			landformEdges,
-			List.of(peaks, highlands, flats)
-		);
+		DensityFunction reliefHeight;
+		if (shape.getRelief().getTransitionWidth() == 0.0) {
+			// Deliberately sharp worlds retain categorical escarpments, including
+			// explicitly authored climate overrides around landmarks.
+			reliefHeight = DensityFunctions.intervalSelect(landform, landformEdges, List.of(peaks, highlands, flats));
+		} else {
+			reliefHeight = WorldsmithReliefFields.select(reliefSelector, shape.getRelief(),
+				List.of(flats, highlands, peaks), shape.getRelief().getTransitionWidth());
+			for (Anchor anchor : shape.getAnchors()) {
+				AnchorClimateBias bias = anchor.getClimateBias();
+				if (bias == null || bias.getStrength() <= 0.0 || bias.getErosion() == null) continue;
+				double erosion = bias.getErosion();
+				DensityFunction target = erosion < -0.375 ? peaks : erosion < 0.05 ? highlands : flats;
+				DensityFunction amount = DensityFunctions.mul(warpedInfluence(anchorInfluence.get(anchor.getId()),
+					anchor.getRadius(), noises), DensityFunctions.constant(bias.getStrength()));
+				reliefHeight = DensityFunctions.lerp(amount, reliefHeight, target);
+			}
+		}
 
 		DensityFunction landInput = DensityFunctions.add(continents, DensityFunctions.constant(0.11));
 		DensityFunction inlandRamp = DensityFunctions.mul(
@@ -317,20 +325,19 @@ public final class WorldsmithNoiseSettings {
 		);
 		horizontalHeightBlocks = hydrology.horizontalHeightBlocks();
 
-		// One influence field per anchor, built once and available four ways:
-		// it raises the ground, carries any explicit climate bias, tells the
-		// surface rules which ring they are painting, and bounds where a band acts.
-		// Behind cache2d because it depends only on X and Z.
+		// Climate, materials and bands share the authored influence. Mesa/caldera
+		// cross-sections read the same warped footprint before the influence's
+		// falloff, so a true level interior does not inherit unrelated base hills.
+		// Both fields are behind cache2d because they depend only on X and Z.
 		// Anchors land after hydrology so a river cannot cut a landmark in half,
 		// and before baseTerrain so the preliminary surface level and the biome
 		// depth parameter both see the ground that was actually built.
 		for (Anchor anchor : shape.getAnchors()) {
-			horizontalHeightBlocks = DensityFunctions.add(
-				horizontalHeightBlocks,
-				DensityFunctions.mul(
-					anchorInfluence.get(anchor.getId()),
-					DensityFunctions.constant(anchor.getAmplitude())
-				)
+			DensityFunction influence = anchorInfluence.get(anchor.getId());
+			DensityFunction footprint = anchor.getFalloff() == 1.0 || anchor.getRelief() instanceof AnchorRelief.Offset
+				? influence : DensityFunctions.cache2d(anchorField(anchor, 1.0, noises));
+			horizontalHeightBlocks = WorldsmithAnchorRelief.apply(
+				anchor.getRelief(), influence, footprint, horizontalHeightBlocks, localDetail, terrain.getSeaLevel()
 			);
 		}
 		DensityFunction temperature = biasClimate(
@@ -720,6 +727,7 @@ public final class WorldsmithNoiseSettings {
 
 	private static DensityFunction anchorField(
 		Anchor anchor,
+		double falloff,
 		HolderGetter<NormalNoise.NoiseParameters> noises
 	) {
 		AnchorPlacement placement = anchor.getPlacement();
@@ -728,7 +736,7 @@ public final class WorldsmithNoiseSettings {
 				fixed.getX(),
 				fixed.getZ(),
 				anchor.getRadius(),
-				anchor.getFalloff(),
+				falloff,
 				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.SILHOUETTE_NOISE))
 			);
 		}
@@ -737,7 +745,7 @@ public final class WorldsmithNoiseSettings {
 				scattered.getSpacing(),
 				scattered.getJitter(),
 				anchor.getRadius(),
-				anchor.getFalloff(),
+				falloff,
 				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.JITTER_NOISE)),
 				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.SILHOUETTE_NOISE))
 			);
@@ -749,7 +757,7 @@ public final class WorldsmithNoiseSettings {
 				line.getEndX(),
 				line.getEndZ(),
 				anchor.getRadius(),
-				anchor.getFalloff(),
+				falloff,
 				new DensityFunction.NoiseHolder(noises.getOrThrow(WorldsmithAnchorFields.SILHOUETTE_NOISE))
 			);
 		}

@@ -33,12 +33,14 @@ enum class VanillaNoisePreset {
     AMPLIFIED,
 }
 
-/** Relative share of inland terrain characters; values are normalized by the compiler. */
+/** Inland family weights are normalized; transition width independently shapes their joins. */
 @Serializable
-data class ReliefDistribution(
+data class ReliefDistribution @JvmOverloads constructor(
     val flats: Double,
     val highlands: Double,
     val peaks: Double,
+    /** Half-width in the ridge-noise selector's units; zero deliberately keeps abrupt escarpments. */
+    val transitionWidth: Double = 0.12,
 )
 
 /** Whether a generated river channel is flooded to sea level or remains a dry valley. */
@@ -179,18 +181,56 @@ data class AnchorClimateBias(
  * the great crater, the shattered spires - needs one, and until now none of it
  * could be written down.
  *
- * <p>[amplitude] carries the sign: positive raises ground into a peak, negative
- * sinks it into a crater, so one field covers both without a second mode.
+ * [relief] gives the landmark an actual cross-section, independently from its
+ * climate and material influence. [falloff] controls that shared influence and
+ * the offset profile; an authored mesa or caldera owns its explicit radii.
  */
 @Serializable
 data class Anchor(
     val id: String,
     val placement: AnchorPlacement,
     val radius: Int,
-    val amplitude: Double,
+    val relief: AnchorRelief,
     val falloff: Double = 1.0,
     val climateBias: AnchorClimateBias? = null,
 )
+
+/**
+ * The physical cross-section of a landmark, not a biome label.
+ *
+ * Absolute levels make a mesa genuinely level and a caldera genuinely hollow:
+ * adding the same radial bump to a mountain otherwise keeps the old mountain
+ * on its top. Radii are fractions of the anchor's warped radius. Bounded
+ * [Mesa.roughness] and [Caldera.roughness] preserve small-scale texture in blocks
+ * without reintroducing the underlying continental or relief height.
+ */
+@Serializable
+sealed interface AnchorRelief {
+    /** Positive amplitude raises the existing ground; negative amplitude lowers it. */
+    @Serializable
+    @SerialName("offset")
+    data class Offset(val amplitude: Double) : AnchorRelief
+
+    /** A level interior with a smooth outer flank returning to the surrounding ground. */
+    @Serializable
+    @SerialName("mesa")
+    data class Mesa(
+        val surfaceY: Int,
+        val topRadius: Double = 0.6,
+        val roughness: Double = 2.0,
+    ) : AnchorRelief
+
+    /** A low floor, rising inner wall, raised ring and smoothly blended outer skirt. */
+    @Serializable
+    @SerialName("caldera")
+    data class Caldera(
+        val floorY: Int,
+        val rimY: Int,
+        val floorRadius: Double = 0.25,
+        val rimRadius: Double = 0.65,
+        val roughness: Double = 2.0,
+    ) : AnchorRelief
+}
 
 /** Whether a band puts rock where there was none, or takes it away. */
 @Serializable

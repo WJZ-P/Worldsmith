@@ -34,7 +34,9 @@ import com.wjz.worldsmith.core.story.StoryLibrary
 
 /** Computes the immutable id of the files that affect world generation. */
 object WorldsmithHashUtil {
-    private const val HASH_DOMAIN = "worldsmith-world-content-bundle-v9"
+    // Terrain blend/profile and roof-state compilation changed even for otherwise identical JSON.
+    // Give those results a new content identity instead of reusing an earlier generation receipt.
+    private const val HASH_DOMAIN = "worldsmith-world-content-bundle-v10"
 
     @JvmStatic @JvmOverloads
     fun computeGenerationId(manifest: WorldsmithPackManifest, contents: Map<String, String>,binaries:Map<String,ByteArray> = emptyMap()): String {

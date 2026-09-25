@@ -28,13 +28,14 @@ object MechanicDiscoveryExample {
     @JvmStatic fun create(): WorldsmithPack {
         val base = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
         val shape = base.terrain.shape as TerrainShape.Procedural
-        // Gentle land and no caves/trees near the little courtyard. The fixed anchor is a
-        // discoverable reference, not a promise that every seed's native spawn is identical.
+        // A real level terrace, rather than a bump retaining each seed's hills.
+        // The fixed anchor is a discoverable reference, not a promise that every
+        // seed's native spawn is identical. Caves/trees stay out of the courtyard.
         val terrain = base.terrain.copy(seed = 20260915L, spawnTargets = listOf(ClimateBox()), shape = shape.copy(
             landRatio = 0.95, relief = ReliefDistribution(1.0, 0.0, 0.0), verticalScale = 0.3,
             caves = shape.caves.copy(tunnelDensity = 0.0, cavernDensity = 0.0, noodleDensity = 0.0, entranceDensity = 0.0),
             hydrology = shape.hydrology.copy(riverCoverage = 0.0, lakeDensity = 0.0),
-            anchors = listOf(Anchor("lantern_court", AnchorPlacement.Fixed(0, 0), 128, 8.0,
+            anchors = listOf(Anchor("lantern_court", AnchorPlacement.Fixed(0, 0), 128, AnchorRelief.Mesa(80, 0.65, 0.0),
                 climateBias = AnchorClimateBias(continentalness = 0.6, erosion = 0.8))),
         ))
         val biomes = base.biomes.copy(biomes = base.biomes.biomes.map { it.copy(features = emptyList(),

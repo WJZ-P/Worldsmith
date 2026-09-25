@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.core.pack
 
+import com.wjz.worldsmith.core.model.AnchorRelief
 import com.wjz.worldsmith.core.model.Anchor
 import com.wjz.worldsmith.core.model.AnchorPlacement
 import com.wjz.worldsmith.core.model.BandEffect
@@ -96,7 +97,7 @@ class WorldsmithPackLoaderTest {
     fun `anchor references are validated across terrain bands and biome surfaces`() {
         val original = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands")
         val shape = original.terrain.shape as TerrainShape.Procedural
-        val anchor = Anchor("holy_peak", AnchorPlacement.Fixed(0, 0), radius = 600, amplitude = 0.0, falloff = 1.0)
+        val anchor = Anchor("holy_peak", AnchorPlacement.Fixed(0, 0), radius = 600, relief = AnchorRelief.Offset(0.0), falloff = 1.0)
         val firstBiome = original.biomes.biomes.first()
         val surfaceRule = SurfaceRuleDefinition(
             id = "summit",

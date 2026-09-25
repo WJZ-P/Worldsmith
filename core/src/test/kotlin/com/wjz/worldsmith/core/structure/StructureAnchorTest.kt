@@ -16,7 +16,7 @@ class StructureAnchorTest {
         build=listOf(BuildOperation.Fill("floor",BuildPos(0,0,0),BuildPos(2,0,2),"stone")))
 
     private fun pack(target: StructureAnchorTarget? = null, placement: AnchorPlacement = AnchorPlacement.Fixed(0,0)): WorldsmithPack {
-        val shape = (base.terrain.shape as TerrainShape.Procedural).copy(anchors=listOf(Anchor("holy_peak",placement,100,30.0)))
+        val shape = (base.terrain.shape as TerrainShape.Procedural).copy(anchors=listOf(Anchor("holy_peak",placement,100,AnchorRelief.Offset(30.0))))
         val changed = base.copy(terrain=base.terrain.copy(shape=shape), structures=StructureLibrary(structures=listOf(
             WorldStructureDefinition("temple",floor,StructurePlacement(listOf(base.biomes.biomes.first().id),anchor=target)))))
         val frozen = WorldContentBundleIO.encode(changed)

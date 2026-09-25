@@ -60,7 +60,7 @@
           "z": 96
         },
         "radius": 128,
-        "amplitude": -5,
+        "relief": { "kind": "offset", "amplitude": -5 },
         "falloff": 1.4,
         "climateBias": {
           "strength": 0.9,
@@ -79,7 +79,7 @@
           "z": -256
         },
         "radius": 192,
-        "amplitude": 24,
+        "relief": { "kind": "offset", "amplitude": 24 },
         "falloff": 1.2,
         "climateBias": {
           "strength": 0.75,
@@ -98,7 +98,7 @@
           "z": 128
         },
         "radius": 160,
-        "amplitude": -8,
+        "relief": { "kind": "offset", "amplitude": -8 },
         "falloff": 1.8,
         "climateBias": {
           "strength": 0.5,

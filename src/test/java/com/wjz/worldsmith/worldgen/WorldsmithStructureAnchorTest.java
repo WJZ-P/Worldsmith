@@ -187,7 +187,7 @@ final class WorldsmithStructureAnchorTest {
         var source=WorldsmithPacks.builtin();var base=source.getTerrain();
         var s=WorldsmithTerrainSamplingTest.shape(.98,2,.05,1,0,0,.1,0);
         var shape=new TerrainShape.Procedural(s.getLandRatio(),s.getContinentScale(),s.getCoastRoughness(),s.getRelief(),s.getVerticalScale(),s.getCaves(),s.getHydrology(),s.getBands(),
-            List.of(new Anchor("holy_peak",anchor,128,32,1,null)));
+            List.of(new Anchor("holy_peak",anchor,128,new AnchorRelief.Offset(32),1,null)));
         var terrain=new TerrainPlan(1,SEED,-64,384,1,2,63,base.getDefaultBlock(),base.getDefaultFluid(),shape,true,true,false,base.getSpawnTargets());
         var placement=new com.wjz.worldsmith.core.structure.StructurePlacement(source.getBiomes().getBiomes().stream().map(BiomeDefinition::getId).toList(),24,8,
             List.of(BuildRotation.NONE,BuildRotation.CLOCKWISE_90),new StructureTerrainFit(StructureSurface.LAND_SURFACE,12,new StructureFoundation(FoundationMode.FILL,"stone",16,List.of())),2,target);

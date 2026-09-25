@@ -40,7 +40,7 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
             return incomplete(
                 sessionId,
                 WorldsmithWorkflow.WRITE_TOOL,
-                "Pack '$packId' no longer hashes to its own id, so it was edited outside Worldsmith.",
+                "Pack '$packId' no longer matches its id under the current generation-content contract. Rebuild a new bundle from the current draft; keep the existing local files intact.",
             )
         }
 

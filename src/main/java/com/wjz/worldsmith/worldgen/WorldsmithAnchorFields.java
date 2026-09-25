@@ -24,13 +24,13 @@ import net.minecraft.world.level.levelgen.synth.NormalNoise;
  * split vanilla already makes for structures between a fixed set of positions
  * and a jittered lattice that repeats forever.
  *
- * <p>Both return an influence from zero to one rather than a height. The same
- * field decides how far the ground rises, which biome is chosen, which surface
- * materials are painted and where a band may act, so it cannot carry a height
- * inside it; the caller scales it where a height is what is wanted.
+ * <p>All return an influence from zero to one rather than a height. The shared
+ * footprint controls geometry, climate, surface materials and band reach.
+ * Offset relief uses the authored falloff directly; mesa/caldera relief reads
+ * the same footprint at falloff one and supplies its own cross-section.
  *
- * <p>That caller adds the scaled field to the horizontal height field rather
- * than to the final density. Folding it in upstream is what keeps the surface
+ * <p>The relief compiler modifies the horizontal height field rather than the
+ * final density. Folding it in upstream is what keeps the surface
  * rules, the preliminary surface level and the biome depth parameter in
  * agreement with the ground that was actually built; adding a mountain to the
  * final density alone produces a summit that still thinks it is at sea level.
@@ -42,9 +42,9 @@ public final class WorldsmithAnchorFields {
 	/**
 	 * Influence at a distance, one at the centre and zero past the radius.
 	 *
-	 * <p>{@code falloff} is the single shape knob: below one gives a plateau
-	 * with steep sides, one gives a dome, above one gives a spire standing in a
-	 * wide skirt.
+	 * <p>{@code falloff} controls influence breadth: below one gives a broad cap,
+	 * one gives a dome, above one gives a spire standing in a wide skirt. Actual
+	 * leveled interiors are authored with a mesa cross-section, not this exponent.
 	 */
 	static double profile(double distance, int radius, double falloff) {
 		if (radius <= 0) {

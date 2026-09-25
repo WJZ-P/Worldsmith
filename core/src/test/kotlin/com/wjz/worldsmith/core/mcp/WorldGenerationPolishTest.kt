@@ -44,7 +44,7 @@ class WorldGenerationPolishTest {
         val chest = StructureBlueprint(id = "supply", size = BuildPos(1, 1, 1), palette = mapOf("chest" to BuildMaterial("minecraft:chest")),
             build = listOf(BuildOperation.SetBlock("chest", BuildPos(0, 0, 0), "chest")), variation = StructureVariation(count = 2),
             interactions = listOf(StructureInteraction.Container(BuildPos(0, 0, 0), items = listOf(StructureItem(0, "worldsmith:item/relic", 2)))))
-        val shape = (base.terrain.shape as TerrainShape.Procedural).copy(anchors = listOf(Anchor("supply", anchorPlacement, 100, 0.0)))
+        val shape = (base.terrain.shape as TerrainShape.Procedural).copy(anchors = listOf(Anchor("supply", anchorPlacement, 100, AnchorRelief.Offset(0.0))))
         val structure = WorldStructureDefinition("supply", chest, StructurePlacement(listOf(base.biomes.biomes.first().id),
             anchor = StructureAnchorTarget("supply"), region = StructureRegion("supply", chance = chance)))
         return base.copy(terrain = base.terrain.copy(shape = shape), structures = StructureLibrary(structures = listOf(structure)),

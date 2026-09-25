@@ -201,25 +201,63 @@ object StructureGeometryCompiler {
             else check(half>0 && rise in 1..half,path,"ROOF_SLOPE_OUT_OF_RANGE","Roof rise must be 1..half its cross-span, so steps remain connected")
             check(op.style==RoofStyle.GABLE || op.ridgeAxis==RoofAxis.Z,path,"UNUSED_ROOF_AXIS","Only GABLE consumes ridgeAxis; leave it omitted for FLAT/HIP")
             if(op.profile.isNotEmpty())check(op.style!=RoofStyle.FLAT && op.profile.size in 2..16 && op.profile.first().at==0.0 && op.profile.last().at==1.0 && op.profile.last().height==1.0 && op.profile.all {it.at in 0.0..1.0 && it.height in 0.0..1.0} && op.profile.zipWithNext().all {(a,b)->a.at<b.at},path,"INVALID_ROOF_PROFILE","Roof profile needs 2..16 ordered knots from at=0 to at=1, heights 0..1 and a full-height ridge")
-            fun height(distance:Int):Int {
-                if(op.style==RoofStyle.FLAT)return op.from.y
-                if(op.profile.isEmpty())return op.from.y+min(rise,distance*rise/half)
-                val t=distance.toDouble()/half
-                val pair=op.profile.zipWithNext().firstOrNull {(a,b)->t>=a.at && t<=b.at} ?: (op.profile[op.profile.lastIndex-1] to op.profile.last())
-                val (a,b)=pair;return op.from.y+(rise*(a.height+(b.height-a.height)*(t-a.at)/(b.at-a.at))).roundToInt()
+            // Profile interpolation depends only on the cross-span band, not the roof's area.
+            // Keep validation and exact knot/rounding semantics, then reuse one bounded table for
+            // surface materials, neighbour transitions and backing-block connectivity.
+            val profileSegments=op.profile.zipWithNext()
+            val heights=IntArray(half+1) {distance->
+                when {
+                    op.style==RoofStyle.FLAT -> op.from.y // Also covers a one-cell span (half=0).
+                    op.profile.isEmpty() -> op.from.y+min(rise,distance*rise/half)
+                    else -> {
+                        val t=distance.toDouble()/half
+                        val (a,b)=profileSegments.firstOrNull {(a,b)->t>=a.at && t<=b.at} ?: profileSegments.last()
+                        op.from.y+(rise*(a.height+(b.height-a.height)*(t-a.at)/(b.at-a.at))).roundToInt()
+                    }
+                }
             }
-            if(op.style!=RoofStyle.FLAT)check((0 until half).all {abs(height(it+1)-height(it))<=1},path,"ROOF_PROFILE_DISCONNECTED","Adjacent roof bands must differ by at most one block")
+            if(op.style!=RoofStyle.FLAT)check((0 until half).all {abs(heights[it+1]-heights[it])<=1},path,"ROOF_PROFILE_DISCONNECTED","Adjacent roof bands must differ by at most one block")
             val ridge=material(op.material,path)
             val stair=op.stairMaterial?.let { material(it,path) }
+            data class Surface(val at:BuildPos,val stairFacing:BuildFacing?)
+            val surfaces=ArrayList<Surface>()
+            val stairs=HashMap<BuildPos,BuildFacing>()
             for(x in op.from.x..op.to.x) for(z in op.from.z..op.to.z) {
                 val dx=min(x-op.from.x,op.to.x-x); val dz=min(z-op.from.z,op.to.z-z)
                 val distance=when(op.style){RoofStyle.FLAT->0;RoofStyle.GABLE->if(op.ridgeAxis==RoofAxis.Z)dx else dz;RoofStyle.HIP->min(dx,dz)}
-                val y=height(distance)
-                var facing=if(op.style==RoofStyle.GABLE && op.ridgeAxis==RoofAxis.Z || op.style==RoofStyle.HIP && dx<=dz) {
-                    if(x-op.from.x <= op.to.x-x)"east" else "west"
-                } else {if(z-op.from.z <= op.to.z-z)"south" else "north"}
-                if(distance<half && height(distance+1)<y)facing=when(facing){"east"->"west";"west"->"east";"north"->"south";else->"north"}
-                val block=if(stair!=null && y<op.to.y) stair.copy(properties=stair.properties+mapOf("facing" to facing,"half" to "bottom","shape" to "straight")) else ridge
+                val y=heights[distance]
+                val inward=if(op.style==RoofStyle.GABLE && op.ridgeAxis==RoofAxis.Z || op.style==RoofStyle.HIP && dx<=dz) {
+                    if(x-op.from.x <= op.to.x-x)BuildFacing.EAST else BuildFacing.WEST
+                } else {if(z-op.from.z <= op.to.z-z)BuildFacing.SOUTH else BuildFacing.NORTH}
+                val lowerOutside=distance>0 && heights[distance-1]<y
+                val lowerInside=distance<half && heights[distance+1]<y
+                // Stairs describe a real transition, not a texture for every band. Repeating stairs
+                // over a level terrace creates a sawtooth surface; a one-band peak with both sides
+                // lower needs a full cap rather than an arbitrary one-sided slope. Keep the eave.
+                val facing=if(stair!=null && y<op.to.y && (distance==0 || lowerOutside!=lowerInside)) {
+                    if(lowerInside)inward.rotate(2) else inward
+                } else null
+                val p=BuildPos(x,y,z)
+                surfaces+=Surface(p,facing)
+                if(facing!=null)stairs[p]=facing
+            }
+            fun stairShape(p:BuildPos,facing:BuildFacing):String {
+                fun neighbour(direction:BuildFacing)=stairs[BuildPos(p.x+direction.dx,p.y,p.z+direction.dz)]
+                // Same-level, same-half topology as native stair neighbour updates. This handles
+                // both convex hip ridges and concave upturned eaves, independently of traversal.
+                val front=neighbour(facing)
+                if(front!=null && front.ordinal%2!=facing.ordinal%2 && neighbour(front.rotate(2))!=facing)
+                    return if(front==facing.rotate(-1))"outer_left" else "outer_right"
+                val back=neighbour(facing.rotate(2))
+                if(back!=null && back.ordinal%2!=facing.ordinal%2 && neighbour(back)!=facing)
+                    return if(back==facing.rotate(-1))"inner_left" else "inner_right"
+                return "straight"
+            }
+            for(surface in surfaces) {
+                val (x,y,z)=surface.at
+                val block=surface.stairFacing?.let {facing->
+                    stair!!.copy(properties=stair.properties+mapOf("facing" to facing.name.lowercase(),"half" to "bottom","shape" to stairShape(surface.at,facing)))
+                } ?: ridge
                 // A one-block rise otherwise only touches the next band at an
                 // edge. Back the higher band inside the declared roof box so
                 // slopes form a six-connected shell instead of diagonal cracks.
@@ -228,7 +266,7 @@ object StructureGeometryCompiler {
                     else {
                         val ndx=min(nx-op.from.x,op.to.x-nx);val ndz=min(nz-op.from.z,op.to.z-nz)
                         val nd=when(op.style){RoofStyle.FLAT->0;RoofStyle.GABLE->if(op.ridgeAxis==RoofAxis.Z)ndx else ndz;RoofStyle.HIP->min(ndx,ndz)}
-                        height(nd)<y
+                        heights[nd]<y
                     }
                 }
                 if(lowerNeighbour && y>op.from.y)emit(BuildPos(x,y-1,z),ridge,transform,path)

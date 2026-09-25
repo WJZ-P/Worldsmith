@@ -1,5 +1,6 @@
 package com.wjz.worldsmith.worldgen;
 
+import com.wjz.worldsmith.core.model.AnchorRelief;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.wjz.worldsmith.core.model.HydrologyIntent;
@@ -44,6 +45,38 @@ final class WorldsmithTerrainSamplingTest {
 	private static final double PEAK_BAND_EDGE = -0.375;
 	private static final long SEED = 0x574F524C44534D49L;
 	private static HolderLookup.Provider activeWorldgen;
+
+	@Test
+	void mesaAndCalderaProfilesReachTheGeneratedSurfaceWithoutChangingBiomeIdentity() {
+		RandomState plain = state(anchorShape(), '4');
+		RandomState mesa = state(anchorShape(new Anchor("mesa", new AnchorPlacement.Fixed(0, 0), 600,
+			new AnchorRelief.Mesa(120, 0.6, 0.0), 3.0, null)), '5');
+		RandomState caldera = state(anchorShape(new Anchor("caldera", new AnchorPlacement.Fixed(0, 0), 600,
+			new AnchorRelief.Caldera(70, 150, 0.25, 0.65, 0.0), 0.2, null)), '6');
+
+		// Warped distance is at most 1.5 times raw distance, so every point in
+		// this square is firmly inside the authored mesa top, despite falloff=3.
+		for (int x = -100; x <= 100; x += 25) {
+			for (int z = -100; z <= 100; z += 25) {
+				double height = surfaceHeight(mesa, x, z);
+				assertTrue(Math.abs(height - 120.0) <= 1.0, "mesa inherited old hills at " + x + "," + z + ": " + height);
+			}
+		}
+		assertTrue(Math.abs(surfaceHeight(caldera, 0, 0) - 70.0) <= 1.0, "caldera lost its authored floor");
+		double highestRim = -64.0;
+		for (int x = 100; x <= 580; x += 8) {
+			highestRim = Math.max(highestRim, surfaceHeight(caldera, x, 0));
+		}
+		assertTrue(highestRim >= 148.0, "caldera never raised a real rim: " + highestRim);
+		for (RandomState shaped : List.of(mesa, caldera)) {
+			assertTrue(Math.abs(surfaceHeight(shaped, 2_000, 0) - surfaceHeight(plain, 2_000, 0)) < 1.0);
+			for (int x : new int[] {0, 250, 600, 2_000}) {
+				var point = new DensityFunction.SinglePointContext(x, 0, 0);
+				assertTrue(Math.abs(shaped.router().erosion().compute(point) - plain.router().erosion().compute(point)) < 1.0E-9,
+					"landmark geometry invented an unauthored biome meaning");
+			}
+		}
+	}
 
 	@BeforeAll
 	static void bootstrapMinecraft() {
@@ -271,7 +304,7 @@ final class WorldsmithTerrainSamplingTest {
 
 	@Test
 	void anAnchorBoundBandStaysInsideTheLandmark() {
-		Anchor anchor = new Anchor("sky_focus", new AnchorPlacement.Fixed(0, 0), 700, 0.0, 1.0, null);
+		Anchor anchor = new Anchor("sky_focus", new AnchorPlacement.Fixed(0, 0), 700, new AnchorRelief.Offset(0.0), 1.0, null);
 		TerrainBand band = new TerrainBand(
 			0.45, 180, 240, BandEffect.ADD, BandRegion.ANYWHERE, "sky_focus", 1.4, 1.0
 		);
@@ -292,7 +325,7 @@ final class WorldsmithTerrainSamplingTest {
 	void aFixedAnchorRaisesGroundOnlyWhereItWasPlaced() {
 		RandomState plain = state(anchorShape(), '2');
 		RandomState peaked = state(
-			anchorShape(new Anchor("holy_peak", new AnchorPlacement.Fixed(600, -400), 500, 150.0, 1.0, null)),
+			anchorShape(new Anchor("holy_peak", new AnchorPlacement.Fixed(600, -400), 500, new AnchorRelief.Offset(150.0), 1.0, null)),
 			'3'
 		);
 
@@ -310,7 +343,7 @@ final class WorldsmithTerrainSamplingTest {
 	void aNegativeAnchorSinksGroundIntoACrater() {
 		RandomState plain = state(anchorShape(), '4');
 		RandomState cratered = state(
-			anchorShape(new Anchor("basin", new AnchorPlacement.Fixed(0, 0), 400, -120.0, 1.0, null)),
+			anchorShape(new Anchor("basin", new AnchorPlacement.Fixed(0, 0), 400, new AnchorRelief.Offset(-120.0), 1.0, null)),
 			'5'
 		);
 
@@ -327,7 +360,7 @@ final class WorldsmithTerrainSamplingTest {
 	void aScatteredAnchorRecursAcrossTheWorld() {
 		RandomState plain = state(anchorShape(), '6');
 		RandomState spires = state(
-			anchorShape(new Anchor("spires", new AnchorPlacement.Scattered(4_000, 0.7), 500, 140.0, 1.0, null)),
+			anchorShape(new Anchor("spires", new AnchorPlacement.Scattered(4_000, 0.7), 500, new AnchorRelief.Offset(140.0), 1.0, null)),
 			'7'
 		);
 
@@ -361,7 +394,7 @@ final class WorldsmithTerrainSamplingTest {
 				"ridge",
 				new AnchorPlacement.Line(-1_200, 300, 1_200, 300),
 				240,
-				90.0,
+				new AnchorRelief.Offset(90.0),
 				1.0,
 				null
 			)),
@@ -392,7 +425,7 @@ final class WorldsmithTerrainSamplingTest {
 				"peak",
 				new AnchorPlacement.Fixed(0, 0),
 				500,
-				150.0,
+				new AnchorRelief.Offset(150.0),
 				1.0,
 				new AnchorClimateBias(1.0, null, null, 0.55, -0.8, null)
 			)),
@@ -450,7 +483,7 @@ final class WorldsmithTerrainSamplingTest {
 	void geometryAloneDoesNotInventABiomeMeaning() {
 		RandomState plain = state(anchorShape(), 'a');
 		RandomState mound = state(
-			anchorShape(new Anchor("mound", new AnchorPlacement.Fixed(0, 0), 300, 1.0, 1.0, null)),
+			anchorShape(new Anchor("mound", new AnchorPlacement.Fixed(0, 0), 300, new AnchorRelief.Offset(1.0), 1.0, null)),
 			'b'
 		);
 
@@ -471,7 +504,7 @@ final class WorldsmithTerrainSamplingTest {
 			"island_peak",
 			new AnchorPlacement.Fixed(point[0], point[1]),
 			600,
-			180.0,
+			new AnchorRelief.Offset(180.0),
 			1.0,
 			new AnchorClimateBias(1.0, null, null, 0.45, -0.8, null)
 		);
@@ -490,7 +523,7 @@ final class WorldsmithTerrainSamplingTest {
 		RandomState plain = state(anchorShape(), 'e');
 		AnchorClimateBias bias = new AnchorClimateBias(0.5, 1.0, -0.8, 0.45, -0.7, 0.6);
 		RandomState authored = state(
-			anchorShape(new Anchor("climate", new AnchorPlacement.Fixed(0, 0), 400, 0.0, 1.0, bias)),
+			anchorShape(new Anchor("climate", new AnchorPlacement.Fixed(0, 0), 400, new AnchorRelief.Offset(0.0), 1.0, bias)),
 			'f'
 		);
 		DensityFunction.SinglePointContext centre = new DensityFunction.SinglePointContext(0, 0, 0);
@@ -519,7 +552,7 @@ final class WorldsmithTerrainSamplingTest {
 				"peak",
 				new AnchorPlacement.Fixed(0, 0),
 				2_000,
-				150.0,
+				new AnchorRelief.Offset(150.0),
 				1.0,
 				new AnchorClimateBias(1.0, null, null, null, -0.8, null)
 			)),
@@ -562,7 +595,7 @@ final class WorldsmithTerrainSamplingTest {
 	void anAnchorOutlineIsNotACircle() {
 		RandomState plain = state(anchorShape(), 'b');
 		RandomState peaked = state(
-			anchorShape(new Anchor("peak", new AnchorPlacement.Fixed(0, 0), 1_200, 150.0, 1.0, null)),
+			anchorShape(new Anchor("peak", new AnchorPlacement.Fixed(0, 0), 1_200, new AnchorRelief.Offset(150.0), 1.0, null)),
 			'c'
 		);
 
@@ -975,6 +1008,15 @@ final class WorldsmithTerrainSamplingTest {
 		BiomeSpatialSettings spatial,
 		char idCharacter
 	) {
+		return state(shape, spatial, idCharacter, SEED);
+	}
+
+	static RandomState state(
+		TerrainShape.Procedural shape,
+		BiomeSpatialSettings spatial,
+		char idCharacter,
+		long seed
+	) {
 		WorldsmithPack source = WorldsmithPacks.builtin();
 		TerrainPlan template = source.getTerrain();
 		TerrainPlan terrain = new TerrainPlan(
@@ -1005,7 +1047,7 @@ final class WorldsmithTerrainSamplingTest {
 			manifest, terrain, biomes, source.getFeatures(), id, source.getStructures()
 		));
 		HolderLookup.Provider registries = WorldsmithPackExporter.compilePatch(compiledPack, activeWorldgen()).full();
-		return RandomState.create(registries, compiledPack.noiseSettingsKey(), SEED);
+		return RandomState.create(registries, compiledPack.noiseSettingsKey(), seed);
 	}
 
 	private static double landShare(RandomState state, int samples) {

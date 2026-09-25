@@ -30,6 +30,28 @@ class BiomeDistributionAnalyzerTest {
     private val terrain = WorldsmithPackLoader.loadClasspath("worldsmith/packs/ashlands").terrain
 
     @Test
+    fun `zero relief families stay absent even for subnormal normalized weights`() {
+        val definitions = listOf(
+            "flats" to com.wjz.worldsmith.core.model.NumericRange(.05f, 2f),
+            "highlands" to com.wjz.worldsmith.core.model.NumericRange(-.375f, .05f),
+            "peaks" to com.wjz.worldsmith.core.model.NumericRange(-2f, -.375f),
+        ).map { (id, erosion) -> biome(id, ReliefBand.FLATS).copy(slot = null,
+            climate = com.wjz.worldsmith.core.model.ClimateBox(erosion = erosion)) }
+        for (relief in listOf(ReliefDistribution(Double.MIN_VALUE, Double.MIN_VALUE, 0.0),
+            ReliefDistribution(1.0, 0.0, 0.0), ReliefDistribution(0.0, 1.0, 0.0), ReliefDistribution(0.0, 0.0, 1.0),
+            ReliefDistribution(.5, 0.0, .5), ReliefDistribution(0.0, .5, .5))) {
+            val shape = terrain.shape as com.wjz.worldsmith.core.model.TerrainShape.Procedural
+            val report = BiomeDistributionAnalyzer.analyze(plan(*definitions.toTypedArray()), terrain.copy(shape = shape.copy(relief = relief)))
+            val shares = report.biomes.associate { it.id to it.share }
+            for ((id, weight) in listOf("flats" to relief.flats, "highlands" to relief.highlands, "peaks" to relief.peaks))
+                if (weight == 0.0) assertEquals(0.0, shares.getValue(id), "$id leaked from $relief")
+            assertEquals(1.0, shares.values.sum(), 1e-12)
+            assertTrue(report.notes.any { "not proof" in it })
+            assertTrue(report.notes.any { "transitionWidth" in it })
+        }
+    }
+
+    @Test
     fun `bands that look like mirrors of each other are not the same size`() {
         // The whole reason this tool exists. HOT spans 0.55 to 1.0 and COLD
         // spans -1.0 to -0.15; they read as a symmetric pair in the contract,
