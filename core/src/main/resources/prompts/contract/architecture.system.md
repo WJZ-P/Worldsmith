@@ -25,6 +25,38 @@ visible weakness first. Shared components should preserve a design language, not
 turn every function into the same resized hall. A validator proves constraints,
 not beauty. Minimum size/count checks are floors, never design targets. Default lighting is authored, not a numeric publication gate.
 
+## Theme-to-site evidence
+
+Before the representative building, choose a small set of consequential decisions
+from the actual prompt and current bible. For each, record the source requirement
+or setting node, the visible consequence, the exact implementation field or drawing
+component, and how it will be inspected. Put facts in the bible and acceptance
+claims in the owning module briefs, not in a new runtime style document.
+
+Consider the building and land as one composition:
+
+- **Shared cause.** Explain why this society builds here, with these materials and
+  these spans, openings and roof forms. The same cause should inform the relief,
+  water, vegetation and exposed ground. A material family can bind them without
+  making every surface the same colour.
+- **Site section.** Compare the actual terrain profile, building support datum,
+  occupied levels and entrance. A level `mesa` anchor, hollow `caldera` anchor,
+  ordinary `offset` anchor, sky band or cave requires different siting. An anchor
+  reference connects locations; it does not level foundations or guarantee a start.
+- **Arrival.** State what is first visible, where the entrance becomes legible, and
+  which authored path, stair, crossing or open court reaches it. Use actual access,
+  ports, assembly and terrain-fit declarations. A line anchor deforms land; it is
+  not a road, and a named journey is not measured traversal.
+- **Contrast.** Choose what remains low, quiet or open so the main form has a role.
+  Distinguish ordinary habitat from the focal place without filling every hill
+  with the same landmark. Check the rear and terrain-facing side too.
+
+For a cross-domain claim, give the architecture brief explicit dependencies on the
+relevant terrain/biome briefs. Review the building's own evidence together with
+those dependencies, not only its `themeFit` prose. Keep a design assumption distinct
+from an exact prompt quotation. Deliberate austerity, repetition or darkness can be
+the right answer; there is no universal ornament, symmetry or window-density target.
+
 ## Form, function and family
 
 - **Choose a composition, not a decorated box.** Briefly consider two plausible
@@ -96,9 +128,26 @@ and preflight its access/lighting. Then inspect distinct members and materially
 different variants; naming or recolouring duplicates is not a finished catalog.
 Before publication, review the assembled place as well as individual buildings.
 If the image is unavailable, state that visual review is pending instead of
-inventing observations. Simplified cubes and approximate colours are enough for
-form studies, not proof of textures, transparency, native stair shapes, physical
-lighting or an eye-level game experience. Report those limits honestly.
+inventing observations. Simplified block geometry and approximate colours are enough
+for form studies, not proof of textures, transparency, neighbor-state updates,
+physical lighting or an eye-level game experience. Basic vanilla slabs and stairs
+have offline shape hints; other blocks remain cubes. Report those limits honestly.
+
+The returned `visualEvidence` supplies bounded whole-voxel measurements of the actual
+selected cells, separate from the slab/stair-aware PNG: occupied bounds, footprint,
+orthographic depth layers, skyline profiles,
+large planar panels and visible material shares. Use its view/region observations
+to locate something worth inspecting, then compare the real PNGs. A large flat
+panel may be an intentional monumental wall; many depth layers may be clutter.
+Changing colours alone does not repair a weak mass. These are descriptive facts,
+not beauty scores, mandatory detail quotas or new publication gates.
+
+Filtering by region, components or cutaway changes the measured object; keep those
+settings fixed for comparisons. `frame` controls the camera scale, not a geometry
+crop. Simplified voxel evidence does not establish native block models, physical
+lighting, collision, terrain placement or a player's actual view. Offline geometry,
+source and image checks are a useful stopping point when game validation is deferred;
+do not launch the game merely to complete this visual-design loop.
 
 ## New guided world requirements
 

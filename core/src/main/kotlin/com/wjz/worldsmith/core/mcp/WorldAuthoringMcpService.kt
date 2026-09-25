@@ -20,9 +20,13 @@ class WorldAuthoringMcpService(private val sessions: WorkflowSessions) {
             McpTool("worldsmith_put_module_briefs","Save derived content briefs","Atomically merge ModuleBriefs by id, with optional explicit removeIds. The server stamps current source digests. Preserve other briefs; reference existing world facts rather than inventing another lore source.",
                 McpJson.schema(cas+mapOf("briefs" to buildJsonObject {put("type","array");put("items",obj);put("maxItems",WorldAuthoringModel.MAX_BRIEFS)},"removeIds" to McpJson.array()),listOf("sessionId","expectedRevision","briefs")),false,handler=::putBriefs),
             McpTool("worldsmith_get_authoring_review_context","Read exact self-check inputs","Return current source/content digests, required check IDs and available evidence pointers for subjectId world_bible or a brief id. Evidence and references do not themselves prove narrative quality.",
-                McpJson.schema(sid+mapOf("subjectId" to str),listOf("sessionId","subjectId")),true,handler={a->
+                McpJson.schema(sid+mapOf("subjectId" to str,"expectedInputDigest" to buildJsonObject {
+                    put("type","string");put("description","Required when sourceOffset is positive: copy the first page's expectedInputDigest to reject continuation across changed review inputs.")
+                },"sourceOffset" to buildJsonObject {
+                    put("type","integer");put("minimum",0);put("description","Read the next complete sourceContext page using its nextOffset; omit for the first page.")
+                }),listOf("sessionId","subjectId")),true,handler={a->
                     val s=session(a);require(s.authoring!=null){"This is a legacy/focused session; explicitly upgrade a complete-world draft to use world-design reviews"}
-                    McpToolResult.success(JsonObject(WorldAuthoringPolicy.reviewContext(s,McpJson.string(a,"subjectId"))+
+                    McpToolResult.success(JsonObject(WorldAuthoringPolicy.reviewContext(s,McpJson.string(a,"subjectId"),a["sourceOffset"]?.jsonPrimitive?.int ?: 0,a["expectedInputDigest"]?.jsonPrimitive?.content)+
                         mapOf("originalPrompt" to JsonPrimitive(s.prompt),"semanticCorrectnessProven" to JsonPrimitive(false))))
                 }),
             McpTool("worldsmith_review_world_alignment","Review actual content against its world brief","Record AI checks that cite current actual module fields/assets and compare them to the brief and WorldBible. A report is stale after its reviewed source or content changes.",
@@ -141,7 +145,7 @@ class WorldAuthoringMcpService(private val sessions: WorkflowSessions) {
             put("legacyAuthoring",s.authoring==null);put("bibleRevision",s.authoring?.bibleRevision ?: 0)
             put("biblePresent",s.authoring?.bible!=null);put("briefCount",s.authoring?.briefs?.size ?: 0)
             put("automaticAfterAiReview",s.authoring!=null);put("reviewSource","AUTHORING_AI");put("userApprovalClaimed",false)
-            put("worldBibleStoredInPackage",false);put("runtimePackFormat",6)
+            put("worldBibleStoredInPackage",false);put("runtimePackFormat",com.wjz.worldsmith.core.pack.WorldContentBundleIO.FORMAT_VERSION)
             put("capabilityContract",WorldAuthoringModel.CAPABILITY_CONTRACT)
             val next=WorldAuthoringFlow.issues(s).firstOrNull()
             put("productionReady",WorldAuthoringPolicy.productionProblems(s).isEmpty())

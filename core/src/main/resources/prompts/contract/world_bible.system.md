@@ -53,12 +53,36 @@ mechanic not installed, preserve the demand and an `openDecisions` blocker. Do
 not relabel it as atmospheric prose and call the request fulfilled. Ordinary
 fictional history is fine when it was not promised as executable gameplay.
 
+## Visible setting consequences
+
+Preserve the player's distinctions before choosing an art direction. Separate an
+explicit requirement and exact prompt quotation from an inferred design choice.
+For the most important visual ideas, record a causal chain in existing REGION,
+STYLE, CULTURE, ECOLOGY and EXPERIENCE nodes: why the place exists; its physical
+section and material sources; the building forms it supports; and how a visitor
+approaches and reads it. Nodes should describe observable differences, not only
+adjectives such as majestic, magical or beautiful.
+
+For example, a society above a drowned landscape might need raised occupied
+floors, a clear waterline, landing access and exposed supports. These are possible
+consequences to justify from this request, not a fixed kit for every water world.
+The terrain and architecture should express the same cause without sharing one
+recoloured silhouette. Preserve quiet background and transitions as well as focal
+places; a request for a barren world need not become a dense village catalog.
+
+Later briefs must translate those facts into actual terrain relief, biome/surface
+rules, structure placement, geometry and access evidence. A requested place name,
+written road or climate adjective alone does not implement a landscape. Record
+unsupported or unresolved choices explicitly instead of promising an unseen result.
+
 ## Stable references and budgets
 
 The service exposes `world/title`, `world/premise`, `world/player_role`,
 `world/conflict`, `world/requires_boss`, `world/assumptions`,
 `world/open_decisions`, `requirement/<id>` and `node/<id>` references. These are
 authoring references, not new runtime ContentKey kinds or bundle modules.
+The bible review additionally exposes `world/original_prompt` for its mandatory
+prompt comparison; it is a review source, not an editable bible node or brief basis.
 
 Use 1..128 requirements and 1..256 nodes. Titles are at most 160 characters;
 premise/playerRole/mainConflict and node descriptions at most 8192; requirement
@@ -78,7 +102,14 @@ shortened facts. Only the UI reading projection may be explicitly truncated.
    Pointer `evidencePaths` within `evidenceDocument` from `evidenceRoots` or their
    existing descendants. Do not invent hashes or paths. `expectedInputDigest`
    identifies the review input/retry basis, not another review DTO field.
-   Cover each required check and explain the reasoning.
+   Cover each required check and explain the reasoning. For `prompt_alignment`,
+   compare the complete original prompt with the recorded requirements and
+   assumptions, including exclusions, requested contrasts and scope. Reviewing only
+   the already extracted quotes can miss a requirement that was never extracted.
+   Cite `world/original_prompt` in that check's `basisRefs`, and both
+   `/originalPrompt` and an existing `/bible` path in its `evidencePaths`. Use the
+   current context's source text and roots; do not invent a missing requirement or
+   treat an author assumption as the player's exact words.
    If `evidenceDocumentIncluded` is false, excerpts are only a preview: read the
    relevant full current draft/structure definitions before deciding the result.
 3. Submit `worldsmith_review_world_bible(sessionId, expectedRevision, review)`:

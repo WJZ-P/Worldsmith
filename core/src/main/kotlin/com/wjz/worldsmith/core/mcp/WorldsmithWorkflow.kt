@@ -148,7 +148,13 @@ object WorldsmithWorkflow {
                 "Send the terrain and biome documents you are about to write. A climate box says where a biome " +
                     "may be, never how much of the world that is, and the axes are bell-shaped noise, so a box " +
                     "that looks half the size of another is often a quarter of it. Fix anything the report calls " +
-                    "never chosen or dominant, then run it again before writing.",
+                    "never chosen or dominant against the player's intent: a desert-dominated world should stay desert-dominated. " +
+                    "Repair unintended absence or imbalance and compare again, rather than forcing all biomes into equal shares. This samples climate-space probabilities, not a map or a building site.",
+        ),
+        WorkflowStep(
+            order = 4,
+            tool = "worldsmith_preview_landform",
+            instruction = "For each important committed terrain anchor, inspect its actual offset/mesa/caldera section against an explicit incomingSurfaceY. Compare platform/floor width, ring height, joins and nominal grade with the geography brief and intended building footprint. Repeat with plausible lower/higher surrounding reference planes. The PNG is an isolated unwarped profile: it does not sample seed noise, fluid, caves, bands or structure placement, and is not required when the world intentionally has no anchors.",
         ),
         WorkflowStep(
             order = 5,
@@ -168,7 +174,7 @@ object WorldsmithWorkflow {
         WorkflowStep(
             order = 8,
             tool = "worldsmith_preview_drawing",
-            instruction = "Inspect actual PNG content: opposite isometrics/top in clay for massing, all elevations in material mode, then occupied-storey cutaways. Note the largest visible flaw, make a specific repair and compare the SAME returned frame/view/mode. Review worldsmith_preview_assembly for group hierarchy, spacing and approach too. Preview approximates block shapes/colours; machine checks and image availability alone never prove visual quality or in-game appearance.",
+            instruction = "Inspect actual PNG content: opposite isometrics/top in clay for massing, all elevations in material mode, then occupied-storey cutaways. Use visualEvidence to locate long unchanged silhouettes and coplanar panels; it measures unit-cell geometry, not beauty or the native shape of stairs/slabs. Keep deliberate quiet surfaces. Note the largest visible flaw, make a concrete repair and compare the SAME returned frame/view/mode. Review worldsmith_preview_assembly for focal hierarchy, spacing, approach and how forms meet the terrain brief. Preview approximates block shapes/colours; machine checks and image availability alone never prove visual quality or in-game appearance.",
         ),
         WorkflowStep(
             order = 9,
@@ -184,8 +190,8 @@ object WorldsmithWorkflow {
             order = 11,
             tool = WRITE_TOOL,
             instruction =
-                "Read the current shared draft revision and send sessionId plus expectedRevision. Supply theme/terrain/biomes/features inline or use committed content drafts; blocks/creatures/items and verified PNG assets are frozen with the same bundle. Preserve the template's technical terrain envelope, " +
-                    "but replace its shape with a procedural intent chosen from the player's prompt; design the " +
+                "Read the current shared draft revision and send sessionId plus expectedRevision. Supply theme/terrain/biomes/features inline or use committed content drafts; blocks/creatures/items and verified PNG assets are frozen with the same bundle. Preserve the fixed Overworld minY/height and validated noise-cell limits, " +
+                    "but derive shape, materials, sea level, water/cave intent and spawn climate from the player's theme instead of copying the template; design the " +
                     "biomes and features to match it. Include the planned architecture and all definitions, or omit structures to use the session drafts. " +
                     "Architecture policy is checked again before files are saved. Validation error diagnostics require content repair. " +
                     "A successful Core save also exports <id>.wspack and returns resourcePackReady/resourcePack. An archive-only RESOURCE_PACK_EXPORT_FAILED preserves the saved pack/session: follow its export-only retry arguments, never regenerate content.",
@@ -225,6 +231,7 @@ object WorldsmithWorkflow {
                 "worldsmith_put_module_briefs" to "Jointly plan the main line, regional ecology and resource/reward chain. Assign concrete targets, setting references, dependencies and evidence criteria to briefs. Drawings/textures use briefIds; do not produce unbriefed content.",
                 "worldsmith_get_generation_progress" to "Follow the highest-priority current gap. Read full contracts only for the domain being authored.",
                 "worldsmith_put_content_modules" to "Author theme/worldgen/content/quests/mechanics/abilities coherently. Promised interactions need actual mechanics rules, not only lore. Build real textures and creature rigs through the linked authoring tools; keep returned asset identities.",
+                "worldsmith_preview_landform" to "If the terrain draft has important anchors, inspect each actual relief section using sessionId, anchorId and an explicit constant incomingSurfaceY. Compare core width, rim and transitions to the terrain/building briefs; this is not seeded terrain, final placement or a required step for worlds without anchors.",
                 STRUCTURE_TOOL to "Use the established SDK, preview, architecture and preflight loops for every planned building; preserve current jobs and shared revisions.",
                 "worldsmith_review_world_alignment" to "For each brief, first read get_authoring_review_context with its subjectId, then cite actual module/asset evidence against every required check. Reports bind current setting, briefs and content digests. A reference or a passing schema check alone is not semantic review.",
                 WRITE_TOOL to "Freeze the current revision and receive the single-file resourcePack .wspack receipt. Publication verifies real compiled-material/reward/spawn/objective links. Archive-only errors preserve the frozen draft and name an export-only retry.",
@@ -235,6 +242,7 @@ object WorldsmithWorkflow {
                 "worldsmith_get_generation_progress" to "Resume the current missing worldgen or architecture step instead of repeating completed work.",
                 TEMPLATE_TOOL to "Read technical field shapes when needed; derive all design choices from the player's prompt.",
                 "worldsmith_put_content_modules" to "Commit the theme and worldgen drafts at the shared expectedRevision; nonrequested item/creature/quest modules may remain empty.",
+                "worldsmith_preview_landform" to "For committed terrain anchors only, inspect the authored relief section against an explicit incomingSurfaceY before fitting buildings. This offline diagram does not sample seed noise, caves, bands or actual placement; skip it when no anchors are intended.",
                 ARCHITECTURE_TOOL to "Apply the existing guided architecture quality contract and author its real structures.",
                 WRITE_TOOL to "Freeze the exact current draft and return its single-file .wspack receipt; repair named content diagnostics or retry only archive export when the Core pack is already saved.",
                 FINISH_TOOL to "Ensure the archive is ready, then finish only after the separate native receipt for the saved worldgen pack.",

@@ -129,6 +129,33 @@ a Boss-looking model, or a word in its name is not a Boss profile. This version
 does not promise that natural spawning places the Boss inside a named building.
 A typed spawner is a repeatable local encounter, not global Boss uniqueness.
 
+## Trace the theme into places
+
+Before expanding the catalog, select the few visual consequences that make this
+world recognisable without its title. Tie each to a real prompt requirement or
+bible node, a named target, and a module-brief acceptance criterion. Preserve the
+chain from physical terrain to settlement function, massing, material roles and
+arrival. Use the existing target `purpose`, architecture fields and brief criteria;
+do not invent a runtime style or route module.
+
+Treat `placed_in_biome` as the exact biome allow-list relation it checks, not proof
+of a suitable slope, a successful start or an accessible entrance. Where a named
+terrain feature matters, inspect the actual anchor relief and optional climate bias
+together with structure `placement.anchor`, `terrainFit`, foundation and access.
+Ordinary distributed buildings need no artificial anchor. Statistical distribution,
+an authored site profile and a placed instance are different evidence levels.
+
+Build a representative place together with its environment before copying a design
+family. Compare its actual clay massing, four elevations, occupied-floor sections
+and assembly against the source intent. Use descriptive preview measurements to
+locate weaknesses, not to impose a universal ornament or silhouette score. Follow
+architecture's `theme-to-site-evidence` and `visual-quality-loop` sections, then
+review the building and its explicit terrain/biome dependencies together.
+
+Offline Core tests, profile samples and real preview PNGs can support this loop
+without launching Minecraft. If runtime validation is deferred, preserve that
+boundary and report placement, native lighting and actual traversal as unobserved.
+
 ## Resume by gaps, not by repeating a universal checklist
 
 1. Read `worldsmith_get_generation_progress(sessionId)` after meaningful changes.

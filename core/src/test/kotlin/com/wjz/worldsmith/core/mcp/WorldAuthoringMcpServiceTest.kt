@@ -89,8 +89,9 @@ class WorldAuthoringMcpServiceTest {
                     if (status == ReviewCheckStatus.BLOCKED) fallbacks[criterion]?.jsonArray.orEmpty().map { it.jsonPrimitive.content } else emptyList()
                 }
                 require(available.isNotEmpty()) { "Fixture has no $status evidence for $criterion" }
-                ReviewCheck(criterion, listOf(if (criterion in allowed) criterion else "world/premise"),
-                    "The referenced current field implements the stated world-design criterion.", listOf(available.first()),
+                val promptCheck = context.getValue("subjectId").jsonPrimitive.content == "world_bible" && criterion == "prompt_alignment"
+                ReviewCheck(criterion, listOf(if (promptCheck) "world/original_prompt" else if (criterion in allowed) criterion else "world/premise"),
+                    "The referenced current field implements the stated world-design criterion.", if (promptCheck) listOf("/originalPrompt", "/bible") else listOf(available.first()),
                     "The cited current input provides the evidence for this explicit test finding.", status)
             })
     }

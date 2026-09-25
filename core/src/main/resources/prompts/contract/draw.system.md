@@ -267,11 +267,20 @@ StructureProgram.generate(AuthoringContext) returns AuthoredStructure. The conte
 exposes seed(), parameters(), random(streamName), canvas(bounds), origin(position),
 material(name,state), room(id,interior,floor), indoorPassage(id,interior,floor),
 entrance(id,feet,facing,floor,headroom), lightFixture(id,at,state,level), support(at),
-protect(region), component(id,region), instance(id,authoredComponent,transform),
+protect(region), keepClear(region), component(id,region), instance(id,authoredComponent,transform),
 container(at,state,items), bossSpawner(at,creatureId),
 bossSpawner(at,creatureId,respawnTicks,requiredPlayerRange,spawnRange), storyAnchor(at,place), storyAnchor(at,place,character) and snapshot().
 Item is AuthoringContext.Item(slot,item,count). Read section boss-encounters for the
 spawner's exact bounds, world binding and arena-clearance responsibilities.
+
+protect(region) records variation/decay protection, not vegetation clearance.
+keepClear(region) records an inclusive Box in semantics.keepClear and requires it
+to stay inside the canvas. It only declares intent: it does not carve AIR, remove
+fixtures or invent a route. Author actual empty geometry separately and exclude
+floors, lights, columns and furniture from air-only yard clearances. When entrances
+are declared, these volumes also become access.requiredClear and are checked by
+preflight. Components transform both declarations with their geometry. Native
+vegetation exclusion and terrain placement still need their own validation.
 
 For hanging lamps, prefer hangingLightFixture(id,at,anchor), which defaults to a
 level-15 hanging lantern and vertical iron_chain. Its full overload is
@@ -333,8 +342,9 @@ explicitly that those images are not a successful assembled plan.
 For aesthetic iteration follow architecture section visual-quality-loop. Preview
 clay massing before adding ornament, inspect all elevations and occupied floors,
 then the assembled place. Compare actual images after a specific change. A material
-preview approximates colours and renders blocks as cubes; do not tune fine native
-stairs/glass/light effects against those approximations as if they were screenshots.
+preview approximates colours and includes basic vanilla slab/stair shapes; other
+blocks remain cubes. This is not texture sampling, transparency, neighbor updates
+or a physical-light screenshot.
 
 Use worldsmith_put_architecture_draft(sessionId,expectedRevision,architecture,structures,
 remove) to commit related plan/member changes as one revision. Repairable drafts can be
@@ -347,6 +357,42 @@ cache hits. It does not estimate model reasoning time. Compilation cache is boun
 Only rebuildable caches are evicted. worldsmith_archive_session archives terminal jobs
 and the session to release capacity, preserving sources and frozen results. Resume
 restores data, not code execution. Finish/cancel active jobs before archiving.
+
+## Measured form and theme evidence
+
+Preview replies include `visualEvidence` from the actual selected non-air voxels,
+not from component names or author descriptions. These measurements retain whole
+occupied cells, independently of the shape-aware PNG. It reports `frame`,
+`occupiedBounds`, `nonAirCells`, `footprintColumns`, `projections` and bounded
+`review` observations. Each orthographic projection includes visible cell count,
+depth layers/span, relief edges, largest planar panel region, skyline profile runs
+and visible material counts. Isometric views use orthographic companion
+measurements rather than pretending to measure a perspective facade.
+
+Read the indicated view and region in the PNG before changing geometry. Relate the
+observation to a current prompt/bible claim: does this exposed wall need a recess,
+does the secondary wing compete with the focal mass, or is restraint intentional?
+Repair a named component and compare the same view/mode/frame/filter. A higher
+depth count or a smaller flat panel is not inherently better. Hidden material
+variation does not count as facade variety; recolouring does not add spatial depth.
+
+The report follows region/component/cutaway filtering; a `slice` projection uses
+its selected layer. A frame sets image scale and is not a clip box. Profile and
+material lists are bounded while their total counts remain explicit. Air is
+excluded, but occupied cubes such as glass are not rendered physical transparency.
+Measurements do not establish walkability, in-game light, structural strength or
+successful placement. Use Core checks and image comparisons without starting the
+game when runtime validation has been deferred.
+
+The PNG renderer separately recognizes vanilla `_slab` states (`type` bottom/top/double)
+and `_stairs` states (`facing`, `half`, and straight/inner/outer `shape`). It uses a
+bounded half-block grid with partial-neighbor occlusion; unknown families and
+invalid shape properties fall back to a cube. Deferred orientation follows the
+current native exporter's mirror-then-rotate state semantics, including stair-corner
+mirror behavior, rather than inventing an ideal reflection or updating neighbors.
+Joined faces are filled without per-face antialias seams and the complete image is
+downsampled; real openings remain. This improves roof/eave readability without
+claiming a native model, transparent glass, collision or game lighting result.
 
 ## Boss encounters
 

@@ -92,7 +92,7 @@ data class ReviewCheck(
 /** Pure structural checks and provenance; reference presence never proves semantic correctness. */
 object WorldAuthoringModel {
     /** Bump when installed authoring/runtime capability contracts change; existing evidence then expires. */
-    const val CAPABILITY_CONTRACT = "minecraft26.2-pack10-blocks2-items4-creatures6-abilities1-control1-events2-quests2-story2-structures3-activation1-mechanics1-authoring1"
+    const val CAPABILITY_CONTRACT = "minecraft26.2-pack10-blocks2-items4-creatures6-abilities1-control1-events2-quests2-story2-structures3-activation1-mechanics1-authoring1-terrainrelief2-terrainblend1-reviewcontext2-visualevidence1"
     const val MAX_BIBLE_BYTES = 512 * 1024
     const val MAX_BRIEF_EDIT_BYTES = 1024 * 1024
     const val MAX_REVIEW_BYTES = 512 * 1024

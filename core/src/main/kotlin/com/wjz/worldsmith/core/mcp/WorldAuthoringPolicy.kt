@@ -136,8 +136,13 @@ object WorldAuthoringPolicy {
     fun contentDigest(session: WorkflowSession, brief: ModuleBrief): String = contentDigest(session, brief, modules(session))
 
     /** JSON Pointers resolve in evidenceDocument; an existing target subtree may supply deeper paths. */
-    fun reviewContext(session: WorkflowSession, subjectId: String): JsonObject {
+    fun reviewContext(session: WorkflowSession, subjectId: String, sourceOffset: Int = 0, expectedInputDigest: String? = null): JsonObject {
+        require(sourceOffset >= 0) { "sourceOffset must be nonnegative" }
+        require(sourceOffset == 0 || expectedInputDigest != null) { "Source continuation requires expectedInputDigest from the first page" }
         val current = context(session, subjectId, if (subjectId == BIBLE) emptyMap() else modules(session))
+        if (current != null && expectedInputDigest != null) require(expectedInputDigest == inputDigest(current)) {
+            "AUTHORING_REVIEW_CONTEXT_CHANGED: reviewed sources or content changed; restart sourceOffset=0 rather than combining pages from different inputs"
+        }
         return buildJsonObject {
             put("sessionId", session.id); put("subjectId", subjectId)
             put("source", AuthoringReviewSource.AUTHORING_AI.name)
@@ -151,7 +156,12 @@ object WorldAuthoringPolicy {
                 put("requiredCheckIds", strings(current.required.sorted()))
                 put("allowedCheckIds", strings(current.allowedChecks.sorted()))
                 put("allowedBasisRefs", strings(current.allowedRefs.sorted()))
+                put("sourceContext", sourceContext(session, subjectId, current.allowedRefs, sourceOffset))
                 put("evidenceRoots", buildJsonObject { current.roots.filterKeys { it in current.required }.toSortedMap().forEach { (id, paths) -> put(id, strings(paths.take(16))) } })
+                put("dependencyEvidenceRoots", strings(current.dependencyRoots.take(64)))
+                put("dependencyEvidenceRootCount", current.dependencyRoots.size)
+                put("dependencyEvidenceRootsTruncated", current.dependencyRoots.size > 64)
+                put("primaryEvidenceRequired", true)
                 put("blockedEvidenceRoots", buildJsonObject { current.blockedRoots.filterKeys { it in current.required }.toSortedMap().forEach { (id, paths) -> put(id, strings(paths.take(16))) } })
                 put("evidenceRootLimitPerCheck", 16)
                 val fullEvidence = current.document.toString().length <= 96 * 1024
@@ -162,7 +172,7 @@ object WorldAuthoringPolicy {
                     val raw = resolve(current.document, pointer)?.toString().orEmpty()
                     put("jsonExcerpt", raw.take(2048)); put("truncated", raw.length > 2048)
                 } }))
-                put("instruction", "Author a finding for every requiredCheckId using current digests, source references and JSON Pointer evidence. PASS and BLOCKED both need findings. The evidenceRoots list contains at most 16 example roots per required check; existing descendants are valid. Optional requirement checks may cite any actual target owned by this brief. blockedEvidenceRoots are only for BLOCKED absence findings. When evidenceDocumentIncluded=false, inspect the current content draft/structure definitions using the content tools; excerpts are not the complete evidence. Core validates provenance and coverage, not semantic truth. A passing setting review continues automatically without a user-approval step.")
+                put("instruction", "Read sourceContext before judging implementation: it contains the player's original prompt, criterion claims and resolved setting facts. Page with sourceOffset=nextOffset and the first page's expectedInputDigest until nextOffset is absent; changed inputs reject continuation. Source entries are design intent, not implementation evidence. Author a finding for every requiredCheckId. PASS and BLOCKED both need findings and at least one primary evidence path under that check's evidenceRoots (or a blockedEvidenceRoot for a BLOCKED absence). Additional dependencyEvidenceRoots may support a comparison with explicitly dependent terrain, biomes, materials or other targets, but never replace primary evidence. Root lists are bounded examples; existing descendants and other actual targets of the dependency closure are valid. Optional requirement checks may cite any actual target owned by this brief. The world_bible prompt_alignment check must cite world/original_prompt and both /originalPrompt and /bible evidence to examine omitted or contradicted player requirements, not only the already-extracted list. When evidenceDocumentIncluded=false, inspect current content with its read tools; excerpts are incomplete. Core validates provenance and coverage, not semantic truth or aesthetic quality.")
             }
         }
     }
@@ -219,7 +229,57 @@ object WorldAuthoringPolicy {
         val basis: String, val content: String, val required: Set<String>, val allowedChecks: Set<String>,
         val allowedRefs: Set<String>, val roots: Map<String, List<String>>, val blockedRoots: Map<String, List<String>>,
         val document: JsonObject,
+        val dependencyRoots: List<String> = emptyList(),
     )
+
+    /** Readable design sources are paged separately from implementation evidence. Nothing is silently elided. */
+    private fun sourceContext(session: WorkflowSession, subjectId: String, allowedRefs: Set<String>, offset: Int): JsonObject {
+        val state = requireNotNull(session.authoring)
+        val bible = requireNotNull(state.bible)
+        val brief = state.briefs.singleOrNull { it.brief.id == subjectId }?.brief
+        val entries = buildList {
+            brief?.criteria?.forEach { criterion -> add(buildJsonObject {
+                put("kind", "criterion"); put("id", criterion.id); put("claim", criterion.claim); put("target", McpJson.encode(criterion.target))
+            }) }
+            val references = WorldAuthoringModel.references(bible)
+            allowedRefs.sorted().forEach { ref ->
+                // A valid 64-note source can exceed the entire page budget. Preserve the canonical
+                // basisRef while returning each complete note separately instead of one huge JSON string.
+                val notes = when (ref) {
+                    "world/assumptions" -> bible.assumptions.sorted()
+                    "world/open_decisions" -> bible.openDecisions.sorted()
+                    else -> null
+                }
+                if (!notes.isNullOrEmpty()) notes.forEachIndexed { index, value -> add(buildJsonObject {
+                    put("kind", "basis"); put("id", ref); put("itemIndex", index); put("collectionSize", notes.size); put("value", value)
+                }) }
+                else references[ref]?.let { value -> add(buildJsonObject {
+                    put("kind", "basis"); put("id", ref); put("value", value)
+                }) }
+            }
+            if (brief != null) closure(state, brief).briefs.filter { it.id != brief.id }.forEach { dependency -> add(buildJsonObject {
+                put("kind", "dependencyBrief"); put("id", dependency.id); put("purpose", dependency.purpose)
+                put("targets", McpJson.encode(dependency.targets)); put("dependencies", strings(dependency.dependencies))
+            }) }
+        }
+        require(offset <= entries.size) { "sourceOffset exceeds ${entries.size} current source entries; restart at zero after edits" }
+        var used = 0
+        val page = entries.drop(offset).take(32).takeWhile { entry ->
+            val bytes = entry.toString().toByteArray(Charsets.UTF_8).size
+            (used == 0 || used + bytes <= 48 * 1024).also { if (it) used += bytes }
+        }
+        return buildJsonObject {
+            put("originalPrompt", session.prompt)
+            put("purpose", brief?.purpose ?: "Compare the complete player request with the proposed world and its explicit assumptions")
+            brief?.let { put("briefId", it.id); put("targets", McpJson.encode(it.targets)); put("dependencies", strings(it.dependencies)) }
+            put("entries", JsonArray(page)); put("offset", offset); put("totalEntries", entries.size)
+            val next = offset + page.size
+            put("truncated", next < entries.size)
+            if (next < entries.size) put("nextOffset", next)
+            put("implementationEvidence", false)
+            put("instruction", "Compare these current design claims with actual evidenceDocument fields. These source entries never count as implementation evidence. Entries are whole, not truncated excerpts; continue with sourceOffset=nextOffset and the first page's expectedInputDigest. Changed reviewed inputs require restarting at zero.")
+        }
+    }
 
     private fun context(session: WorkflowSession, subjectId: String, documents: Map<String, JsonObject>): ReviewContext? {
         val state = session.authoring ?: return null
@@ -227,22 +287,28 @@ object WorldAuthoringPolicy {
         val refs = WorldAuthoringModel.references(bible).keys
         if (subjectId == BIBLE) {
             val roots = bible.requirements.mapIndexed { i, requirement -> "requirement/${requirement.id}" to listOf("/bible/requirements/$i") }.toMap() +
-                bible.nodes.mapIndexed { i, node -> "node/${node.id}" to listOf("/bible/nodes/$i") }.toMap() + ("global" to listOf("/bible"))
+                bible.nodes.mapIndexed { i, node -> "node/${node.id}" to listOf("/bible/nodes/$i") }.toMap() +
+                mapOf("global" to listOf("/bible"), "prompt_alignment" to listOf("/originalPrompt", "/bible"))
             val hash = WorldAuthoringModel.bibleDigest(bible)
-            return ReviewContext(hash, hash, roots.keys, roots.keys, refs, roots, emptyMap(), buildJsonObject { put("bible", McpJson.encode(bible)) })
+            val document = buildJsonObject { put("originalPrompt", session.prompt); put("bible", McpJson.encode(bible)) }
+            return ReviewContext(hash, digest(document), roots.keys, roots.keys, refs + "world/original_prompt", roots, emptyMap(), document)
         }
         val brief = state.briefs.singleOrNull { it.brief.id == subjectId }?.brief ?: return null
         val requirements = refs.filter { it.startsWith("requirement/") }.toSet()
         val required = brief.criteria.map { it.id }.toSet() + brief.basisRefs.filter { it in requirements }
         val content = contentDigest(session, brief, documents)
         val document = evidenceDocument(session, documents)
-        val targetRoots = brief.targets.associateWith { target -> targetRoots(target, documents) }
+        val targetRootMap = brief.targets.associateWith { target -> targetRoots(target, documents) }
         fun withAssets(paths: List<String>): List<String> = (paths + paths.flatMap { path -> textureIds(resolve(document, path)).filter { it in session.contentAssets }.map { "/assets/$it" } }).distinct()
-        val allRoots = withAssets(targetRoots.values.flatten())
+        val allRoots = withAssets(targetRootMap.values.flatten())
         val fallbacks = brief.targets.associateWith { target -> listOf(fallbackRoot(target, document)) }
-        val roots = brief.criteria.associate { it.id to withAssets(targetRoots[it.target].orEmpty()) } + requirements.associateWith { allRoots }
+        val roots = brief.criteria.associate { it.id to withAssets(targetRootMap[it.target].orEmpty()) } + requirements.associateWith { allRoots }
         val blockedRoots = brief.criteria.associate { it.id to fallbacks.getValue(it.target) } + requirements.associateWith { fallbacks.values.flatten().distinct() }
-        val basisRefs = closure(state, brief).briefs.flatMap { it.basisRefs }.toMutableSet()
+        val relatedBriefs = closure(state, brief).briefs
+        val dependencyRoots = withAssets(relatedBriefs.filter { it.id != brief.id }.flatMap { dependency ->
+            dependency.targets.flatMap { targetRoots(it, documents) }
+        }).distinct().sorted()
+        val basisRefs = relatedBriefs.flatMap { it.basisRefs }.toMutableSet()
         // Core requirements and rules are part of every basis digest, even when not individually named.
         basisRefs += refs.filter { it.startsWith("world/") || it.startsWith("requirement/") }
         basisRefs += bible.nodes.filter { it.kind == WorldBibleNodeKind.RULE }.map { "node/${it.id}" }
@@ -252,7 +318,7 @@ object WorldAuthoringPolicy {
             if (basisRefs.add("node/$id")) pending.addLast("node/$id")
         }
         return ReviewContext(basisDigest(state, brief), content, required, brief.criteria.map { it.id }.toSet() + requirements,
-            basisRefs.intersect(refs), roots, blockedRoots, document)
+            basisRefs.intersect(refs), roots, blockedRoots, document, dependencyRoots)
     }
 
     private fun validateReview(session: WorkflowSession, review: AuthoringReview, current: ReviewContext?): List<Diagnostic> {
@@ -270,10 +336,17 @@ object WorldAuthoringPolicy {
             if (check.basisRefs.any { it !in current.allowedRefs }) result += problem(at, "${prefix}_BASIS_REFERENCE", "Review findings must cite existing sources in this subject's setting/dependency basis")
             if ((check.criterionId.startsWith("requirement/") || review.subjectId == BIBLE && check.criterionId.startsWith("node/")) && check.criterionId !in check.basisRefs)
                 result += problem(at, "${prefix}_CHECK_BASIS", "This finding must cite the requirement or setting node it evaluates")
-            val roots = current.roots[check.criterionId].orEmpty() + if (check.status == ReviewCheckStatus.BLOCKED) current.blockedRoots[check.criterionId].orEmpty() else emptyList()
+            val primaryRoots = current.roots[check.criterionId].orEmpty() + if (check.status == ReviewCheckStatus.BLOCKED) current.blockedRoots[check.criterionId].orEmpty() else emptyList()
+            val roots = primaryRoots + current.dependencyRoots
             check.evidencePaths.forEach { pointer ->
                 if (resolve(current.document, pointer) == null || roots.none { within(pointer, it) })
-                    result += problem(at, "${prefix}_EVIDENCE_INVALID", "Evidence '$pointer' must exist in the current inputs and belong to this check's actual target; plans are not implementation evidence")
+                    result += problem(at, "${prefix}_EVIDENCE_INVALID", "Evidence '$pointer' must exist under this check's target or an explicit dependency target; plans and design sources are not implementation evidence")
+            }
+            if (check.evidencePaths.none { pointer -> resolve(current.document, pointer) != null && primaryRoots.any { within(pointer, it) } })
+                result += problem(at, "${prefix}_PRIMARY_EVIDENCE_REQUIRED", "A dependency alone does not prove this target: cite its own current content or a BLOCKED absence root")
+            if (review.subjectId == BIBLE && check.criterionId == "prompt_alignment") {
+                if ("world/original_prompt" !in check.basisRefs || "/originalPrompt" !in check.evidencePaths || check.evidencePaths.none { within(it, "/bible") })
+                    result += problem(at, "WORLD_BIBLE_PROMPT_COMPARISON_REQUIRED", "Compare the complete original prompt with the Bible: cite world/original_prompt and both /originalPrompt and an existing /bible path")
             }
         }
         return result

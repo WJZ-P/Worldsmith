@@ -90,6 +90,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
     private val publicationService=PackPublicationService(packStore,sessions,publicationHost,drawingService,abilityCapabilities)
     private val contentService=WorldContentMcpService(packStore,nativeChecks!=null,sessions,this.packDirectory.resolveSibling("content-assets"),drawings::list,abilityCapabilities)
     private val authoringService=WorldAuthoringMcpService(sessions)
+    private val landformPreviewService=LandformPreviewMcpService(sessions)
     private val materialPalette=PreviewMaterialPalette(contentService::textureBytes)
     private val creatureAuthoringService=CreatureAuthoringMcpService(sessions,contentService,this.packDirectory.resolveSibling("creature-work"))
     private val resourcePackExchange=ResourcePackExchange(this.packDirectory, abilityCapabilities)
@@ -107,7 +108,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
 
     fun all(): List<McpTool> = rawTools().map { WorldAuthoringFlow.guard(it,sessions) }.map(progressGateway::observe)
 
-    private fun rawTools(): List<McpTool> = authoringService.tools()+resourcePackService.tools()+contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+abilitySimulationService.tools()+abilityExtensionService.tools()+listOf(
+    private fun rawTools(): List<McpTool> = authoringService.tools()+landformPreviewService.tools()+resourcePackService.tools()+contentService.tools()+creatureAuthoringService.tools()+drawingService.tools()+structureService.tools()+abilitySimulationService.tools()+abilityExtensionService.tools()+listOf(
         McpTool("worldsmith_get_generation_progress_view", "Read the native progress view", "Read the same bounded in-memory session catalog and progress view shown in Create World. No draft edits, selection changes, source execution or archived-file scan.",
             objectSchema(mapOf("sessionId" to stringSchema()),emptyList()),true,handler={ a ->
                 McpToolResult.success(encode(progressSnapshot((a["sessionId"] as? JsonPrimitive)?.contentOrNull)).jsonObject)
@@ -273,10 +274,10 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             name = WorldsmithWorkflow.ANALYZE_TOOL,
             title = "Analyze Worldsmith biome distribution",
             description =
-                "Predict how much of the world each biome will actually cover, before writing the pack. A climate " +
-                    "box says where a biome may be, never how much that is, and the axes are bell-shaped noise: " +
-                    "the HOT band looks like COLD's mirror and is a quarter its size. Reports per-biome share, " +
-                    "land/water split, biomes that are never chosen, and which pairs share a border. " +
+                "Estimate biome shares in sampled statistical climate space before writing the pack, not in a seeded world map. " +
+                    "Unequal axis distributions can make similarly sized climate boxes occur at very different frequencies. " +
+                    "Reports per-biome shares, a land/water estimate, biomes absent from this finite sample and likely climate-space neighbors. " +
+                    "Rare or landmark-local biomes may be absent from the sample without being impossible; intended theme dominance is not a defect. " +
                     "Send the same terrain and biomes you intend to write, or the id of a saved pack.",
             inputSchema = analyzeSchema(),
             readOnly = true,
@@ -672,7 +673,8 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         val terrain: TerrainPlan
         val biomes: BiomePlan
         if (id != null) {
-            val pack = runCatching { WorldsmithPackLoader.loadDirectory(packDirectory.resolve(id)) }
+            val path = packStore.managed(id) ?: return McpToolResult.error("No managed pack with id " + id)
+            val pack = runCatching { WorldsmithPackLoader.loadDirectory(path) }
                 .getOrElse { return McpToolResult.error("No managed pack with id " + id) }
             terrain = pack.terrain
             biomes = pack.biomes
@@ -683,6 +685,9 @@ class WorldsmithMcpTools @JvmOverloads constructor(
 
         val report = BiomeDistributionAnalyzer.analyze(biomes, terrain)
         val structured = buildJsonObject {
+            put("samplingScope", "deterministic statistical climate-space estimate, not a sampled world map")
+            put("actualWorldSampled", false)
+            put("absenceProven", false)
             put("samples", report.samples)
             put("landShare", report.landShare)
             put("waterShare", report.waterShare)
@@ -718,10 +723,11 @@ class WorldsmithMcpTools @JvmOverloads constructor(
         }
 
         val text = buildString {
+            appendLine("Statistical climate-space estimate (${report.samples} draws), not a world map or proof of absence.")
             appendLine("land " + percent(report.landShare) + " / water " + percent(report.waterShare))
             report.biomes.forEach { appendLine(percent(it.share).padStart(6) + "  " + it.id) }
             if (report.absent.isNotEmpty()) {
-                appendLine("never chosen: " + report.absent.joinToString(", "))
+                appendLine("not observed in these samples: " + report.absent.joinToString(", "))
             }
             if (report.rare.isNotEmpty()) {
                 appendLine("under " + percent(BiomeDistributionAnalyzer.RARE_SHARE) + ": " + report.rare.joinToString(", "))

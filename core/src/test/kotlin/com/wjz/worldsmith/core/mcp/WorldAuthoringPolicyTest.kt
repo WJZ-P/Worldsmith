@@ -74,8 +74,9 @@ internal object WorldAuthoringPolicyFixtures {
             val paths = roots[criterion]?.jsonArray.orEmpty()
             val fallback = blocked[criterion]?.jsonArray.orEmpty()
             val evidence = (if (paths.isNotEmpty()) paths else fallback).firstOrNull()?.jsonPrimitive?.content ?: "/modules"
-            val source = if (criterion.startsWith("requirement/") || subjectId == "world_bible" && criterion.startsWith("node/")) criterion else allowed.first()
-            ReviewCheck(criterion, listOf(source), "Compare the assigned role with the cited current input", listOf(evidence),
+            val promptCheck = subjectId == "world_bible" && criterion == "prompt_alignment"
+            val source = if (promptCheck) "world/original_prompt" else if (criterion.startsWith("requirement/") || subjectId == "world_bible" && criterion.startsWith("node/")) criterion else allowed.first()
+            ReviewCheck(criterion, listOf(source), "Compare the assigned role with the cited current input", if (promptCheck) listOf("/originalPrompt", "/bible") else listOf(evidence),
                 if (status == ReviewCheckStatus.PASS) "The fixture report finds the criterion expressed in the cited definition" else "The fixture report identifies a mismatch that needs revision", status)
         }
         return AuthoringReview(id, subjectId, context.getValue("expectedBasisDigest").jsonPrimitive.content,

@@ -78,6 +78,29 @@ If implementation changes a setting fact, update WorldBible first, review that
 revision, then refresh affected briefs. Do not create a second story in a brief
 or merely update the player-facing theme to hide a contradiction.
 
+## Joint landscape and architecture claims
+
+Make important visual claims falsifiable without assigning a beauty score. A useful
+criterion identifies the relevant source fact, the physical consequence, the actual
+target fields or named geometry to inspect, and the intended contrast. For example:
+"the occupied hall sits above the water datum and its authored landing reaches the
+entrance" is more useful than "the hall fits the aquatic theme". Do not hard-code
+that example's building type or proportions into unrelated worlds.
+
+Use one owner per target, with explicit production dependencies when a building
+depends on terrain, biome surfaces or material definitions. Consider these together:
+
+- relief section and water datum versus foundation, occupied floor and arrival;
+- shared local materials versus distinct structural, surface and accent roles;
+- focal silhouette versus background terrain, supporting masses and useful voids;
+- declared entrance and access versus actual authored paths, stairs and crossings.
+
+Source facts belong in the bible; these implementation acceptance claims belong in
+`criteria`. Existing architecture `themeFit`, `layoutIntent`, `distinction` and
+`discovery` summarize the design, but are not geometric proof. Compare current
+multi-view PNGs and descriptive `visualEvidence` for form claims. A terrain profile
+sample is not a generated site, and a biome distribution estimate is not a map.
+
 ## Review the actual candidate, not only the brief
 
 Read `worldsmith_get_authoring_review_context(sessionId, subjectId: briefId)`
@@ -91,6 +114,25 @@ excerpt; inspect the relevant full current draft/structures before reviewing.
 Compare the global hard constraints, related facts, brief criteria, dependencies
 and actual field values. Write one concrete requirement/fact → implementation
 claim → evidence → conclusion chain for each required check.
+
+The context's `sourceContext` is a bounded reading aid for the original prompt,
+resolved setting basis, criteria and dependency briefs. If `truncated` is true,
+read the next page with `sourceOffset: sourceContext.nextOffset` and the first
+page's `expectedInputDigest` on
+`worldsmith_get_authoring_review_context`; unchanged inputs retain the same
+expected digests. Changed review inputs reject continuation; restart at offset
+zero rather than combining old and new source pages. Entries have explicit `kind` values, so keep criterion claims,
+basis facts and dependency briefs distinct. `implementationEvidence:false` means
+source prose explains why a decision was made, not whether it was implemented.
+
+For cross-domain checks, `dependencyEvidenceRoots` adds actual targets owned by the
+brief's explicit dependency closure. Every check still needs at least one primary
+path from its own `evidenceRoots` (or its own `blockedEvidenceRoots` for a BLOCKED
+absence finding); dependency evidence supplements rather than replaces it. Cite
+both ends of a site-fit claim, such as the building placement and
+its terrain anchor relief. Unrelated session targets are not admitted merely because
+they exist. `blockedEvidenceRoots` remains for missing implementation findings,
+not a way to pass with only plans or dependencies.
 
 Submit `worldsmith_review_world_alignment(sessionId, expectedRevision,
 subjectId: briefId, review)` using the AuthoringReview schema in `world_bible`.
