@@ -76,6 +76,14 @@ world-specific groups, independent structures, a monumental landmark and readabl
 The executable AI contract is
 [`contract/structure`](core/src/main/resources/prompts/contract/structure.system.md).
 
+For theme-driven terrain and building composition, see
+[the landscape design guide](docs/theme-landscape-design.md) and the
+[plateau observatory workbench](docs/examples/theme-landscape/README.md).
+Terrain landmarks have explicit `offset`, `mesa` and `caldera` relief profiles;
+`worldsmith_preview_landform` plots an isolated section without launching the game.
+Building previews show basic vanilla stair/slab shapes and return bounded
+silhouette/facade evidence, not an automatic beauty score or a placement guarantee.
+
 ## Build
 
 ```powershell

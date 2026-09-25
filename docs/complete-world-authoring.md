@@ -21,6 +21,10 @@ Worldsmith 提供可复用的 MCP 创作和原生运行时，不内置调用某�
    items schema2的准确字段见 [物品契约](../core/src/main/resources/prompts/contract/items.system.md)，普通资源仍可没有能力。
 3. 通过 SDK worker 生成结构，查看实际预览，提交建筑组装计划。Boss 地标使用
    [typed boss_spawner](creature-bosses.md)，不是一段任意实体 NBT。
+   建筑和地形先用同一份[主题—场地设计依据](theme-landscape-design.md)协调：
+   检查实际 `anchor.relief` 剖面、主次体量、占地／支撑与到达路径；调用
+   `worldsmith_preview_landform` 和结构预览的 `visualEvidence` 定位问题，再看 PNG。
+   两类离线证据均不代替真实世界放置与玩家体验观察。
 4. 用 `worldsmith_get_generation_progress` 获取当前 revision、缺项和下一步参数。
    内容写入共享 `expectedRevision`，不靠重建素材解决 CAS 冲突。
 5. 新作者态流程先对实际内容提交当前有效 AI 实现审核。`worldsmith_write_pack` 复验

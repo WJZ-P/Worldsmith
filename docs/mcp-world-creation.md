@@ -53,6 +53,14 @@ landmark anchors from the player's prompt. The biome contract covers climate
 placement, environment, surface grammar and features. The template supplies the
 technical envelope; it is not a fixed terrain design.
 
+Landmark geometry uses `anchor.relief.kind=offset|mesa|caldera`, not a signed
+amplitude pretending every shape is a hill. After saving the terrain draft,
+`worldsmith_preview_landform(sessionId, anchorId, incomingSurfaceY)` returns an
+offline section against an explicit constant reference plane. It does not
+sample a seed's terrain, caves, bands, fluids or actual structure placement.
+See [theme and landscape design](theme-landscape-design.md) for connecting those
+profiles to building briefs, source-context paging and two-sided dependency evidence.
+
 `complete=true` requires Core checks, native structure export/readback, the full Minecraft
 data-pack reload, verified client asset reload, stable world bindings and preset activation in the current Create World context.
 A selected but unprepared pack returns `WAITING_CREATION` with `requiresUserAction=true`: choose it and press Create New World. Browsing and selection never trigger client resource activation.
