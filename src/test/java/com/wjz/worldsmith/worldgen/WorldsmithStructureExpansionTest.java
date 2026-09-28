@@ -113,7 +113,7 @@ final class WorldsmithStructureExpansionTest {
     private static StructureBlueprint blueprint(String id)throws Exception {
         return WorldsmithJson.INSTANCE.getFormat().decodeFromString(StructureBlueprint.Companion.serializer(),resource(id));
     }
-    private static CompiledPack pack(String id)throws Exception {
+    static CompiledPack pack(String id)throws Exception {
         var base=WorldsmithPacks.builtin();WorldStructureDefinition definition;
         if(id.equals("connected_courtyard"))definition=WorldsmithJson.INSTANCE.getFormat().decodeFromString(WorldStructureDefinition.Companion.serializer(),resource(id));
         else definition=new WorldStructureDefinition(id,blueprint(id),new com.wjz.worldsmith.core.structure.StructurePlacement(List.of(),24,8,List.of(BuildRotation.NONE),new StructureTerrainFit(),2,null));

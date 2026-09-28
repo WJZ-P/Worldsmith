@@ -56,6 +56,7 @@ final class WorldsmithColumnSampler implements WorldsmithTerrainProbe.Sampler {
             // Charge prefetched columns too, so sparse road/water probes cannot bypass the budget.
             if((long)(cells.size()+1)*width*width>WorldsmithTerrainProbe.MAX_COLUMNS)
                 throw new WorldsmithTerrainProbe.ProbeBudgetExceeded();
+            WorldsmithStructureLocator.checkBudget();
             cell=readCell(cellX*width,cellZ*width);cells.put(key,cell);
         }
         return cell[Math.floorMod(x,width)*width+Math.floorMod(z,width)];

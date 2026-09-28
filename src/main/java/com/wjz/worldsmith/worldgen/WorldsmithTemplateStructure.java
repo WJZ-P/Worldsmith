@@ -6,6 +6,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.QuartPos;
 import net.minecraft.core.registries.Registries;
@@ -62,12 +63,23 @@ public final class WorldsmithTemplateStructure extends Structure {
         var sampler=new WorldsmithTerrainProbe.CachedSampler(WorldsmithColumnSampler.create(
             context.chunkGenerator(),context.randomState(),height,config.roads.isPresent()?null:config.site,config.roads.isPresent()?2:plan.height()));
         int first=chooser.nextInt(config.rotations.size());
+        Predicate<BlockPos> biome=p->context.validBiome().test(context.biomeSource().getNoiseBiome(QuartPos.fromBlock(p.getX()),QuartPos.fromBlock(p.getY()),QuartPos.fromBlock(p.getZ()),context.randomState().sampler()));
+        // Every fit ends by testing the biome at the anchor column at the fitted
+        // height, which the fit can only place inside this range.
+        int partY=plan.parts().getFirst().offset().getY();
+        int lowest=height.getMinY()+Math.min(0,partY),highest=height.getMaxY()+Math.max(0,partY);
+        var region=config.layout.region();
         try {
             for(var anchor:WorldsmithTerrainProbe.sites(nominal.get(),config.site.searchRadius())) {
-                if(config.layout.region().isPresent()&&(!config.layout.region().get().contains(context.seed(),anchor)||!config.layout.region().get().waterMatches(anchor,sampler)))continue;
+                WorldsmithStructureLocator.checkBudget();
+                if(region.isPresent()&&!region.get().contains(context.seed(),anchor))continue;
+                // A biome lookup costs about 1/200 of one terrain cell; rule the
+                // column out before its water scan and fits sample any terrain.
+                if(!anyHeight(anchor,lowest,highest,biome))continue;
+                if(region.isPresent()&&!region.get().waterMatches(anchor,sampler))continue;
                 for(int attempt=0;attempt<config.rotations.size();attempt++) {
                     Rotation rotation=config.rotations.get((first+attempt)%config.rotations.size());
-                    var fit=WorldsmithSettlementPlacement.fit(plan,config.site,config.roads,anchor,rotation,sampler,height.getMinY(),height.getMaxY(),p->context.validBiome().test(context.biomeSource().getNoiseBiome(QuartPos.fromBlock(p.getX()),QuartPos.fromBlock(p.getY()),QuartPos.fromBlock(p.getZ()),context.randomState().sampler())));
+                    var fit=WorldsmithSettlementPlacement.fit(plan,config.site,config.roads,anchor,rotation,sampler,height.getMinY(),height.getMaxY(),biome);
                     if(fit.isEmpty())continue;
                     var placed=fit.get();var locate=anchor.atY(placed.parts().getFirst().position().getY());
                     return Optional.of(new GenerationStub(locate,builder->{
@@ -84,6 +96,11 @@ public final class WorldsmithTemplateStructure extends Structure {
             return Optional.empty();
         }
         return Optional.empty();
+    }
+    /** Whether any height of this column, at biome resolution, is in an allowed biome. */
+    static boolean anyHeight(BlockPos column,int minY,int maxY,Predicate<BlockPos> biome) {
+        for(int y=QuartPos.toBlock(QuartPos.fromBlock(minY));y<=maxY;y+=QuartPos.SIZE)if(biome.test(column.atY(y)))return true;
+        return false;
     }
     @Override public StructureType<?> type(){return WorldsmithStructureTypes.template();}
 }

@@ -84,9 +84,20 @@ an anchor alone. Foundation materials are separate placement policy, not weather
 blueprint writes. Worldsmith vegetation avoids authored/reserved/earthwork volumes;
 third-party vegetation and full environmental simulation are outside this protection.
 
-Locate keeps the vanilla search and adds bounded anchor candidates. Default fixed
+Locate searches Worldsmith structures itself and leaves every other structure to
+vanilla. Random-spread rings keep vanilla's order and first-ring-wins rule; anchor
+candidates follow nearest first; the whole search stops after 5 seconds. Vanilla
+would run every candidate's full terrain fit on the server thread for up to 100
+rings, which took minutes for a rare structure that must fit terrain. A search
+cut short returns the nearest start found so far and logs where it stopped. Default fixed
 anchors retain their exact pivot; enabling nearby search allows a small displacement
 inside the reserved envelope. A failed bounded locate is not a global absence proof.
+
+Each nearby pivot is ruled out by biome before any terrain is sampled: if no
+height of its column is in an allowed biome, it cannot pass the final biome check,
+and one biome lookup costs about 1/200 of a sampled terrain cell. Water-proximity
+regions sample an 8-block lattice fixed in world space, so nearby pivots reuse
+each other's columns.
 
 ## Bounds
 

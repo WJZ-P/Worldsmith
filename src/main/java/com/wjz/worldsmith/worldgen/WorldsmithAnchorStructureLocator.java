@@ -1,27 +1,19 @@
 package com.wjz.worldsmith.worldgen;
 
-import com.mojang.datafixers.util.Pair;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
-import net.minecraft.core.SectionPos;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.Structure;
-import net.minecraft.world.level.levelgen.structure.StructureCheckResult;
-import org.jspecify.annotations.Nullable;
 
 /**
- * Vanilla locate only scans its two native placement classes. Add anchor sites
- * without replacing vanilla random-spread/ring search or loading chunks during
- * ordinary placement. Chunk-start checks below run only for explicit locate/map queries.
+ * Vanilla locate only scans its two native placement classes. Enumerates anchor
+ * sites nearest first for {@link WorldsmithStructureLocator}, without loading
+ * chunks; the presence checks themselves run only for explicit locate/map queries.
  */
 public final class WorldsmithAnchorStructureLocator {
     public static final int MAX_SITE_CHECKS = 256;
@@ -61,26 +53,6 @@ public final class WorldsmithAnchorStructureLocator {
         return candidates.stream().sorted(Comparator.comparingDouble((Candidate c) -> origin.distSqr(c.pivot))
             .thenComparing(c -> c.structure.unwrapKey().map(k -> k.identifier().toString()).orElse(""))
             .thenComparing(Candidate::pivot, WorldsmithStructureAnchor.POSITION_ORDER)).limit(MAX_SITE_CHECKS).toList();
-    }
-
-    public static @Nullable Pair<BlockPos, Holder<Structure>> findNearest(ServerLevel level, HolderSet<Structure> wanted,
-        BlockPos origin, int maxRadius, boolean createReference, @Nullable Pair<BlockPos, Holder<Structure>> vanilla) {
-        if (SharedConstants.DEBUG_DISABLE_FEATURES || !level.getServer().getWorldGenSettings().options().generateStructures()) return vanilla;
-        var manager = level.structureManager();
-        double bound = vanilla == null ? Double.POSITIVE_INFINITY : origin.distSqr(vanilla.getFirst());
-        for (var candidate : candidates(level.getChunkSource().getGeneratorState(), wanted, origin, maxRadius)) {
-            if (origin.distSqr(candidate.pivot) >= bound) break;
-            var chunkPos = ChunkPos.containing(candidate.pivot);
-            var presence = manager.checkStructurePresence(chunkPos, candidate.structure.value(), candidate.placement, createReference);
-            if (presence == StructureCheckResult.START_NOT_PRESENT) continue;
-            if (!createReference && presence == StructureCheckResult.START_PRESENT) return Pair.of(candidate.pivot, candidate.structure);
-            var chunk = level.getChunk(chunkPos.x(), chunkPos.z(), ChunkStatus.STRUCTURE_STARTS);
-            var start = manager.getStartForStructure(SectionPos.bottomOf(chunk), candidate.structure.value(), chunk);
-            if (start == null || !start.isValid() || createReference && !start.canBeReferenced()) continue;
-            if (createReference) manager.addReference(start);
-            return Pair.of(candidate.pivot, candidate.structure);
-        }
-        return vanilla;
     }
 
     private static int limit(long coordinate) {

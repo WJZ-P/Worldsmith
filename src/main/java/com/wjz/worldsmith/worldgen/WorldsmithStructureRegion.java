@@ -28,13 +28,17 @@ public record WorldsmithStructureRegion(int groupSeed,int cellSize,double minInf
     }
     public boolean contains(long seed,BlockPos p){double v=influence(seed,p);return v>=minInfluence&&v<=maxInfluence;}
     public boolean accepts(long seed,int salt,BlockPos p){return contains(seed,p)&&unit(seed+salt+net.minecraft.world.level.ChunkPos.pack(p)*0x94D049BB133111EBL)<chance;}
-    /** Coarse 8-block sampling, not an exact distance transform. */
+    /**
+     * Coarse 8-block sampling, not an exact distance transform. The lattice is
+     * fixed in world space, so the nearby sites of one candidate share almost
+     * every sampled column instead of each paying for its own offset lattice.
+     */
     public boolean waterMatches(BlockPos p,WorldsmithTerrainProbe.Sampler sampler) {
         if(water.equals("ANY"))return true;
-        int extent=(waterRadius/8)*8;
-        for(int x=-extent;x<=extent;x+=8)for(int z=-extent;z<=extent;z+=8) {
-            if(x*x+z*z>waterRadius*waterRadius)continue;
-            var c=sampler.sample(p.getX()+x,p.getZ()+z);if(c.water()&&c.surfaceY()>c.groundY())return water.equals("NEAR");
+        for(int x=Math.ceilDiv(p.getX()-waterRadius,8)*8;x<=p.getX()+waterRadius;x+=8)for(int z=Math.ceilDiv(p.getZ()-waterRadius,8)*8;z<=p.getZ()+waterRadius;z+=8) {
+            long dx=x-p.getX(),dz=z-p.getZ();
+            if(dx*dx+dz*dz>(long)waterRadius*waterRadius)continue;
+            var c=sampler.sample(x,z);if(c.water()&&c.surfaceY()>c.groundY())return water.equals("NEAR");
         }
         return water.equals("AWAY");
     }
