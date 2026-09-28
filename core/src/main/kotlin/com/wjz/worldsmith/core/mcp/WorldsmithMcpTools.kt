@@ -12,6 +12,8 @@ import com.wjz.worldsmith.core.draw.DrawSnapshotCodec
 import java.util.Base64
 import com.wjz.worldsmith.core.WorldsmithCore
 import com.wjz.worldsmith.core.analysis.BiomeDistributionAnalyzer
+import com.wjz.worldsmith.core.analysis.PlayabilityAnalyzer
+import com.wjz.worldsmith.core.analysis.PlayabilityReport
 import com.wjz.worldsmith.core.hash.WorldsmithHashUtil
 import com.wjz.worldsmith.core.model.BiomePlan
 import com.wjz.worldsmith.core.model.FeatureLibrary
@@ -282,6 +284,24 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             inputSchema = analyzeSchema(),
             readOnly = true,
             handler = ::analyzeDistribution,
+        ),
+        McpTool(
+            name = WorldsmithWorkflow.PLAYABILITY_TOOL,
+            title = "Analyze Worldsmith playability",
+            description =
+                "Report the symptoms of a world that is valid but dull: interactions stamped from one template, quest lines " +
+                    "that are mostly reading, creatures that only wander, structures that each exist once, items that do nothing, " +
+                    "and whether anything happens without the player. Advisory only; it never blocks a write. " +
+                    WorldsmithWorkflow.WRITE_TOOL + " returns the same report for the pack it was given.",
+            inputSchema = objectSchema(
+                properties = mapOf("id" to buildJsonObject {
+                    put("type", "string"); put("pattern", "^[0-9a-f]{64}$")
+                    put("description", "A saved pack to analyze.")
+                }),
+                required = listOf("id"),
+            ),
+            readOnly = true,
+            handler = ::analyzePlayability,
         ),
         McpTool(
             name = "worldsmith_list_packs",
@@ -668,6 +688,14 @@ class WorldsmithMcpTools @JvmOverloads constructor(
      * the useful moment is before the write, while the design is still cheap to
      * change. A pack id is accepted too, for looking at what was already built.
      */
+    private fun analyzePlayability(arguments: JsonObject): McpToolResult {
+        val id = requiredString(arguments, "id")
+        val pack = runCatching { WorldsmithPackLoader.loadDirectory(packDirectory.resolve(id)) }
+            .getOrElse { return McpToolResult.error("No managed pack with id " + id) }
+        val report = PlayabilityAnalyzer.analyze(pack)
+        return McpToolResult.success(buildJsonObject { put("id", id); put("playability", playabilityJson(report)) }, playabilityText(report))
+    }
+
     private fun analyzeDistribution(arguments: JsonObject): McpToolResult {
         val id = arguments["id"]?.jsonPrimitive?.contentOrNull
         val terrain: TerrainPlan
@@ -1030,10 +1058,12 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             diagnostics += WorldDesignCoverage.validate(pack,requireNotNull(session?.designPlan),requireNotNull(session).requiresPlannedBoss())
             diagnostics += WorldAuthoringPolicy.publicationProblems(session,pack)
         }
+        val playability = playabilityJson(PlayabilityAnalyzer.analyze(pack))
         val structured = buildJsonObject {
             put("id", manifest.id)
             put("valid", diagnostics.none { it.severity == DiagnosticSeverity.ERROR })
             put("diagnostics", diagnosticsJson(diagnostics))
+            put("playability", playability)
             put("mode",session?.mode?.name ?: WorkflowMode.STANDALONE.name)
             put("completeWorldCoverageVerified",completeWorld && diagnostics.none {it.severity==DiagnosticSeverity.ERROR})
             if(diagnostics.any {it.severity==DiagnosticSeverity.ERROR})put("nextTool","worldsmith_get_generation_progress")
@@ -1065,6 +1095,7 @@ class WorldsmithMcpTools @JvmOverloads constructor(
             put("path", directory.toString())
             put("valid", true);put("stage","CORE_CHECK");put("minecraftCompiled",false)
             put("diagnostics", diagnosticsJson(diagnostics))
+            put("playability", playability)
             put("mode",session?.mode?.name ?: WorkflowMode.STANDALONE.name)
             put("completeWorldCoverageVerified",completeWorld)
             if (sessionId.isNotEmpty()) {

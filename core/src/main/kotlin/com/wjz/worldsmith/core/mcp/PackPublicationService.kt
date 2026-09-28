@@ -75,9 +75,13 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
         }
         val activationQueued = !session.finished
         if(sessions.finishAtRevision(sessionId,packId,session.revision)==null)return incomplete(sessionId,WorldsmithWorkflow.WRITE_TOOL,"Draft revision changed during native publication; validate and publish the current revision")
+        val playability = com.wjz.worldsmith.core.analysis.PlayabilityAnalyzer.analyze(pack)
         val report = "Worldsmith pack '${pack.manifest.displayName}' is saved and valid: " +
             "${pack.biomes.biomes.size} biomes, ${pack.features.features.size} features and ${pack.structures.structures.size} structures, stored at $directory. " +
-            "Native export/readback and Minecraft activation have succeeded; actual world placement is not yet verified."
+            "Native export/readback and Minecraft activation have succeeded; actual world placement is not yet verified." +
+            playability.findings.takeIf { it.isNotEmpty() }?.let { findings ->
+                " Known playability gaps to mention honestly: " + findings.joinToString("; ") { it.code.lowercase().replace('_', ' ') } + "."
+            }.orEmpty()
         val structured = buildJsonObject {
             put("sessionId", sessionId)
             put("complete", true)
@@ -109,6 +113,7 @@ class PackPublicationService(private val store:ManagedPackStore,private val sess
                 put("rawClimateBoxes", pack.biomes.biomes.count { it.climate != null })
             }
             put("diagnostics", diagnosticsJson(diagnostics))
+            put("playability", playabilityJson(playability))
             put("activationQueued", false);put("activationSucceeded",true);put("newlyCompleted",activationQueued)
             put("nextTool", JsonNull)
             put("report", report)

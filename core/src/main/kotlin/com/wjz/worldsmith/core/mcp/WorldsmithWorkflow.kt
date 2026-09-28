@@ -70,6 +70,7 @@ object WorldsmithWorkflow {
     const val STYLE_GET_TOOL: String = "worldsmith_get_style"
     const val CONTRACT_TOOL: String = "worldsmith_get_contract"
     const val ANALYZE_TOOL: String = "worldsmith_analyze_biome_distribution"
+    const val PLAYABILITY_TOOL: String = "worldsmith_analyze_playability"
     const val ARCHITECTURE_TOOL: String = "worldsmith_plan_architecture"
     const val ARCHITECTURE_VALIDATE_TOOL: String = "worldsmith_validate_architecture"
     const val STRUCTURE_TOOL: String = "worldsmith_put_structure"
