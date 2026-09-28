@@ -32,7 +32,9 @@ class CreatureBuilder private constructor(private val id: String, private val di
         knockbackResistance: Double, width: Float, height: Float) = attributes(CreatureAttributes(health, speed, followRange, attackDamage, knockbackResistance, width, height))
     fun behavior(value: CreatureBehavior) = apply { behavior = value }
     fun behavior(passiveMode: CreaturePassiveMode, territoryRadius: Int, attackReach: Double, windupTicks: Int, recoveryTicks: Int) =
-        behavior(CreatureBehavior(passiveMode, territoryRadius, attackReach, windupTicks, recoveryTicks))
+        behavior(CreatureBehavior(passiveMode, territoryRadius, attackReach, windupTicks, recoveryTicks, behavior.drives))
+    /** The relationships a creature has to the rest of its world; selects schema 7. */
+    fun drives(value: CreatureDrives) = apply { behavior = behavior.copy(drives = value) }
     fun spawn(value: CreatureSpawn) = apply { spawn = value }
     fun drops(value:List<CreatureDrop>) = apply { drops = value.toList() }
     fun boss(value:CreatureBossProfile?) = apply { boss = value?.copy(phases = value.phases.toList()) }
@@ -58,7 +60,7 @@ class CreatureBuilder private constructor(private val id: String, private val di
         mirrors += MirrorRecipe(sourceRoot, targetRoot, shareUv)
     }
 
-    fun recipe() = CreatureRecipe(id, displayName, category, schemaVersion = if(abilityBindings.any { it.intervalTicks != 1 }) 6 else if(abilityBindings.isNotEmpty()) 5 else if(ability != null) 4 else if(sounds != null) 3 else if(boss == null) 1 else 2, atlasWidth = atlasWidth, atlasHeight = atlasHeight,
+    fun recipe() = CreatureRecipe(id, displayName, category, schemaVersion = if(!behavior.drives.isDefault) 7 else if(abilityBindings.any { it.intervalTicks != 1 }) 6 else if(abilityBindings.isNotEmpty()) 5 else if(ability != null) 4 else if(sounds != null) 3 else if(boss == null) 1 else 2, atlasWidth = atlasWidth, atlasHeight = atlasHeight,
         padding = padding, themeRole = themeRole, attributes = attributes, behavior = behavior,
         spawn = spawn.copy(biomes = spawn.biomes.toList()), bones = bones.values.map { it.copy(cubes = it.cubes.toList()) }, mirrors = mirrors.toList(), drops=drops.toList(), boss=boss?.let {it.copy(phases=it.phases.toList())}, sounds=sounds, ability=ability, abilityBindings=AbilityEventBindings.freeze(abilityBindings))
     fun build(textureSha256: String) = CreatureAuthoring.compile(recipe(), textureSha256)

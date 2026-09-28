@@ -110,7 +110,7 @@ object ExistingWorldContentModules {
             } } + item.abilityBindings.mapIndexed { j, binding -> ContentReference(ContentKey("ability", binding.program), "items.items[$i].abilityBindings[$j].program") }, assets = listOfNotNull(item.textureAsset, item.equipment?.textureAsset)) },
                 diagnostics = CustomItemValidation.validate(library).map { it.copy(path = "items.${it.path}") })
         },
-        TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1, 2, 3, 4, 5, 6), compileAfter = listOf("biomes", "abilities"), requirements = listOf(
+        TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1, 2, 3, 4, 5, 6, 7), compileAfter = listOf("biomes", "abilities"), requirements = listOf(
             ContentRequirement("creatures.native_hosts", 1, ContentLifecycle.BOOTSTRAP),
             ContentRequirement("assets.entity_models", 1, ContentLifecycle.CLIENT_RESOURCES),
             ContentRequirement("creatures.world_behaviors", 1, ContentLifecycle.WORLD_BINDING),
@@ -121,8 +121,10 @@ object ExistingWorldContentModules {
                     creature.spawn.biomes.mapIndexed { j, biome -> ContentReference(ContentKey("biome", biome), "$path.spawn.biomes[$j]") } +
                         listOfNotNull(creature.ability?.let { ContentReference(ContentKey("ability", it.program), "$path.ability.program") }) +
                         creature.abilityBindings.mapIndexed { j, binding -> ContentReference(ContentKey("ability", binding.program), "$path.abilityBindings[$j].program") } +
-                        localBlockReferences(raw.getValue("creatures").jsonArray[i], path),
-                    assets = listOf(creature.model.texture), nativeReferences = nativeReferences(raw.getValue("creatures").jsonArray[i]))
+                        localBlockReferences(raw.getValue("creatures").jsonArray[i], path) +
+                        driveReferences(creature.behavior.drives, "$path.behavior.drives"),
+                    assets = listOf(creature.model.texture),
+                    nativeReferences = nativeReferences(raw.getValue("creatures").jsonArray[i]) + nativeDriveReferences(creature.behavior.drives))
             }, diagnostics = CustomCreatureValidator.validate(library).map { it.copy(path = "creatures.${it.path}") })
         },
         TypedModule(ContentModuleDescriptor("mechanics", listOf("mechanic", "mechanic_rule"), listOf(1),
@@ -213,6 +215,27 @@ object ExistingWorldContentModules {
     val plannedModules = listOf(
         ContentModuleDescriptor("achievements", listOf("achievement"), emptyList(), description = "Independent achievement authoring is not installed or accepted; existing quests already project into native world-specific advancements"),
     )
+
+    /** Drives name other content by id; recording them lets the catalog report a creature that hunts nothing real. */
+    private fun driveReferences(drives: CreatureDrives, path: String): List<ContentReference> = buildList {
+        fun local(field: String, values: List<String>, kind: (String) -> ContentKey?) = values.forEachIndexed { i, v -> kind(v)?.let { add(ContentReference(it, "$path.$field[$i]")) } }
+        val creature = { v: String -> if (':' in v) null else ContentKey("creature", v) }
+        local("hunts", drives.hunts, creature)
+        local("fears", drives.fears, creature)
+        local("eats", drives.eats) { v -> if (v.startsWith(LOCAL_BLOCK_PREFIX)) ContentKey("block", v.removePrefix(LOCAL_BLOCK_PREFIX).substringBefore('[')) else null }
+        local("temptedBy", drives.temptedBy) { v -> when {
+            v.startsWith(LOCAL_ITEM_PREFIX) -> ContentKey("item", v.removePrefix(LOCAL_ITEM_PREFIX))
+            v.startsWith(LOCAL_BLOCK_PREFIX) -> ContentKey("block_item", v.removePrefix(LOCAL_BLOCK_PREFIX).substringBefore('['))
+            else -> null
+        } }
+    }
+
+    private fun nativeDriveReferences(drives: CreatureDrives): List<NativeContentReference> = buildList {
+        fun native(v: String) = ':' in v && !v.startsWith(LOCAL_BLOCK_PREFIX) && !v.startsWith(LOCAL_ITEM_PREFIX)
+        (drives.hunts + drives.fears).filter(::native).forEach { add(NativeContentReference("entity_type", it)) }
+        drives.eats.filter(::native).forEach { add(NativeContentReference("block", it)) }
+        drives.temptedBy.filter(::native).forEach { add(NativeContentReference("item", it)) }
+    }.distinct()
 
     private fun nativeReferences(value: JsonElement): List<NativeContentReference> {
         val result = linkedSetOf<NativeContentReference>()

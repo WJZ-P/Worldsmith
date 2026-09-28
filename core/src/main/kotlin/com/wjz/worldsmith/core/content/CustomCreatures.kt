@@ -82,13 +82,87 @@ data class CreatureAttributes(
 )
 
 @Serializable
-data class CreatureBehavior(
+@OptIn(ExperimentalSerializationApi::class)
+data class CreatureBehavior @JvmOverloads constructor(
     val passiveMode: CreaturePassiveMode = CreaturePassiveMode.WANDER,
     val territoryRadius: Int = 32,
     val attackReach: Double = 2.0,
     val windupTicks: Int = 12,
     val recoveryTicks: Int = 20,
+    /** What the creature does when no player is involved; requires creature schema 7. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val drives: CreatureDrives = CreatureDrives(),
 )
+
+/** How a creature gets around. Each one swaps the native navigation, not only the animation. */
+@Serializable enum class CreatureMovement { WALK, FLY, AMPHIBIOUS }
+
+/** When a creature is out. Outside its hours it settles near home instead of roaming. */
+@Serializable enum class CreatureActivity { ALWAYS, DAY, NIGHT }
+
+/**
+ * The relationships that make a creature part of a world rather than scenery in it.
+ *
+ * Wandering and fighting the player are the only behaviors a creature had, so
+ * every creature waited for the player and nothing was ever found already
+ * happening. Each drive here is a relationship to something else in the world -
+ * a block it eats, a creature it hunts or runs from, an item that draws it, the
+ * time of day, others of its kind - and those play out whether or not anyone is
+ * watching. A few of them combined are what makes a place feel inhabited: the
+ * grazer that thins a meadow, the predator that follows the grazers, the spirit
+ * that only walks at night.
+ *
+ * Creature references are local creature ids or namespaced native entity ids
+ * (`minecraft:sheep`); blocks and items use the same logical or native ids as
+ * every other module.
+ */
+@Serializable
+data class CreatureDrives @JvmOverloads constructor(
+    val movement: CreatureMovement = CreatureMovement.WALK,
+    val activity: CreatureActivity = CreatureActivity.ALWAYS,
+    /** Blocks it walks to and eats; an eaten block becomes air, as a sheep turns grass to dirt. */
+    val eats: List<String> = emptyList(),
+    /** Creatures it chases and attacks. A passive creature with prey still ignores players. */
+    val hunts: List<String> = emptyList(),
+    /** Creatures it keeps away from. */
+    val fears: List<String> = emptyList(),
+    /** Items that make it follow a player holding one. */
+    val temptedBy: List<String> = emptyList(),
+    /** Stays close to others of its own kind. */
+    val herds: Boolean = false,
+    /** Catches fire in direct sunlight, as a zombie does. */
+    val burnsInDaylight: Boolean = false,
+) {
+    /** Each drive as a word, so a report can say what a creature does. */
+    fun verbs(): List<String> = buildList {
+        when (movement) {
+            CreatureMovement.WALK -> Unit
+            CreatureMovement.FLY -> add("flies")
+            CreatureMovement.AMPHIBIOUS -> add("swims")
+        }
+        when (activity) {
+            CreatureActivity.ALWAYS -> Unit
+            CreatureActivity.DAY -> add("keeps daytime hours")
+            CreatureActivity.NIGHT -> add("comes out at night")
+        }
+        if (eats.isNotEmpty()) add("eats " + eats.joinToString())
+        if (hunts.isNotEmpty()) add("hunts " + hunts.joinToString())
+        if (fears.isNotEmpty()) add("flees " + fears.joinToString())
+        if (temptedBy.isNotEmpty()) add("follows players holding " + temptedBy.joinToString())
+        if (herds) add("herds")
+        if (burnsInDaylight) add("burns in daylight")
+    }
+
+    /** Relationships that play out with no player involved. */
+    fun links(): Int = eats.size + hunts.size + fears.size +
+        (if (herds) 1 else 0) + (if (activity != CreatureActivity.ALWAYS) 1 else 0) + (if (burnsInDaylight) 1 else 0)
+
+    val isDefault: Boolean get() = this == CreatureDrives()
+
+    companion object {
+        const val MAX_REFERENCES = 8
+    }
+}
 
 @Serializable
 data class CreatureSpawn(
@@ -113,13 +187,15 @@ object CustomCreatureValidator {
     @JvmStatic fun freeze(library: CreatureLibrary): CreatureLibrary = library.copy(creatures = java.util.List.copyOf(library.creatures.map { c ->
         c.copy(model = c.model.copy(bones = java.util.List.copyOf(c.model.bones.map { b -> b.copy(cubes = java.util.List.copyOf(b.cubes)) })),
             spawn = c.spawn.copy(biomes = java.util.List.copyOf(c.spawn.biomes)), drops = java.util.List.copyOf(c.drops),
+            behavior = c.behavior.copy(drives = c.behavior.drives.let { d -> d.copy(eats = java.util.List.copyOf(d.eats), hunts = java.util.List.copyOf(d.hunts),
+                fears = java.util.List.copyOf(d.fears), temptedBy = java.util.List.copyOf(d.temptedBy)) }),
             boss = c.boss?.let {it.copy(phases = java.util.List.copyOf(it.phases))}, abilityBindings = AbilityEventBindings.freeze(c.abilityBindings))
     }))
 
     @JvmStatic fun validate(library: CreatureLibrary): List<Diagnostic> {
         val result = mutableListOf<Diagnostic>()
         fun error(path: String, message: String) { result += Diagnostic(path, "creature.invalid", DiagnosticSeverity.ERROR, message) }
-        if (library.schemaVersion !in 1..6) error("creatures.schemaVersion", "Supported creature schemaVersions are 1 through 6")
+        if (library.schemaVersion !in 1..7) error("creatures.schemaVersion", "Supported creature schemaVersions are 1 through 7")
         if (library.creatures.size > MAX_CREATURES) error("creatures.creatures", "At most $MAX_CREATURES creature definitions are supported")
         val ids = mutableSetOf<String>()
         library.creatures.forEachIndexed { i, c ->
@@ -207,6 +283,8 @@ object CustomCreatureValidator {
                 range(attackReach, 0.5, 5.0, "behavior.attackReach")
                 if (windupTicks !in 1..100) error("$p.behavior.windupTicks", "Windup must be 1 to 100 ticks")
                 if (recoveryTicks !in 4..200) error("$p.behavior.recoveryTicks", "Recovery must be 4 to 200 ticks")
+                if (!drives.isDefault && library.schemaVersion < 7) error("$p.behavior.drives", "Creature drives require creature schemaVersion 7")
+                validateDrives(c, drives, "$p.behavior.drives", ids = library.creatures.map { it.id }.toSet(), error = ::error)
             }
             with(c.spawn) {
                 if (biomes.size > 128 || biomes.distinct().size != biomes.size || biomes.any { !idPattern.matches(it) || it.split('/').any { s -> s == "." || s == ".." } }) error("$p.spawn.biomes", "Use up to 128 unique logical biome ids; an empty list disables natural spawning")
@@ -216,6 +294,40 @@ object CustomCreatureValidator {
             }
         }
         return result
+    }
+
+    private val nativeId = Regex("[a-z0-9_.-]+:[a-z0-9_./-]+")
+
+    /**
+     * Shapes only; whether a native id names a real block, item or entity is
+     * something only the Minecraft side can know, and it reports and skips an
+     * unknown one rather than failing the world.
+     */
+    private fun validateDrives(
+        creature: CreatureDefinition,
+        drives: CreatureDrives,
+        path: String,
+        ids: Set<String>,
+        error: (String, String) -> Unit,
+    ) {
+        fun list(field: String, values: List<String>, local: (String) -> Boolean) {
+            if (values.size > CreatureDrives.MAX_REFERENCES || values.distinct().size != values.size)
+                error("$path.$field", "List at most ${CreatureDrives.MAX_REFERENCES} unique references")
+            values.forEachIndexed { i, value ->
+                if (!nativeId.matches(value) && !local(value)) error("$path.$field[$i]", "Expected a local id or a namespaced native id")
+            }
+        }
+        list("eats", drives.eats) { false }
+        list("temptedBy", drives.temptedBy) { false }
+        list("hunts", drives.hunts) { it in ids }
+        list("fears", drives.fears) { it in ids }
+        if (creature.id in drives.hunts || creature.id in drives.fears)
+            error(path, "A creature cannot hunt or flee its own kind; use herds for kinship")
+        drives.hunts.intersect(drives.fears.toSet()).forEach {
+            error("$path.fears", "'$it' is both hunted and feared; a creature cannot chase what it runs from")
+        }
+        if (drives.movement == CreatureMovement.FLY && creature.attributes.height > 3.0f)
+            error("$path.movement", "Flying hosts are limited to 3 blocks tall so they can path through open air")
     }
 }
 

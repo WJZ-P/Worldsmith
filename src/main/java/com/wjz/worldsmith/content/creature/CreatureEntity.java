@@ -50,6 +50,8 @@ public class CreatureEntity extends PathfinderMob {
     private final Set<ServerPlayer> bossTrackedPlayers = new HashSet<>();
     private ServerBossEvent bossEvent;
     private CreatureBehavior effectiveBehavior;
+    private boolean flying;
+    private boolean amphibious;
     private int savedBossPhase;
     private int combatRevision;
     private java.util.UUID combatInvocation;
@@ -57,8 +59,10 @@ public class CreatureEntity extends PathfinderMob {
     public CreatureEntity(EntityType<? extends CreatureEntity> type, Level level) { super(type, level); }
 
     public static AttributeSupplier.Builder createAttributes() {
+        // FLYING_SPEED is registered for every host because flight is chosen per definition after construction.
         return Mob.createMobAttributes().add(Attributes.MAX_HEALTH, 20).add(Attributes.MOVEMENT_SPEED, .25)
-            .add(Attributes.FOLLOW_RANGE, 24).add(Attributes.ATTACK_DAMAGE, 3).add(Attributes.KNOCKBACK_RESISTANCE, 0);
+            .add(Attributes.FOLLOW_RANGE, 24).add(Attributes.ATTACK_DAMAGE, 3).add(Attributes.KNOCKBACK_RESISTANCE, 0)
+            .add(Attributes.FLYING_SPEED, .6);
     }
 
     @Override protected void registerGoals() { /* Goals are installed only after immutable identity resolves. */ }
@@ -144,6 +148,8 @@ public class CreatureEntity extends PathfinderMob {
         if (origin == null) origin = blockPosition();
         setHomeTo(origin, d.getBehavior().getTerritoryRadius());
         goalSelector.removeAllGoals(goal -> true); targetSelector.removeAllGoals(goal -> true);
+        var drives = d.getBehavior().getDrives();
+        applyMovement(drives.getMovement());
         goalSelector.addGoal(0, new FloatGoal(this));
         goalSelector.addGoal(1, new ReturnHomeGoal());
         goalSelector.addGoal(2, new ProgramControlGoal());
@@ -155,10 +161,13 @@ public class CreatureEntity extends PathfinderMob {
         } else if (d.getBehavior().getPassiveMode() == CreaturePassiveMode.FLEE_PLAYERS) {
             goalSelector.addGoal(3, new AvoidEntityGoal<>(this, Player.class, (float)a.getFollowRange(), 1.0, 1.35));
         }
+        installDrives(d, drives, (float)a.getFollowRange());
         goalSelector.addGoal(4, new StoryRoutineGoal());
-        goalSelector.addGoal(5, new WaterAvoidingRandomStrollGoal(this, 1.0));
-        goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 8));
-        goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+        goalSelector.addGoal(6, flying
+            ? new WaterAvoidingRandomFlyingGoal(this, 1.0)
+            : drives.getMovement() == CreatureMovement.AMPHIBIOUS ? new RandomStrollGoal(this, 1.0) : new WaterAvoidingRandomStrollGoal(this, 1.0));
+        goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 8));
+        goalSelector.addGoal(8, new RandomLookAroundGoal(this));
         refreshDimensions();
         // Do not override an explicit vanilla NoAI save flag.
     }
@@ -194,6 +203,67 @@ public class CreatureEntity extends PathfinderMob {
         if (level() instanceof ServerLevel) AbilityEventRuntime.creatureTick(this);
     }
 
+    /**
+     * Swaps native navigation for the authored way of moving.
+     *
+     * <p>Navigation is chosen by the Mob constructor, before this entity knows
+     * which creature it is, so it is replaced here once identity resolves.
+     * Walking keeps the constructor's ground navigation untouched.
+     */
+    private void applyMovement(CreatureMovement movement) {
+        boolean fly = movement == CreatureMovement.FLY;
+        if (fly && !flying) {
+            moveControl = new net.minecraft.world.entity.ai.control.FlyingMoveControl<>(this, 20, true);
+            var nav = new net.minecraft.world.entity.ai.navigation.FlyingPathNavigation(this, level());
+            nav.setCanOpenDoors(false); nav.setCanFloat(true);
+            navigation = nav;
+        } else if (movement == CreatureMovement.AMPHIBIOUS && !amphibious) {
+            navigation = new net.minecraft.world.entity.ai.navigation.AmphibiousPathNavigation(this, level());
+        }
+        flying = fly;
+        amphibious = movement == CreatureMovement.AMPHIBIOUS;
+    }
+
+    /**
+     * The relationships that make a creature part of its world.
+     *
+     * <p>Each drive is one native goal. Fleeing sits beside the existing
+     * avoidance at priority 3, hunting and a lure at 3-4, grazing and herding
+     * above wandering, and keeping hours at 4 so a night creature is simply not
+     * out in the day. Hunting uses the same bounded melee as a hostile creature,
+     * so a passive predator still never turns on a player.
+     */
+    private void installDrives(CreatureDefinition d, CreatureDrives drives, float range) {
+        if (drives.isDefault()) return;
+        String owner = d.getId();
+        if (!drives.getFears().isEmpty()) {
+            var feared = CreatureDrivesRuntime.creatures(drives.getFears(), owner);
+            goalSelector.addGoal(3, new AvoidEntityGoal<>(this, LivingEntity.class, feared::test, Math.min(range, 16f), 1.0, 1.4, entity -> true));
+        }
+        if (!drives.getHunts().isEmpty()) {
+            var prey = CreatureDrivesRuntime.creatures(drives.getHunts(), owner);
+            if (d.getCategory() != CreatureCategory.HOSTILE) goalSelector.addGoal(3, new BoundedAttackGoal());
+            targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this, LivingEntity.class, true,
+                (target, level) -> CreatureDrivesRuntime.active(this, drives) && prey.test(target)));
+        }
+        if (!drives.getTemptedBy().isEmpty() && level() instanceof ServerLevel server)
+            goalSelector.addGoal(4, new TemptGoal(this, 1.1, CreatureDrivesRuntime.items(drives.getTemptedBy(), server, owner), false));
+        if (drives.getActivity() != CreatureActivity.ALWAYS) goalSelector.addGoal(4, new CreatureDrivesRuntime.RestGoal(this, drives));
+        if (!drives.getEats().isEmpty()) goalSelector.addGoal(5, new CreatureDrivesRuntime.GrazeGoal(this, CreatureDrivesRuntime.blocks(drives.getEats(), owner)));
+        if (drives.getHerds()) goalSelector.addGoal(5, new CreatureDrivesRuntime.HerdGoal(this, owner));
+    }
+
+    @Override public void aiStep() {
+        super.aiStep();
+        if (configured != null && configured.getBehavior().getDrives().getBurnsInDaylight() && CreatureDrivesRuntime.sunBurns(this)) igniteForSeconds(8.0F);
+    }
+
+    @Override protected void checkFallDamage(double ya, boolean onGround, net.minecraft.world.level.block.state.BlockState onState, BlockPos pos) {
+        if (!flying) super.checkFallDamage(ya, onGround, onState, pos);
+    }
+
+    @Override public boolean canBreatheUnderwater() { return amphibious || super.canBreatheUnderwater(); }
+
     @Override protected EntityDimensions getDefaultDimensions(Pose pose) {
         var d = definition();
         return d == null ? super.getDefaultDimensions(pose) : EntityDimensions.scalable(d.getAttributes().getWidth(), d.getAttributes().getHeight());
@@ -225,7 +295,7 @@ public class CreatureEntity extends PathfinderMob {
         getAttribute(Attributes.MOVEMENT_SPEED).setBaseValue(definition.getAttributes().getSpeed()*selected.getSpeedMultiplier());
         getAttribute(Attributes.ATTACK_DAMAGE).setBaseValue(definition.getAttributes().getAttackDamage()*selected.getDamageMultiplier());
         var base=definition.getBehavior();
-        effectiveBehavior=new CreatureBehavior(base.getPassiveMode(),base.getTerritoryRadius(),base.getAttackReach(),selected.getWindupTicks(),selected.getRecoveryTicks());
+        effectiveBehavior=new CreatureBehavior(base.getPassiveMode(),base.getTerritoryRadius(),base.getAttackReach(),selected.getWindupTicks(),selected.getRecoveryTicks(),base.getDrives());
         savedBossPhase=phase; entityData.set(BOSS_PHASE,phase); combatRevision++;
     }
 

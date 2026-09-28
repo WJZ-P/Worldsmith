@@ -1,4 +1,4 @@
-# Worldsmith custom creature contract — module schemas 1 through 6
+# Worldsmith custom creature contract — module schemas 1 through 7
 
 New publications use bundle format 10 with required mechanics and abilities. Older bundle formats are rejected; domain schema versions below are not bundle-format compatibility paths.
 
@@ -8,8 +8,9 @@ procedural role-based motion, passive wandering/fleeing, hostile melee, bounded
 death drops, explicit schema-2 ground-melee Boss phases, and schema-4 shared
 AbilityScript bindings. The abilities module is the programmable behavior layer;
 this creature DTO carries the host policy, not closed skill presets. GeckoLib
-files, flight/swimming-specific host navigation, mounts, inventories and multipart
-body entities remain outside this DTO. Scripts can emit projectiles via capabilities.
+files, mounts, inventories and multipart body entities remain outside this DTO.
+Scripts can emit projectiles via capabilities. Schema 7 adds `behavior.drives`:
+flight and amphibious navigation plus the relationships described below.
 
 Schema 5 adds general native event bindings; schema 6 adds bounded, staggered
 `tick` observation intervals. Pure observation sources run beside native daily
@@ -19,7 +20,7 @@ yielding, read-only perception and resource/lifecycle limits.
 
 ## Exact library and definition fields
 
-`CreatureLibrary` has `schemaVersion` (1 by default, or 2/3/4/5/6) and `creatures`.
+`CreatureLibrary` has `schemaVersion` (1 by default, or 2/3/4/5/6/7) and `creatures`.
 Schema 1 preserves ordinary creature definitions and omits `boss`. A non-null
 `boss` requires schema 2 through 6 and current bundle format 10. Older bundle formats
 are rejected rather than silently dropping fields. An empty library is valid outside
@@ -110,6 +111,7 @@ Bosses may use zero base attackDamage because their program owns damage.
 - `attackReach`: finite 0.5..5 blocks, default 2.
 - `windupTicks`: integer 1..100, default 12.
 - `recoveryTicks`: integer 4..200, default 20.
+- `drives`: optional, schema 7; see *Drives* below.
 
 Without an ability binding the server owns the simple melee windup/strike/recovery
 state machine. With a schema-4 binding, the AbilityScript source owns combat flow.
@@ -123,6 +125,49 @@ ability field and separate abilities module; do not invent inline script fields.
 - `weight`: integer 1..1000, default 10.
 - `minGroup`/`maxGroup`: integers satisfying 1 <= min <= max <= 8; defaults 1/3.
 - `minLight`/`maxLight`: integers satisfying 0 <= min <= max <= 15; defaults 0/15.
+
+## Drives: what a creature does when nobody is watching (schema 7)
+
+A creature that only wanders is scenery that moves. Players remember the
+places where something was already happening when they arrived: deer scattering
+from wolves, a meadow grazed thin, lantern moths drifting out at dusk. Those
+come from relationships, and each drive is one relationship. **Give every
+creature at least one.** A world where grazers eat a plant, a predator hunts the
+grazers and something only walks at night is more alive than any number of
+extra quests, and it costs a few words per creature.
+
+`behavior.drives` fields, all optional:
+
+- `movement`: `WALK` (default), `FLY` or `AMPHIBIOUS`. `FLY` swaps in flying
+  navigation with no fall damage and requires `height` at most 3; use it for
+  birds, moths and drifting spirits instead of apologising for a walking bird.
+  `AMPHIBIOUS` breathes underwater and paths through water and over land.
+- `activity`: `ALWAYS` (default), `DAY` or `NIGHT`. Outside its hours the
+  creature goes home and stays there, so players can learn when to look for it.
+- `eats`: up to 8 block ids it walks to and eats; the block becomes air (subject
+  to mob griefing). Pick something the biome actually grows.
+- `hunts`: up to 8 creature references it chases and attacks with its melee. A
+  passive predator still never targets players. Hunting only happens inside its
+  active hours.
+- `fears`: up to 8 creature references it runs from.
+- `temptedBy`: up to 8 item ids; it follows a player holding one. This is how a
+  player befriends, herds or lures something - pair it with an item the world
+  lets them obtain.
+- `herds`: `true` keeps it near others of its own kind.
+- `burnsInDaylight`: `true` sets it alight in open sunlight unless the biome's
+  environment turns burning off.
+
+Creature references are local creature ids or namespaced vanilla entity ids
+(`minecraft:sheep`). Blocks and items use the same logical
+(`worldsmith:content/...`, `worldsmith:item/...`) or vanilla ids as everywhere
+else. A creature cannot hunt or fear its own kind, or both hunt and fear the same
+thing. An unknown vanilla id is reported by the game and that one relationship
+is skipped.
+
+```json
+"behavior": { "territoryRadius": 40, "drives": {
+  "activity": "NIGHT", "hunts": ["dream_mote", "minecraft:rabbit"], "herds": true } }
+```
 
 ## Schema 2 Boss profile
 

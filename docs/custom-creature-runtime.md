@@ -59,9 +59,27 @@ Low-level creature APIs, used by the aggregate service:
 5. On unload/disconnect call `unbind(level)`/`clearServer()` and `clearClient()`. A prepared draft is never a default for another world.
 6. Explicit server spawns place an entity first, then call `entity.initialize(bundleHash, creatureId, appearanceSeed)` before adding it to the level. Identity/category validation runs before attributes and goals are installed.
 
+## Drives (schema 7)
+
+`behavior.drives` gives a creature relationships to the rest of its world, so something happens whether or not a player is present. Every drive becomes one native goal when the creature's identity resolves in `CreatureEntity.configure`; references are resolved once into predicates by `CreatureDrivesRuntime`, and an unknown native id is logged and that one relationship skipped.
+
+| drive | native behavior |
+| --- | --- |
+| `movement: FLY` | `FlyingMoveControl` + `FlyingPathNavigation` swapped in after construction, flying stroll, no fall damage; hosts ≤ 3 blocks tall |
+| `movement: AMPHIBIOUS` | `AmphibiousPathNavigation`, breathes underwater, stroll does not avoid water |
+| `activity: DAY / NIGHT` | outside its hours the creature returns home and stays; hunting only targets during active hours |
+| `eats` | walks to a nearby matching block inside its territory and removes it (respects `mobGriefing`), healing 2 |
+| `hunts` | `NearestAttackableTargetGoal` over matching creatures/entities using the bounded melee; a passive predator still never targets players |
+| `fears` | `AvoidEntityGoal` over matching creatures/entities |
+| `temptedBy` | vanilla `TemptGoal`; logical items compare by their world definition |
+| `herds` | drifts back toward the centre of same-id creatures within 16 blocks |
+| `burnsInDaylight` | vanilla's sun test, honouring the `monsters_burn` environment attribute |
+
+`FLYING_SPEED` is registered on every creature host because flight is chosen per definition after the entity is constructed.
+
 ## Gameplay boundaries
 
-Flying, swimming navigation, taming, breeding, riding, multipart bodies, equipment, scripted keyframe timelines, inverse kinematics, arbitrary keyframe-triggered sound events, runtime code generation and automatic per-world network asset transfer are not implemented by this module. The installed branching quests module independently validates player-credited `kill_creature` objectives using logical IDs, including typed landmark Bosses; achievements are not installed. The common world lifecycle decides which client/server deployment modes are currently available.
+Taming, breeding, riding, multipart bodies, equipment, scripted keyframe timelines, inverse kinematics, arbitrary keyframe-triggered sound events, runtime code generation and automatic per-world network asset transfer are not implemented by this module. The installed branching quests module independently validates player-credited `kill_creature` objectives using logical IDs, including typed landmark Bosses; achievements are not installed. The common world lifecycle decides which client/server deployment modes are currently available.
 
 ## Offline creature authoring preview
 
