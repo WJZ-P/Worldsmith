@@ -59,6 +59,32 @@ the first delivery consumes less than the available earlier supply; the reward
 enables a later supported item action. These are examples of causal reasoning,
 not fixed required content or names. Every claimed mechanism needs actual fields.
 
+## Claims about play, not only about fidelity
+
+Every check in this workflow asks whether content matches the setting. None of
+them can ask whether it is fun, so a world can pass them all and still be six
+copies of one interaction, a quest line that is mostly reading, and creatures
+that walk at random. The review only enforces what a criterion claims; if play
+matters, it has to be claimed. Give the owning briefs criteria like these,
+phrased for this world:
+
+- each landmark offers one interaction that could only happen there, not the
+  same inspect/offer pair with a different name;
+- every creature has at least one drive (`eats`, `hunts`, `fears`, `temptedBy`,
+  `herds`, `activity`, `movement`) linking it to a block, another creature, an
+  item or the time of day, and at least one predator/prey or grazer/plant pair
+  plays out with no player present;
+- at least one small structure repeats across the biomes so walking in any
+  direction can turn something up, and the vanilla structures that fit the
+  theme are enabled through biome `tags`;
+- quest objectives mostly change the world (build, deliver, drive off,
+  activate) rather than read a fact;
+- every obtainable item is spent, worn, used, traded or handed in somewhere.
+
+`worldsmith_write_pack` and `worldsmith_analyze_playability` report where the
+current content falls short of exactly these. The report is advisory; the
+criteria are what make the review hold the world to it.
+
 Terrain-first is a production dependency after the bible/plan/briefs, not a reason
 to defer story and resource planning. Build one representative slice and inspect
 actual geometry, PNGs and supported sound profiles before multiplying content.

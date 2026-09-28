@@ -53,6 +53,17 @@ mechanic not installed, preserve the demand and an `openDecisions` blocker. Do
 not relabel it as atmospheric prose and call the request fulfilled. Ordinary
 fictional history is fine when it was not promised as executable gameplay.
 
+## A world that is doing something
+
+A bible that only describes a place produces a diorama. Record at least one
+ECOLOGY node naming who eats what and who hunts whom, with the time of day each
+is about, and at least one EXPERIENCE node for what a player stumbles on between
+the authored landmarks. Those nodes are what later briefs turn into creature
+drives, repeating structures and enabled vanilla discoveries; without them the
+world waits for the player instead of being found already underway. These are
+authoring choices recorded as nodes, not hard requirements - requirements still
+quote the prompt.
+
 ## Visible setting consequences
 
 Preserve the player's distinctions before choosing an art direction. Separate an
