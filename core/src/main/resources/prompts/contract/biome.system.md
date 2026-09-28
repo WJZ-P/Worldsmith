@@ -221,6 +221,37 @@ Some particles need a block or a colour before they can be drawn - `falling_dust
 cannot be named by id alone. Those are skipped while the world loads, so the
 effect simply never appears.
 
+### Vanilla structures: what a player can stumble on
+
+A world is worth exploring when walking in any direction can turn something
+up. Vanilla structures only generate in biomes that belong to their
+`has_structure` tag, and a custom biome belongs to nothing unless it is put
+there, so each biome's `archetype` joins the discoveries that fit almost any
+world by default:
+
+| archetype | joins by default |
+| --- | --- |
+| land (`BEACH`, `MOUNTAIN`, `HILL`, `LOWLAND`) | `minecraft:has_structure/mineshaft`; ruined portals; trial chambers except on `BEACH` |
+| `BEACH` | also beached shipwrecks and buried treasure |
+| `OCEAN`, `DEEP_OCEAN` | shipwrecks, cold ocean ruins, ocean ruined portals; `DEEP_OCEAN` also ocean monuments |
+
+`tags` changes that per biome, with `add` and `remove` lists of full tag ids:
+
+```json
+"tags": { "add": ["minecraft:has_structure/village_taiga"],
+          "remove": ["minecraft:has_structure/trial_chambers"] }
+```
+
+Remove a default only when it would genuinely break the theme; a sealed dead
+world may not want trial chambers, but it almost always wants mines and ruins
+to explore. **Add** the ones that fit: villages (`village_plains`,
+`village_taiga`, `village_snowy`, `village_desert`, `village_savanna`) where
+people could plausibly live, `pillager_outpost` where danger should have a
+face, `desert_pyramid`, `jungle_temple`, `igloo`, `swamp_hut`, `trail_ruins`
+and `woodland_mansion` where the biome resembles their home. A village brings
+villagers, trading and raids, which is a whole layer of play the pack does not
+have to author.
+
 ## Surface grammar
 
 A stack lists fixed-thickness layers from the exposed block downward, followed

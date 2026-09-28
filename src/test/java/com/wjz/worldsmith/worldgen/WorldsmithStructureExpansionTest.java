@@ -153,7 +153,7 @@ final class WorldsmithStructureExpansionTest {
     }
     @Test void inlineLootAndEveryVariantAreExportedAsLoadableNativeResources()throws Exception {
         var pack=pack("wayfarer_lodge");var compiled=WorldsmithPackExporter.compilePatch(pack,VanillaRegistries.createLookup());
-        assertEquals(59+WorldContentRuntime.prepare(pack).serverResources().size(),WorldsmithPackExporter.write(pack,compiled,temp)); // 52 + structure/set + 4 templates + loot + content bundle
+        assertEquals(70+WorldContentRuntime.prepare(pack).serverResources().size(),WorldsmithPackExporter.write(pack,compiled,temp)); // 63 + structure/set + 4 templates + loot + content bundle
         for(int i=0;i<4;i++)assertTrue(Files.exists(temp.resolve("data/worldsmith/structure/"+pack.structureTemplateId("wayfarer_lodge",i).getPath()+".nbt")));
         var loot=temp.resolve("data/worldsmith/loot_table/"+pack.structureLootId("wayfarer_lodge",0).getPath()+".json");
         assertNotNull(LootTable.DIRECT_CODEC.parse(compiled.full().createSerializationContext(JsonOps.INSTANCE),JsonParser.parseString(Files.readString(loot))).getOrThrow());
@@ -162,7 +162,7 @@ final class WorldsmithStructureExpansionTest {
     }
     @Test void multiPiecePlansReallyPlaceAcrossChunksAndRemainStableInReverseOrder()throws Exception {
         var pack=pack("connected_courtyard");var compiled=WorldsmithPackExporter.compilePatch(pack,VanillaRegistries.createLookup());
-        var lookup=compiled.full();assertEquals(57+WorldContentRuntime.prepare(pack).serverResources().size(),WorldsmithPackExporter.write(pack,compiled,temp.resolve("pack")));
+        var lookup=compiled.full();assertEquals(68+WorldContentRuntime.prepare(pack).serverResources().size(),WorldsmithPackExporter.write(pack,compiled,temp.resolve("pack")));
         var structure=(WorldsmithTemplateStructure)lookup.lookupOrThrow(Registries.STRUCTURE).getOrThrow(pack.structureKey("connected_courtyard")).value();
         var biome=lookup.lookupOrThrow(Registries.BIOME).getOrThrow(pack.biomes().getFirst().key());
         var settings=new FlatLevelGeneratorSettings(Optional.empty(),biome,List.of());settings.getLayersInfo().add(new FlatLayerInfo(129,Blocks.STONE));settings.updateLayers();

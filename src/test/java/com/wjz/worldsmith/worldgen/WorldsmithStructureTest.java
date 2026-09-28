@@ -74,7 +74,7 @@ final class WorldsmithStructureTest {
         var compiled=WorldsmithPackExporter.compilePatch(pack,vanilla);
         Path output=temp.resolve("export");
         int written=WorldsmithPackExporter.write(pack,compiled,output);
-        assertEquals(55+WorldContentRuntime.prepare(pack).serverResources().size(),written,"normal 52 files plus structure, structure set, NBT and the embedded verified world bundle");
+        assertEquals(66+WorldContentRuntime.prepare(pack).serverResources().size(),written,"normal 63 files plus structure, structure set, NBT and the embedded verified world bundle");
         Identifier id=pack.structureTemplateId("forest_shrine");
         Path nbt=output.resolve("data/worldsmith/structure/"+id.getPath()+".nbt");
         assertTrue(Files.size(nbt)>100);

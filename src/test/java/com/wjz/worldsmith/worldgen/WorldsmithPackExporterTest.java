@@ -72,13 +72,13 @@ final class WorldsmithPackExporterTest {
 
 		int written = WorldsmithPackExporter.export(WorldsmithPacks.builtinCompiled(), vanilla, output);
 
-		assertEquals(52, written, "51 data files plus pack.mcmeta");
+		assertEquals(63, written, "62 data files plus pack.mcmeta");
 		Path expectedData = Path.of(System.getProperty("worldsmith.projectRoot", "."), "src/main/generated/data").toAbsolutePath().normalize();
 		Path actualData = output.resolve("data");
 		Set<String> expectedFiles = jsonFiles(expectedData);
 		Set<String> actualFiles = jsonFiles(actualData);
 		assertEquals(expectedFiles, actualFiles, "runtime export and datagen must contain the same files");
-		assertEquals(51, actualFiles.size());
+		assertEquals(62, actualFiles.size());
 
 		for (String relative : expectedFiles) {
 			assertEquals(
@@ -160,7 +160,7 @@ final class WorldsmithPackExporterTest {
 		RegistrySetBuilder.PatchedRegistries compiled = WorldsmithPackExporter.compilePatch(runtime, activeWorldgen);
 		Path output = this.tempDirectory.resolve("scoped");
 
-		assertEquals(52 + WorldContentRuntime.prepare(runtime).serverResources().size(), WorldsmithPackExporter.write(runtime, compiled, output));
+		assertEquals(63 + WorldContentRuntime.prepare(runtime).serverResources().size(), WorldsmithPackExporter.write(runtime, compiled, output));
 		String prefix = "generated/" + runtime.id();
 		assertTrue(Files.isRegularFile(
 			output.resolve("data/worldsmith/worldgen/biome").resolve(prefix).resolve("abyss.json")
@@ -238,7 +238,7 @@ final class WorldsmithPackExporterTest {
 		RegistrySetBuilder.PatchedRegistries compiled = WorldsmithPackExporter.compilePatch(runtime, activeWorldgen);
 		Path output = this.tempDirectory.resolve("procedural");
 
-		assertEquals(52 + WorldContentRuntime.prepare(runtime).serverResources().size(), WorldsmithPackExporter.write(runtime, compiled, output));
+		assertEquals(63 + WorldContentRuntime.prepare(runtime).serverResources().size(), WorldsmithPackExporter.write(runtime, compiled, output));
 		JsonElement proceduralBiome = readJson(
 			output.resolve("data/worldsmith/worldgen/biome/generated")
 				.resolve(id)

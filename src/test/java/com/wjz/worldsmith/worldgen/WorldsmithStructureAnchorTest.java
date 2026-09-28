@@ -125,7 +125,7 @@ final class WorldsmithStructureAnchorTest {
         var encoded=net.minecraft.world.level.levelgen.structure.placement.StructurePlacement.CODEC.encodeStart(ops,grid).getOrThrow();
         assertEquals(grid.anchor(),assertInstanceOf(WorldsmithAnchorStructurePlacement.class,
             net.minecraft.world.level.levelgen.structure.placement.StructurePlacement.CODEC.parse(ops,encoded).getOrThrow()).anchor());
-        assertEquals(55+WorldContentRuntime.prepare(pack).serverResources().size(),WorldsmithPackExporter.write(pack,compiled,temp));
+        assertEquals(66+WorldContentRuntime.prepare(pack).serverResources().size(),WorldsmithPackExporter.write(pack,compiled,temp));
         assertTrue(Files.exists(temp.resolve("data/worldsmith/structure/"+pack.structureTemplateId("floor").getPath()+".nbt")));
     }
 

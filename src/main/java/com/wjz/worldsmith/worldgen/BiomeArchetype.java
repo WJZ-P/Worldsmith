@@ -20,12 +20,29 @@ import net.minecraft.world.level.biome.Biome;
  * any structure whose biome set does not intersect the world's possible biomes.
  */
 public enum BiomeArchetype {
-	DEEP_OCEAN(BiomeTags.IS_OCEAN, BiomeTags.IS_DEEP_OCEAN),
-	OCEAN(BiomeTags.IS_OCEAN),
-	BEACH(BiomeTags.IS_BEACH),
-	MOUNTAIN(BiomeTags.IS_MOUNTAIN, BiomeTags.IS_HILL, BiomeTags.STRONGHOLD_BIASED_TO),
-	HILL(BiomeTags.IS_HILL, BiomeTags.STRONGHOLD_BIASED_TO),
-	LOWLAND(BiomeTags.STRONGHOLD_BIASED_TO);
+	DEEP_OCEAN(BiomeTags.IS_OCEAN, BiomeTags.IS_DEEP_OCEAN, BiomeTags.REQUIRED_OCEAN_MONUMENT_SURROUNDING,
+		BiomeTags.HAS_OCEAN_MONUMENT, BiomeTags.HAS_SHIPWRECK, BiomeTags.HAS_OCEAN_RUIN_COLD, BiomeTags.HAS_RUINED_PORTAL_OCEAN),
+	OCEAN(BiomeTags.IS_OCEAN, BiomeTags.REQUIRED_OCEAN_MONUMENT_SURROUNDING,
+		BiomeTags.HAS_SHIPWRECK, BiomeTags.HAS_OCEAN_RUIN_COLD, BiomeTags.HAS_RUINED_PORTAL_OCEAN),
+	BEACH(BiomeTags.IS_BEACH, BiomeTags.HAS_SHIPWRECK_BEACHED, BiomeTags.HAS_BURIED_TREASURE,
+		BiomeTags.HAS_MINESHAFT, BiomeTags.HAS_RUINED_PORTAL_STANDARD),
+	MOUNTAIN(BiomeTags.IS_MOUNTAIN, BiomeTags.IS_HILL, BiomeTags.STRONGHOLD_BIASED_TO,
+		BiomeTags.HAS_MINESHAFT, BiomeTags.HAS_TRIAL_CHAMBERS, BiomeTags.HAS_RUINED_PORTAL_MOUNTAIN),
+	HILL(BiomeTags.IS_HILL, BiomeTags.STRONGHOLD_BIASED_TO,
+		BiomeTags.HAS_MINESHAFT, BiomeTags.HAS_TRIAL_CHAMBERS, BiomeTags.HAS_RUINED_PORTAL_STANDARD),
+	LOWLAND(BiomeTags.STRONGHOLD_BIASED_TO,
+		BiomeTags.HAS_MINESHAFT, BiomeTags.HAS_TRIAL_CHAMBERS, BiomeTags.HAS_RUINED_PORTAL_STANDARD);
+
+	/*
+	 * The has_structure defaults above are the vanilla discoveries that fit
+	 * almost any world - mines and trial chambers underground, wrecks, ruins and
+	 * treasure along the sea, broken portals everywhere. Without them a world of
+	 * custom biomes has nothing to find between its authored landmarks, and a
+	 * /locate for any of them walks its whole search radius on the server thread
+	 * before giving up. A pack removes any that break its theme through
+	 * tags.remove, and adds villages, temples and the rest through tags.add where
+	 * they belong.
+	 */
 
 	/**
 	 * Tags every Worldsmith biome joins. {@link BiomeTags#HAS_STRONGHOLD} is not
