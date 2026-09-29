@@ -185,6 +185,8 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         })
         return draft(requireNotNull(sessions.putDesignPlan(s.id,s.revision,plan,mode)) {"Draft is not active"})
     }
+    /** A PNG painted host-side, attached under the same revision check as every texture tool. */
+    fun attachGenerated(a:JsonObject,texture:TextureAsset):McpToolResult = attach(a,texture)
     private fun attach(a:JsonObject,texture:TextureAsset):McpToolResult {
         val s=current(a)
         require(s.contentAssets.size<ContentAssetValidation.MAX_ASSETS || texture.descriptor.id in s.contentAssets)

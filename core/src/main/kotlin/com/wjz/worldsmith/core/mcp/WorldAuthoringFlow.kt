@@ -78,7 +78,7 @@ object WorldAuthoringFlow {
         val administrative=setOf("worldsmith_cancel_drawing_job","worldsmith_archive_session","worldsmith_resume_session")
         if(tool.readOnly || tool.name in authoringTools || tool.name in administrative)return tool
         val opaque=tool.name in setOf("worldsmith_build_drawing","worldsmith_build_texture","worldsmith_import_texture_file",
-            "worldsmith_put_texture_asset","worldsmith_create_pixel_texture")
+            "worldsmith_put_texture_asset","worldsmith_create_pixel_texture","worldsmith_paint_creature_skin")
         val schema=if(!opaque)tool.inputSchema else JsonObject(tool.inputSchema+mapOf("properties" to JsonObject(
             tool.inputSchema["properties"]?.jsonObject.orEmpty()+mapOf("briefIds" to buildJsonObject {
                 put("type","array");put("items",McpJson.type("string"));put("maxItems",WorldAuthoringModel.MAX_BRIEFS)

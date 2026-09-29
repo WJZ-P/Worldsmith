@@ -24,7 +24,9 @@ placement is a separate natural habitat or typed structure encounter declaration
 4. Use `worldsmith_preview_creature` with its `buildId`. Inspect opposite views,
    the UV debug view, and pose sheets. These are offline previews, not game screenshots.
 5. Paint an atlas preserving every face rectangle and upload the actual PNG through
-   `worldsmith_put_texture_asset` at the current shared draft revision.
+   `worldsmith_put_texture_asset` at the current shared draft revision - or let
+   `worldsmith_paint_creature_skin` paint it from materials (below), which also
+   performs step 6 and returns the textured preview.
 6. Rebuild the same recipe with the returned `textureAsset`. Its PNG width/height must
    exactly match atlasWidth/atlasHeight. Changing the recipe rebuilds UVs, so recheck the
    skin when sizes, cube IDs, or packing change.
@@ -54,6 +56,36 @@ material function across every species. This direction applies equally to image
 providers and deterministic pixel recipes; no hosted image model is required.
 Keep the compiled UV faces and orientation exact, then inspect front/back/side and
 pose views for matching markings, a clear face and readability at game distance.
+
+## Painting a skin from materials
+
+`worldsmith_paint_creature_skin(sessionId, expectedRevision, buildId, skin)` paints
+the build's whole atlas, attaches it and rebuilds. Give each cube a `materialRole`
+that means something - `fur`, `belly`, `muzzle`, `horn`, `eye` - since that is the
+unit a skin colours.
+
+```json
+{"materials": {
+   "fur":    {"base": "#C8641E", "shade": 0.22, "pattern": "FUR", "patternDensity": 0.5},
+   "cream":  {"base": "#EFE3CF", "shade": 0.15},
+   "dark":   {"base": "#3B2A22"}},
+ "decals": [{"bone": "head", "cube": "skull", "face": "front", "x": 0, "y": 2,
+             "rows": ["KW..WK"], "colors": {"K": "#1A1210", "W": "#F4F0E8"}}]}
+```
+
+- Every material role of the model needs exactly one material; `base` is `#RRGGBB`.
+- `shade` 0..0.6 (default 0.2) lifts tops and darkens undersides and the lower part
+  of each side. `grain` 0..0.3 (default 0.035) varies the colour in 2x2 clusters.
+- `pattern` NONE, SPECKLE, SPOTS, STRIPES, SCALES or FUR at `patternDensity` 0..1,
+  in `patternColor` or a tone of the base - subtle for fur and scales, strong for
+  spots and stripes. Most materials want NONE; see the direction above.
+- A decal stamps pixel art on one face of one cube: `face` is top, bottom, left,
+  front, right or back; `x`/`y` are face-local as the face is drawn in the UV guide;
+  `.` keeps the skin beneath. Up to 64 decals. Eyes, nostrils, a mouth, markings.
+  A decal on a mirrored limb shows on both sides because they share pixels.
+
+Painting is deterministic and uses no image model. Iterate on decals by painting
+again from the same geometry build.
 
 ## Recipe fields
 

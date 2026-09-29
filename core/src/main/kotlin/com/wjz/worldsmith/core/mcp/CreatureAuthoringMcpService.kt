@@ -25,7 +25,7 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
             McpTool("worldsmith_get_creature_authoring_contract","Read creature construction and preview contract",
                 "Read the version-independent bone/cube builder recipe, mirroring, automatic UV layout and frozen preview flow. Optional schema-4 ability bindings invoke shared AbilityScript; Boss presentation may omit automatic stat phases.",McpJson.schema(emptyMap(),emptyList()),true,handler={
                     val text=javaClass.classLoader.getResourceAsStream("prompts/contract/creature_authoring.system.md")?.bufferedReader()?.use {it.readText()} ?: error("Missing creature authoring contract")
-                    McpToolResult.success(buildJsonObject {put("contract",text);put("views",McpJson.encode(CreaturePreview.VIEWS));put("poses",McpJson.encode(CreaturePose.POSES));put("runtimeSchemas",McpJson.encode(listOf(1,2,3,4,5,6)));put("soundVocabulary",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.vocabulary()));put("soundVoices",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.voices()))})
+                    McpToolResult.success(buildJsonObject {put("contract",text);put("views",McpJson.encode(CreaturePreview.VIEWS));put("poses",McpJson.encode(CreaturePose.POSES));put("runtimeSchemas",McpJson.encode(listOf(1,2,3,4,5,6,7)));put("soundVocabulary",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.vocabulary()));put("soundVoices",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.voices()))})
                 }),
             McpTool("worldsmith_build_creature","Build a frozen creature model candidate",
                 "Compile a CreatureRecipe: named bones/cubes, mirrored limbs and automatic box UVs. Optional textureAsset must already be attached to the session. Without it the output is a diagnostic UV guide, not a final skin. Saves an immutable build artifact, but never changes content drafts or activates a world.",
@@ -35,6 +35,9 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
                     val sid=session(a).id;val id=McpJson.string(a,"buildId");val record=read(sid,id)
                     McpToolResult.success(payload(sid,id,record))
                 }),
+            McpTool("worldsmith_paint_creature_skin","Paint a shaded skin onto a creature's UV layout",
+                "Paint the whole atlas of a frozen creature build from one material per materialRole (base colour, shade, grain, pattern) plus face-local pixel decals such as eyes, attach it at expectedRevision and rebuild the creature with it. Returns the new buildId, the textured model preview and the atlas. Deterministic; no image model.",
+                McpJson.schema(mapOf("sessionId" to str,"expectedRevision" to McpJson.type("integer"),"buildId" to str,"skin" to obj),listOf("sessionId","expectedRevision","buildId","skin")),false,handler=::paintSkin),
             McpTool("worldsmith_preview_creature","Render an actual textured model or UV layout",
                 "Offline z-buffer rendering of the frozen model and verified PNG, with the same procedural pose evaluator as the native renderer. mode=model|sheet|uv; model views isometric/isometric_back/front/back/left/right/top; poses idle/walk/windup/strike/recovery. A model image is not a Minecraft screenshot or gameplay acceptance.",
                 McpJson.schema(mapOf("sessionId" to str,"buildId" to str,"mode" to str,"view" to str,"pose" to str,"bossPhase" to McpJson.type("integer")),listOf("sessionId","buildId")),true,handler=::preview),
@@ -74,6 +77,20 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
         return McpToolResult.success(JsonObject(payload(session.id,id,record)+buildJsonObject {
             put("builtFromRevision",session.revision);put("draftUpdated",false);put("nextTool","worldsmith_preview_creature")
         }),images=listOf(McpImage(Base64.getEncoder().encodeToString(if(record.textureGuideOnly)png else CreaturePreview.png(record.definition,png,"isometric","idle")))))
+    }
+    private fun paintSkin(a:JsonObject):McpToolResult {
+        val session=session(a);require(!session.archived) {"Resume the archived draft before painting"}
+        val record=read(session.id,McpJson.string(a,"buildId"))
+        val skin=McpJson.decode<CreatureSkin>(a.getValue("skin").jsonObject)
+        val problems=CreatureSkins.validate(record.uvLayout,skin)
+        require(problems.isEmpty()) {"Skin does not fit this model: "+problems.take(12).joinToString("; ")}
+        val png=CreatureSkins.paint(record.uvLayout,skin)
+        val attached=content.attachGenerated(a,ContentTextureMcp.upload(Base64.getEncoder().encodeToString(png)))
+        val asset=attached.structuredContent.getValue("asset").jsonObject.getValue("id").jsonPrimitive.content
+        val built=build(buildJsonObject {put("sessionId",session.id);put("recipe",McpJson.encode(record.recipe));put("textureAsset",asset)})
+        return McpToolResult.success(JsonObject(built.structuredContent+buildJsonObject {
+            put("revision",attached.structuredContent.getValue("revision"));put("skinAsset",asset);put("paintedFromBuild",McpJson.string(a,"buildId"))
+        }),images=built.images+McpImage(Base64.getEncoder().encodeToString(png)))
     }
     private fun preview(a:JsonObject):McpToolResult {
         val sid=session(a).id;val id=McpJson.string(a,"buildId");val record=read(sid,id)

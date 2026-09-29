@@ -289,4 +289,31 @@ class WorldContentAuthoringTest {
         assertArrayEquals(persisted, Files.readAllBytes(root.resolve("drafts/$id.json")))
         assertArrayEquals(originalBytes, Files.readAllBytes(blob))
     }
+
+    @Test fun `a creature skin painted from materials is attached and rebuilt in one call`() {
+        val id = begin()
+        val creature = com.wjz.worldsmith.core.creatureauthoring.CreatureBuilder.create("stone_hound", "Stone hound", CreatureCategory.HOSTILE).atlas(64, 64, 1)
+        creature.bone("body", null, 0f, 16f, 0f).cube("torso", -3f, -3f, -5f, 6, 6, 10, "stone").end()
+        creature.bone("head", "body", 0f, -2f, -5f).role(CreatureBoneRole.HEAD).cube("skull", -2f, -3f, -4f, 4, 4, 4, "stone").end()
+        val guide = call("worldsmith_build_creature", buildJsonObject { put("sessionId", id); put("recipe", McpJson.encode(creature.recipe())) })
+        val buildId = guide.structuredContent.getValue("buildId").jsonPrimitive.content
+        assertTrue(guide.structuredContent.getValue("textureGuideOnly").jsonPrimitive.boolean)
+
+        val before = revision(id)
+        val skin = com.wjz.worldsmith.core.creatureauthoring.CreatureSkin(mapOf("stone" to com.wjz.worldsmith.core.creatureauthoring.SkinMaterial("#7A7F86")),
+            listOf(com.wjz.worldsmith.core.creatureauthoring.SkinDecal("head", "skull", "front", 0, 1, listOf("E..E"), mapOf("E" to "#6FE3FF"))))
+        val painted = call("worldsmith_paint_creature_skin", buildJsonObject {
+            put("sessionId", id); put("expectedRevision", before); put("buildId", buildId); put("skin", McpJson.encode(skin))
+        })
+        assertFalse(painted.isError, painted.text)
+        assertFalse(painted.structuredContent.getValue("textureGuideOnly").jsonPrimitive.boolean, "the rebuilt creature carries the painted skin")
+        assertEquals(before + 1, revision(id))
+        assertTrue(painted.structuredContent.getValue("skinAsset").jsonPrimitive.content in sessions.find(id)!!.contentAssets)
+        assertEquals(2, painted.images.size, "the textured model and the atlas")
+
+        val stale = runCatching { call("worldsmith_paint_creature_skin", buildJsonObject {
+            put("sessionId", id); put("expectedRevision", before); put("buildId", buildId); put("skin", McpJson.encode(skin))
+        }) }
+        assertTrue(stale.isFailure || stale.getOrThrow().isError, "a stale revision attaches nothing")
+    }
 }
