@@ -2,6 +2,10 @@ package com.wjz.worldsmith.worldgen;
 
 import com.wjz.worldsmith.Worldsmith;
 import com.wjz.worldsmith.core.model.AmbientParticleSpec;
+import com.wjz.worldsmith.core.model.BiomeAddition;
+import com.wjz.worldsmith.core.model.BiomeAudio;
+import com.wjz.worldsmith.core.model.BiomeMood;
+import com.wjz.worldsmith.core.model.BiomeMusic;
 import com.wjz.worldsmith.core.model.BiomeDefinition;
 import com.wjz.worldsmith.core.model.BiomeEnvironment;
 import com.wjz.worldsmith.core.model.BiomeGrassColorModifier;
@@ -18,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import net.minecraft.core.Holder;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
@@ -27,7 +32,13 @@ import net.minecraft.data.worldgen.BiomeDefaultFeatures;
 import net.minecraft.data.worldgen.BootstrapContext;
 import net.minecraft.data.worldgen.placement.MiscOverworldPlacements;
 import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.Music;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.attribute.AmbientAdditionsSettings;
+import net.minecraft.world.attribute.AmbientMoodSettings;
 import net.minecraft.world.attribute.AmbientParticle;
+import net.minecraft.world.attribute.AmbientSounds;
+import net.minecraft.world.attribute.BackgroundMusic;
 import net.minecraft.world.attribute.EnvironmentAttributes;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeGenerationSettings;
@@ -145,6 +156,7 @@ public final class BiomeCompiler {
 		if (!particles.isEmpty()) {
 			builder = builder.setAttribute(EnvironmentAttributes.AMBIENT_PARTICLES, particles);
 		}
+		builder = audio(builder, definition, environment.getAudio());
 
 		return builder
 			.mobSpawnSettings(mobs.build())
@@ -223,6 +235,58 @@ public final class BiomeCompiler {
 			builder = builder.setAttribute(EnvironmentAttributes.SKY_LIGHT_FACTOR, light.getSkyFactor());
 		}
 		return builder;
+	}
+
+	/**
+	 * Music and ambience. Each attribute is set only when authored, so a biome
+	 * without audio keeps the overworld's music and cave mood from the dimension.
+	 * An unknown sound event is skipped with a warning, like a particle.
+	 */
+	private static Biome.BiomeBuilder audio(Biome.BiomeBuilder builder, BiomeDefinition definition, BiomeAudio audio) {
+		if (audio == null) {
+			return builder;
+		}
+		Optional<Music> music = music(definition, audio.getMusic());
+		Optional<Music> underwater = music(definition, audio.getUnderwaterMusic());
+		if (music.isPresent()) {
+			// Like vanilla's own biome tracks: creative mode falls back to the biome's default.
+			builder = builder.setAttribute(EnvironmentAttributes.BACKGROUND_MUSIC, new BackgroundMusic(music, Optional.empty(), underwater));
+		} else if (underwater.isPresent()) {
+			builder = builder.setAttribute(EnvironmentAttributes.BACKGROUND_MUSIC, BackgroundMusic.OVERWORLD.withUnderwater(underwater.get()));
+		}
+		if (audio.getMusicVolume() != null) {
+			builder = builder.setAttribute(EnvironmentAttributes.MUSIC_VOLUME, audio.getMusicVolume());
+		}
+		BiomeMood mood = audio.getMood();
+		if (audio.getLoop() != null || !audio.getAdditions().isEmpty() || !mood.equals(new BiomeMood())) {
+			Optional<Holder<SoundEvent>> loop = audio.getLoop() == null ? Optional.empty() : sound(definition, audio.getLoop());
+			AmbientMoodSettings moodSettings = sound(definition, mood.getSound())
+				.map(sound -> new AmbientMoodSettings(sound, mood.getTickDelay(), mood.getBlockSearchExtent(), mood.getOffset()))
+				.orElse(AmbientMoodSettings.LEGACY_CAVE_SETTINGS);
+			List<AmbientAdditionsSettings> additions = new ArrayList<>();
+			for (BiomeAddition addition : audio.getAdditions()) {
+				sound(definition, addition.getSound()).ifPresent(sound -> additions.add(new AmbientAdditionsSettings(sound, addition.getTickChance())));
+			}
+			builder = builder.setAttribute(EnvironmentAttributes.AMBIENT_SOUNDS, new AmbientSounds(loop, Optional.of(moodSettings), List.copyOf(additions)));
+		}
+		return builder;
+	}
+
+	private static Optional<Music> music(BiomeDefinition definition, BiomeMusic music) {
+		if (music == null) {
+			return Optional.empty();
+		}
+		return sound(definition, music.getSound())
+			.map(sound -> new Music(sound, music.getMinDelayTicks(), music.getMaxDelayTicks(), music.getReplaceCurrent()));
+	}
+
+	private static Optional<Holder<SoundEvent>> sound(BiomeDefinition definition, String id) {
+		Identifier key = Identifier.tryParse(id);
+		Optional<Holder<SoundEvent>> sound = key == null ? Optional.empty() : BuiltInRegistries.SOUND_EVENT.get(key).map(reference -> reference);
+		if (sound.isEmpty()) {
+			Worldsmith.LOGGER.warn("Biome {} asks for sound event {}, which is not registered", definition.getId(), id);
+		}
+		return sound;
 	}
 
 	/**

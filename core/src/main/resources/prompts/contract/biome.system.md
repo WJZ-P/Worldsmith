@@ -221,6 +221,54 @@ Some particles need a block or a colour before they can be drawn - `falling_dust
 cannot be named by id alone. Those are skipped while the world loads, so the
 effect simply never appears.
 
+### Sound
+
+`environment.audio` is how a place sounds. Left out, a biome plays the
+overworld's general music and the cave mood in dark spaces, exactly like every
+other biome of the world - which is why a world without audio sounds the same
+from one end to the other. Vanilla gives most of its biomes their own music.
+Every sound here is an existing sound event; nothing is a new recording.
+
+```json
+"audio": {
+  "music": {"sound": "minecraft:music.overworld.cherry_grove", "minDelayTicks": 12000, "maxDelayTicks": 24000},
+  "additions": [{"sound": "minecraft:block.bell.resonate", "tickChance": 0.0005}]
+}
+```
+
+| field | meaning |
+| --- | --- |
+| `music` | `{sound, minDelayTicks 12000, maxDelayTicks 24000, replaceCurrent false}`, delays 0..72000 |
+| `underwaterMusic` | the same shape, heard while submerged |
+| `musicVolume` | 0..1; `0` silences music here, which is itself a statement |
+| `loop` | a sound event played continuously while the player is in the biome |
+| `mood` | `{sound "minecraft:ambient.cave", tickDelay 6000, blockSearchExtent 8, offset 2.0}` - plays in dark enclosed spaces |
+| `additions` | at most 4 `{sound, tickChance}`, each rolled every tick |
+
+Music tracks, named by the vanilla biome that plays them - `music.overworld.` plus
+`forest`, `flower_forest`, `old_growth_taiga`, `cherry_grove`, `meadow`, `grove`,
+`bamboo_jungle`, `jungle`, `sparse_jungle`, `swamp`, `desert`, `badlands`,
+`snowy_slopes`, `frozen_peaks`, `jagged_peaks`, `stony_peaks`, `lush_caves`,
+`dripstone_caves`, `deep_dark`, `sulfur_caves`; the nether's
+`music.nether.crimson_forest`, `warped_forest`, `soul_sand_valley`,
+`basalt_deltas`, `nether_wastes`; and `music.under_water`. Choose by what the
+place is like, not by its name.
+
+Loops, moods and additions: `ambient.<place>.loop`, `.mood` and `.additions`
+exist for `crimson_forest`, `warped_forest`, `soul_sand_valley`,
+`basalt_deltas` and `nether_wastes`, plus `ambient.underwater.loop`. Any other
+sound event can be an addition: `block.water.ambient` near marsh, a distant
+`block.bell.resonate` near a temple valley, `block.campfire.crackle`,
+`block.amethyst_block.chime`.
+
+**A loop never stops.** Vanilla uses them only in the Nether. Keep one for a
+place meant to feel wrong or overwhelming, never for a pleasant meadow the
+player will cross twenty times. **Additions are seasoning:** vanilla's busiest
+rolls `0.0111` per tick, about every four and a half seconds; a distant bell
+at `0.0005` is heard about every hundred seconds and stays remarkable. Give distinct
+music to the biomes that define the world, and let quiet transitional land keep
+the overworld default.
+
 ### Vanilla structures: what a player can stumble on
 
 A world is worth exploring when walking in any direction can turn something

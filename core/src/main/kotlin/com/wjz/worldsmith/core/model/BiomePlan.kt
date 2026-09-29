@@ -286,6 +286,51 @@ data class AmbientParticleSpec(
     val probability: Float,
 )
 
+/** One music track: an existing sound event, heard again after a random pause. */
+@Serializable
+data class BiomeMusic(
+    val sound: String,
+    val minDelayTicks: Int = 12000,
+    val maxDelayTicks: Int = 24000,
+    /** Cut the current track when a player walks in, instead of waiting for it to end. */
+    val replaceCurrent: Boolean = false,
+)
+
+/**
+ * The sound a dark enclosed space makes. Vanilla plays its cave mood in every
+ * overworld biome; this is that default unless a biome chooses another.
+ */
+@Serializable
+data class BiomeMood(
+    val sound: String = "minecraft:ambient.cave",
+    val tickDelay: Int = 6000,
+    val blockSearchExtent: Int = 8,
+    val offset: Double = 2.0,
+)
+
+/** A sound that occasionally plays near the listener, once per tick with this chance. */
+@Serializable
+data class BiomeAddition(
+    val sound: String,
+    val tickChance: Double,
+)
+
+/**
+ * How a biome sounds. Every sound is an existing sound event; nothing here is a
+ * new recording. Left null, a biome keeps the overworld's music and cave mood.
+ */
+@Serializable
+data class BiomeAudio(
+    val music: BiomeMusic? = null,
+    val underwaterMusic: BiomeMusic? = null,
+    /** 0 silences music here entirely, which is itself a strong statement. */
+    val musicVolume: Float? = null,
+    /** A continuous bed that plays for as long as the player stands in the biome. */
+    val loop: String? = null,
+    val mood: BiomeMood = BiomeMood(),
+    val additions: List<BiomeAddition> = emptyList(),
+)
+
 /**
  * How a biome looks.
  *
@@ -299,12 +344,14 @@ data class AmbientParticleSpec(
  * describes what it wants to be different.
  */
 @Serializable
-data class BiomeEnvironment(
+data class BiomeEnvironment @JvmOverloads constructor(
     val tint: BiomeTint,
     val fog: BiomeFog,
     val sky: BiomeSky,
     val light: BiomeLight = BiomeLight(),
     val ambientParticles: List<AmbientParticleSpec> = emptyList(),
+    /** Null is omitted on disk, so a biome written before audio existed keeps its exact encoding. */
+    val audio: BiomeAudio? = null,
 )
 
 /**

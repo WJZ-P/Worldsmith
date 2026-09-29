@@ -5,6 +5,8 @@ import com.wjz.worldsmith.core.feature.VegetationBudget
 import com.wjz.worldsmith.core.model.BiomeDefinition
 import com.wjz.worldsmith.core.model.BiomeArchetypeRole
 import com.wjz.worldsmith.core.model.AmbientParticleSpec
+import com.wjz.worldsmith.core.model.BiomeAudio
+import com.wjz.worldsmith.core.model.BiomeMusic
 import com.wjz.worldsmith.core.model.BiomeEnvironment
 import com.wjz.worldsmith.core.model.BiomeFog
 import com.wjz.worldsmith.core.model.BiomeLight
@@ -80,6 +82,10 @@ object BiomePlanValidator {
 
     /** Twice the densest thing vanilla or the built-in pack does. */
     private const val MAX_PARTICLE_PROBABILITY = 0.25f
+
+    /** Vanilla's busiest ambient addition, the nether's, rolls 0.0111 per tick. */
+    private const val MAX_QUIET_ADDITION_CHANCE = 0.02
+    private const val MAX_ADDITIONS = 4
 
     fun validate(plan: BiomePlan, features: FeatureLibrary): List<Diagnostic> = buildList {
         if (plan.schemaVersion != WorldsmithCore.BLUEPRINT_SCHEMA_VERSION) {
@@ -244,6 +250,7 @@ object BiomePlanValidator {
         addAll(validateSky("$path.sky", environment.sky))
         addAll(validateLight("$path.light", environment.light))
         addAll(validateParticles("$path.ambientParticles", environment.ambientParticles))
+        environment.audio?.let { addAll(validateAudio("$path.audio", it)) }
     }
 
     private fun validateTint(path: String, tint: BiomeTint): List<Diagnostic> = buildList {
@@ -386,6 +393,44 @@ object BiomePlanValidator {
         addAll(rgb("$path.ambientColor", light.ambientColor))
         addAll(rgb("$path.blockTint", light.blockTint))
         addAll(unit("$path.skyFactor", light.skyFactor))
+    }
+
+    private fun validateAudio(path: String, audio: BiomeAudio): List<Diagnostic> = buildList {
+        fun sound(at: String, id: String) {
+            if (!RESOURCE_ID.matches(id)) add(error(at, "INVALID_SOUND_ID", "Sound must be a namespaced sound event id but was $id"))
+        }
+        fun music(at: String, music: BiomeMusic) {
+            sound("$at.sound", music.sound)
+            if (music.minDelayTicks < 0 || music.maxDelayTicks < music.minDelayTicks || music.maxDelayTicks > 72000) {
+                add(error(at, "MUSIC_DELAY_OUT_OF_RANGE", "Music delays need 0 <= minDelayTicks <= maxDelayTicks <= 72000"))
+            }
+            if (RESOURCE_ID.matches(music.sound) && !music.sound.substringAfter(':').startsWith("music.")) {
+                add(warning("$at.sound", "MUSIC_NOT_A_TRACK", "${music.sound} is not a music track; played as music it " +
+                    "repeats one short clip after a long pause. Use a music.* event, or an addition for an occasional sound."))
+            }
+        }
+        audio.music?.let { music("$path.music", it) }
+        audio.underwaterMusic?.let { music("$path.underwaterMusic", it) }
+        addAll(unit("$path.musicVolume", audio.musicVolume))
+        audio.loop?.let { sound("$path.loop", it) }
+        sound("$path.mood.sound", audio.mood.sound)
+        if (audio.mood.tickDelay !in 1..72000 || audio.mood.blockSearchExtent !in 1..16 || audio.mood.offset !in 0.0..8.0) {
+            add(error("$path.mood", "MOOD_OUT_OF_RANGE", "Mood needs tickDelay 1..72000, blockSearchExtent 1..16 and offset 0..8"))
+        }
+        if (audio.additions.size > MAX_ADDITIONS) {
+            add(error("$path.additions", "TOO_MANY_ADDITIONS", "A biome may define at most $MAX_ADDITIONS ambient additions"))
+        }
+        audio.additions.forEachIndexed { index, addition ->
+            val at = "$path.additions[$index]"
+            sound("$at.sound", addition.sound)
+            if (!addition.tickChance.isFinite() || addition.tickChance <= 0.0 || addition.tickChance > 1.0) {
+                add(error("$at.tickChance", "ADDITION_CHANCE_OUT_OF_RANGE", "An addition's tickChance is above 0 and at most 1"))
+            } else if (addition.tickChance > MAX_QUIET_ADDITION_CHANCE) {
+                add(warning("$at.tickChance", "DENSE_AMBIENT_ADDITION", "At ${addition.tickChance} per tick this plays " +
+                    "about every ${String.format(java.util.Locale.ROOT, "%.1f", 1 / addition.tickChance / 20)} seconds and becomes a noise to " +
+                    "escape rather than a place. Vanilla's busiest addition is 0.0111."))
+            }
+        }
     }
 
     private fun validateParticles(path: String, particles: List<AmbientParticleSpec>): List<Diagnostic> = buildList {

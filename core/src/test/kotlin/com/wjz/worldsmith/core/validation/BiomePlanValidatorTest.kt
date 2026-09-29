@@ -1,6 +1,10 @@
 package com.wjz.worldsmith.core.validation
 
 import com.wjz.worldsmith.core.model.AmbientParticleSpec
+import com.wjz.worldsmith.core.model.BiomeAddition
+import com.wjz.worldsmith.core.model.BiomeAudio
+import com.wjz.worldsmith.core.model.BiomeMood
+import com.wjz.worldsmith.core.model.BiomeMusic
 import com.wjz.worldsmith.core.model.BiomeArchetypeRole
 import com.wjz.worldsmith.core.model.BiomeBehavior
 import com.wjz.worldsmith.core.model.BiomeDefinition
@@ -43,6 +47,7 @@ import com.wjz.worldsmith.core.model.TreeCrownShape
 import com.wjz.worldsmith.core.model.TreeCrownSpec
 import com.wjz.worldsmith.core.model.WaterFog
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -587,6 +592,55 @@ class BiomePlanValidatorTest {
 
         assertTrue(diagnostics.any { it.code == "DENSE_AMBIENT_PARTICLE" }, diagnostics.toString())
         assertTrue(diagnostics.none { it.severity == DiagnosticSeverity.ERROR }, diagnostics.toString())
+    }
+
+    @Test
+    fun `a biome's own music and a rare addition validate`() {
+        val audio = BiomeAudio(
+            music = BiomeMusic("minecraft:music.overworld.cherry_grove"),
+            additions = listOf(BiomeAddition("minecraft:block.bell.resonate", 0.0005)),
+        )
+        val codes = BiomePlanValidator.validate(withAudio(audio), library()).map { it.code }
+
+        assertTrue(codes.none { it.contains("SOUND") || it.contains("MUSIC") || it.contains("ADDITION") || it.contains("MOOD") }, codes.toString())
+    }
+
+    @Test
+    fun `broken audio is refused and tiring audio is reported`() {
+        val audio = BiomeAudio(
+            music = BiomeMusic("minecraft:block.bell.use", minDelayTicks = 600, maxDelayTicks = 100),
+            musicVolume = 1.5f,
+            loop = "not an id",
+            mood = BiomeMood(tickDelay = 0),
+            additions = listOf(
+                BiomeAddition("minecraft:block.water.ambient", 0.05),
+                BiomeAddition("minecraft:block.water.ambient", 0.0),
+                BiomeAddition("minecraft:block.water.ambient", 0.001),
+                BiomeAddition("minecraft:block.water.ambient", 0.001),
+                BiomeAddition("minecraft:block.water.ambient", 0.001),
+            ),
+        )
+        val codes = BiomePlanValidator.validate(withAudio(audio), library()).map { it.code }.toSet()
+
+        for (code in listOf("MUSIC_DELAY_OUT_OF_RANGE", "MUSIC_NOT_A_TRACK", "UNIT_RANGE_OUT_OF_BOUNDS", "INVALID_SOUND_ID",
+            "MOOD_OUT_OF_RANGE", "TOO_MANY_ADDITIONS", "ADDITION_CHANCE_OUT_OF_RANGE", "DENSE_AMBIENT_ADDITION")) {
+            assertTrue(code in codes, "$code not in $codes")
+        }
+    }
+
+    @Test
+    fun `a biome without audio keeps its exact encoding`() {
+        // Bundles hash their modules; a biome written before audio existed must not gain a field.
+        val silent = plan().biomes.first().environment
+        assertFalse("audio" in com.wjz.worldsmith.core.serialization.WorldsmithJson.encode(silent))
+        val scored = silent.copy(audio = BiomeAudio(loop = "minecraft:ambient.soul_sand_valley.loop"))
+        assertEquals(scored, com.wjz.worldsmith.core.serialization.WorldsmithJson.decode<BiomeEnvironment>(com.wjz.worldsmith.core.serialization.WorldsmithJson.encode(scored)))
+    }
+
+    private fun withAudio(audio: BiomeAudio) = plan().let { source ->
+        source.copy(biomes = source.biomes.map { biome ->
+            if (biome.id != "flats_temperate") biome else biome.copy(environment = biome.environment.copy(audio = audio))
+        })
     }
 
     private fun withParticle(particle: String, probability: Float) = plan().let { source ->
