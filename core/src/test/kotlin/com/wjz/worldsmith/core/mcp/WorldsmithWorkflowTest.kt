@@ -178,14 +178,14 @@ class WorldsmithWorkflowTest {
     }
 
     @Test
-    fun `a run with no installed styles is pointed at the general method`() {
+    fun `the style list offers installed styles and always the general method`() {
         val listed = call(WorldsmithWorkflow.STYLE_LIST_TOOL)
         val body = listed.structuredContent
 
         assertFalse(listed.isError)
-        // Deliberately empty for now. The fallback is what makes that survivable,
-        // so an empty catalog has to read as a normal state rather than a hole.
-        assertTrue(body.getValue("styles").jsonArray.isEmpty())
+        val styles = body.getValue("styles").jsonArray.map { it.jsonObject }
+        assertTrue(styles.any { it.text("id") == "eastern_classical" && it.text("description").isNotBlank() }, styles.toString())
+        // A prompt no style matches is the normal case, so the method is offered beside the list.
         val fallback = body.getValue("fallback").jsonObject
         assertEquals(StyleCatalog.FALLBACK_ID, fallback.text("id"))
         assertTrue(fallback.text("description").isNotBlank())
@@ -205,6 +205,19 @@ class WorldsmithWorkflowTest {
         assertTrue("continentScale" in guide)
         assertTrue("coastRoughness" in guide)
         assertTrue("verticalScale" in guide)
+    }
+
+    @Test
+    fun `an installed style carries calibration rather than naming the theme back`() {
+        val guide = call(
+            WorldsmithWorkflow.STYLE_GET_TOOL,
+            buildJsonObject { put("id", "eastern_classical") },
+        ).structuredContent.text("guide")
+
+        assertTrue("landRatio" in guide && "verticalScale" in guide)
+        assertTrue("fog.endDistance" in guide && "tint.water" in guide)
+        // 26.2 renamed the block; a style must not teach the old id.
+        assertTrue("iron_chain" in guide)
     }
 
     @Test
