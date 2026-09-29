@@ -46,7 +46,11 @@ data class CreatureDrop @JvmOverloads constructor(
 
 @Serializable enum class CreatureCategory { PASSIVE, HOSTILE }
 @Serializable enum class CreaturePassiveMode { WANDER, FLEE_PLAYERS }
-@Serializable enum class CreatureBoneRole { NONE, HEAD, LEG_LEFT, LEG_RIGHT, ARM_LEFT, ARM_RIGHT, TAIL }
+/** How a bone moves by itself. WING_*, BODY and JAW are schema 7, beside drives, since flight gave wings a reason to exist. */
+@Serializable enum class CreatureBoneRole {
+    NONE, HEAD, LEG_LEFT, LEG_RIGHT, ARM_LEFT, ARM_RIGHT, TAIL, WING_LEFT, WING_RIGHT, BODY, JAW;
+    val schema: Int get() = if (ordinal >= WING_LEFT.ordinal) 7 else 1
+}
 @Serializable data class CreatureVector(val x: Float = 0f, val y: Float = 0f, val z: Float = 0f)
 @Serializable data class CreatureUv(val u: Int = 0, val v: Int = 0)
 
@@ -247,6 +251,7 @@ object CustomCreatureValidator {
                 vector(b.pivot, "$q.pivot", 128f)
                 vector(b.rotation, "$q.rotation", 360f)
                 if (!b.gaitPhase.isFinite() || b.gaitPhase !in -360f..360f) error("$q.gaitPhase", "Gait phase must be finite and within +/-360 degrees")
+                if (b.role.schema > library.schemaVersion) error("$q.role", "Bone role ${b.role} requires creature schemaVersion ${b.role.schema}")
                 if (b.parent != null && b.parent !in byId) error("$q.parent", "Unknown parent bone '${b.parent}'")
                 val visited = mutableSetOf<String>()
                 var current: CreatureBone? = b

@@ -60,7 +60,7 @@ class CreatureBuilder private constructor(private val id: String, private val di
         mirrors += MirrorRecipe(sourceRoot, targetRoot, shareUv)
     }
 
-    fun recipe() = CreatureRecipe(id, displayName, category, schemaVersion = if(!behavior.drives.isDefault) 7 else if(abilityBindings.any { it.intervalTicks != 1 }) 6 else if(abilityBindings.isNotEmpty()) 5 else if(ability != null) 4 else if(sounds != null) 3 else if(boss == null) 1 else 2, atlasWidth = atlasWidth, atlasHeight = atlasHeight,
+    fun recipe() = CreatureRecipe(id, displayName, category, schemaVersion = if(!behavior.drives.isDefault || bones.values.any { it.role.schema >= 7 }) 7 else if(abilityBindings.any { it.intervalTicks != 1 }) 6 else if(abilityBindings.isNotEmpty()) 5 else if(ability != null) 4 else if(sounds != null) 3 else if(boss == null) 1 else 2, atlasWidth = atlasWidth, atlasHeight = atlasHeight,
         padding = padding, themeRole = themeRole, attributes = attributes, behavior = behavior,
         spawn = spawn.copy(biomes = spawn.biomes.toList()), bones = bones.values.map { it.copy(cubes = it.cubes.toList()) }, mirrors = mirrors.toList(), drops=drops.toList(), boss=boss?.let {it.copy(phases=it.phases.toList())}, sounds=sounds, ability=ability, abilityBindings=AbilityEventBindings.freeze(abilityBindings))
     fun build(textureSha256: String) = CreatureAuthoring.compile(recipe(), textureSha256)

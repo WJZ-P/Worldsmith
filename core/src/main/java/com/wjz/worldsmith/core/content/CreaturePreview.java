@@ -313,11 +313,12 @@ public final class CreaturePreview {
 
     private static Map<String, Transform> transforms(CreatureDefinition definition, CreaturePose.Frame frame) {
         Map<String, Transform> result = new HashMap<>(); var pending = new ArrayList<>(definition.getModel().getBones());
+        var chains = CreaturePose.chains(definition.getModel().getBones());
         while (!pending.isEmpty()) {
             int before = pending.size();
             for (var iterator = pending.iterator(); iterator.hasNext();) {
                 var bone = iterator.next(); if (bone.getParent() != null && !result.containsKey(bone.getParent())) continue;
-                Transform local = Transform.bone(bone, CreaturePose.rotation(bone, frame));
+                Transform local = Transform.bone(bone, CreaturePose.rotation(bone, frame, chains.getOrDefault(bone.getId(), 0)));
                 result.put(bone.getId(), bone.getParent() == null ? local : result.get(bone.getParent()).multiply(local)); iterator.remove();
             }
             if (before == pending.size()) throw new IllegalArgumentException("Invalid creature hierarchy");

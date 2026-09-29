@@ -60,7 +60,18 @@ Each bone has:
 - `pivot`: `{x,y,z}`, default all zero, each finite within -128..128.
 - `rotation`: `{x,y,z}` in degrees, default zero, each finite within -360..360.
 - `role`: `NONE` (default), `HEAD`, `LEG_LEFT`, `LEG_RIGHT`, `ARM_LEFT`,
-  `ARM_RIGHT`, or `TAIL`. Roles select installed procedural motion.
+  `ARM_RIGHT`, or `TAIL`; schema 7 adds `WING_LEFT`, `WING_RIGHT`, `BODY` and
+  `JAW`. Roles select installed procedural motion:
+  - `HEAD` follows the look target and nods into a strike; legs and arms swing
+    with the gait, and a flier's legs tuck back while airborne.
+  - `TAIL` sways and follows the gait. Chain tail bones parent to parent: each
+    segment lags the one before it, so a jointed tail travels as a wave.
+  - `WING_*` hinge about Z at the shoulder: folded with a breath on the ground,
+    beating while a `FLY` creature is in the air. Make the wing a flat cube
+    extending sideways from its pivot.
+  - `BODY` breathes, rolls with the gait, rears on windup and lunges on strike;
+    put the torso on it and hang head, legs and tail from it.
+  - `JAW` opens on windup and snaps wide on strike; pivot it at the hinge.
 - `gaitPhase`: finite degrees -360..360, default 0; phase offset 180 on hind
   legs can distinguish diagonal quadruped gait from matching front/hind motion.
 - `cubes`: list of cube objects, default empty.

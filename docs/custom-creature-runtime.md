@@ -25,7 +25,7 @@ Model units are 1/16 block. X points right, Y down, Z toward the back. Model-ori
 
 Cube UVs use vanilla unfolded box layout: width `2*(size.x+size.z)`, height `size.y+size.z`. The UV origin plus that entire footprint must fit within the declared texture. Different cubes may intentionally share UV regions. Texture generation must respect this layout rather than pasting a concept image onto an arbitrary atlas.
 
-Animation roles: `NONE`, `HEAD`, `LEG_LEFT`, `LEG_RIGHT`, `ARM_LEFT`, `ARM_RIGHT`, `TAIL`. Set the two hind legs' `gaitPhase` to 180 for a diagonal quadruped gait. Seed controls stable idle/tail phase; species appearance currently comes from its explicit model and texture, not randomized shape generation.
+Animation roles: `NONE`, `HEAD`, `LEG_LEFT`, `LEG_RIGHT`, `ARM_LEFT`, `ARM_RIGHT`, `TAIL`; schema 7 adds `WING_LEFT`, `WING_RIGHT` (beat while a flier is airborne), `BODY` (breath, gait roll, rear and lunge) and `JAW` (opens on windup and strike). Tail bones chained parent to parent lag one another as a wave. Set the two hind legs' `gaitPhase` to 180 for a diagonal quadruped gait. Seed controls stable idle/tail phase; species appearance currently comes from its explicit model and texture, not randomized shape generation.
 
 ## Hard bounds
 

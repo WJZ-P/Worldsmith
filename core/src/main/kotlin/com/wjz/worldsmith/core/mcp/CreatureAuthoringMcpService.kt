@@ -39,7 +39,7 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
                 "Paint the whole atlas of a frozen creature build from one material per materialRole (base colour, shade, grain, pattern) plus face-local pixel decals such as eyes, attach it at expectedRevision and rebuild the creature with it. Returns the new buildId, the textured model preview and the atlas. Deterministic; no image model.",
                 McpJson.schema(mapOf("sessionId" to str,"expectedRevision" to McpJson.type("integer"),"buildId" to str,"skin" to obj),listOf("sessionId","expectedRevision","buildId","skin")),false,handler=::paintSkin),
             McpTool("worldsmith_preview_creature","Render an actual textured model or UV layout",
-                "Offline z-buffer rendering of the frozen model and verified PNG, with the same procedural pose evaluator as the native renderer. mode=model|sheet|uv; model views isometric/isometric_back/front/back/left/right/top; poses idle/walk/windup/strike/recovery. A model image is not a Minecraft screenshot or gameplay acceptance.",
+                "Offline z-buffer rendering of the frozen model and verified PNG, with the same procedural pose evaluator as the native renderer. mode=model|sheet|uv; model views isometric/isometric_back/front/back/left/right/top; poses idle/walk/fly/windup/strike/recovery. A model image is not a Minecraft screenshot or gameplay acceptance.",
                 McpJson.schema(mapOf("sessionId" to str,"buildId" to str,"mode" to str,"view" to str,"pose" to str,"bossPhase" to McpJson.type("integer")),listOf("sessionId","buildId")),true,handler=::preview),
         )
     }

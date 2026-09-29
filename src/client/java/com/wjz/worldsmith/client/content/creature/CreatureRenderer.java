@@ -38,6 +38,8 @@ public final class CreatureRenderer extends MobRenderer<CreatureEntity, Creature
         state.definition = entity.definition(); state.bundleHash = entity.bundleHash();
         state.action = entity.action(); state.appearanceSeed = entity.appearanceSeed();
         state.bossPhase = entity.bossPhase();
+        state.airborne = state.definition != null && !entity.onGround()
+            && state.definition.getBehavior().getDrives().getMovement() == com.wjz.worldsmith.core.content.CreatureMovement.FLY;
         var animation = com.wjz.worldsmith.client.ability.AbilityVisualClient.animation(entity, partialTicks);
         state.animationClip = animation == null ? null : animation.clip();
         state.animationTicks = animation == null ? 0 : animation.elapsed();

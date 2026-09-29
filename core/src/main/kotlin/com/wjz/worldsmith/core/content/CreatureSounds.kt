@@ -30,6 +30,7 @@ data class CreatureSoundProfile @JvmOverloads constructor(
 
 object CreatureSounds {
     @JvmStatic fun requiredSchema(c: CreatureDefinition): Int = when {
+        !c.behavior.drives.isDefault || c.model.bones.any { it.role.schema >= 7 } -> 7
         c.abilityBindings.any { it.intervalTicks != 1 } -> 6
         c.abilityBindings.isNotEmpty() -> 5
         c.ability != null -> 4

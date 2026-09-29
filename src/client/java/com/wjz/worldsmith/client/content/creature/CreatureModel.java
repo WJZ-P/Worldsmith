@@ -12,7 +12,7 @@ import net.minecraft.util.Mth;
 /** Native arbitrary cuboid skeleton, box UVs and role-based procedural animation (not a vanilla reskin). */
 public final class CreatureModel extends EntityModel<CreatureRenderState> {
     private final List<BonePart> animated;
-    private record BonePart(CreatureBone bone, ModelPart part) {}
+    private record BonePart(CreatureBone bone, ModelPart part, int chain) {}
 
     private CreatureModel(ModelPart root, List<CreatureBone> bones) {
         super(root);
@@ -28,7 +28,8 @@ public final class CreatureModel extends EntityModel<CreatureRenderState> {
             }
             if (before == pending.size()) throw new IllegalArgumentException("Invalid creature bone hierarchy");
         }
-        animated = bones.stream().map(b -> new BonePart(b, parts.get(b.getId()))).toList();
+        var chains = CreaturePose.chains(bones);
+        animated = bones.stream().map(b -> new BonePart(b, parts.get(b.getId()), chains.getOrDefault(b.getId(), 0))).toList();
     }
 
     public static CreatureModel bake(com.wjz.worldsmith.core.content.CreatureModel definition) {
@@ -68,11 +69,11 @@ public final class CreatureModel extends EntityModel<CreatureRenderState> {
         int phase=state.definition==null || state.definition.getBoss()==null || state.definition.getBoss().getPhases().isEmpty() ? 0
             : Math.max(0,Math.min(state.bossPhase,state.definition.getBoss().getPhases().size()-1));
         var frame = CreaturePose.withBossPhase(new CreaturePose.Frame(state.ageInTicks, state.walkAnimationPos, state.walkAnimationSpeed,
-            state.yRot, state.xRot, state.appearanceSeed, state.action),state.definition,phase);
+            state.yRot, state.xRot, state.appearanceSeed, state.action, state.airborne),state.definition,phase);
         var clip = state.animationClip == null ? Map.<String, com.wjz.worldsmith.core.ability.visual.AbilityClip.Transform>of()
             : state.animationClip.sample(state.animationTicks);
         for (var entry : animated) {
-            var rotation = CreaturePose.rotation(entry.bone(), frame);
+            var rotation = CreaturePose.rotation(entry.bone(), frame, entry.chain());
             var part = entry.part(); part.xRot = rotation.x(); part.yRot = rotation.y(); part.zRot = rotation.z();
             var transform = clip.get(entry.bone().getId());
             if (transform != null) {

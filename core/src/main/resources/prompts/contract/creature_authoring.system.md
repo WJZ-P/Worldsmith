@@ -128,6 +128,8 @@ publication uses current bundle format 10. A landmark can use the drawing contra
 `boss-encounters` section after the actual Boss definition exists.
 
 - Bone: `id`, optional `parent`, `pivot`, `rotation`, `role`, `gaitPhase`, `cubes`.
+  Roles and their motion are in the `creatures` contract; `WING_*`, `BODY` and `JAW`
+  make the recipe schema 7. Preview a flier with pose `fly`.
 - Cube: `id`, `origin`, integer `size`, optional `materialRole` and `mirror`.
 - Mirror: existing `sourceRoot`, new `targetRoot`, and `shareUv` (default true).
 - Positions and rotations use the native creature convention: one unit is 1/16 block,

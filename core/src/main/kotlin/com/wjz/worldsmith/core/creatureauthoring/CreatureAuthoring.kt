@@ -138,6 +138,8 @@ object CreatureAuthoring {
         CreatureBoneRole.ARM_RIGHT -> CreatureBoneRole.ARM_LEFT
         CreatureBoneRole.LEG_LEFT -> CreatureBoneRole.LEG_RIGHT
         CreatureBoneRole.LEG_RIGHT -> CreatureBoneRole.LEG_LEFT
+        CreatureBoneRole.WING_LEFT -> CreatureBoneRole.WING_RIGHT
+        CreatureBoneRole.WING_RIGHT -> CreatureBoneRole.WING_LEFT
         else -> role
     }
 
