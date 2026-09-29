@@ -170,7 +170,10 @@ habit. For every prompt-generated world, author a `procedural` terrain intent:
     - `{"kind": "fixed", "x": 0, "z": 0}` places exactly one instance. Use it
       only for something the player is meant to find, and keep it within a few
       thousand blocks of the origin, or it has been designed and will not be
-      seen.
+      seen. The place a player should reach first belongs within about 500
+      blocks: players appear near the origin, where the climate best matches
+      `spawnTargets`, so give that anchor a `climateBias` the spawn targets
+      match, or the arrival drifts to some other land.
     - `{"kind":"line","startX":-2000,"startZ":0,"endX":2000,"endZ":0}`
       creates one finite corridor. `radius` is its half-width: positive
       `offset` amplitude makes a mountain chain, negative amplitude a fault or

@@ -147,6 +147,21 @@ class PlayabilityAnalyzerTest {
     }
 
     @Test
+    fun `a first landmark far from where players arrive is reported`() {
+        val near = PlayabilityAnalyzer.analyze(base)
+        assertFalse("FAR_FROM_ARRIVAL" in near.findings.map { it.code }, "the village is built at the origin")
+        assertEquals(0, near.nearestLandmarkBlocks)
+
+        val shape = base.terrain.shape as com.wjz.worldsmith.core.model.TerrainShape.Procedural
+        val moved = base.copy(terrain = base.terrain.copy(shape = shape.copy(anchors = shape.anchors.map {
+            it.copy(placement = com.wjz.worldsmith.core.model.AnchorPlacement.Fixed(3000, 1200))
+        })))
+        val far = PlayabilityAnalyzer.analyze(moved)
+        assertTrue("FAR_FROM_ARRIVAL" in far.findings.map { it.code })
+        assertEquals(3231, far.nearestLandmarkBlocks)
+    }
+
+    @Test
     fun `findings never block and carry no score`() {
         // Nothing in the report is a gate; it exists beside the diagnostics.
         val report = PlayabilityAnalyzer.analyze(base)

@@ -31,6 +31,7 @@ internal fun playabilityJson(report: PlayabilityReport): JsonObject = buildJsonO
     put("livingLinks", report.livingLinks)
     put("unusedItems", JsonArray(report.unusedItems.map(::JsonPrimitive)))
     put("soundedBiomes", report.soundedBiomes)
+    report.nearestLandmarkBlocks?.let { put("nearestLandmarkBlocks", it) }
     put("advisory", true)
 }
 

@@ -5,7 +5,11 @@ import com.wjz.worldsmith.core.content.CreatureDefinition
 import com.wjz.worldsmith.core.content.CreaturePassiveMode
 import com.wjz.worldsmith.core.content.MechanicAction
 import com.wjz.worldsmith.core.content.QuestObjective
+import com.wjz.worldsmith.core.model.AnchorPlacement
+import com.wjz.worldsmith.core.model.TerrainShape
 import com.wjz.worldsmith.core.model.WorldsmithPack
+import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 /** One observation about how a world will play, with the evidence that produced it. */
 data class PlayabilityFinding(
@@ -30,6 +34,8 @@ data class PlayabilityReport(
     val findings: List<PlayabilityFinding>,
     /** Biomes that sound like somewhere: their own music, a loop or occasional sounds. */
     val soundedBiomes: Int = 0,
+    /** Blocks from the origin, where players arrive, to the nearest landmark pinned to a fixed place. */
+    val nearestLandmarkBlocks: Int? = null,
 )
 
 /**
@@ -55,6 +61,8 @@ object PlayabilityAnalyzer {
     /** Above this share of creatures with no verb, the world stands still. */
     const val IDLE_SHARE: Double = 0.5
 
+    /** About two minutes on foot; farther than this, a world opens with minutes of nothing. */
+    const val ARRIVAL_REACH: Int = 512
     private const val MIN_MECHANICS_FOR_TEMPLATE = 4
     private const val MIN_OBJECTIVES_FOR_READING = 6
 
@@ -165,6 +173,25 @@ object PlayabilityAnalyzer {
             )
         }
 
+        // ---------------------------------------------------------------- arrival
+        val anchors = (pack.terrain.shape as? TerrainShape.Procedural)?.anchors.orEmpty().associateBy { it.id }
+        val fixed = structures.mapNotNull { structure ->
+            val target = structure.placement.anchor ?: return@mapNotNull null
+            val place = anchors[target.id]?.placement as? AnchorPlacement.Fixed ?: return@mapNotNull null
+            structure.id to hypot((place.x + target.offsetX).toDouble(), (place.z + target.offsetZ).toDouble()).roundToInt()
+        }
+        val nearest = fixed.minByOrNull { it.second }
+        if (nearest != null && nearest.second > ARRIVAL_REACH) {
+            findings += PlayabilityFinding(
+                "FAR_FROM_ARRIVAL",
+                "Players arrive near the origin, and the nearest landmark, ${nearest.first}, is ${nearest.second} " +
+                    "blocks away - several minutes of walking through land that has nothing to say yet. Put the " +
+                    "place a player should reach first within about $ARRIVAL_REACH blocks of the origin, and give " +
+                    "its anchor a climate the spawn targets match so the arrival does not drift elsewhere.",
+                listOf(nearest.first),
+            )
+        }
+
         return PlayabilityReport(
             mechanics = mechanics.size,
             distinctMechanics = distinct,
@@ -176,6 +203,7 @@ object PlayabilityAnalyzer {
             unusedItems = unused,
             findings = findings,
             soundedBiomes = sounded,
+            nearestLandmarkBlocks = nearest?.second,
         )
     }
 
