@@ -171,6 +171,39 @@ are level sets, not exact distances: shell thickness on those is not uniformly m
 in blocks. Continuous field rotations change geometry only, not block facing; use exact
 painter transforms for block-oriented components. All rasterizations are voxel approximations.
 
+## Roofs
+
+The roof decides whether a building reads as architecture, and stairs are easy
+to get wrong one block at a time. `Roofs` lays a whole roof over the top course
+of a wall `Box`, in the painter's local frame, and resolves every stair's
+`shape` with Minecraft's own neighbour rule, so hip corners come out as the
+outer corners the placed structure will show.
+
+```java
+var tile = Roofs.Material.of("deepslate_tile_stairs", "deepslate_tile_slab", "deepslate_tiles");
+var hall = Box.of(0, 0, 0, 12, 5, 8);                     // walls; the roof starts at y=6
+Roofs.gable(pen, hall, Roofs.Ridge.X, tile,
+    Roofs.Options.defaults().withOverhang(1).withGableWall("white_terracotta"));
+var pavilion = Box.of(20, 0, 0, 26, 4, 6);                // columns' footprint
+Roofs.hip(pen, pavilion, tile, Roofs.Options.defaults().withOverhang(2).withFlaredCorners());
+```
+
+- `gable(pen, walls, ridge, material, options)`: two slopes climbing one block per
+  block toward a ridge along `Ridge.X` or `Ridge.Z`, capped with slabs; the gable
+  ends are filled with `withGableWall(block)` or left open.
+- `hip(pen, walls, material, options)`: four slopes; a square footprint closes to
+  a point (a pavilion), a long one to a short slab ridge. Stack a smaller `hip`
+  over a narrower upper storey for double eaves.
+- `Options.defaults()` is overhang 1, straight corners, no gable wall, and AIR
+  authored under the roof inside the walls so terrain cannot fill the attic;
+  `keepingAttic()` leaves that space unauthored. Overhang is 0..3.
+- `withFlaredCorners()` lifts each hip eave corner half a block on an inverted
+  stair - the upturned eave of pavilions and halls. A gable refuses it: its
+  eaves run straight into the gable ends.
+
+Walls, columns, openings and the interior stay yours to draw; `Roofs` only
+writes the roof and the space directly under it.
+
 ## Brushes and masks
 
 `Brush` is `(localPosition, previousDrawBlock) -> BlockStateRef`; null output skips.
