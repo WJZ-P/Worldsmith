@@ -70,6 +70,10 @@ top are where the theme actually lands. Vary them: two biomes that differ in
 height or temperature must not resolve to the same colours. Override only what
 should differ from Minecraft's own values.
 
+A place is also what it sounds like. Give the biomes that define the world
+their own music and, sparingly, a sound of the place through `audio`; a player
+knows they have crossed into somewhere new before they see it.
+
 ## 6. Read the prompt once more, backwards
 
 For each claim in it, name the field that implements it. A claim with no field

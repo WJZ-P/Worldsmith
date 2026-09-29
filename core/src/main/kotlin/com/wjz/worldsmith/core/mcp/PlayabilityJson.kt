@@ -30,6 +30,7 @@ internal fun playabilityJson(report: PlayabilityReport): JsonObject = buildJsonO
     put("landmarkStructures", report.landmarkStructures); put("repeatingStructures", report.repeatingStructures)
     put("livingLinks", report.livingLinks)
     put("unusedItems", JsonArray(report.unusedItems.map(::JsonPrimitive)))
+    put("soundedBiomes", report.soundedBiomes)
     put("advisory", true)
 }
 

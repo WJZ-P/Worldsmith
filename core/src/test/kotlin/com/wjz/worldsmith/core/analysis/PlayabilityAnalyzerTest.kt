@@ -133,6 +133,20 @@ class PlayabilityAnalyzerTest {
     }
 
     @Test
+    fun `a world that sounds the same everywhere is reported until a defining biome has its own sound`() {
+        val biomes = base.biomes.biomes
+        assertTrue(biomes.size >= 3, "the example needs several biomes for this to be a world-wide sameness")
+        assertTrue("ONE_SOUNDSCAPE" in codes(base))
+
+        val meadow = com.wjz.worldsmith.core.model.BiomeAudio(music = com.wjz.worldsmith.core.model.BiomeMusic("minecraft:music.overworld.meadow"))
+        val scored = base.copy(biomes = base.biomes.copy(biomes = biomes.mapIndexed { i, biome ->
+            if (i == 0) biome.copy(environment = biome.environment.copy(audio = meadow)) else biome
+        }))
+        assertFalse("ONE_SOUNDSCAPE" in codes(scored))
+        assertEquals(1, PlayabilityAnalyzer.analyze(scored).soundedBiomes)
+    }
+
+    @Test
     fun `findings never block and carry no score`() {
         // Nothing in the report is a gate; it exists beside the diagnostics.
         val report = PlayabilityAnalyzer.analyze(base)

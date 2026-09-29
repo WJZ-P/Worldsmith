@@ -28,6 +28,8 @@ data class PlayabilityReport(
     val livingLinks: Int,
     val unusedItems: List<String>,
     val findings: List<PlayabilityFinding>,
+    /** Biomes that sound like somewhere: their own music, a loop or occasional sounds. */
+    val soundedBiomes: Int = 0,
 )
 
 /**
@@ -149,6 +151,20 @@ object PlayabilityAnalyzer {
             )
         }
 
+        // ------------------------------------------------------------------ sound
+        val sounded = pack.biomes.biomes.count { biome ->
+            biome.environment.audio?.let { it.music != null || it.loop != null || it.additions.isNotEmpty() } == true
+        }
+        if (pack.biomes.biomes.size >= 3 && sounded == 0) {
+            findings += PlayabilityFinding(
+                "ONE_SOUNDSCAPE",
+                "Every biome plays the overworld's general music and nothing else, so the world sounds the same from " +
+                    "one end to the other. Give the biomes that define it their own music, and a rare sound of the " +
+                    "place - water, a distant bell - through environment.audio.",
+                pack.biomes.biomes.map { it.id },
+            )
+        }
+
         return PlayabilityReport(
             mechanics = mechanics.size,
             distinctMechanics = distinct,
@@ -159,6 +175,7 @@ object PlayabilityAnalyzer {
             livingLinks = living,
             unusedItems = unused,
             findings = findings,
+            soundedBiomes = sounded,
         )
     }
 
