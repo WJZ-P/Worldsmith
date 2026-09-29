@@ -26,6 +26,8 @@ data class DesignInventory(
     val structureCreatures: Set<String> = emptySet(),
     val mechanicCreatures: Set<String> = emptySet(),
     val reachableMechanics: Set<String> = emptySet(),
+    /** Results of item recipes, including recipes made only from native materials. */
+    val craftedItems: Set<ContentKey> = emptySet(),
 ) {
     val encounterCreatures: Set<String> get() = naturalCreatures + structureCreatures + mechanicCreatures
 }
@@ -97,9 +99,9 @@ object WorldDesignCoverage {
                     error("designPlan.targets", "DESIGN_CREATURE_UNPLACED", "Planned creature '${key.id}' has no positive natural habitat, valid structure encounter, initially spawnable placed story character or reachable mechanic summon")
                 "item" -> {
                     val producers = actual.links.filter { it.to == key && it.relation in setOf(DesignRelation.DROPS_ITEM, DesignRelation.CONTAINS_REWARD, DesignRelation.QUEST_REWARD, DesignRelation.GRANTS_ITEM) }
-                    if (strictGeometry && producers.isEmpty()) error("designPlan.targets", "DESIGN_ITEM_UNOBTAINABLE", "Planned item '${key.id}' has no configured creature, structure, quest or mechanic reward producer")
-                    if (actual.links.none { it.to == key && it.relation in setOf(DesignRelation.DELIVERY_OBJECTIVE, DesignRelation.QUEST_REWARD, DesignRelation.THEME_ANCHOR, DesignRelation.CONSUMES_ITEM, DesignRelation.GRANTS_ITEM) })
-                        error("designPlan.targets", "DESIGN_ITEM_UNCONNECTED", "Planned item '${key.id}' has no delivery objective, quest/mechanic reward or consumption role, or concrete theme anchor")
+                    if (strictGeometry && producers.isEmpty() && key !in actual.craftedItems) error("designPlan.targets", "DESIGN_ITEM_UNOBTAINABLE", "Planned item '${key.id}' has no configured creature, structure, quest, mechanic reward or recipe producer")
+                    if (actual.links.none { it.to == key && it.relation in setOf(DesignRelation.DELIVERY_OBJECTIVE, DesignRelation.QUEST_REWARD, DesignRelation.THEME_ANCHOR, DesignRelation.CONSUMES_ITEM, DesignRelation.GRANTS_ITEM, DesignRelation.CRAFTED_FROM) })
+                        error("designPlan.targets", "DESIGN_ITEM_UNCONNECTED", "Planned item '${key.id}' has no delivery objective, quest/mechanic reward, consumption or recipe ingredient role, or concrete theme anchor")
                 }
                 "quest" -> if (key.id !in actual.themedQuests)
                     error("designPlan.targets", "DESIGN_QUEST_UNTHEMED", "Planned quest '${key.id}' must bind to an existing narrative beat through themeBeat")
@@ -174,6 +176,12 @@ object WorldDesignCoverage {
             val owner = key("item", value.id); symbols += owner; textures[owner] = setOf(value.textureAsset)
             value.actions.flatMap { it.effects }.filterIsInstance<ItemEffect.RunProgram>().forEach { link(owner, key("ability", it.program), DesignRelation.INVOKES_ABILITY) }
             value.abilityBindings.forEach { link(owner, key("ability", it.program), DesignRelation.INVOKES_ABILITY) }
+        }
+        val crafted = linkedSetOf<ContentKey>()
+        items?.recipes.orEmpty().forEach { recipe ->
+            val result = item(recipe.result) ?: return@forEach
+            crafted += result
+            recipe.inputs().mapNotNull(::item).distinct().forEach { link(result, it, DesignRelation.CRAFTED_FROM) }
         }
         val biomeIds = biomes?.biomes.orEmpty().map { it.id }.toSet()
         creatures?.creatures.orEmpty().forEach { value ->
@@ -309,6 +317,6 @@ object WorldDesignCoverage {
                 structureSupplies[value.id] = upperBounds
             }
         }
-        return DesignInventory(symbols, links, textures, drawings, bosses, spawned, themed, errors, structureSupplies, structureCreatures)
+        return DesignInventory(symbols, links, textures, drawings, bosses, spawned, themed, errors, structureSupplies, structureCreatures, craftedItems = crafted)
     }
 }

@@ -1,10 +1,10 @@
-# Worldsmith items — schema 4 adds generic native event bindings
+# Worldsmith items — schema 5 adds crafting and cooking recipes
 
 New publications use bundle format 10 with twelve typed modules. `items` may retain
 schemaVersion=1 for plain resources/relics, or explicitly select schemaVersion=2
 for equipment, consumables and actions, or schemaVersion=3 for shared AbilityScript
 invocation. Schema 2 retains its small typed effect library; schema 3 is the
-source-program extension point. Choose capabilities that deepen this world's exploration,
+source-program extension point; schema 4 adds event bindings and schema 5 recipes. Choose capabilities that deepen this world's exploration,
 combat and rewards; ordinary materials should remain ordinary when that is useful.
 
 ## Exact item library
@@ -217,7 +217,8 @@ a foreign world's item does not acquire the current world's abilities.
 3. Link real `item` ContentKeys in theme beats and the design plan. Give intended
    survival items an actual creature drop, structure-container or quest-reward source.
 4. Use existing quests' explicit deliver_item/reward fields; wearing or using a
-   reward does not independently complete its quest or create a crafting tree.
+   reward does not independently complete its quest. Crafting exists only as the
+   schema 5 recipes below.
 5. On `worldsmith_write_pack`, choose the world's most recognisable existing item
    or block through `representativeContent: {"kind":"item","id":"ember_focus"}`
    (kind may instead be block). This becomes manifest.representativeContent,
@@ -286,3 +287,35 @@ item interaction takes precedence over a target NPC's declared interaction, avoi
 double starts. Start/listen/cancel only operate on this binding's owned UUID.
 All fields participate in validation, deep freeze, hash and invokes_ability links.
 Use worldsmith_put_content_modules(sessionId,expectedRevision,modules) as usual.
+
+## Schema 5: crafting and cooking recipes
+
+`CustomItemLibrary` additionally accepts `recipes:[]` (at most 128). A recipe is a
+native crafting-table or cooking recipe; the result a player takes out is the full
+world item, with its model, name, equipment and abilities.
+
+```json
+"recipes": [
+  {"kind":"cooking","id":"ember_shard","station":"BLAST_FURNACE","ingredient":"worldsmith:item/raw_ember","result":"worldsmith:item/ember_shard","experience":0.7},
+  {"kind":"shaped","id":"ember_blade","pattern":[" E "," E "," S "],"key":{"E":"worldsmith:item/ember_shard","S":"minecraft:stick"},"result":"worldsmith:item/ember_blade"},
+  {"kind":"shapeless","id":"trail_ration","ingredients":["minecraft:bread","#minecraft:flowers"],"result":"worldsmith:item/trail_ration","count":2}
+]
+```
+
+| Kind | Fields |
+| --- | --- |
+| shaped | `pattern` 1..3 equal rows of 1..3 characters, space = empty; `key` maps each used character to one ingredient |
+| shapeless | `ingredients` 1..9, any order |
+| cooking | one `ingredient`; `station` FURNACE (default), BLAST_FURNACE, SMOKER or CAMPFIRE; `experience` 0..100 (default 0.1); `cookingTicks` 1..32767, default is the station's own |
+
+Every recipe has a local `id`, a `result` and `count` 1..64 within the result's
+stack size. Ingredients and results are `worldsmith:item/<id>`,
+`worldsmith:content/<blockId>` or a native item id; an ingredient may also be a
+native item tag `#namespace:path`. Each recipe makes or spends at least one item
+of this library. Recipes are unlocked in every player's recipe book on arrival.
+
+Use recipes for the gather-process-make loop the setting implies: a creature drop
+or custom ore is smelted, the result forged into gear or cooked into food. Record
+it as a `crafted_from` design link (result to ingredient). A crafted item counts as
+obtainable only when every ingredient is native or itself renewable.
+

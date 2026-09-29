@@ -54,6 +54,7 @@ public final class CustomItemRuntime {
         host = Registry.register(BuiltInRegistries.ITEM, key, new ResourceItem(new Item.Properties().setId(key).stacksTo(64)));
         ItemAbilityProjectile.register();
         AbilityEventRuntime.register();
+        WorldItemRecipes.register();
     }
 
     public static Item host() { return Objects.requireNonNull(host, "CustomItemRuntime.register must run during bootstrap"); }
@@ -85,6 +86,11 @@ public final class CustomItemRuntime {
     public static void clearClient() { clientSnapshot = null; }
     public static Snapshot clientSnapshot() { return clientSnapshot; }
     public static Snapshot snapshot(Level level) { return level instanceof ServerLevel server ? WORLDS.get(server) : clientSnapshot; }
+    /** Recipes assemble without a level; every running level of one world binds the same snapshot. */
+    public static Snapshot boundSnapshot(String bundleHash) {
+        for (Snapshot snapshot : WORLDS.values()) if (snapshot.bundleHash.equals(bundleHash)) return snapshot;
+        return null;
+    }
 
     /** A foreign or missing identity stays unresolved; its persisted name/model are never replaced by the new world's names. */
     public static CustomItemDefinition definition(Level level, ItemStack stack) {

@@ -78,6 +78,8 @@ public final class WorldContentRuntime {
         Map<String, byte[]> server = new LinkedHashMap<>(GeneratedBlockResources.serverResources(bindings, blocks));
         com.wjz.worldsmith.content.quest.GeneratedQuestAdvancements.serverResources(pack, quests.worldTitle())
             .forEach((path, bytes) -> putUnique(server, path, bytes));
+        com.wjz.worldsmith.content.item.GeneratedItemRecipes.serverResources(items, pack.getItems(), WorldBlockBindings.resolver(bindings))
+            .forEach((path, bytes) -> putUnique(server, path, bytes));
         var bundle = WorldContentBundleIO.encode(pack);
         putUnique(server, EMBEDDED_MANIFEST, WorldsmithJson.INSTANCE.getFormat().encodeToString(WorldsmithPackManifest.Companion.serializer(), bundle.getManifest()).getBytes(StandardCharsets.UTF_8));
         bundle.getTexts().forEach((path, text) -> putUnique(server, EMBEDDED_ROOT + path, text.getBytes(StandardCharsets.UTF_8)));

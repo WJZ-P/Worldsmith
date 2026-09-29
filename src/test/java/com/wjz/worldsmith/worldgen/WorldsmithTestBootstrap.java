@@ -3,6 +3,8 @@ package com.wjz.worldsmith.worldgen;
 import com.wjz.worldsmith.Worldsmith;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.List;
+import java.util.Map;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.Holder;
 import net.minecraft.core.MappedRegistry;
@@ -15,6 +17,7 @@ import net.minecraft.server.Bootstrap;
 public final class WorldsmithTestBootstrap {
 	private static boolean bootstrapped;
 	private static boolean customBlocksBootstrapped;
+	private static boolean customItemsBootstrapped;
 
 	private WorldsmithTestBootstrap() {
 	}
@@ -44,6 +47,51 @@ public final class WorldsmithTestBootstrap {
 			}
 			customBlocksBootstrapped = true;
 		} catch (ReflectiveOperationException failure) { throw new IllegalStateException("Could not register native custom block hosts in test bootstrap", failure); }
+	}
+
+	/** Registers the shared world-item host, its component and recipe serializers, as Fabric init would. */
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	public static synchronized void bootStrapCustomItems() {
+		bootStrap();
+		if (customItemsBootstrapped) return;
+		try {
+			Field frozen = MappedRegistry.class.getDeclaredField("frozen"); frozen.setAccessible(true);
+			Field intrusive = MappedRegistry.class.getDeclaredField("unregisteredIntrusiveHolders"); intrusive.setAccessible(true);
+			MappedRegistry<?> items = (MappedRegistry<?>)BuiltInRegistries.ITEM, entities = (MappedRegistry<?>)BuiltInRegistries.ENTITY_TYPE;
+			List<MappedRegistry<?>> opened = List.of(items, entities, (MappedRegistry<?>)BuiltInRegistries.DATA_COMPONENT_TYPE, (MappedRegistry<?>)BuiltInRegistries.RECIPE_SERIALIZER);
+			Object oldItems = intrusive.get(items), oldEntities = intrusive.get(entities);
+			for (var registry : opened) frozen.setBoolean(registry, false);
+			intrusive.set(items, new java.util.IdentityHashMap<>()); intrusive.set(entities, new java.util.IdentityHashMap<>());
+			try {
+				com.wjz.worldsmith.content.item.CustomItemRuntime.register();
+				Method tags = Holder.Reference.class.getDeclaredMethod("bindTags", java.util.Collection.class); tags.setAccessible(true);
+				Method bindValue = Holder.Reference.class.getDeclaredMethod("bindValue", Object.class); bindValue.setAccessible(true);
+				tags.invoke(com.wjz.worldsmith.content.item.CustomItemRuntime.host().builtInRegistryHolder(), List.of());
+				tags.invoke(com.wjz.worldsmith.content.item.ItemAbilityProjectile.type().builtInRegistryHolder(), List.of());
+				// Stand-alone holders of an already-frozen registry are not bound by register itself.
+				Map<ResourceKey<?>, Object> values = Map.of(
+					ResourceKey.create(Registries.DATA_COMPONENT_TYPE, Worldsmith.id("item_identity")), com.wjz.worldsmith.content.item.CustomItemRuntime.identityComponent(),
+					ResourceKey.create(Registries.RECIPE_SERIALIZER, Worldsmith.id("world_shaped")), com.wjz.worldsmith.content.item.WorldItemRecipes.SHAPED,
+					ResourceKey.create(Registries.RECIPE_SERIALIZER, Worldsmith.id("world_shapeless")), com.wjz.worldsmith.content.item.WorldItemRecipes.SHAPELESS,
+					ResourceKey.create(Registries.RECIPE_SERIALIZER, Worldsmith.id("world_smelting")), com.wjz.worldsmith.content.item.WorldItemRecipes.SMELTING,
+					ResourceKey.create(Registries.RECIPE_SERIALIZER, Worldsmith.id("world_blasting")), com.wjz.worldsmith.content.item.WorldItemRecipes.BLASTING,
+					ResourceKey.create(Registries.RECIPE_SERIALIZER, Worldsmith.id("world_smoking")), com.wjz.worldsmith.content.item.WorldItemRecipes.SMOKING,
+					ResourceKey.create(Registries.RECIPE_SERIALIZER, Worldsmith.id("world_campfire_cooking")), com.wjz.worldsmith.content.item.WorldItemRecipes.CAMPFIRE);
+				for (var entry : values.entrySet()) {
+					var registry = entry.getKey().isFor(Registries.DATA_COMPONENT_TYPE) ? BuiltInRegistries.DATA_COMPONENT_TYPE : BuiltInRegistries.RECIPE_SERIALIZER;
+					Holder.Reference<?> holder = (Holder.Reference<?>) ((net.minecraft.core.Registry) registry).get((ResourceKey) entry.getKey()).orElseThrow();
+					bindValue.invoke(holder, entry.getValue());
+					tags.invoke(holder, List.of());
+				}
+			} finally {
+				for (var registry : opened) frozen.setBoolean(registry, true);
+				intrusive.set(items, oldItems); intrusive.set(entities, oldEntities);
+			}
+			// The host's prototype components are baked like every other item's.
+			BuiltInRegistries.DATA_COMPONENT_INITIALIZERS.build(net.minecraft.data.registries.VanillaRegistries.createLookup())
+				.forEach(net.minecraft.core.component.DataComponentInitializers.PendingComponents::apply);
+			customItemsBootstrapped = true;
+		} catch (ReflectiveOperationException failure) { throw new IllegalStateException("Could not register the world item host in test bootstrap", failure); }
 	}
 
 	@SuppressWarnings({"rawtypes", "unchecked"})

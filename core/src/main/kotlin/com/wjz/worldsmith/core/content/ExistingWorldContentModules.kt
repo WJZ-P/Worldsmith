@@ -98,16 +98,19 @@ object ExistingWorldContentModules {
                     ContentEntry(ContentKey("block_item", block.id), "blocks", path, references = listOf(ContentReference(ContentKey("block", block.id), "$path.id"))))
             }, diagnostics = CustomBlockValidation.validate(library).map { it.copy(path = "blocks.${it.path}") })
         },
-        TypedModule(ContentModuleDescriptor("items", listOf("item"), listOf(1, 2, 3, 4), compileAfter = listOf("abilities"), requirements = listOf(
+        TypedModule(ContentModuleDescriptor("items", listOf("item"), listOf(1, 2, 3, 4, 5), compileAfter = listOf("abilities"), requirements = listOf(
             ContentRequirement("custom_items.native_host", 1, ContentLifecycle.BOOTSTRAP),
             ContentRequirement("world_content.client_resources", 1, ContentLifecycle.CLIENT_RESOURCES),
             ContentRequirement("custom_items.world_stacks", 1, ContentLifecycle.WORLD_BINDING),
             ContentRequirement("custom_items.equipment", 1, ContentLifecycle.WORLD_BINDING),
             ContentRequirement("custom_items.actions", 1, ContentLifecycle.WORLD_BINDING),
-        ), description = "World-scoped item stacks; schema 2 equipment and consumption; schema 3 invokes shared AbilityScript programs"), CustomItemLibrary.serializer()) { library, _ ->
+            ContentRequirement("custom_items.recipes", 1, ContentLifecycle.WORLD_DATA),
+        ), description = "World-scoped item stacks; schema 2 equipment and consumption; schema 3 invokes shared AbilityScript programs; schema 5 crafting and cooking recipes"), CustomItemLibrary.serializer()) { library, _ ->
+            val recipes = recipeReferences(library)
             ContentContribution(library.items.mapIndexed { i, item -> ContentEntry(ContentKey("item", item.id), "items", "items.items[$i]", references = item.actions.flatMapIndexed { j, action -> action.effects.mapIndexedNotNull { k, effect ->
                 (effect as? ItemEffect.RunProgram)?.let { ContentReference(ContentKey("ability", it.program), "items.items[$i].actions[$j].effects[$k].program") }
-            } } + item.abilityBindings.mapIndexed { j, binding -> ContentReference(ContentKey("ability", binding.program), "items.items[$i].abilityBindings[$j].program") }, assets = listOfNotNull(item.textureAsset, item.equipment?.textureAsset)) },
+            } } + item.abilityBindings.mapIndexed { j, binding -> ContentReference(ContentKey("ability", binding.program), "items.items[$i].abilityBindings[$j].program") } + recipes.references[item.id].orEmpty(),
+                assets = listOfNotNull(item.textureAsset, item.equipment?.textureAsset), nativeReferences = recipes.natives[item.id].orEmpty()) },
                 diagnostics = CustomItemValidation.validate(library).map { it.copy(path = "items.${it.path}") })
         },
         TypedModule(ContentModuleDescriptor("creatures", listOf("creature"), listOf(1, 2, 3, 4, 5, 6, 7), compileAfter = listOf("biomes", "abilities"), requirements = listOf(
@@ -207,7 +210,7 @@ object ExistingWorldContentModules {
         "custom_blocks.native_hosts" to 1, "world_content.client_resources" to 1, "world_content.world_binding" to 1,
         "creatures.native_hosts" to 1, "assets.entity_models" to 1, "creatures.world_behaviors" to 1,
         "custom_items.native_host" to 1, "custom_items.world_stacks" to 1,
-        "custom_items.equipment" to 1, "custom_items.actions" to 1,
+        "custom_items.equipment" to 1, "custom_items.actions" to 1, "custom_items.recipes" to 1,
         "mechanics.anchor_interactions" to 1, "abilities.runtime" to 1, "story.runtime" to 1, "story.client" to 1,
         "quests.server_progress" to 2, "quests.client_journal" to 2, "quests.native_advancements" to 2,
     )
@@ -215,6 +218,36 @@ object ExistingWorldContentModules {
     val plannedModules = listOf(
         ContentModuleDescriptor("achievements", listOf("achievement"), emptyList(), description = "Independent achievement authoring is not installed or accepted; existing quests already project into native world-specific advancements"),
     )
+
+    private class RecipeReferences(val references: Map<String, List<ContentReference>>, val natives: Map<String, List<NativeContentReference>>)
+
+    /**
+     * A recipe is not a content kind of its own. Its references hang on the first
+     * library item it makes or spends, which validation guarantees exists.
+     */
+    private fun recipeReferences(library: CustomItemLibrary): RecipeReferences {
+        val references = linkedMapOf<String, MutableList<ContentReference>>()
+        val natives = linkedMapOf<String, MutableSet<NativeContentReference>>()
+        library.recipes.forEachIndexed { i, recipe ->
+            val path = "items.recipes[$i]"
+            val fields = buildList {
+                add("$path.result" to recipe.result)
+                when (recipe) {
+                    is ItemRecipe.Shaped -> recipe.key.forEach { (symbol, value) -> add("$path.key.$symbol" to value) }
+                    is ItemRecipe.Shapeless -> recipe.ingredients.forEachIndexed { j, value -> add("$path.ingredients[$j]" to value) }
+                    is ItemRecipe.Cooking -> add("$path.ingredient" to recipe.ingredient)
+                }
+            }
+            val owner = (listOf(recipe.result) + recipe.inputs()).firstOrNull { it.startsWith(LOCAL_ITEM_PREFIX) }?.removePrefix(LOCAL_ITEM_PREFIX) ?: return@forEachIndexed
+            fields.forEach { (at, value) -> when {
+                value.startsWith(LOCAL_ITEM_PREFIX) -> references.getOrPut(owner, ::mutableListOf) += ContentReference(ContentKey("item", value.removePrefix(LOCAL_ITEM_PREFIX)), at)
+                value.startsWith(LOCAL_BLOCK_PREFIX) -> references.getOrPut(owner, ::mutableListOf) += ContentReference(ContentKey("block_item", value.removePrefix(LOCAL_BLOCK_PREFIX)), at)
+                value.startsWith("#") -> natives.getOrPut(owner, ::linkedSetOf) += NativeContentReference("item_tag", value.substring(1))
+                else -> natives.getOrPut(owner, ::linkedSetOf) += NativeContentReference("item", value)
+            } }
+        }
+        return RecipeReferences(references, natives.mapValues { it.value.toList() })
+    }
 
     /** Drives name other content by id; recording them lets the catalog report a creature that hunts nothing real. */
     private fun driveReferences(drives: CreatureDrives, path: String): List<ContentReference> = buildList {

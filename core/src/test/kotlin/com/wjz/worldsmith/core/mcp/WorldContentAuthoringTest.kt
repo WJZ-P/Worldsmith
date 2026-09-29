@@ -190,7 +190,7 @@ class WorldContentAuthoringTest {
             val content = result.structuredContent.getValue("contract").jsonPrimitive.content
             assertTrue(content.contains("expectedRevision"), "$module must document shared draft CAS")
             assertTrue(content.contains("worldsmith_put_content_modules"), "$module must document its real authoring entry point")
-            assertEquals(when (module) { "creatures" -> 7; "items" -> 4; "quests", "blocks", "story" -> 2; else -> 1 }, result.structuredContent.getValue("schemaVersion").jsonPrimitive.int)
+            assertEquals(when (module) { "creatures" -> 7; "items" -> 5; "quests", "blocks", "story" -> 2; else -> 1 }, result.structuredContent.getValue("schemaVersion").jsonPrimitive.int)
         }
         assertThrows(IllegalArgumentException::class.java) { call("worldsmith_get_content_contract", buildJsonObject { put("module", "achievements") }) }
     }

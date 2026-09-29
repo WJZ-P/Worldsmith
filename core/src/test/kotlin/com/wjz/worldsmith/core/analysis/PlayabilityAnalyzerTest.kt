@@ -122,6 +122,17 @@ class PlayabilityAnalyzerTest {
     }
 
     @Test
+    fun `an item crafted into something else is not a dead end`() {
+        val texture = base.items.items.first().textureAsset
+        val shard = CustomItemDefinition("ember_shard", "Ember shard", texture)
+        val lamp = CustomItemDefinition("ember_lamp", "Ember lamp", texture)
+        val recipe = com.wjz.worldsmith.core.content.ItemRecipe.Shapeless("lamp", listOf("worldsmith:item/ember_shard", "minecraft:glass"), "worldsmith:item/ember_lamp")
+        val report = PlayabilityAnalyzer.analyze(base.copy(items = CustomItemLibrary(5, listOf(shard, lamp), listOf(recipe))))
+
+        assertEquals(listOf("ember_lamp"), report.unusedItems, "the shard is an ingredient; the lamp it makes still does nothing")
+    }
+
+    @Test
     fun `findings never block and carry no score`() {
         // Nothing in the report is a gate; it exists beside the diagnostics.
         val report = PlayabilityAnalyzer.analyze(base)

@@ -155,4 +155,18 @@ class WorldMechanicReachabilityTest {
         val slay = quest("slay", "prepare", listOf(QuestObjective.KillCreature("guardian")))
         assertTrue(codes(world(listOf(mechanism), listOf(seed(2), prepare, slay), listOf(guardian()))).isEmpty())
     }
+
+    @Test fun aRecipeFromRenewableInputsIsASourceButOneNeedingAnUnsourcedItemIsNot() {
+        val texture = "a".repeat(64)
+        val items = listOf(CustomItemDefinition("charm", "Charm", texture), CustomItemDefinition("relic", "Relic", texture))
+        val fromNative = ItemRecipe.Shapeless("charm", listOf("minecraft:glass", "#minecraft:planks"), "worldsmith:item/charm")
+        val deliver = quest("get", objectives = listOf(QuestObjective.DeliverItem("worldsmith:item/charm", 3)))
+        val crafted = world(emptyList(), listOf(deliver)).copy(items = CustomItemLibrary(5, items, listOf(fromNative)))
+        assertTrue(codes(crafted).isEmpty(), codes(crafted).toString())
+        // A chain is followed to its end: nothing yields the relic, so nothing yields a charm made from it.
+        val fromRelic = ItemRecipe.Cooking("charm", "worldsmith:item/relic", "worldsmith:item/charm")
+        assertEquals(listOf("DESIGN_DELIVERY_NO_PRODUCER"), codes(crafted.copy(items = CustomItemLibrary(5, items, listOf(fromRelic)))))
+        val relicFromNative = ItemRecipe.Shapeless("relic", listOf("minecraft:gold_ingot"), "worldsmith:item/relic")
+        assertTrue(codes(crafted.copy(items = CustomItemLibrary(5, items, listOf(fromRelic, relicFromNative)))).isEmpty())
+    }
 }

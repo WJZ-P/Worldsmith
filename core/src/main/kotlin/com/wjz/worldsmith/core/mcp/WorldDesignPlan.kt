@@ -42,6 +42,7 @@ data class WorldDesignPlan(
     @SerialName("consumes_item") CONSUMES_ITEM,
     @SerialName("grants_item") GRANTS_ITEM,
     @SerialName("spawns_creature") SPAWNS_CREATURE,
+    @SerialName("crafted_from") CRAFTED_FROM,
 }
 
 object WorldDesignPlans {
@@ -112,6 +113,7 @@ object WorldDesignPlans {
             DesignRelation.DELIVERY_OBJECTIVE, DesignRelation.QUEST_REWARD -> from == "quest" && to in setOf("item", "block_item")
             DesignRelation.CONSUMES_ITEM, DesignRelation.GRANTS_ITEM -> from == "mechanic" && to in setOf("item", "block_item")
             DesignRelation.SPAWNS_CREATURE -> from == "mechanic" && to == "creature"
+            DesignRelation.CRAFTED_FROM -> from in setOf("item", "block_item") && to in setOf("item", "block_item")
             DesignRelation.PREREQUISITE -> from == "quest" && to == "quest"
             DesignRelation.THEME_ANCHOR -> from in setOf("theme", "narrative_beat") && to in targetKinds + "block_item"
         }

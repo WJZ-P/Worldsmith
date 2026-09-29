@@ -98,6 +98,7 @@ may be implicit. Every complete-world target participates in a promised link.
 | uses_block | terrain/biome/feature/structure/mechanic → block | selected material, compiled voxel or mechanic pattern/action |
 | consumes_item | mechanic → item/block_item | explicit heldItem cost or consumed custom-block cell |
 | grants_item | mechanic → item/block_item | positive give_item action |
+| crafted_from | item/block_item → item/block_item | an items schema 5 recipe makes the first from the second |
 | invokes_ability | item/creature/mechanic/dialogue → ability | actual run_program action or CreatureDefinition.ability |
 | spawns_creature | mechanic → creature | typed spawn_creature action |
 | uses_feature | biome → feature | the biome's configured feature references |

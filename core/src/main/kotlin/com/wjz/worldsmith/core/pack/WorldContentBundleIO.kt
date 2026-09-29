@@ -54,6 +54,7 @@ object WorldContentBundleIO {
         require(pack.creatures.creatures.none { it.abilityBindings.isNotEmpty() } || pack.creatures.schemaVersion >= 5) { "Event bindings require creature module schema 5" }
         require(pack.creatures.creatures.none { c -> c.abilityBindings.any { it.intervalTicks != 1 } } || pack.creatures.schemaVersion >= 6) { "Observation intervals require creature module schema 6" }
         require(pack.items.items.none { it.abilityBindings.isNotEmpty() || it.maxUseTicks != 0 } || pack.items.schemaVersion >= 4) { "Event bindings and held use require items schema 4" }
+        require(pack.items.recipes.isEmpty() || pack.items.schemaVersion >= 5) { "Recipes require items schema 5" }
         ContentAssetValidation.verifyAll(pack.manifest.assets, pack.assets)
         val texts = linkedMapOf<String, String>()
         fun put(module: String, text: String) { texts[pack.manifest.modulePath(module)] = text }

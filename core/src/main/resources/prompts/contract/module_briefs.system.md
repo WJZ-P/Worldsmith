@@ -79,7 +79,8 @@ phrased for this world:
   theme are enabled through biome `tags`;
 - quest objectives mostly change the world (build, deliver, drive off,
   activate) rather than read a fact;
-- every obtainable item is spent, worn, used, traded or handed in somewhere.
+- every obtainable item is spent, worn, used, traded, handed in or crafted into
+  something, and raw drops lead somewhere through items schema 5 recipes.
 
 `worldsmith_write_pack` and `worldsmith_analyze_playability` report where the
 current content falls short of exactly these. The report is advisory; the

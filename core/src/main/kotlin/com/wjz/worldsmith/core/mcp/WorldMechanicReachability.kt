@@ -76,6 +76,14 @@ object WorldMechanicReachability {
             }) repeatable += ContentKey("block_item", link.to.id)
             else -> Unit
         } }
+        // A recipe whose every input is native or already renewable renews its result.
+        // Recipes that would spend finite stock are left out, so this never overstates supply.
+        do {
+            val grown = pack.items.recipes.mapNotNull { recipe -> logicalItem(recipe.result)?.takeIf { result ->
+                result !in repeatable && recipe.inputs().all { input -> logicalItem(input)?.let(repeatable::contains) ?: true }
+            } }
+            repeatable += grown
+        } while (grown.isNotEmpty())
         val validMechanics = if (WorldMechanicValidation.validate(pack.mechanics).isEmpty()) pack.mechanics.mechanics else emptyList()
         return Planner(pack, validMechanics, biomes, baseCreatures, repeatable, stock)
     }

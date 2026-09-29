@@ -144,7 +144,7 @@ object PlayabilityAnalyzer {
             findings += PlayabilityFinding(
                 "DEAD_END_ITEMS",
                 "${unused.size} item(s) can be obtained but never used, spent, worn or handed in. An item that does " +
-                    "nothing is a note in the inventory; make it a cost, a key, a gift someone wants, or a tool.",
+                    "nothing is a note in the inventory; make it a cost, a key, a gift someone wants, a recipe ingredient, or a tool.",
                 unused,
             )
         }
@@ -188,6 +188,7 @@ object PlayabilityAnalyzer {
             quest.objectives.filterIsInstance<QuestObjective.DeliverItem>().forEach { add(bare(it.item)) }
         }
         pack.creatures.creatures.forEach { creature -> creature.behavior.drives.temptedBy.forEach { add(bare(it)) } }
+        pack.items.recipes.flatMap { it.inputs() }.filter { it.startsWith("worldsmith:item/") }.forEach { add(bare(it)) }
     }
 
     private fun kindOf(objective: QuestObjective): String = when (objective) {

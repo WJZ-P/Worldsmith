@@ -72,9 +72,44 @@ import kotlinx.serialization.ExperimentalSerializationApi
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val maxUseTicks: Int = 0,
 )
-@Serializable data class CustomItemLibrary @JvmOverloads constructor(
+@Serializable enum class CookingStation(val defaultTicks: Int) { FURNACE(200), BLAST_FURNACE(100), SMOKER(100), CAMPFIRE(600) }
+
+/**
+ * A native crafting-table or cooking recipe that makes or spends this world's items.
+ * References are `worldsmith:item/<id>`, `worldsmith:content/<blockId>` or native item ids;
+ * ingredients may also name a native item tag as `#namespace:path`.
+ */
+@Serializable sealed class ItemRecipe {
+    abstract val id: String
+    abstract val result: String
+    abstract val count: Int
+    abstract fun inputs(): List<String>
+
+    @Serializable @SerialName("shaped") data class Shaped @JvmOverloads constructor(
+        override val id: String, val pattern: List<String>, val key: Map<String, String>,
+        override val result: String, override val count: Int = 1,
+    ) : ItemRecipe() {
+        override fun inputs() = pattern.flatMap { row -> row.filter { it != ' ' }.map { key[it.toString()].orEmpty() } }
+    }
+    @Serializable @SerialName("shapeless") data class Shapeless @JvmOverloads constructor(
+        override val id: String, val ingredients: List<String>, override val result: String, override val count: Int = 1,
+    ) : ItemRecipe() {
+        override fun inputs() = ingredients
+    }
+    @Serializable @SerialName("cooking") data class Cooking @JvmOverloads constructor(
+        override val id: String, val ingredient: String, override val result: String, override val count: Int = 1,
+        val station: CookingStation = CookingStation.FURNACE, val experience: Float = 0.1f, val cookingTicks: Int? = null,
+    ) : ItemRecipe() {
+        override fun inputs() = listOf(ingredient)
+    }
+}
+
+@Serializable @OptIn(ExperimentalSerializationApi::class) data class CustomItemLibrary @JvmOverloads constructor(
     val schemaVersion: Int = 1,
     val items: List<CustomItemDefinition> = emptyList(),
+    /** Schema 5. Omitted when empty so earlier libraries keep their exact encoding and bundle hash. */
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val recipes: List<ItemRecipe> = emptyList(),
 )
 
 object CustomItemValidation {
@@ -94,7 +129,7 @@ object CustomItemValidation {
             if (ticks !in 1..72000) error("$path.durationTicks", "items.duration", "Effect duration supports 1..72000 ticks")
             if (amplifier !in 0..9) error("$path.amplifier", "items.amplifier", "Effect amplifier supports 0..9")
         }
-        if (library.schemaVersion !in 1..4) error("schemaVersion", "items.schema", "Item library schema must be 1 through 4")
+        if (library.schemaVersion !in 1..5) error("schemaVersion", "items.schema", "Item library schema must be 1 through 5")
         if (library.items.size > MAX_ITEMS) {
             error("items", "items.capacity", "At most $MAX_ITEMS item definitions per world")
             return@buildList
@@ -180,8 +215,77 @@ object CustomItemValidation {
                 }
             }
         }
+        addAll(validateRecipes(library))
     }
-    @JvmStatic fun freeze(library: CustomItemLibrary) = library.copy(items = java.util.List.copyOf(library.items.map { item ->
+
+    const val MAX_RECIPES = 128
+    private const val LOCAL_BLOCK_PREFIX = "worldsmith:content/"
+
+    private fun validateRecipes(library: CustomItemLibrary): List<Diagnostic> = buildList {
+        fun error(path: String, code: String, message: String) { add(Diagnostic(path, code, DiagnosticSeverity.ERROR, message)) }
+        if (library.recipes.isEmpty()) return@buildList
+        if (library.schemaVersion < 5) error("recipes", "items.schema", "Recipes require items schema 5")
+        if (library.recipes.size > MAX_RECIPES) {
+            error("recipes", "items.recipe_capacity", "At most $MAX_RECIPES recipes per world")
+            return@buildList
+        }
+        val items = library.items.associateBy { it.id }
+        val seen = mutableSetOf<String>()
+        fun reference(path: String, value: String, ingredient: Boolean) {
+            when {
+                value.startsWith(LOGICAL_PREFIX) -> if (value.removePrefix(LOGICAL_PREFIX) !in items)
+                    error(path, "items.recipe_item", "No item '${value.removePrefix(LOGICAL_PREFIX)}' in this library")
+                value.startsWith("worldsmith:content/item/") || value.startsWith("worldsmith:content/block/") ->
+                    error(path, "items.recipe_reference", "Name the logical item or block, never a reserved native host")
+                value.startsWith(LOCAL_BLOCK_PREFIX) -> if (!ID.matches(value.removePrefix(LOCAL_BLOCK_PREFIX)))
+                    error(path, "items.recipe_reference", "Custom block items are worldsmith:content/<blockId> without block state properties")
+                value.startsWith("#") -> if (!ingredient || !NATIVE_ID.matches(value.substring(1)))
+                    error(path, "items.recipe_reference", if (ingredient) "Item tags are #namespace:path" else "A result is one item, not a tag")
+                !NATIVE_ID.matches(value) || value == "minecraft:air" -> error(path, "items.recipe_reference", "Expected worldsmith:item/<id>, worldsmith:content/<blockId>, a native item id or, for ingredients, #tag")
+            }
+        }
+        library.recipes.forEachIndexed { index, recipe ->
+            val path = "recipes[$index]"
+            if (!validId(recipe.id)) error("$path.id", "items.recipe_id", "Use a local lowercase recipe id of 1..64 characters")
+            if (!seen.add(recipe.id)) error("$path.id", "items.recipe_duplicate", "Duplicate recipe '${recipe.id}'")
+            reference("$path.result", recipe.result, ingredient = false)
+            val stack = items[recipe.result.removePrefix(LOGICAL_PREFIX)]?.takeIf { recipe.result.startsWith(LOGICAL_PREFIX) }?.maxStackSize ?: 64
+            if (recipe.count !in 1..stack) error("$path.count", "items.recipe_count", "A result count is 1..$stack, within the result's stack size")
+            // Recipes live here to give this world's items sources and uses; that also anchors their references.
+            if ((recipe.inputs() + recipe.result).none { it.startsWith(LOGICAL_PREFIX) })
+                error(path, "items.recipe_scope", "A recipe makes or spends at least one worldsmith:item/<id> from this library")
+            when (recipe) {
+                is ItemRecipe.Shaped -> {
+                    val width = recipe.pattern.firstOrNull()?.length ?: 0
+                    if (recipe.pattern.size !in 1..3 || width !in 1..3 || recipe.pattern.any { it.length != width })
+                        error("$path.pattern", "items.recipe_pattern", "A pattern is 1..3 rows of equal length 1..3")
+                    val symbols = recipe.pattern.flatMap { row -> row.toList() }.filter { it != ' ' }.map { it.toString() }.toSet()
+                    if (symbols.isEmpty()) error("$path.pattern", "items.recipe_pattern", "A pattern needs at least one ingredient symbol")
+                    symbols.filter { it !in recipe.key }.forEach { error("$path.pattern", "items.recipe_key", "Symbol '$it' has no key entry") }
+                    recipe.key.forEach { (symbol, value) ->
+                        if (symbol.length != 1 || symbol == " ") error("$path.key", "items.recipe_key", "Keys are single non-space characters")
+                        else if (symbol !in symbols) error("$path.key.$symbol", "items.recipe_key", "Key '$symbol' is not used by the pattern")
+                        reference("$path.key.$symbol", value, ingredient = true)
+                    }
+                }
+                is ItemRecipe.Shapeless -> {
+                    if (recipe.ingredients.size !in 1..9) error("$path.ingredients", "items.recipe_ingredients", "A shapeless recipe has 1..9 ingredients")
+                    recipe.ingredients.forEachIndexed { i, value -> reference("$path.ingredients[$i]", value, ingredient = true) }
+                }
+                is ItemRecipe.Cooking -> {
+                    reference("$path.ingredient", recipe.ingredient, ingredient = true)
+                    if (!recipe.experience.isFinite() || recipe.experience !in 0f..100f) error("$path.experience", "items.recipe_experience", "Experience is 0..100")
+                    if (recipe.cookingTicks != null && recipe.cookingTicks !in 1..32767) error("$path.cookingTicks", "items.recipe_time", "Cooking time is 1..32767 ticks")
+                }
+            }
+        }
+    }
+
+    @JvmStatic fun freeze(library: CustomItemLibrary) = library.copy(recipes = java.util.List.copyOf(library.recipes.map { recipe -> when (recipe) {
+        is ItemRecipe.Shaped -> recipe.copy(pattern = java.util.List.copyOf(recipe.pattern), key = java.util.Collections.unmodifiableMap(LinkedHashMap(recipe.key)))
+        is ItemRecipe.Shapeless -> recipe.copy(ingredients = java.util.List.copyOf(recipe.ingredients))
+        is ItemRecipe.Cooking -> recipe
+    } }), items = java.util.List.copyOf(library.items.map { item ->
         item.copy(abilityBindings = AbilityEventBindings.freeze(item.abilityBindings), consumable = item.consumable?.copy(effects = java.util.List.copyOf(item.consumable.effects)), actions = java.util.List.copyOf(item.actions.map { a ->
             a.copy(effects = java.util.List.copyOf(a.effects.map { e -> if (e is ItemEffect.Projectile) e.copy(hitEffects = java.util.List.copyOf(e.hitEffects)) else e }))
         }))

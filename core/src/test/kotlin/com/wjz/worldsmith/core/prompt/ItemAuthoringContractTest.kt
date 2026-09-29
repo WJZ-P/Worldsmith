@@ -33,6 +33,15 @@ class ItemAuthoringContractTest {
         for(tier in ItemMiningTier.entries) assertTrue(Regex("\\b${tier.name}\\b").containsMatchIn(contract),tier.name)
     }
 
+    @Test fun `the schema five recipe example decodes through the DTO and validates`() {
+        val fragment=Regex("```json\\s*\\n([\\s\\S]*?)\\n```").findAll(contract).map {it.groupValues[1]}.single {"\"recipes\"" in it}
+        val items=listOf("raw_ember","ember_shard","ember_blade","trail_ration").map {CustomItemDefinition(it,it,"a".repeat(64),maxStackSize=if(it=="ember_blade") 1 else 64)}
+        val library=WorldsmithJson.decode<CustomItemLibrary>("{\"schemaVersion\":5,$fragment}").copy(items=items)
+        assertTrue(CustomItemValidation.validate(library).isEmpty(),CustomItemValidation.validate(library).toString())
+        assertEquals(setOf(ItemRecipe.Shaped::class,ItemRecipe.Shapeless::class,ItemRecipe.Cooking::class),library.recipes.map {it::class}.toSet())
+        for(station in CookingStation.entries) assertTrue(Regex("\\b${station.name}\\b").containsMatchIn(contract),station.name)
+    }
+
     @Test fun `examples keep food costs and melee equipment requirements consistent with the runtime`() {
         val library=example()
         val food=library.items.single {it.consumable!=null}
