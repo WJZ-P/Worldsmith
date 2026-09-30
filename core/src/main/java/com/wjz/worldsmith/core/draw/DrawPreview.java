@@ -136,8 +136,15 @@ public final class DrawPreview {
 	}
 	private static double dot(double[] a,double[] b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
 	private static int shade(int rgb,double amount){return ((int)(((rgb>>16)&255)*amount)<<16)|((int)(((rgb>>8)&255)*amount)<<8)|(int)((rgb&255)*amount);}
+	/**
+	 * Light sources stay bright so a preview shows where the light is; other vanilla
+	 * blocks use their measured texture average; the keyword guesses remain for
+	 * tinted and modded blocks.
+	 */
 	private static int colour(String id) {
 		if(id.contains("lantern")||id.contains("glowstone"))return 0xF5CE73;
+		Integer measured=DrawPreviewColours.average(id);
+		if(measured!=null)return measured;
 		if(id.contains("oxidized")||id.contains("prismarine"))return 0x548F87;
 		if(id.contains("quartz")||id.contains("calcite")||id.contains("white_"))return 0xE3DFCF;
 		if(id.contains("deepslate")||id.contains("blackstone"))return 0x3B4651;

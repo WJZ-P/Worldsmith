@@ -62,7 +62,7 @@ Materials by role:
 | --- | --- |
 | roof | `deepslate_tile_stairs` / `deepslate_tile_slab` - grey tile |
 | frame | `dark_oak_log`, `spruce_log` and their stripped forms as exposed columns and beams |
-| walls | `calcite` or `white_terracotta` plaster; `mud_bricks` for rural houses |
+| walls | `calcite` or `white_concrete` plaster (`white_terracotta` reads warm beige, not white); `mud_bricks` for rural houses |
 | plinth and steps | `stone_bricks`, `polished_andesite`, `tuff_bricks` |
 | windows | `spruce_trapdoor` or `birch_trapdoor` lattice, `white_stained_glass_pane` paper |
 | rank accent | `red_terracotta` columns, only on halls, temples and gates |
