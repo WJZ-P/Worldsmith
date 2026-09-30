@@ -93,6 +93,21 @@ public final class Walls {
 		return pen;
 	}
 
+	/**
+	 * The floor a person stands on in this footprint: the course below
+	 * {@code minY}, under the walls too, so a doorway has a threshold. It fills
+	 * only unbuilt or AIR cells: over a storey below it boards the room without
+	 * covering that storey's beams, and under a jettied storey it runs out over
+	 * them like joists. Lay floors before cutting stairwells through them.
+	 */
+	public static Painter floor(Painter pen, Box walls, String material) {
+		Objects.requireNonNull(pen); Objects.requireNonNull(walls);
+		if (walls.max().x() - walls.min().x() < 2 || walls.max().z() - walls.min().z() < 2) throw new IllegalArgumentException("A floor needs a footprint at least 3 blocks each way");
+		var boards = new Box(new Vec3i(walls.min().x(), walls.min().y() - 1, walls.min().z()), new Vec3i(walls.max().x(), walls.min().y() - 1, walls.max().z()));
+		pen.brush(Brush.solid(BlockStateRef.parse(material))).masked(Mask.solidOnly().not()).fill(boards);
+		return pen;
+	}
+
 	/** A window centred at {@code center} along the side, with its trim outside the wall line. */
 	public static Painter window(Painter pen, Box walls, Side side, int center, Window window) {
 		Objects.requireNonNull(pen); Objects.requireNonNull(walls); Objects.requireNonNull(side); Objects.requireNonNull(window);

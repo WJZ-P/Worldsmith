@@ -236,9 +236,45 @@ Roofs.gable(pen, hall, Roofs.Ridge.X, tile, Roofs.Options.defaults().withGableWa
 - Sides are `NORTH`, `SOUTH`, `WEST`, `EAST`; positions along them are the canvas
   X (north/south walls) or Z (west/east walls) coordinate.
 
-These draw no floor and no furniture. Give important buildings their own
-proportions rather than one frame everywhere: a denser bay for a hall, a plain
-plastered wall for a storehouse, a stone plinth on a slope.
+Give important buildings their own proportions rather than one frame
+everywhere: a denser bay for a hall, a plain plastered wall for a storehouse, a
+stone plinth on a slope.
+
+## Floors, storeys and stairs
+
+A second storey is another `walls` box whose `minY` is one above the storey
+below's `maxY`; a jettied upper storey is one block wider on each side. Lay each
+storey's floor, then its frame, then cut the stairs through.
+
+```java
+var lower = Box.of(0, 1, 0, 11, 5, 8), upper = Box.of(-1, 6, -1, 12, 10, 9);   // upper storey jettied out
+Walls.floor(pen, lower, "cobblestone");
+Walls.frame(pen, lower, frame);
+Walls.door(pen, lower, Walls.Side.SOUTH, 5, "spruce_door");
+Walls.floor(pen, upper, "spruce_planks");
+Walls.frame(pen, upper, frame);
+Vec3i landing = Stairs.flight(pen, new Vec3i(2, 1, 6), Walls.Side.NORTH, 5,
+    Stairs.Flight.of("spruce_stairs").withSupport("spruce_planks"));   // lands at (2, 6, 1)
+Roofs.gable(pen, upper, Roofs.Ridge.X, tile, Roofs.Options.defaults().withGableWall("calcite"));
+```
+
+- `Walls.floor(pen, walls, material)` lays the course under `minY` across the
+  whole footprint, walls included, so a doorway has a threshold. It fills only
+  unbuilt or AIR cells: over a lower storey it boards the room without covering
+  that storey's beams, and under a jettied storey it runs out over them.
+- `Stairs.flight(pen, start, up, rise, Flight)` lays `rise` steps from the lowest
+  at `start`, one block up per block toward `up`, widening to the climber's
+  right (1..8 wide). Every stair faces up the flight and the `headroom` (2..6,
+  default 3) above each step is authored AIR, which cuts the stairwell through
+  the floor above. The last step lies level with the floor it reaches, so
+  climbing from feet level `y` to a floor laid at `y + rise - 1` takes `rise`
+  steps. It returns the landing where a person stands at the top: use it in
+  `access.destinations`. `withSupport(block)` fills under the steps; without it
+  the space under the flight is left as it was.
+- Leave a block of floor in front of the first step and at the landing; a flight
+  that starts against a wall or lands in one is not walkable.
+
+Stairs, floors and walls draw no furniture.
 
 ## Brushes and masks
 
