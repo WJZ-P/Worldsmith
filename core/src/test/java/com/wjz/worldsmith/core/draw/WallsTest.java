@@ -59,6 +59,25 @@ class WallsTest {
         assertThrows(IllegalArgumentException.class, () -> Walls.window(pen, walls, Walls.Side.SOUTH, 5, window.withSize(1, 4)), "not through the top beam");
     }
 
+    @Test void shuttersFoldOpenFlatAgainstTheWallBesideTheWindow() {
+        var canvas = new DrawCanvas(Box.of(-2, 0, -2, 14, 8, 10));
+        var walls = Box.of(0, 1, 0, 12, 5, 8);
+        var pen = canvas.pen("minecraft:stone");
+        Walls.frame(pen, walls, FRAME);
+        Walls.window(pen, walls, Walls.Side.EAST, 4, Walls.Window.of("glass_pane").withShutters("spruce_trapdoor"));
+        var cells = cells(canvas);
+
+        for (int z : new int[]{3, 5}) for (int y : new int[]{2, 3}) {
+            var leaf = cells.get(new Vec3i(13, y, z));
+            assertEquals("minecraft:spruce_trapdoor", leaf.id());
+            assertEquals("true", leaf.properties().get("open"));
+            // An open trapdoor lies against the side opposite its facing: facing east, it rests on the wall to its west.
+            assertEquals("east", leaf.properties().get("facing"));
+        }
+        assertNull(cells.get(new Vec3i(13, 2, 4)), "the window itself stays clear");
+        assertThrows(IllegalArgumentException.class, () -> Walls.Window.of("glass_pane").withShutters("spruce_door"));
+    }
+
     @Test void aDoorIsBothHalvesWithAWalkableWayThrough() {
         var canvas = new DrawCanvas(Box.of(-2, 0, -2, 14, 8, 10));
         var walls = Box.of(0, 1, 0, 12, 5, 8);

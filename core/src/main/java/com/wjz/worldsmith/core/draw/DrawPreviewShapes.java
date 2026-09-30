@@ -5,7 +5,8 @@ import java.util.List;
 
 /**
  * Bounded offline shape hints, not registry-resolved models, collision or neighbor-state simulation.
- * Known vanilla slabs and stairs fit an exact 2 x 2 x 2 grid; everything else stays a unit cube.
+ * Known vanilla slabs and stairs fit an exact 2 x 2 x 2 grid; trapdoors and carpets are drawn as a
+ * half-block panel where their thinner one lies. Everything else stays a unit cube.
  */
 public final class DrawPreviewShapes {
     private DrawPreviewShapes() {}
@@ -65,6 +66,27 @@ public final class DrawPreviewShapes {
                     default -> front;
                 };
                 if (filled) shape |= bit(x, 1 - baseY, z);
+            }
+        } else if (state.id().endsWith("_carpet")) {
+            shape = half(0);
+        } else if (state.id().endsWith("_trapdoor")) {
+            String half = state.properties().getOrDefault("half", "bottom");
+            if (!half.equals("bottom") && !half.equals("top")) return FULL_CUBE;
+            if (!state.properties().getOrDefault("open", "false").equals("true")) shape = half(half.equals("bottom") ? 0 : 1);
+            else {
+                int dx, dz;
+                switch (state.properties().getOrDefault("facing", "north")) {
+                    case "north" -> { dx = 0; dz = -1; }
+                    case "south" -> { dx = 0; dz = 1; }
+                    case "east" -> { dx = 1; dz = 0; }
+                    case "west" -> { dx = -1; dz = 0; }
+                    default -> { return FULL_CUBE; }
+                }
+                if (block.orientation().mirrorX() && dx != 0) dx = -dx;
+                // An open trapdoor stands against the side of its cell opposite its facing.
+                shape = 0;
+                for (int x = 0; x < 2; x++) for (int y = 0; y < 2; y++) for (int z = 0; z < 2; z++)
+                    if ((2 * x - 1) * dx + (2 * z - 1) * dz < 0) shape |= bit(x, y, z);
             }
         } else return FULL_CUBE;
 

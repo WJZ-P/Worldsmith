@@ -2,6 +2,7 @@ package com.wjz.worldsmith.core.draw;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -47,18 +48,21 @@ public final class Walls {
 	/**
 	 * A window {@code width} x {@code height} whose lowest pane is {@code sill}
 	 * blocks above the floor. With {@code trim} stairs it gets a sill that juts
-	 * out beneath it and a hood above.
+	 * out beneath it and a hood above; with {@code shutter} trapdoors, a shutter
+	 * folded open against the wall on either side.
 	 */
-	public record Window(int width, int height, int sill, BlockStateRef glass, BlockStateRef trim) {
+	public record Window(int width, int height, int sill, BlockStateRef glass, BlockStateRef trim, BlockStateRef shutter) {
 		public Window {
 			Objects.requireNonNull(glass);
 			if (width < 1 || width > 8 || height < 1 || height > 8 || sill < 0 || sill > 8) throw new IllegalArgumentException("A window is 1..8 by 1..8 with a sill 0..8 above the floor");
 			if (trim != null && !trim.id().endsWith("_stairs")) throw new IllegalArgumentException("Window trim must be stairs: " + trim.id());
+			if (shutter != null && !shutter.id().endsWith("_trapdoor")) throw new IllegalArgumentException("Window shutters must be trapdoors: " + shutter.id());
 		}
-		public static Window of(String glass) { return new Window(1, 2, 1, BlockStateRef.parse(glass), null); }
-		public Window withSize(int width, int height) { return new Window(width, height, sill, glass, trim); }
-		public Window withSill(int blocksAboveFloor) { return new Window(width, height, blocksAboveFloor, glass, trim); }
-		public Window withTrim(String stairs) { return new Window(width, height, sill, glass, BlockStateRef.parse(stairs)); }
+		public static Window of(String glass) { return new Window(1, 2, 1, BlockStateRef.parse(glass), null, null); }
+		public Window withSize(int width, int height) { return new Window(width, height, sill, glass, trim, shutter); }
+		public Window withSill(int blocksAboveFloor) { return new Window(width, height, blocksAboveFloor, glass, trim, shutter); }
+		public Window withTrim(String stairs) { return new Window(width, height, sill, glass, BlockStateRef.parse(stairs), shutter); }
+		public Window withShutters(String trapdoor) { return new Window(width, height, sill, glass, trim, BlockStateRef.parse(trapdoor)); }
 	}
 
 	private static final Set<String> PILLARS = Set.of("minecraft:bamboo_block", "minecraft:stripped_bamboo_block", "minecraft:basalt",
@@ -124,6 +128,14 @@ public final class Walls {
 			var stair = window.trim().with("facing", side.inward());
 			pen.brush(Brush.solid(stair.with("half", "top"))).points(sill);
 			pen.brush(Brush.solid(stair.with("half", "bottom"))).points(hood);
+		}
+		if (window.shutter() != null) {
+			// An open trapdoor lies against the side of its cell opposite its facing,
+			// so facing outward folds it flat against the wall.
+			var leaves = new ArrayList<Vec3i>();
+			for (int y = bottom; y <= top; y++) { leaves.add(onWall(walls, side, from - 1, y, 1)); leaves.add(onWall(walls, side, to + 1, y, 1)); }
+			var leaf = window.shutter().with("facing", side.name().toLowerCase(Locale.ROOT)).with("open", "true").with("half", "bottom").with("powered", "false");
+			pen.brush(Brush.solid(leaf)).points(leaves);
 		}
 		return pen;
 	}

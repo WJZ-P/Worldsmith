@@ -30,6 +30,22 @@ class DrawPreviewShapesTest {
         assertEquals(0, DrawPreviewShapes.mask(block("cave_air")));
     }
 
+    @Test void trapdoorsAreAPanelWhereTheirLeafLies() {
+        assertEquals(DrawPreviewShapes.mask(block("stone_slab[type=bottom]")), DrawPreviewShapes.mask(block("oak_trapdoor[half=bottom,open=false]")));
+        assertEquals(DrawPreviewShapes.mask(block("stone_slab[type=top]")), DrawPreviewShapes.mask(block("oak_trapdoor[half=top,open=false]")));
+        assertEquals(DrawPreviewShapes.mask(block("stone_slab[type=bottom]")), DrawPreviewShapes.mask(block("red_carpet")), "a rug is not a block");
+        // Open, a trapdoor stands against the side of its cell opposite its facing: north-facing lies on the south (+Z) half.
+        int north = DrawPreviewShapes.mask(block("oak_trapdoor[facing=north,half=bottom,open=true]"));
+        for (int x = 0; x < 2; x++) for (int y = 0; y < 2; y++) {
+            assertTrue(DrawPreviewShapes.occupied(north, x, y, 1));
+            assertFalse(DrawPreviewShapes.occupied(north, x, y, 0));
+        }
+        int east = DrawPreviewShapes.mask(block("oak_trapdoor[facing=east,half=top,open=true]"));
+        assertTrue(DrawPreviewShapes.occupied(east, 0, 1, 0) && !DrawPreviewShapes.occupied(east, 1, 1, 0));
+        var mirrored = new DrawBlock(BlockStateRef.parse("oak_trapdoor[facing=east,open=true]"), GridTransform.reflectX());
+        assertEquals(DrawPreviewShapes.mask(block("oak_trapdoor[facing=west,open=true]")), DrawPreviewShapes.mask(mirrored));
+    }
+
     @Test void stairsHaveTheExpectedVolumesAndHandedCorners() {
         for (String facing : List.of("north", "east", "south", "west")) {
             for (String half : List.of("bottom", "top")) {

@@ -244,7 +244,9 @@ Roofs.gable(pen, hall, Roofs.Ridge.X, tile, Roofs.Options.defaults().withGableWa
   side; `windows(pen, walls, side, frame, Window, skip...)` centres one in every
   bay wide enough, skipping bays that contain a `skip` position. With
   `withTrim(stairs)` an inverted stair juts out as a sill below and a stair hoods
-  it above, outside the wall line. Windows stay clear of corners and the top beam.
+  it above, outside the wall line; `withShutters(trapdoor)` folds an open
+  trapdoor flat against the wall on each side. Windows stay clear of corners and
+  the top beam.
 - `door(pen, walls, side, center, door)` writes both halves facing into the room
   and authors AIR in front of and behind it, so the way in is walkable.
 - Sides are `NORTH`, `SOUTH`, `WEST`, `EAST`; positions along them are the canvas
@@ -288,7 +290,40 @@ Roofs.gable(pen, upper, Roofs.Ridge.X, tile, Roofs.Options.defaults().withGableW
 - Leave a block of floor in front of the first step and at the landing; a flight
   that starts against a wall or lands in one is not walkable.
 
-Stairs, floors and walls draw no furniture.
+## Furnishing
+
+An empty room reads as unfinished, and the pieces that furnish it hide their
+orientation in states that mean something different on each block. `Furniture`
+takes the intent and writes the state; directions are `Walls.Side` values.
+
+```java
+Furniture.table(pen, Box.of(7, 1, 3, 9, 1, 4), "spruce_slab");           // top slabs at sitting height
+for (int x = 7; x <= 9; x++) {
+    Furniture.seat(pen, new Vec3i(x, 1, 2), Walls.Side.SOUTH, "spruce_stairs");  // looking at the table
+    Furniture.seat(pen, new Vec3i(x, 1, 5), Walls.Side.NORTH, "spruce_stairs");
+}
+Furniture.againstWall(pen, new Vec3i(4, 1, 1), Walls.Side.NORTH, "furnace");  // front to the room
+Furniture.hangingLantern(pen, new Vec3i(8, 3, 4), 1, "lantern");             // one chain link to the ceiling
+Furniture.wallTorch(pen, new Vec3i(1, 3, 4), Walls.Side.WEST, "torch");
+Furniture.bed(pen, new Vec3i(9, 6, 2), Walls.Side.NORTH, "red_bed");           // pillow toward the north wall
+```
+
+- `bed(pen, foot, headToward, bed)`: the foot at `foot` and the head one block
+  toward `headToward`, each half with its `part`.
+- `seat(pen, at, facing, stairs)`: a stair for someone looking toward `facing`;
+  its high side, the backrest, is behind them.
+- `table(pen, top, slab)`: top slabs over a one-course box, open underneath.
+- `againstWall(pen, at, wall, block)`: anything whose `facing` is its front -
+  furnaces, smokers, barrels, lecterns, looms, shelves, chiseled bookshelves -
+  standing against the `wall` side of its cell, front to the room.
+- `hangingLantern(pen, at, chain, lantern)`: a hanging lantern (or soul/copper
+  lantern) with `chain` iron chain links above it, up to the ceiling.
+- `wallTorch(pen, at, wall, torch)`: `torch`, `soul_torch` or `copper_torch` in
+  its wall form, fixed to the `wall` side of its cell.
+
+Plain blocks need no helper: bookshelves, crafting tables, carpets as rugs,
+potted plants. Keep a walkable way from the door to every bed, seat and stair,
+and light each room: a room without a lantern or torch spawns monsters.
 
 ## Brushes and masks
 
@@ -461,8 +496,8 @@ explicitly that those images are not a successful assembled plan.
 For aesthetic iteration follow architecture section visual-quality-loop. Preview
 clay massing before adding ornament, inspect all elevations and occupied floors,
 then the assembled place. Compare actual images after a specific change. A material
-preview approximates colours and includes basic vanilla slab/stair shapes; other
-blocks remain cubes. This is not texture sampling, transparency, neighbor updates
+preview approximates colours and includes basic vanilla slab/stair/trapdoor/carpet
+shapes; other blocks remain cubes. This is not texture sampling, transparency, neighbor updates
 or a physical-light screenshot.
 
 Use worldsmith_put_architecture_draft(sessionId,expectedRevision,architecture,structures,

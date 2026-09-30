@@ -128,7 +128,7 @@ public final class DrawPreview {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
 		g.setColor(new Color(0xD6E3E8));g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,18));
 		g.drawString("Worldsmith | "+view+" | "+renderMode+" | "+occupied.size()+" selected non-air cells",40,950);
-		g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14));g.drawString("Offline model; basic vanilla slab/stair shapes, other blocks as cubes. Not an in-game screenshot."+(renderMode.equals("clay")&&view.equals("top")?" Top shade indicates height.":""),40,978);g.dispose();
+		g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14));g.drawString("Offline model; basic vanilla slab/stair/trapdoor/carpet shapes, other blocks as cubes. Not an in-game screenshot."+(renderMode.equals("clay")&&view.equals("top")?" Top shade indicates height.":""),40,978);g.dispose();
         var output=new BufferedImage(1280,1000,BufferedImage.TYPE_INT_RGB);var composite=output.createGraphics();
         composite.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         composite.drawImage(image,0,0,1280,1000,null);composite.dispose();
