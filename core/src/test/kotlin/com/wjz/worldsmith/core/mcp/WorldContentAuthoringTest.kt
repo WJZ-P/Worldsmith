@@ -316,4 +316,14 @@ class WorldContentAuthoringTest {
         }) }
         assertTrue(stale.isFailure || stale.getOrThrow().isError, "a stale revision attaches nothing")
     }
+
+    @Test fun `a creature template is a recipe the build tool accepts`() {
+        val id = begin()
+        val template = call("worldsmith_get_creature_template", buildJsonObject { put("bodyPlan", "quadruped"); put("id", "moss_hound"); put("displayName", "Moss hound") })
+        assertFalse(template.isError, template.text)
+        assertEquals(1, template.images.size)
+        val built = call("worldsmith_build_creature", buildJsonObject { put("sessionId", id); put("recipe", template.structuredContent.getValue("recipe")) })
+        assertFalse(built.isError, built.text)
+        assertTrue("fur" in template.structuredContent.getValue("materialRoles").jsonArray.map { it.jsonPrimitive.content })
+    }
 }

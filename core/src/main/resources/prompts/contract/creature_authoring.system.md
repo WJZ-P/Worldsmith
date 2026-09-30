@@ -16,7 +16,13 @@ placement is a separate natural habitat or typed structure encounter declaration
 ## Workflow
 
 1. Begin/resume a world session. Read this contract and the `creatures` content contract.
-2. Call `worldsmith_build_creature` with `sessionId` and a `recipe`.
+2. Call `worldsmith_build_creature` with `sessionId` and a `recipe`. To start from a
+   rigged body plan rather than from nothing, read
+   `worldsmith_get_creature_template(bodyPlan, id, displayName, scale)` - QUADRUPED,
+   BIPED, BIRD or SERPENT at scale 1..3. Its pivots already sit at the joints, with
+   roles, hind-leg gait phase, a foldable spread wing, a hinged jaw or a jointed
+   body, feet on the ground line and material roles for the skin painter. Reshape,
+   add and rename cubes to make the species; move a joint only on purpose.
 3. Omit `textureAsset` during geometry work: the build returns a real diagnostic UV
    guide and a runtime definition whose texture hash identifies that guide. The guide
    is NOT automatically attached to the world's assets. `textureGuideOnly=true` means

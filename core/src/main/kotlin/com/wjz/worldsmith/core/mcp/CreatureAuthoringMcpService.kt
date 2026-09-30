@@ -27,6 +27,17 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
                     val text=javaClass.classLoader.getResourceAsStream("prompts/contract/creature_authoring.system.md")?.bufferedReader()?.use {it.readText()} ?: error("Missing creature authoring contract")
                     McpToolResult.success(buildJsonObject {put("contract",text);put("views",McpJson.encode(CreaturePreview.VIEWS));put("poses",McpJson.encode(CreaturePose.POSES));put("runtimeSchemas",McpJson.encode(listOf(1,2,3,4,5,6,7)));put("soundVocabulary",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.vocabulary()));put("soundVoices",McpJson.encode(com.wjz.worldsmith.core.content.CreatureSounds.voices()))})
                 }),
+            McpTool("worldsmith_get_creature_template","Start a creature from a rigged body plan",
+                "Return a CreatureRecipe for QUADRUPED, BIPED, BIRD or SERPENT with pivots at the joints, motion roles, hind-leg gait phase, a foldable spread wing, a hinged jaw or a jointed tail, feet on the ground line and named material roles, at scale 1..3; with a preview of it. Reshape and rename the cubes, keep the joints, then pass it to worldsmith_build_creature. Read-only.",
+                McpJson.schema(mapOf("bodyPlan" to str,"id" to str,"displayName" to str,"scale" to McpJson.type("integer")),listOf("bodyPlan","id","displayName")),true,handler={a->
+                    val plan=CreatureBodyPlan.valueOf(McpJson.string(a,"bodyPlan").uppercase())
+                    val recipe=CreatureTemplates.recipe(plan,McpJson.string(a,"id"),McpJson.string(a,"displayName"),a["scale"]?.jsonPrimitive?.int ?: 1)
+                    val guide=CreatureAuthoring.guide(recipe)
+                    McpToolResult.success(buildJsonObject {
+                        put("recipe",McpJson.encode(recipe));put("bodyPlan",plan.name);put("nextTool","worldsmith_build_creature")
+                        put("materialRoles",McpJson.encode(guide.uvLayout.islands.map {it.materialRole}.distinct()))
+                    },images=listOf(McpImage(Base64.getEncoder().encodeToString(CreaturePreview.png(guide.definition,guide.png,"isometric",if(plan==CreatureBodyPlan.BIRD)"fly" else "walk")))))
+                }),
             McpTool("worldsmith_build_creature","Build a frozen creature model candidate",
                 "Compile a CreatureRecipe: named bones/cubes, mirrored limbs and automatic box UVs. Optional textureAsset must already be attached to the session. Without it the output is a diagnostic UV guide, not a final skin. Saves an immutable build artifact, but never changes content drafts or activates a world.",
                 McpJson.schema(mapOf("sessionId" to str,"recipe" to obj,"textureAsset" to str),listOf("sessionId","recipe")),false,handler=::build),
