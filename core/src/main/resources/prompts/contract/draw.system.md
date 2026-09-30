@@ -186,6 +186,8 @@ Roofs.gable(pen, hall, Roofs.Ridge.X, tile,
     Roofs.Options.defaults().withOverhang(1).withGableWall("white_terracotta"));
 var pavilion = Box.of(20, 0, 0, 26, 4, 6);                // columns' footprint
 Roofs.hip(pen, pavilion, tile, Roofs.Options.defaults().withOverhang(2).withFlaredCorners());
+var porch = Box.of(1, 0, 9, 11, 2, 12);                   // posts; leans on the hall's south wall
+Roofs.shed(pen, porch, Walls.Side.SOUTH, tile, Roofs.Options.defaults().withLowPitch().keepingAttic());
 ```
 
 - `gable(pen, walls, ridge, material, options)`: two slopes climbing one block per
@@ -194,12 +196,24 @@ Roofs.hip(pen, pavilion, tile, Roofs.Options.defaults().withOverhang(2).withFlar
 - `hip(pen, walls, material, options)`: four slopes; a square footprint closes to
   a point (a pavilion), a long one to a short slab ridge. Stack a smaller `hip`
   over a narrower upper storey for double eaves.
-- `Options.defaults()` is overhang 1, straight corners, no gable wall, and AIR
-  authored under the roof inside the walls so terrain cannot fill the attic;
-  `keepingAttic()` leaves that space unauthored. Overhang is 0..3.
+- `shed(pen, walls, low, material, options)`: one slope falling toward the `low`
+  `Walls.Side` - a porch, a covered walk, a wing leaning on a larger wall. It
+  overhangs the low side and both ends but stops at the high wall line, so give
+  a lean-to a footprint that starts one block out from the wall it leans on and
+  keep its top below that building's eave.
+- `Options.defaults()` is overhang 1, straight corners, no gable wall, a full
+  pitch, and AIR authored under the roof inside the walls so terrain cannot fill
+  the attic; `keepingAttic()` leaves that space unauthored. Overhang is 0..3.
+- `withGableWall(block)` closes the walls up to the roof: gable ends, a shed's
+  high side, and under an overhang of 2 or more the strip between the wall top
+  and the roof, which is otherwise an open slot into the attic seen from below.
+- `withLowPitch()` climbs half a block per block in slabs instead of a block in
+  stairs, for any of the three roofs: the shallow roofs of dry climates, long
+  halls and porches. A slab row that rests on a wall is laid as the full block
+  so no half-block slit opens above the wall.
 - `withFlaredCorners()` lifts each hip eave corner half a block on an inverted
-  stair - the upturned eave of pavilions and halls. A gable refuses it: its
-  eaves run straight into the gable ends.
+  stair - the upturned eave of pavilions and halls. A gable or shed refuses it,
+  and so does a low pitch: the lift is a stair.
 
 Walls, columns, openings and the interior stay yours to draw; `Roofs` only
 writes the roof and the space directly under it.

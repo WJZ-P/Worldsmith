@@ -83,6 +83,50 @@ class RoofsTest {
         assertNotEquals(GridTransform.IDENTITY.orientation(), eave.block().orientation());
     }
 
+    @Test void aShedFallsToItsLowSideAndStopsAtTheWallItLeansOn() {
+        var canvas = new DrawCanvas(new Box(new Vec3i(-4, 0, -4), new Vec3i(10, 12, 10)));
+        var walls = new Box(new Vec3i(0, 0, 0), new Vec3i(6, 3, 4));
+        Roofs.shed(canvas.pen("minecraft:stone"), walls, Walls.Side.SOUTH, TILE, Roofs.Options.defaults().withGableWall("minecraft:white_terracotta"));
+        var cells = cells(canvas);
+
+        assertEquals("north", cells.get(new Vec3i(3, 4, 5)).properties().get("facing"), "the eave overhangs the low side and climbs away from it");
+        assertEquals("north", cells.get(new Vec3i(3, 9, 0)).properties().get("facing"));
+        assertNull(cells.get(new Vec3i(3, 9, -1)), "no overhang past the high side, so it can meet a wall");
+        assertEquals("minecraft:deepslate_tile_stairs", cells.get(new Vec3i(-1, 7, 2)).id(), "the ends overhang");
+        assertEquals("minecraft:white_terracotta", cells.get(new Vec3i(3, 8, 0)).id(), "the high side is closed up to the slope");
+        assertEquals("minecraft:white_terracotta", cells.get(new Vec3i(0, 6, 2)).id(), "and so are the ends");
+        assertTrue(cells.get(new Vec3i(3, 6, 2)).isAir());
+    }
+
+    @Test void aLowPitchClimbsInSlabsWithoutASlitOverTheWalls() {
+        var canvas = new DrawCanvas(new Box(new Vec3i(-4, 0, -4), new Vec3i(12, 12, 10)));
+        var walls = new Box(new Vec3i(0, 0, 0), new Vec3i(8, 3, 6));
+        Roofs.gable(canvas.pen("minecraft:stone"), walls, Roofs.Ridge.X, TILE, Roofs.Options.defaults().withLowPitch().withGableWall("minecraft:white_terracotta"));
+        var cells = cells(canvas);
+
+        assertEquals("bottom", cells.get(new Vec3i(4, 4, -1)).properties().get("type"));
+        assertEquals("minecraft:deepslate_tiles", cells.get(new Vec3i(4, 4, 0)).id(), "a full block over the wall shows the same top as a top slab");
+        assertEquals("bottom", cells.get(new Vec3i(4, 5, 1)).properties().get("type"));
+        assertEquals("top", cells.get(new Vec3i(4, 5, 2)).properties().get("type"), "half a block up per block");
+        assertEquals("bottom", cells.get(new Vec3i(4, 6, 3)).properties().get("type"));
+        assertEquals("minecraft:deepslate_tiles", cells.get(new Vec3i(0, 5, 2)).id(), "the same over the gable wall");
+        assertEquals("minecraft:white_terracotta", cells.get(new Vec3i(0, 4, 2)).id());
+        assertThrows(IllegalArgumentException.class, () -> Roofs.Options.defaults().withLowPitch().withFlaredCorners());
+    }
+
+    @Test void aDeepOverhangClosesTheStripBetweenWallAndRoof() {
+        var canvas = new DrawCanvas(new Box(new Vec3i(-4, 0, -4), new Vec3i(12, 20, 10)));
+        var walls = new Box(new Vec3i(0, 0, 0), new Vec3i(8, 3, 6));
+        Roofs.gable(canvas.pen("minecraft:stone"), walls, Roofs.Ridge.X, TILE, Roofs.Options.defaults().withOverhang(2).withGableWall("minecraft:white_terracotta"));
+        Roofs.hip(canvas.pen("minecraft:stone").translate(0, 8, 0), walls, TILE, Roofs.Options.defaults().withOverhang(2).withGableWall("minecraft:calcite"));
+        var cells = cells(canvas);
+
+        for (int y : new int[]{4, 5}) assertEquals("minecraft:white_terracotta", cells.get(new Vec3i(4, y, 0)).id());
+        assertEquals("minecraft:deepslate_tile_stairs", cells.get(new Vec3i(4, 6, 0)).id());
+        assertEquals("minecraft:calcite", cells.get(new Vec3i(4, 13, 6)).id(), "a hip closes its eave strip on every side");
+        assertTrue(cells.get(new Vec3i(4, 13, 3)).isAir(), "while its attic stays open");
+    }
+
     @Test void materialsMustBeTheirOwnForms() {
         assertThrows(IllegalArgumentException.class, () -> Roofs.Material.of("minecraft:stone", "minecraft:stone_slab", "minecraft:stone"));
         assertThrows(IllegalArgumentException.class, () -> Roofs.Material.of("minecraft:stone_stairs", "minecraft:stone", "minecraft:stone"));
