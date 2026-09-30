@@ -204,6 +204,42 @@ Roofs.hip(pen, pavilion, tile, Roofs.Options.defaults().withOverhang(2).withFlar
 Walls, columns, openings and the interior stay yours to draw; `Roofs` only
 writes the roof and the space directly under it.
 
+## Walls, windows and doors
+
+A wall of one flat material reads as a box. `Walls` lays the layers vernacular
+building shares - a heavier base course, posts at the corners and at a rhythm,
+a beam along the top, lighter panels between - and puts depth in the openings.
+The `walls` box is the footprint: its X/Z edges are the wall line, `minY` the
+floor a person stands on, `maxY` the course a roof sits on.
+
+```java
+var hall = Box.of(0, 1, 0, 12, 5, 8);
+var frame = Walls.Frame.of("stripped_dark_oak_log", "dark_oak_log", "white_terracotta", "cobblestone").withBay(4);
+Walls.frame(pen, hall, frame);
+var window = Walls.Window.of("glass_pane").withSize(1, 2).withSill(1).withTrim("spruce_stairs");
+Walls.windows(pen, hall, Walls.Side.SOUTH, frame, window, 6);   // skip the bay holding x=6
+Walls.door(pen, hall, Walls.Side.SOUTH, 6, "spruce_door");
+Roofs.gable(pen, hall, Roofs.Ridge.X, tile, Roofs.Options.defaults().withGableWall("white_terracotta"));
+```
+
+- `frame(pen, walls, Frame)`: posts at the corners and at most `bay` (2..16)
+  apart, evened out along each wall; the plinth on the floor course, the beam on
+  the top course, infill between. Logs, stems and pillars get their `axis`
+  along the member. The room inside is cleared to AIR unless `keepingInterior()`.
+- `window(pen, walls, side, center, Window)` puts one window at `center` along the
+  side; `windows(pen, walls, side, frame, Window, skip...)` centres one in every
+  bay wide enough, skipping bays that contain a `skip` position. With
+  `withTrim(stairs)` an inverted stair juts out as a sill below and a stair hoods
+  it above, outside the wall line. Windows stay clear of corners and the top beam.
+- `door(pen, walls, side, center, door)` writes both halves facing into the room
+  and authors AIR in front of and behind it, so the way in is walkable.
+- Sides are `NORTH`, `SOUTH`, `WEST`, `EAST`; positions along them are the canvas
+  X (north/south walls) or Z (west/east walls) coordinate.
+
+These draw no floor and no furniture. Give important buildings their own
+proportions rather than one frame everywhere: a denser bay for a hall, a plain
+plastered wall for a storehouse, a stone plinth on a slope.
+
 ## Brushes and masks
 
 `Brush` is `(localPosition, previousDrawBlock) -> BlockStateRef`; null output skips.
