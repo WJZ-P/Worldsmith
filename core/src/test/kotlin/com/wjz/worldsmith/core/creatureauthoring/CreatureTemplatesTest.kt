@@ -27,6 +27,17 @@ class CreatureTemplatesTest {
     }
 
     @Test
+    fun `every starter skin covers its template's roles and puts two eyes on the face`() {
+        for (plan in CreatureBodyPlan.entries) for (scale in 1..3) {
+            val guide = CreatureAuthoring.guide(CreatureTemplates.recipe(plan, "t", "T", scale))
+            val skin = CreatureTemplates.skin(plan, scale)
+            assertEquals(emptyList<String>(), CreatureSkins.validate(guide.uvLayout, skin), "$plan x$scale")
+            assertEquals(2, skin.decals.count { it.cube == "skull" && it.face == "front" }, "$plan x$scale")
+            CreatureSkins.paint(guide.uvLayout, skin)
+        }
+    }
+
+    @Test
     fun `each plan carries the joints its motion needs`() {
         fun roles(plan: CreatureBodyPlan) = CreatureAuthoring.compile(CreatureTemplates.recipe(plan, "t", "T"), "a".repeat(64)).definition
         val quadruped = roles(CreatureBodyPlan.QUADRUPED)

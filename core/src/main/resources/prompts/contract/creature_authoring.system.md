@@ -21,8 +21,11 @@ placement is a separate natural habitat or typed structure encounter declaration
    `worldsmith_get_creature_template(bodyPlan, id, displayName, scale)` - QUADRUPED,
    BIPED, BIRD or SERPENT at scale 1..3. Its pivots already sit at the joints, with
    roles, hind-leg gait phase, a foldable spread wing, a hinged jaw or a jointed
-   body, feet on the ground line and material roles for the skin painter. Reshape,
-   add and rename cubes to make the species; move a joint only on purpose.
+   body, feet on the ground line and material roles for the skin painter. It also
+   returns a starter `skin` - a palette per material role and eyes on the head's
+   front face - and previews the two together. Reshape, add and rename cubes to
+   make the species; move a joint only on purpose. Recolour the skin to the
+   species and keep its eyes, moving each decal with the cube it sits on.
 3. Omit `textureAsset` during geometry work: the build returns a real diagnostic UV
    guide and a runtime definition whose texture hash identifies that guide. The guide
    is NOT automatically attached to the world's assets. `textureGuideOnly=true` means

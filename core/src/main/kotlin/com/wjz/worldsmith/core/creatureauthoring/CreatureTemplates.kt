@@ -80,4 +80,48 @@ object CreatureTemplates {
         }
         return b.recipe()
     }
+
+    /**
+     * A first skin for a template: a material per role in a believable palette and
+     * eyes where a viewer looks for them, so the first textured preview reads as an
+     * animal rather than a lump. Recolour, repattern and add markings to make the
+     * species; eyes are what give a creature a face, so keep some.
+     */
+    @JvmStatic @JvmOverloads
+    fun skin(plan: CreatureBodyPlan, scale: Int = 1): CreatureSkin {
+        require(scale in 1..3) { "Template scale is 1..3" }
+        val s = scale
+        // An eye is an s x s dark block; from scale 2 its top-left pixel catches the light.
+        fun eye(bone: String, cube: String, x: Int, y: Int) = SkinDecal(bone, cube, "front", x * s, y * s,
+            List(s) { r -> String(CharArray(s) { c -> if (s > 1 && r == 0 && c == 0) 'h' else 'e' }) }, mapOf("e" to "#17151a", "h" to "#f2efe6"))
+        return when (plan) {
+            CreatureBodyPlan.QUADRUPED -> CreatureSkin(mapOf(
+                "fur" to SkinMaterial("#8a6a4a", pattern = SkinPattern.FUR),
+                "muzzle" to SkinMaterial("#c9ab86", shade = 0.15f),
+                "leg" to SkinMaterial("#6e533a", pattern = SkinPattern.FUR, patternDensity = 0.15f),
+            ), listOf(eye("head", "skull", 1, 1), eye("head", "skull", 4, 1),
+                SkinDecal("head", "muzzle", "front", s, 0, List(s) { "n".repeat(2 * s) }, mapOf("n" to "#2a1f1a"))))
+            CreatureBodyPlan.BIPED -> CreatureSkin(mapOf(
+                "skin" to SkinMaterial("#c8a484", shade = 0.15f),
+                "clothes" to SkinMaterial("#4a5a7a", pattern = SkinPattern.SPECKLE, patternDensity = 0.2f),
+                "sleeve" to SkinMaterial("#3f4d69"),
+                "legs" to SkinMaterial("#3a3a44"),
+            ), listOf(false, true).map { right ->
+                // Two-pixel eyes, white toward the temples: the humanoid face every player knows.
+                SkinDecal("head", "skull", "front", (if (right) 5 else 1) * s, 4 * s,
+                    List(s) { if (right) "e".repeat(s) + "w".repeat(s) else "w".repeat(s) + "e".repeat(s) }, mapOf("w" to "#f2efe6", "e" to "#2d3b5a"))
+            })
+            CreatureBodyPlan.BIRD -> CreatureSkin(mapOf(
+                "plume" to SkinMaterial("#9aa6b0", pattern = SkinPattern.SCALES, patternDensity = 0.35f),
+                "head" to SkinMaterial("#6f7d89"),
+                "beak" to SkinMaterial("#e0a030", shade = 0.1f, grain = 0f),
+                "wing" to SkinMaterial("#6e7c88", pattern = SkinPattern.STRIPES, patternDensity = 0.3f),
+                "leg" to SkinMaterial("#d08a2a", grain = 0f),
+            ), listOf(eye("head", "skull", 0, 1), eye("head", "skull", 3, 1)))
+            CreatureBodyPlan.SERPENT -> CreatureSkin(mapOf(
+                "scale" to SkinMaterial("#5f7a3a", pattern = SkinPattern.SCALES, patternDensity = 0.5f),
+                "belly" to SkinMaterial("#cfc08a", shade = 0.1f),
+            ), listOf(eye("head", "skull", 0, 1), eye("head", "skull", 5, 1)))
+        }
+    }
 }
