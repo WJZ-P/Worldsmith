@@ -51,9 +51,33 @@ Supported operation kinds:
 - `stamp`: x/y, same-width text `rows`, `glyphs` mapping one character to a palette
   index, optional integer scale=1..8. A dot `.` preserves the underlying pixel.
 
+Material operations, for blocks and items that should read like vanilla ones. All
+take an optional rectangle (default the whole canvas):
+
+- `bricks`: courses `cellSize` tall and bricks `scale` long (2..64 each, both
+  counting their 1-pixel mortar line), every other course offset by half a brick.
+  `color` is the mortar, `colors` the brick faces chosen per brick; optional
+  `highlight` and `shadow` indices light each brick's top-left and shade its
+  bottom-right edge. On a full canvas whose size is a multiple of both, it tiles
+  without a seam. Use it for bricks, tiles, paving and masonry.
+- `bevel`: a 1-pixel `highlight` along the top and left of the rectangle and a
+  `shadow` along its bottom and right - a panel, a block face, a plank end.
+- `grain`: varies brightness by up to `amount` (0..0.3) in `cellSize` clusters, on
+  painted pixels only. Keep it near 0.04-0.08; more reads as noise.
+- `gradient`: brightness from `1+amount` at the top to `1-amount` at the bottom
+  (amount -0.5..0.5). It does not tile, so keep it off repeating block faces; use
+  it on items, a single door or pillar face, or creature parts.
+- `edge`: darkens every painted pixel beside transparency by `amount` (0..0.8),
+  the defined rim a vanilla item icon has. Apply it last.
+
+Vanilla blocks read at a distance through a few value steps - lit edges, shaded
+edges, a mortar or seam line - not through many hues. A brick wall is two or
+three close tones with a darker mortar; a plank is one tone with a seam every
+four pixels.
+
 Unknown operations, out-of-bounds writes, invalid indices and excessive work are
 errors, not silently clipped images. This is an explicit pixel-art tool, not a
-claim of automatic artistic quality or sophisticated material synthesis.
+claim of automatic artistic quality.
 
 ## Route B: external painting or image generation
 

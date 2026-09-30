@@ -49,4 +49,37 @@ class TextureRecipesTest {
         val resized=ImageIO.read(ByteArrayInputStream(TextureRecipes.fit(source,4,4,"nearest").bytes))
         assertEquals(0xff112233.toInt(),resized.getRGB(1,1));assertEquals(0xffddeeff.toInt(),resized.getRGB(2,1))
     }
+    @Test fun `bricks stagger their courses around mortar and tile without a seam`() {
+        val palette=listOf("#202020","#808080","#C0C0C0","#404040","#FFFFFF")
+        val image=pixels(TextureRecipe(width=16,height=16,palette=palette,seed=5,operations=listOf(
+            TextureOperation("bricks",cellSize=4,scale=8,color=0,colors=listOf(1),highlight=2,shadow=3))))
+        val mortar=0xff202020.toInt()
+        for (x in 0..15) assertEquals(mortar,image.getRGB(x,3),"each course ends in a mortar line")
+        assertEquals(mortar,image.getRGB(7,0));assertEquals(mortar,image.getRGB(15,0))
+        assertEquals(mortar,image.getRGB(3,4),"the next course is offset by half a brick")
+        assertEquals(0xffc0c0c0.toInt(),image.getRGB(0,0),"a brick's top-left edge catches the light")
+        assertEquals(0xff404040.toInt(),image.getRGB(6,1),"its bottom-right edge is shaded")
+        // Wrapping: a course's mortar columns repeat every brick length, across the tile edge too.
+        for (y in 0..15) assertEquals(image.getRGB(0,y)==mortar,image.getRGB(8,y)==mortar)
+    }
+    @Test fun `grain gradient and edge change brightness only where there is paint`() {
+        val flat=recipe(TextureOperation("fill",x=0,y=0,width=8,height=8,color=2))
+        val grained=pixels(flat.copy(operations=flat.operations+TextureOperation("grain",amount=.2,cellSize=2)))
+        assertEquals(0,grained.getRGB(12,12),"transparency stays transparent")
+        assertTrue((0..7).flatMap {y->(0..7).map {x->grained.getRGB(x,y)}}.distinct().size>1)
+        assertEquals(grained.getRGB(0,0),grained.getRGB(1,1),"grain varies in clusters, not per pixel")
+
+        val graded=pixels(flat.copy(operations=flat.operations+TextureOperation("gradient",amount=.2)))
+        assertTrue((graded.getRGB(3,0) and 0xff)>(graded.getRGB(3,7) and 0xff),"lighter at the top")
+
+        val edged=pixels(flat.copy(operations=flat.operations+TextureOperation("edge",amount=.5)))
+        assertTrue((edged.getRGB(7,3) and 0xff)<(edged.getRGB(3,3) and 0xff),"the rim beside transparency darkens")
+        assertEquals(0xffeeddcc.toInt(),edged.getRGB(3,3),"the interior is untouched")
+    }
+    @Test fun `material operations refuse values outside their ranges`() {
+        listOf(TextureOperation("bricks",cellSize=1,scale=8,colors=listOf(0)),TextureOperation("bricks",cellSize=4,scale=8),
+            TextureOperation("bevel"),TextureOperation("grain",amount=.5),TextureOperation("gradient",amount=.9),
+            TextureOperation("edge",amount=Double.NaN),TextureOperation("bevel",highlight=9))
+            .forEach {op->assertThrows(IllegalArgumentException::class.java){TextureRecipes.render(recipe(op))}}
+    }
 }

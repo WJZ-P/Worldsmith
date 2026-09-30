@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.Random
+import kotlin.math.roundToInt
 import javax.imageio.ImageIO
 
 /** Vendor-independent pixel authoring data, not a prompt sent to an image model. */
@@ -20,6 +21,8 @@ import javax.imageio.ImageIO
     val color:Int=0,val colors:List<Int> = emptyList(),val probability:Double=1.0,
     val x2:Int?=null,val y2:Int?=null,val cellSize:Int=1,
     val rows:List<String> = emptyList(),val glyphs:Map<String,Int> = emptyMap(),val scale:Int=1,
+    /** Material operations: palette indices for a lit and a shaded edge, and a brightness amount. */
+    val highlight:Int?=null,val shadow:Int?=null,val amount:Double=0.0,
 )
 
 /** Deterministic, bounded raster compiler shared by every MCP caller. No executable code or network. */
@@ -65,7 +68,64 @@ object TextureRecipes {
                     budget(w.toLong()*h)
                     op.rows.forEachIndexed {y,row->row.forEachIndexed {x,c->if(c!='.'){val color=requireNotNull(op.glyphs[c.toString()]) {"Unmapped stamp glyph"};for(dy in 0 until op.scale)for(dx in 0 until op.scale)paint(op.x+x*op.scale+dx,op.y+y*op.scale+dy,color)}}}
                 }
-                else->throw IllegalArgumentException("Unsupported texture operation '${op.kind}'; use fill, noise, checker, line or stamp")
+                "bricks","bevel","grain","gradient","edge" -> {
+                    val w=op.width ?: recipe.width;val h=op.height ?: recipe.height
+                    require(w>0 && h>0 && op.x>=0 && op.y>=0 && op.x.toLong()+w<=recipe.width && op.y.toLong()+h<=recipe.height) {"Operation $index has invalid rectangle bounds"}
+                    budget(w.toLong()*h)
+                    require(listOfNotNull(op.highlight,op.shadow).all {it in palette.indices}) {"Invalid highlight or shadow palette index"}
+                    fun shadeAt(x:Int,y:Int,factor:Double) {
+                        val argb=image.getRGB(x,y);if(argb ushr 24==0)return
+                        fun c(shift:Int)=(((argb shr shift) and 255)*factor).roundToInt().coerceIn(0,255)
+                        image.setRGB(x,y,(argb and 0xff000000.toInt()) or (c(16) shl 16) or (c(8) shl 8) or c(0))
+                    }
+                    when(op.kind) {
+                        "bricks" -> {
+                            // Courses cellSize tall and bricks scale long, each ending in a mortar line,
+                            // every other course offset by half a brick; wraps so a full tile repeats.
+                            require(op.cellSize in 2..64 && op.scale in 2..64 && op.color in palette.indices && op.colors.isNotEmpty() && op.colors.all {it in palette.indices}) {"bricks needs cellSize (course) and scale (brick length) 2..64, a mortar color and brick colors"}
+                            for(y in 0 until h)for(x in 0 until w) {
+                                val course=y/op.cellSize;val rowInCourse=y%op.cellSize
+                                val shifted=x+(if(course%2==1)op.scale/2 else 0)
+                                val brick=Math.floorMod(shifted,w)/op.scale;val colInBrick=Math.floorMod(shifted,w)%op.scale
+                                val mortar=rowInCourse==op.cellSize-1 || colInBrick==op.scale-1
+                                val color=when {
+                                    mortar -> op.color
+                                    op.highlight!=null && (rowInCourse==0 || colInBrick==0) -> op.highlight
+                                    op.shadow!=null && (rowInCourse==op.cellSize-2 || colInBrick==op.scale-2) -> op.shadow
+                                    else -> op.colors[Math.floorMod((recipe.seed xor (course*7919L+brick*104729L)).toInt()*-1640531535,op.colors.size)]
+                                }
+                                paint(op.x+x,op.y+y,color)
+                            }
+                        }
+                        "bevel" -> {
+                            require(op.highlight!=null || op.shadow!=null) {"bevel needs a highlight or shadow palette index"}
+                            for(y in 0 until h)for(x in 0 until w) {
+                                if(op.highlight!=null && (y==0 || x==0) && !(y==h-1 || x==w-1)) paint(op.x+x,op.y+y,op.highlight)
+                                else if(op.shadow!=null && (y==h-1 || x==w-1)) paint(op.x+x,op.y+y,op.shadow)
+                            }
+                        }
+                        "grain" -> {
+                            require(op.amount.isFinite() && op.amount in 0.0..0.3 && op.cellSize in 1..16) {"grain amount is 0..0.3 and cellSize 1..16"}
+                            for(y in 0 until h)for(x in 0 until w) {
+                                val cell=Random(recipe.seed xor index.toLong() xor ((op.x+x)/op.cellSize*73856093L) xor ((op.y+y)/op.cellSize*19349663L)).nextDouble()
+                                shadeAt(op.x+x,op.y+y,1+(cell*2-1)*op.amount)
+                            }
+                        }
+                        "gradient" -> {
+                            require(op.amount.isFinite() && op.amount in -0.5..0.5) {"gradient amount is -0.5..0.5"}
+                            for(y in 0 until h){val t=if(h==1)0.5 else y.toDouble()/(h-1);for(x in 0 until w)shadeAt(op.x+x,op.y+y,1+op.amount*(1-2*t))}
+                        }
+                        "edge" -> {
+                            // Darken every opaque pixel that touches transparency or the canvas border.
+                            require(op.amount.isFinite() && op.amount in 0.0..0.8) {"edge amount is 0..0.8"}
+                            val opaque={x:Int,y:Int->x in 0 until recipe.width && y in 0 until recipe.height && image.getRGB(x,y) ushr 24!=0}
+                            val edges=buildList {for(y in 0 until h)for(x in 0 until w){val px=op.x+x;val py=op.y+y
+                                if(opaque(px,py) && (!opaque(px-1,py) || !opaque(px+1,py) || !opaque(px,py-1) || !opaque(px,py+1))) add(px to py)}}
+                            edges.forEach {(px,py)->shadeAt(px,py,1-op.amount)}
+                        }
+                    }
+                }
+                else->throw IllegalArgumentException("Unsupported texture operation '${op.kind}'; use fill, noise, checker, line, stamp, bricks, bevel, grain, gradient or edge")
             }
         }
         return encode(image)
