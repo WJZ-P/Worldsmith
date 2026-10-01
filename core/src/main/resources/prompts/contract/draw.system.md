@@ -249,6 +249,14 @@ Roofs.gable(pen, hall, Roofs.Ridge.X, tile, Roofs.Options.defaults().withGableWa
   the top beam.
 - `door(pen, walls, side, center, door)` writes both halves facing into the room
   and authors AIR in front of and behind it, so the way in is walkable.
+- `arch(pen, walls, side, center, Arch)` cuts a round-headed opening from the
+  floor: `Arch.of(width, spring)` is 2..15 wide with `spring` blocks of straight
+  jamb, then a head of `withRise(rows)` (default half the width, a semicircle;
+  fewer rows flatten it). `withDepth(n)` cuts through a wall n blocks thick, for
+  gates in city walls; `withSurround(block)` dresses the jambs and one ring of
+  voussoirs; `withStairs(stairs)` rounds each step of the head with an inverted
+  stair. Like a door it authors AIR in front and behind. Arches every few blocks
+  along one wall make an arcade; neighbours share their jamb as a pier.
 - Sides are `NORTH`, `SOUTH`, `WEST`, `EAST`; positions along them are the canvas
   X (north/south walls) or Z (west/east walls) coordinate.
 

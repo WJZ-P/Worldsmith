@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Framed walls, windows and doors around a rectangular footprint.
+ * Framed walls, windows, doors and arches around a rectangular footprint.
  *
  * <p>A wall drawn as one flat material is what makes a building read as a box.
  * Vernacular building everywhere has the same few layers - a heavier base
@@ -63,6 +63,36 @@ public final class Walls {
 		public Window withSill(int blocksAboveFloor) { return new Window(width, height, blocksAboveFloor, glass, trim, shutter); }
 		public Window withTrim(String stairs) { return new Window(width, height, sill, glass, BlockStateRef.parse(stairs), shutter); }
 		public Window withShutters(String trapdoor) { return new Window(width, height, sill, glass, trim, BlockStateRef.parse(trapdoor)); }
+	}
+
+	/**
+	 * A round-headed opening {@code width} wide (2..15) whose straight jambs stand
+	 * {@code spring} blocks (0..16) before the head curves over in {@code rise}
+	 * rows (1..8, by default half the width rounded up, a semicircle; less is a
+	 * flatter segmental arch, more a taller one). It cuts {@code depth} blocks
+	 * (1..8) into the wall from its line. A {@code surround} block dresses the
+	 * jambs and the ring of voussoirs over the head; {@code stairs} round each
+	 * step of the head with an inverted stair.
+	 */
+	public record Arch(int width, int spring, int rise, int depth, BlockStateRef surround, BlockStateRef stairs) {
+		public Arch {
+			if (width < 2 || width > 15 || spring < 0 || spring > 16 || rise < 1 || rise > 8 || depth < 1 || depth > 8)
+				throw new IllegalArgumentException("An arch is 2..15 wide with 0..16 of jamb, a rise of 1..8 and a depth of 1..8");
+			if (stairs != null && !stairs.id().endsWith("_stairs")) throw new IllegalArgumentException("Arch stairs must be stairs: " + stairs.id());
+		}
+		public static Arch of(int width, int spring) { return new Arch(width, spring, (width + 1) / 2, 1, null, null); }
+		public Arch withRise(int rows) { return new Arch(width, spring, rows, depth, surround, stairs); }
+		public Arch withDepth(int blocks) { return new Arch(width, spring, rise, blocks, surround, stairs); }
+		public Arch withSurround(String block) { return new Arch(width, spring, rise, depth, BlockStateRef.parse(block), stairs); }
+		public Arch withStairs(String block) { return new Arch(width, spring, rise, depth, surround, BlockStateRef.parse(block)); }
+
+		/** Open rows of the head above the jambs in column {@code i} (0..width-1): cells whose centres lie inside the ellipse. */
+		int head(int i) {
+			double r = width / 2.0, du = (i + 0.5 - r) / r;
+			int rows = 0;
+			while (rows < rise && du * du + Math.pow((rows + 0.5) / rise, 2) < 1) rows++;
+			return rows;
+		}
 	}
 
 	private static final Set<String> PILLARS = Set.of("minecraft:bamboo_block", "minecraft:stripped_bamboo_block", "minecraft:basalt",
@@ -150,6 +180,51 @@ public final class Walls {
 			boolean skipped = false;
 			for (int s : skip) if (s > a && s < b) skipped = true;
 			if (!skipped) window(pen, walls, side, a + (b - a) / 2, window);
+		}
+		return pen;
+	}
+
+	/**
+	 * An arched opening centred at {@code center} along the side, cut from the
+	 * floor up through {@code depth} blocks of wall, with AIR authored in front of
+	 * and behind it at walking height so the way through is open.
+	 */
+	public static Painter arch(Painter pen, Box walls, Side side, int center, Arch arch) {
+		Objects.requireNonNull(pen); Objects.requireNonNull(walls); Objects.requireNonNull(side); Objects.requireNonNull(arch);
+		int from = center - (arch.width() - 1) / 2, to = from + arch.width() - 1, floor = walls.min().y(), spring = floor + arch.spring();
+		requireAlong(walls, side, from, to);
+		int[] head = new int[arch.width()];
+		int top = spring - 1;
+		for (int i = 0; i < head.length; i++) { head[i] = arch.head(i); top = Math.max(top, spring + head[i] - 1); }
+		if (top + (arch.surround() != null ? 1 : 0) >= walls.max().y()) throw new IllegalArgumentException("An arch, with its surround, must stay below the wall's top course");
+		java.util.function.BiPredicate<Integer, Integer> open = (u, y) -> u >= from && u <= to && y >= floor && y < spring + head[u - from];
+		var opening = new ArrayList<Vec3i>(); var ring = new ArrayList<Vec3i>(); var passage = new ArrayList<Vec3i>();
+		var westward = new ArrayList<Vec3i>(); var eastward = new ArrayList<Vec3i>();
+		for (int d = 0; d < arch.depth(); d++) {
+			for (int u = from - 1; u <= to + 1; u++) for (int y = floor; y <= top + 1; y++) {
+				if (open.test(u, y)) { opening.add(onWall(walls, side, u, y, -d)); continue; }
+				boolean touches = false;
+				for (int du = -1; du <= 1 && !touches; du++) for (int dy = -1; dy <= 1; dy++) if (open.test(u + du, y + dy)) { touches = true; break; }
+				if (!touches) continue;
+				int i = u - from;
+				// The first closed cell over a column whose inner neighbour rises higher is a step of the head.
+				boolean step = i >= 0 && i < head.length && y == spring + head[i] && y >= spring
+					&& (2 * i + 1 < head.length ? head[i + 1] > head[i] : 2 * i + 1 > head.length && head[i - 1] > head[i]);
+				if (step && arch.stairs() != null) (2 * i + 1 < head.length ? westward : eastward).add(onWall(walls, side, u, y, -d));
+				else if (arch.surround() != null) ring.add(onWall(walls, side, u, y, -d));
+			}
+		}
+		for (int u = from; u <= to; u++) for (int y = floor; y <= floor + 1; y++) {
+			passage.add(onWall(walls, side, u, y, 1)); passage.add(onWall(walls, side, u, y, -arch.depth()));
+		}
+		pen.brush(Brush.air()).points(opening);
+		pen.brush(Brush.air()).points(passage);
+		if (!ring.isEmpty()) pen.brush(Brush.solid(arch.surround())).points(ring);
+		if (arch.stairs() != null) {
+			// An inverted stair facing the jamb leaves its lower inner quarter open, rounding the step.
+			var stair = arch.stairs().with("half", "top").with("shape", "straight");
+			pen.brush(Brush.solid(stair.with("facing", side.alongX() ? "west" : "north"))).points(westward);
+			pen.brush(Brush.solid(stair.with("facing", side.alongX() ? "east" : "south"))).points(eastward);
 		}
 		return pen;
 	}

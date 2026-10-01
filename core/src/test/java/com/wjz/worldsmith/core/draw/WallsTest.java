@@ -78,6 +78,29 @@ class WallsTest {
         assertThrows(IllegalArgumentException.class, () -> Walls.Window.of("glass_pane").withShutters("spruce_door"));
     }
 
+    @Test void anArchRoundsItsHeadWithInvertedStairsInsideADressedSurround() {
+        var canvas = new DrawCanvas(Box.of(-2, 0, -2, 14, 10, 10));
+        var walls = Box.of(0, 1, 0, 12, 8, 8);
+        var pen = canvas.pen("minecraft:stone");
+        Walls.frame(pen, walls, FRAME);
+        var arch = Walls.Arch.of(5, 2).withSurround("stone_bricks").withStairs("stone_brick_stairs");
+        assertEquals(java.util.List.of(2, 3, 3, 3, 2), java.util.stream.IntStream.range(0, 5).map(arch::head).boxed().toList(), "a semicircular head");
+        Walls.arch(pen, walls, Walls.Side.SOUTH, 6, arch);
+        var cells = cells(canvas);
+
+        assertTrue(cells.get(new Vec3i(6, 5, 8)).isAir(), "the crown is open");
+        assertTrue(cells.get(new Vec3i(4, 4, 8)).isAir());
+        var left = cells.get(new Vec3i(4, 5, 8)); var right = cells.get(new Vec3i(8, 5, 8));
+        assertEquals("top", left.properties().get("half"), "an inverted stair rounds each step of the head");
+        assertEquals("west", left.properties().get("facing"), "facing the jamb, its open quarter faces the opening");
+        assertEquals("east", right.properties().get("facing"));
+        for (var at : new Vec3i[]{new Vec3i(3, 2, 8), new Vec3i(9, 5, 8), new Vec3i(4, 6, 8), new Vec3i(6, 6, 8)})
+            assertEquals("minecraft:stone_bricks", cells.get(at).id(), "jambs and voussoirs are dressed: " + at);
+        assertNotEquals("minecraft:stone_bricks", cells.get(new Vec3i(3, 7, 8)).id(), "the surround is one ring, not a block");
+        assertTrue(cells.get(new Vec3i(6, 1, 9)).isAir() && cells.get(new Vec3i(6, 1, 7)).isAir(), "open in front and behind");
+        assertThrows(IllegalArgumentException.class, () -> Walls.arch(pen, walls, Walls.Side.SOUTH, 6, Walls.Arch.of(5, 5)), "not through the top beam");
+    }
+
     @Test void aDoorIsBothHalvesWithAWalkableWayThrough() {
         var canvas = new DrawCanvas(Box.of(-2, 0, -2, 14, 8, 10));
         var walls = Box.of(0, 1, 0, 12, 5, 8);
