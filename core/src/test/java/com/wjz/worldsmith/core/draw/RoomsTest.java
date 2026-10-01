@@ -40,6 +40,7 @@ class RoomsTest {
                 if (ring) assertNull(cells.get(new Vec3i(x, 1, z)), use + " walkway at " + x + "," + z);
             }
             for (int x = 4; x <= 6; x++) assertNull(cells.get(new Vec3i(x, 1, 7)), use + " beside the door");
+            assertNull(cells.get(new Vec3i(5, 1, 4)), use + " leaves the centre a declared room walks to");
         }
         assertThrows(IllegalArgumentException.class, () -> Rooms.Style.of("stone", "red"));
         assertThrows(IllegalArgumentException.class, () -> Rooms.Style.of("oak", "crimson"));

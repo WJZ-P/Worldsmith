@@ -365,7 +365,7 @@ no building is left as empty shells:
 ```java
 var room = Rooms.inside(walls);                      // within the wall line, floor to the course under the top
 var door = new Vec3i(5, 1, 7);                       // the cell just inside the doorway
-List<Vec3i> lights = Rooms.furnish(pen, room, Rooms.Use.TAVERN,
+List<Rooms.Light> lights = Rooms.furnish(pen, room, Rooms.Use.TAVERN,
     Rooms.Style.of("spruce", "red").withSeed(context.seed()), new Box(door, door), stairFootprint);
 ```
 
@@ -376,16 +376,21 @@ List<Vec3i> lights = Rooms.furnish(pen, room, Rooms.Use.TAVERN,
   `STOREROOM` (stacked barrels and hay).
 - Furniture stands in the band along the walls; the next ring in is always left
   free as a walkway, and tables, seats and rugs use only the middle beyond it.
+  The room's centre cell, which `AuthoringContext.room` declares as the room's
+  destination, stays bare floor.
   Nothing is placed within one block of a `keepClear` box: pass the cell inside
   every doorway and the footprint of every stair flight and landing.
 - `Style` picks the wood of seats and tables, the dye of beds and rugs, and a
   seed that varies where along the walls the pieces start.
-- Lights stand on furniture or the floor, never hang from a ceiling that may not
-  be there. The returned positions are the room's lights, ready for the
-  structure's lighting sources.
-- Furnish after the walls, floors, doors and stairs. Add your own pieces after
-  it for a room that should feel particular: a shrine's altar, a captain's map
-  table, the trophy over a hunter's hearth.
+- Lanterns stand on furniture or the floor, never hang from a ceiling that may
+  not be there, and more are added on free wall cells until every walkway cell
+  is within six blocks of one, so the READABLE estimate stays at level 8 or
+  more. Each returned `Light` has the position, block and level to declare: in a
+  `StructureProgram`, `a.lightFixture("hall_light_" + i, l.at(), l.state(), l.level())`.
+- Furnish after the walls, floors, doors and stairs, and after
+  `AuthoringContext.room`, which authors AIR through the room. Add your own
+  pieces afterwards for a room that should feel particular: a shrine's altar, a
+  captain's map table, the trophy over a hunter's hearth.
 
 ## Brushes and masks
 

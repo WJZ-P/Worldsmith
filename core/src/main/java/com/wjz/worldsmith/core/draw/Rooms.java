@@ -1,7 +1,11 @@
 package com.wjz.worldsmith.core.draw;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -13,10 +17,11 @@ import java.util.Set;
  * forge. Furnishing every room piece by piece is the step most often skipped,
  * so a room here is furnished in one call, in a way that keeps it usable:
  * furniture stands in the band along the walls, the next ring in is always
- * left free as a walkway, tables and seats only use the middle beyond that, and
- * nothing is placed beside a doorway, stair or other kept area. Every room gets
- * at least one light standing on its furniture or floor, never hanging from a
- * ceiling that may not be there.
+ * left free as a walkway, tables and seats only use the middle beyond that, the
+ * room's centre cell stays open, and nothing is placed beside a doorway, stair
+ * or other kept area. Lanterns stand on furniture or the floor, never hanging
+ * from a ceiling that may not be there, until every free floor cell is
+ * readably lit.
  */
 public final class Rooms {
 	/** What a room is for; each lays its own pieces along the walls and in the middle. */
@@ -24,6 +29,10 @@ public final class Rooms {
 
 	private static final Set<String> WOODS = Set.of("oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak", "bamboo", "crimson", "warped");
 	private static final Set<String> CLOTHS = Set.of("white", "light_gray", "gray", "black", "brown", "red", "orange", "yellow", "lime", "green", "cyan", "light_blue", "blue", "purple", "magenta", "pink");
+	/** The block light every free floor cell is kept at, feet and head: the READABLE minimum. */
+	private static final int READABLE = 8;
+	private static final BlockStateRef LANTERN = BlockStateRef.of("lantern").with("hanging", "false");
+	private static final BlockStateRef CANDLES = BlockStateRef.of("candle").with("candles", "3").with("lit", "true");
 
 	/** The wood of seats and tables, the dye of beds and rugs, and a seed that varies where along the walls pieces start. */
 	public record Style(String wood, String cloth, long seed) {
@@ -37,12 +46,24 @@ public final class Rooms {
 		BlockStateRef slab() { return BlockStateRef.of(wood + "_slab"); }
 	}
 
+	/** A light the room stands, with the block and the level to declare it as a lighting source. */
+	public record Light(Vec3i at, BlockStateRef state, int level) {}
+
 	private record Slot(Vec3i at, Walls.Side wall, Walls.Side along) {}
+
+	/** One furnishing in progress: what it has filled, and the lights it has stood. */
+	private static final class Work {
+		final Painter pen; final Box room; final Style style;
+		final Set<Vec3i> filled = new HashSet<>();
+		final List<Light> lights = new ArrayList<>();
+		Work(Painter pen, Box room, Style style) { this.pen = pen; this.room = room; this.style = style; }
+		void put(Vec3i at, BlockStateRef state) { Furniture.place(pen, at, state); filled.add(at); }
+		void light(Vec3i at, BlockStateRef state, int level) { put(at, state); lights.add(new Light(at, state, level)); }
+	}
 
 	private interface Piece {
 		int width();
-		/** Draws on {@code slots}, returning where it put a light, if anywhere. */
-		List<Vec3i> place(Painter pen, List<Slot> slots, Box room, Style style);
+		void place(Work work, List<Slot> slots);
 	}
 
 	private Rooms() {}
@@ -56,16 +77,16 @@ public final class Rooms {
 	 * Furnishes {@code room}, the open volume a person stands in (at least 3 x 3
 	 * and 3 high), for {@code use}. Nothing is placed within one block of any
 	 * {@code keepClear} box: pass the cell inside each doorway and the footprint of
-	 * each stair flight and landing. Returns where the lights stand, for the
-	 * structure's lighting sources.
+	 * each stair flight and landing. Returns the lights it stood, to declare as
+	 * the structure's lighting sources.
 	 */
-	public static List<Vec3i> furnish(Painter pen, Box room, Use use, Style style, Box... keepClear) {
+	public static List<Light> furnish(Painter pen, Box room, Use use, Style style, Box... keepClear) {
 		Objects.requireNonNull(pen); Objects.requireNonNull(room); Objects.requireNonNull(use); Objects.requireNonNull(style);
 		if (room.width() < 3 || room.depth() < 3 || room.height() < 3) throw new IllegalArgumentException("A furnished room is at least 3 x 3 and 3 high");
 		var keep = List.of(keepClear);
+		var work = new Work(pen, room, style);
 		var slots = slots(room, keep, style.seed());
-		var lights = new ArrayList<Vec3i>();
-		lights.addAll(centre(pen, room, use, style, keep));
+		centre(work, use, keep);
 		var pieces = pieces(use, room);
 		// Libraries and storerooms line every free wall; other rooms set each piece once with a gap between.
 		boolean dense = use == Use.LIBRARY || use == Use.STOREROOM;
@@ -73,17 +94,69 @@ public final class Rooms {
 		for (int i = 0; i < slots.size() && (dense || next < pieces.size()); ) {
 			var piece = pieces.get(next % pieces.size());
 			if (!fits(slots, i, piece.width())) { i++; continue; }
-			lights.addAll(piece.place(pen, slots.subList(i, i + piece.width()), room, style));
+			piece.place(work, slots.subList(i, i + piece.width()));
 			i += piece.width() + (dense ? 0 : 1);
 			next++;
 		}
-		if (lights.isEmpty()) {
-			// A room too small or too kept for its pieces still needs a light: a lantern on the floor by a wall.
-			var free = slots.isEmpty() ? room.min() : slots.get(0).at();
-			Furniture.place(pen, free, BlockStateRef.of("lantern").with("hanging", "false"));
-			lights.add(free);
+		lightUp(work, slots);
+		return List.copyOf(work.lights);
+	}
+
+	/**
+	 * While any free floor cell of the room is darker than the READABLE level at
+	 * feet or head, stands a lantern on the floor of the free wall cell nearest
+	 * to it. Light spreads as the structure check spreads it: through the room's
+	 * open cells, around the furniture placed here, one level per step.
+	 */
+	private static void lightUp(Work work, List<Slot> slots) {
+		// A cell one lantern at its nearest free wall cell cannot light is given up, not chased with more.
+		var tried = new HashSet<Vec3i>();
+		for (int round = 0; round < 32; round++) {
+			var dark = darkest(work, tried);
+			if (dark == null) return;
+			tried.add(dark);
+			Slot best = null;
+			for (var slot : slots)
+				if (!work.filled.contains(slot.at()) && (best == null || distance(slot.at(), dark) < distance(best.at(), dark))) best = slot;
+			if (best == null) {
+				if (work.lights.isEmpty()) work.light(work.room.min(), LANTERN, 15);
+				return;
+			}
+			work.light(best.at(), LANTERN, 15);
 		}
-		return lights;
+	}
+
+	/** The first free floor cell not yet tried that is below the READABLE level at feet or head, or null. */
+	private static Vec3i darkest(Work work, Set<Vec3i> tried) {
+		var levels = new HashMap<Vec3i, Integer>();
+		var queue = new ArrayDeque<Vec3i>();
+		for (var light : work.lights) if (light.level() > levels.getOrDefault(light.at(), 0)) { levels.put(light.at(), light.level()); queue.add(light.at()); }
+		int[][] steps = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+		while (!queue.isEmpty()) {
+			var at = queue.removeFirst();
+			int next = levels.get(at) - 1;
+			if (next <= 0) continue;
+			for (var s : steps) {
+				var to = new Vec3i(at.x() + s[0], at.y() + s[1], at.z() + s[2]);
+				if (!work.room.contains(to) || work.filled.contains(to) || next <= levels.getOrDefault(to, 0)) continue;
+				levels.put(to, next); queue.add(to);
+			}
+		}
+		int y = work.room.min().y();
+		for (int x = work.room.min().x(); x <= work.room.max().x(); x++)
+			for (int z = work.room.min().z(); z <= work.room.max().z(); z++) {
+				var feet = new Vec3i(x, y, z); var head = new Vec3i(x, y + 1, z);
+				if (work.filled.contains(feet) || work.filled.contains(head) || tried.contains(feet)) continue;
+				if (Math.min(levels.getOrDefault(feet, 0), levels.getOrDefault(head, 0)) < READABLE) return feet;
+			}
+		return null;
+	}
+
+	private static int distance(Vec3i a, Vec3i b) { return Math.abs(a.x() - b.x()) + Math.abs(a.y() - b.y()) + Math.abs(a.z() - b.z()); }
+
+	/** The cell a declared room names as its destination: its centre on the floor. */
+	private static Vec3i middle(Box room) {
+		return new Vec3i((room.min().x() + room.max().x()) / 2, room.min().y(), (room.min().z() + room.max().z()) / 2);
 	}
 
 	/** Floor cells along the walls, clockwise from above, minus those near kept areas, starting at a seeded point. */
@@ -96,9 +169,10 @@ public final class Rooms {
 		for (int z = z1 - 1; z > z0; z--) ring.add(new Slot(new Vec3i(x0, y, z), Walls.Side.WEST, Walls.Side.NORTH));
 		int start = Math.floorMod(Long.hashCode(seed * 0x9E3779B97F4A7C15L), ring.size());
 		var result = new ArrayList<Slot>();
+		var centre = middle(room);
 		for (int i = 0; i < ring.size(); i++) {
 			var slot = ring.get((start + i) % ring.size());
-			if (!kept(slot.at(), keep)) result.add(slot);
+			if (!kept(slot.at(), keep) && !slot.at().equals(centre)) result.add(slot);
 		}
 		return result;
 	}
@@ -121,46 +195,48 @@ public final class Rooms {
 	}
 
 	/** Tables, seats or a rug in the middle, two blocks in from the walls so the walkway ring stays free. */
-	private static List<Vec3i> centre(Painter pen, Box room, Use use, Style style, List<Box> keep) {
-		var lights = new ArrayList<Vec3i>();
+	private static void centre(Work work, Use use, List<Box> keep) {
+		Box room = work.room;
 		int y = room.min().y();
 		int x0 = room.min().x() + 2, x1 = room.max().x() - 2, z0 = room.min().z() + 2, z1 = room.max().z() - 2;
-		if (x0 > x1 || z0 > z1) return lights;
+		if (x0 > x1 || z0 > z1) return;
+		var centre = middle(room);
 		boolean alongX = x1 - x0 >= z1 - z0;
 		int long0 = alongX ? x0 : z0, long1 = alongX ? x1 : z1, short0 = alongX ? z0 : x0, short1 = alongX ? z1 : x1;
+		int centreLong = alongX ? centre.x() : centre.z(), centreShort = alongX ? centre.z() : centre.x();
 		switch (use) {
 			case BEDROOM -> {
-				var rug = new ArrayList<Vec3i>();
-				for (int x = x0; x <= x1; x++) for (int z = z0; z <= z1; z++) if (!kept(new Vec3i(x, y, z), keep)) rug.add(new Vec3i(x, y, z));
-				if (!rug.isEmpty()) pen.brush(Brush.solid(BlockStateRef.of(style.cloth() + "_carpet"))).points(rug);
+				// A runner on the side of the middle away from the centre cell, which stays bare floor.
+				for (int u = long0; u <= long1; u++) for (int v = short0; v < centreShort; v++)
+					if (!kept(at(alongX, u, y, v), keep)) work.put(at(alongX, u, y, v), BlockStateRef.of(work.style.cloth() + "_carpet"));
 			}
 			case KITCHEN, LIBRARY, TAVERN -> {
-				// Rows of seat | table | seat across the short axis; a tavern repeats them, others set one.
+				// Rows of seat | table | seat across the short axis; along the long axis
+				// two-block tables with a gap every third block, the centre falling in a gap.
 				int rows = use == Use.TAVERN ? Math.max(1, (short1 - short0 + 2) / 4) : 1;
+				int first = long0 + Math.floorMod(centreLong - long0 - 2, 3);
 				for (int r = 0; r < rows; r++) {
 					int seatA = short0 + r * 4, table = seatA + 1, seatB = seatA + 2;
 					if (seatB > short1) break;
-					for (int u = long0; u + 1 <= long1; u += 3) {
+					for (int u = first; u + 1 <= long1; u += 3) {
 						var tableCells = List.of(at(alongX, u, y, table), at(alongX, u + 1, y, table));
 						var seats = List.of(at(alongX, u, y, seatA), at(alongX, u + 1, y, seatA), at(alongX, u, y, seatB), at(alongX, u + 1, y, seatB));
-						if (tableCells.stream().anyMatch(p -> kept(p, keep)) || seats.stream().anyMatch(p -> kept(p, keep))) continue;
-						pen.brush(Brush.solid(style.slab().with("type", "top"))).points(tableCells);
+						if (tableCells.stream().anyMatch(p -> kept(p, keep) || p.equals(centre)) || seats.stream().anyMatch(p -> kept(p, keep) || p.equals(centre))) continue;
+						for (var cell : tableCells) work.put(cell, work.style.slab().with("type", "top"));
 						Walls.Side towardB = alongX ? Walls.Side.SOUTH : Walls.Side.EAST, towardA = alongX ? Walls.Side.NORTH : Walls.Side.WEST;
 						for (int k = 0; k < 2; k++) {
-							Furniture.seat(pen, seats.get(k), towardB, style.stairs().id());
-							Furniture.seat(pen, seats.get(2 + k), towardA, style.stairs().id());
+							Furniture.seat(work.pen, seats.get(k), towardB, work.style.stairs().id());
+							Furniture.seat(work.pen, seats.get(2 + k), towardA, work.style.stairs().id());
 						}
+						work.filled.addAll(seats);
 						var top = new Vec3i(tableCells.get(0).x(), y + 1, tableCells.get(0).z());
-						if (lights.isEmpty()) Furniture.place(pen, top, BlockStateRef.of("lantern").with("hanging", "false"));
-						else Furniture.place(pen, top, BlockStateRef.of("candle").with("candles", "3").with("lit", "true"));
-						lights.add(top);
-						if (use != Use.TAVERN) return lights;
+						if (work.lights.isEmpty()) work.light(top, LANTERN, 15); else work.light(top, CANDLES, 9);
+						if (use != Use.TAVERN) return;
 					}
 				}
 			}
 			default -> { }
 		}
-		return lights;
 	}
 
 	private static Vec3i at(boolean alongX, int u, int y, int v) { return alongX ? new Vec3i(u, y, v) : new Vec3i(v, y, u); }
@@ -177,39 +253,34 @@ public final class Rooms {
 		};
 	}
 
+	private interface PieceBody { void place(Work work, Slot slot); }
+
 	private static Piece one(PieceBody body) {
 		return new Piece() {
 			public int width() { return 1; }
-			public List<Vec3i> place(Painter pen, List<Slot> slots, Box room, Style style) { return body.place(pen, slots.get(0), room); }
+			public void place(Work work, List<Slot> slots) { body.place(work, slots.get(0)); }
 		};
 	}
 
-	private interface PieceBody { List<Vec3i> place(Painter pen, Slot slot, Box room); }
+	private static Piece plain(String block) { return one((work, s) -> work.put(s.at(), BlockStateRef.parse(block))); }
 
-	private static Piece plain(String block) { return one((pen, s, room) -> { Furniture.place(pen, s.at(), BlockStateRef.parse(block)); return List.of(); }); }
-
-	private static Piece fronted(String block) { return one((pen, s, room) -> { Furniture.againstWall(pen, s.at(), s.wall(), block); return List.of(); }); }
+	/** A block standing against its wall with its front to the room. */
+	private static Piece fronted(String block) { return one((work, s) -> work.put(s.at(), BlockStateRef.parse(block).with("facing", s.wall().inward()))); }
 
 	/** A block whose facing runs along the wall, an anvil or a grindstone. */
-	private static Piece along(String block) {
-		return one((pen, s, room) -> { Furniture.place(pen, s.at(), BlockStateRef.parse(block).with("facing", Furniture.id(s.along()))); return List.of(); });
-	}
+	private static Piece along(String block) { return one((work, s) -> work.put(s.at(), BlockStateRef.parse(block).with("facing", Furniture.id(s.along())))); }
 
 	private static Piece stack(String block, int height) {
-		return one((pen, s, room) -> {
-			var state = BlockStateRef.parse(block);
-			for (int h = 0; h < height && s.at().y() + h <= room.max().y() - 1; h++) Furniture.place(pen, new Vec3i(s.at().x(), s.at().y() + h, s.at().z()), state);
-			return List.of();
+		return one((work, s) -> {
+			for (int h = 0; h < height && s.at().y() + h <= work.room.max().y() - 1; h++) work.put(new Vec3i(s.at().x(), s.at().y() + h, s.at().z()), BlockStateRef.parse(block));
 		});
 	}
 
 	/** A block with a lantern standing on it. */
 	private static Piece lit(String block) {
-		return one((pen, s, room) -> {
-			Furniture.place(pen, s.at(), BlockStateRef.parse(block));
-			var lantern = new Vec3i(s.at().x(), s.at().y() + 1, s.at().z());
-			Furniture.place(pen, lantern, BlockStateRef.of("lantern").with("hanging", "false"));
-			return List.of(lantern);
+		return one((work, s) -> {
+			work.put(s.at(), BlockStateRef.parse(block));
+			work.light(new Vec3i(s.at().x(), s.at().y() + 1, s.at().z()), LANTERN, 15);
 		});
 	}
 
@@ -217,9 +288,9 @@ public final class Rooms {
 	private static Piece bed() {
 		return new Piece() {
 			public int width() { return 2; }
-			public List<Vec3i> place(Painter pen, List<Slot> slots, Box room, Style style) {
-				Furniture.bed(pen, slots.get(0).at(), slots.get(0).along(), style.cloth() + "_bed");
-				return List.of();
+			public void place(Work work, List<Slot> slots) {
+				Furniture.bed(work.pen, slots.get(0).at(), slots.get(0).along(), work.style.cloth() + "_bed");
+				work.filled.add(slots.get(0).at()); work.filled.add(slots.get(1).at());
 			}
 		};
 	}
@@ -228,13 +299,10 @@ public final class Rooms {
 	private static Piece counter(int length) {
 		return new Piece() {
 			public int width() { return length; }
-			public List<Vec3i> place(Painter pen, List<Slot> slots, Box room, Style style) {
-				var top = new ArrayList<Vec3i>();
-				for (var s : slots) top.add(s.at());
-				pen.brush(Brush.solid(style.slab().with("type", "top"))).points(top);
-				var lantern = new Vec3i(top.get(0).x(), top.get(0).y() + 1, top.get(0).z());
-				Furniture.place(pen, lantern, BlockStateRef.of("lantern").with("hanging", "false"));
-				return List.of(lantern);
+			public void place(Work work, List<Slot> slots) {
+				for (var s : slots) work.put(s.at(), work.style.slab().with("type", "top"));
+				var first = slots.get(0).at();
+				work.light(new Vec3i(first.x(), first.y() + 1, first.z()), LANTERN, 15);
 			}
 		};
 	}
