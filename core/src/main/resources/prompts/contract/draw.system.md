@@ -298,6 +298,30 @@ Roofs.gable(pen, upper, Roofs.Ridge.X, tile, Roofs.Options.defaults().withGableW
 - Leave a block of floor in front of the first step and at the landing; a flight
   that starts against a wall or lands in one is not walkable.
 
+## Railings and battlements
+
+An open edge reads as unfinished and, for a player, as a fall. `Railings` puts
+rails round decks, balconies, bridges and terraces, and battlements on walls.
+
+```java
+var deck = Box.of(14, 0, 0, 26, 4, 8);                   // the deck's top course is its floor
+Railings.around(pen, deck, Railings.Railing.of("spruce_fence").withPosts("stripped_spruce_log", 3),
+    new Vec3i(20, 5, 8));                                 // leave a gap where a stair arrives
+Railings.line(pen, new Vec3i(0, 1, -3), new Vec3i(9, 1, -3), Railings.Railing.of("stone_brick_wall"));
+Railings.battlements(pen, keep, "stone_bricks");          // merlons on the keep's wall line
+```
+
+- `around(pen, deck, Railing, openings...)` runs one course above the deck's top
+  surface round its edge, leaving out each railing-level cell in `openings`.
+- `line(pen, from, to, Railing)` runs straight along X or Z at one height.
+- `Railing.of(rail)` takes a fence, wall, pane, iron bars or any solid for a low
+  parapet; `withPosts(block, spacing)` stands posts at the corners and at most
+  `spacing` (2..16) apart. Fences, walls and panes are written with the
+  connections they take to the rest of the railing; a wall shows its post at
+  ends, corners and posts. The offline preview draws these thin blocks as cubes.
+- `battlements(pen, walls, block)` puts merlons on the wall line one course above
+  `walls`, at the corners and on every other block, crenels open between.
+
 ## Furnishing
 
 An empty room reads as unfinished, and the pieces that furnish it hide their
