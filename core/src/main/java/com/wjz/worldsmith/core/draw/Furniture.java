@@ -86,6 +86,8 @@ public final class Furniture {
 		return state;
 	}
 
+	static void place(Painter pen, Vec3i at, BlockStateRef state) { pen.brush(Brush.solid(state)).points(List.of(at)); }
+
 	static String id(Walls.Side side) { return side.name().toLowerCase(Locale.ROOT); }
 
 	static Vec3i step(Vec3i at, Walls.Side side, int blocks) { return new Vec3i(at.x() + side.dx * blocks, at.y(), at.z() + side.dz * blocks); }
