@@ -134,7 +134,7 @@ physical lighting or an eye-level game experience. Basic vanilla slabs and stair
 have offline shape hints; other blocks remain cubes. Report those limits honestly.
 
 The returned `visualEvidence` supplies bounded whole-voxel measurements of the actual
-selected cells, separate from the slab/stair/trapdoor/carpet-aware PNG: occupied bounds, footprint,
+selected cells, separate from the shape-aware PNG: occupied bounds, footprint,
 orthographic depth layers, skyline profiles,
 large planar panels and visible material shares. Use its view/region observations
 to locate something worth inspecting, then compare the real PNGs. A large flat

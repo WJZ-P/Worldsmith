@@ -15,7 +15,7 @@ public final class DrawPreview {
 	public static final List<String> RENDER_MODES = List.of("material", "clay");
     static final int MAX_FACES = 250_000;
 	private record Face(double[] x,double[] y,double depth,int colour) {}
-	private record PreviewCell(DrawBlock block,int shape) {}
+	private record PreviewCell(DrawBlock block,int shape,List<DrawPreviewShapes.Part> parts) {}
 	public record Marker(Vec3i position,int colour,String label) {}
     public static byte[] png(DrawStructure drawing,String view,Integer sliceY) throws IOException {
         return png(drawing,view,sliceY,drawing.bounds(),List.of());
@@ -33,14 +33,27 @@ public final class DrawPreview {
 		if(!RENDER_MODES.contains(renderMode))throw new IllegalArgumentException("Unknown preview renderMode");
 		if(view.equals("slice")&&(sliceY==null||sliceY<drawing.bounds().min().y()||sliceY>drawing.bounds().max().y()))throw new IllegalArgumentException("sliceY must be inside drawing bounds");
 		var occupied=new HashMap<Vec3i,PreviewCell>();
-        var shapeCache=new HashMap<DrawBlock,Integer>();
-		for(var v:drawing.voxels())if(!v.block().state().isAir()&&(!view.equals("slice")||v.position().y()==sliceY)) {
-            Integer shape=shapeCache.get(v.block());
-            if(shape==null) {
-                shape=DrawPreviewShapes.mask(v.block());
-                if(shapeCache.size()<1024)shapeCache.put(v.block(),shape);
+        var shapeCache=new HashMap<DrawBlock,PreviewCell>();
+        var drawn=new HashMap<Vec3i,DrawBlock>();
+		for(var v:drawing.voxels())if(!v.block().state().isAir()&&(!view.equals("slice")||v.position().y()==sliceY))drawn.put(v.position(),v.block());
+        int[][] sides={{0,-1},{1,0},{0,1},{-1,0}};
+        for(var v:drawn.entrySet()) {
+            var p=v.getKey();var block=v.getValue();
+            PreviewCell cell;
+            if(DrawPreviewShapes.joinsNeighbours(block.state())) {
+                // Written without connections, as a window's panes are: join what the world would join.
+                var joined=DrawPreviewShapes.joined(block,s->drawn.containsKey(new Vec3i(p.x()+sides[s][0],p.y(),p.z()+sides[s][1])));
+                cell=new PreviewCell(block,0,DrawPreviewShapes.parts(joined));
+            } else {
+                cell=shapeCache.get(block);
+                if(cell==null) {
+                    // Thin blocks are drawn from their model boxes and hide no neighbouring face.
+                    var parts=DrawPreviewShapes.parts(block);
+                    cell=new PreviewCell(block,parts.isEmpty()?DrawPreviewShapes.mask(block):0,parts);
+                    if(shapeCache.size()<1024)shapeCache.put(block,cell);
+                }
             }
-            occupied.put(v.position(),new PreviewCell(v.block(),shape));
+            occupied.put(p,cell);
         }
 		double yaw=switch(view) {
             case "back" -> Math.PI;
@@ -92,6 +105,25 @@ public final class DrawPreview {
                     faces.add(new Face(xs,ys,depth,shade(baseColour,axis==1?1.0:axis==0?.77:.9)));
                 }
 			}
+            var state=entry.getValue().block().state();
+            int partColour=renderMode.equals("clay")?0xC3C7CC:colours.getOrDefault(state.id(),colour(state.id()));
+            for(var part:entry.getValue().parts()) {
+                double[] lo={part.x0()/16.0-.5,part.y0()/16.0-.5,part.z0()/16.0-.5},hi={part.x1()/16.0-.5,part.y1()/16.0-.5,part.z1()/16.0-.5};
+                for(int axis=0;axis<3;axis++) {
+                    if(Math.abs(near[axis])<1e-8)continue;
+                    if(faces.size()>=MAX_FACES)throw new IllegalArgumentException("Isometric face budget exceeded; request front/back or a slice of this same drawing");
+                    int u=(axis+1)%3,v=(axis+2)%3;
+                    double[] xs=new double[4],ys=new double[4];double depth=0;
+                    for(int i=0;i<4;i++) {
+                        double[] point=centre.clone();
+                        point[axis]+=near[axis]>0?hi[axis]:lo[axis];
+                        point[u]+=(i==1||i==2)?hi[u]:lo[u];
+                        point[v]+=(i>=2)?hi[v]:lo[v];
+                        xs[i]=dot(point,right);ys[i]=dot(point,down);depth+=dot(point,near)/4;
+                    }
+                    faces.add(new Face(xs,ys,depth,shade(partColour,axis==1?1.0:axis==0?.77:.9)));
+                }
+            }
 		}
 		faces.sort(Comparator.comparingDouble(Face::depth).thenComparingDouble(f->f.x[0]).thenComparingDouble(f->f.y[0]));
         // Antialiasing each polygon separately blends shared edges with previously drawn background
@@ -128,7 +160,7 @@ public final class DrawPreview {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
 		g.setColor(new Color(0xD6E3E8));g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,18));
 		g.drawString("Worldsmith | "+view+" | "+renderMode+" | "+occupied.size()+" selected non-air cells",40,950);
-		g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14));g.drawString("Offline model; basic vanilla slab/stair/trapdoor/carpet shapes, other blocks as cubes. Not an in-game screenshot."+(renderMode.equals("clay")&&view.equals("top")?" Top shade indicates height.":""),40,978);g.dispose();
+		g.setFont(new Font(Font.SANS_SERIF,Font.PLAIN,14));g.drawString("Offline model; vanilla slabs, stairs, trapdoors, carpets and thin blocks shaped, other blocks as cubes. Not an in-game screenshot."+(renderMode.equals("clay")&&view.equals("top")?" Top shade indicates height.":""),40,978);g.dispose();
         var output=new BufferedImage(1280,1000,BufferedImage.TYPE_INT_RGB);var composite=output.createGraphics();
         composite.setRenderingHint(RenderingHints.KEY_INTERPOLATION,RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         composite.drawImage(image,0,0,1280,1000,null);composite.dispose();

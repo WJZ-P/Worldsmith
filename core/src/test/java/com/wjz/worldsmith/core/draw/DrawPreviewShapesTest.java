@@ -30,6 +30,34 @@ class DrawPreviewShapesTest {
         assertEquals(0, DrawPreviewShapes.mask(block("cave_air")));
     }
 
+    @Test void thinBlocksAreDrawnFromTheirModelBoxes() {
+        var fence = DrawPreviewShapes.parts(block("oak_fence[north=true,east=false,south=false,west=true]"));
+        assertEquals(new DrawPreviewShapes.Part(6, 0, 6, 10, 16, 10), fence.get(0), "the post");
+        assertTrue(fence.contains(new DrawPreviewShapes.Part(7, 12, 0, 9, 15, 9)), "an upper rail to the north");
+        assertTrue(fence.contains(new DrawPreviewShapes.Part(0, 6, 7, 9, 9, 9)), "a lower rail to the west");
+        assertEquals(5, fence.size());
+        // The door model for facing=east is a panel on the west side of its cell.
+        assertEquals(List.of(new DrawPreviewShapes.Part(0, 0, 0, 3, 16, 16)), DrawPreviewShapes.parts(block("oak_door[facing=east,half=lower]")));
+        var wall = DrawPreviewShapes.parts(block("cobblestone_wall[up=false,north=low,south=tall]"));
+        assertTrue(wall.contains(new DrawPreviewShapes.Part(5, 0, 0, 11, 14, 8)) && wall.contains(new DrawPreviewShapes.Part(5, 0, 8, 11, 16, 16)) && wall.size() == 2);
+        // A quarter turn carries the connections with the geometry, as native rotation turns the state.
+        var turned = DrawPreviewShapes.parts(new DrawBlock(BlockStateRef.parse("glass_pane[north=true]"), GridTransform.rotateY(1)));
+        assertTrue(turned.contains(new DrawPreviewShapes.Part(9, 0, 7, 16, 16, 9)), turned.toString());
+        for (String full : List.of("stone", "jack_o_lantern", "sea_lantern", "glass", "oak_planks"))
+            assertTrue(DrawPreviewShapes.parts(block(full)).isEmpty(), full);
+        assertFalse(DrawPreviewShapes.parts(block("lantern[hanging=true]")).isEmpty());
+    }
+
+    @Test void paneWrittenWithoutSidesJoinsWhatTheWorldWouldJoin() {
+        assertTrue(DrawPreviewShapes.joinsNeighbours(BlockStateRef.parse("glass_pane")));
+        assertFalse(DrawPreviewShapes.joinsNeighbours(BlockStateRef.parse("glass_pane[north=true]")), "written sides are kept as written");
+        assertFalse(DrawPreviewShapes.joinsNeighbours(BlockStateRef.parse("glass")));
+        var pane = DrawPreviewShapes.parts(DrawPreviewShapes.joined(block("glass_pane"), s -> s == 1 || s == 3));
+        assertTrue(pane.contains(new DrawPreviewShapes.Part(9, 0, 7, 16, 16, 9)) && pane.contains(new DrawPreviewShapes.Part(0, 0, 7, 7, 16, 9)), "spans to the walls east and west");
+        var wall = DrawPreviewShapes.joined(block("stone_brick_wall"), s -> s == 0 || s == 2);
+        assertEquals("false", wall.state().properties().get("up"), "a straight run shows no post");
+    }
+
     @Test void trapdoorsAreAPanelWhereTheirLeafLies() {
         assertEquals(DrawPreviewShapes.mask(block("stone_slab[type=bottom]")), DrawPreviewShapes.mask(block("oak_trapdoor[half=bottom,open=false]")));
         assertEquals(DrawPreviewShapes.mask(block("stone_slab[type=top]")), DrawPreviewShapes.mask(block("oak_trapdoor[half=top,open=false]")));

@@ -319,7 +319,7 @@ Railings.battlements(pen, keep, "stone_bricks");          // merlons on the keep
   parapet; `withPosts(block, spacing)` stands posts at the corners and at most
   `spacing` (2..16) apart. Fences, walls and panes are written with the
   connections they take to the rest of the railing; a wall shows its post at
-  ends, corners and posts. The offline preview draws these thin blocks as cubes.
+  ends, corners and posts.
 - `battlements(pen, walls, block)` puts merlons on the wall line one course above
   `walls`, at the corners and on every other block, crenels open between.
 
@@ -632,8 +632,11 @@ explicitly that those images are not a successful assembled plan.
 For aesthetic iteration follow architecture section visual-quality-loop. Preview
 clay massing before adding ornament, inspect all elevations and occupied floors,
 then the assembled place. Compare actual images after a specific change. A material
-preview approximates colours and includes basic vanilla slab/stair/trapdoor/carpet
-shapes; other blocks remain cubes. This is not texture sampling, transparency, neighbor updates
+preview approximates colours and shapes vanilla slabs, stairs, trapdoors and carpets,
+and draws thin blocks - fences, walls, panes, bars, chains, doors, lanterns,
+candles, torches, flower pots - from their model boxes; panes and fences written
+without side states are joined to their neighbours as the world would. Other
+blocks remain cubes. This is not texture sampling, transparency, neighbor updates
 or a physical-light screenshot.
 
 Use worldsmith_put_architecture_draft(sessionId,expectedRevision,architecture,structures,
