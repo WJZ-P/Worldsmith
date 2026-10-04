@@ -32,6 +32,29 @@ class RoomsTest {
         assertEquals(expected, furnace.getValue().properties().get("facing"));
     }
 
+    @Test void doorsWindowsAndWhatIsAlreadyThereAreReadFromTheCanvas() {
+        var canvas = new DrawCanvas(Box.of(-2, 0, -2, 14, 8, 10));
+        var pen = canvas.pen("minecraft:stone");
+        var walls = Box.of(0, 1, 0, 11, 5, 8);
+        var frame = Walls.Frame.of("stripped_oak_log", "oak_log", "calcite", "cobblestone");
+        Walls.frame(pen, walls, frame);
+        Walls.door(pen, walls, Walls.Side.SOUTH, 5, "oak_door");
+        Walls.windows(pen, walls, Walls.Side.NORTH, frame, Walls.Window.of("glass_pane"));
+        Furniture.againstWall(pen, new Vec3i(10, 1, 4), Walls.Side.EAST, "lectern");
+        Rooms.furnish(pen, Rooms.inside(walls), Rooms.Use.LIBRARY, Rooms.Style.of("oak", "green"));
+        Map<Vec3i, BlockStateRef> cells = new HashMap<>();
+        for (var voxel : canvas.snapshot().voxels()) cells.put(voxel.position(), voxel.block().state());
+
+        for (int x = 4; x <= 6; x++) assertTrue(cells.get(new Vec3i(x, 1, 7)).isAir(), "the doorway is kept clear without being named: " + x);
+        for (int x : new int[]{2, 5, 9}) {
+            var sill = cells.get(new Vec3i(x, 2, 1));
+            assertTrue(sill.isAir() || sill.id().equals("minecraft:lantern"), "nothing tall in front of the window at x=" + x + ": " + sill);
+        }
+        assertEquals("minecraft:lectern", cells.get(new Vec3i(10, 1, 4)).id(), "what was drawn stays");
+        assertTrue(cells.get(new Vec3i(10, 1, 3)).isAir() && cells.get(new Vec3i(10, 1, 5)).isAir(), "and keeps its own clearance");
+        assertTrue(cells.values().stream().filter(s -> s.id().equals("minecraft:bookshelf")).count() > 8, "the other walls are still shelved");
+    }
+
     @Test void theWalkwayRingAndKeptAreasStayEmpty() {
         for (var use : Rooms.Use.values()) {
             var cells = furnished(use, Box.of(5, 1, 7, 5, 1, 7));

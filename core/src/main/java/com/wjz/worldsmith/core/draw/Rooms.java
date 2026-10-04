@@ -19,7 +19,9 @@ import java.util.Set;
  * furniture stands in the band along the walls, the next ring in is always
  * left free as a walkway, tables and seats only use the middle beyond that, the
  * room's centre cell stays open, and nothing is placed beside a doorway, stair
- * or other kept area. Lanterns stand on furniture or the floor, never hanging
+ * or other kept area. What the canvas already holds is read first: doors and
+ * openings in the walls are kept clear, nothing stands beside what was drawn in
+ * the room before, and only low pieces stand in front of windows. Lanterns stand on furniture or the floor, never hanging
  * from a ceiling that may not be there, until every free floor cell is
  * readably lit.
  */
@@ -49,7 +51,8 @@ public final class Rooms {
 	/** A light the room stands, with the block and the level to declare it as a lighting source. */
 	public record Light(Vec3i at, BlockStateRef state, int level) {}
 
-	private record Slot(Vec3i at, Walls.Side wall, Walls.Side along) {}
+	/** A floor cell along a wall, and how many blocks high a piece may stand there: one in front of a window. */
+	private record Slot(Vec3i at, Walls.Side wall, Walls.Side along, int height) {}
 
 	/** One furnishing in progress: what it has filled, and the lights it has stood. */
 	private static final class Work {
@@ -75,17 +78,19 @@ public final class Rooms {
 
 	/**
 	 * Furnishes {@code room}, the open volume a person stands in (at least 3 x 3
-	 * and 3 high), for {@code use}. Nothing is placed within one block of any
-	 * {@code keepClear} box: pass the cell inside each doorway and the footprint of
-	 * each stair flight and landing. Returns the lights it stood, to declare as
-	 * the structure's lighting sources.
+	 * and 3 high), for {@code use}. Nothing is placed within one block of a door
+	 * or opening in the walls, of anything already drawn on the room's floor, or
+	 * of a {@code keepClear} box - for what is drawn after, such as a stair flight
+	 * added later. Returns the lights it stood, to declare as the structure's
+	 * lighting sources.
 	 */
 	public static List<Light> furnish(Painter pen, Box room, Use use, Style style, Box... keepClear) {
 		Objects.requireNonNull(pen); Objects.requireNonNull(room); Objects.requireNonNull(use); Objects.requireNonNull(style);
 		if (room.width() < 3 || room.depth() < 3 || room.height() < 3) throw new IllegalArgumentException("A furnished room is at least 3 x 3 and 3 high");
-		var keep = List.of(keepClear);
 		var work = new Work(pen, room, style);
-		var slots = slots(room, keep, style.seed());
+		var keep = new ArrayList<>(List.of(keepClear));
+		keep.addAll(existing(work));
+		var slots = slots(work, keep, style.seed());
 		centre(work, use, keep);
 		var pieces = pieces(use, room);
 		// Libraries and storerooms line every free wall; other rooms set each piece once with a gap between.
@@ -160,13 +165,14 @@ public final class Rooms {
 	}
 
 	/** Floor cells along the walls, clockwise from above, minus those near kept areas, starting at a seeded point. */
-	private static List<Slot> slots(Box room, List<Box> keep, long seed) {
+	private static List<Slot> slots(Work work, List<Box> keep, long seed) {
+		Box room = work.room;
 		int y = room.min().y(), x0 = room.min().x(), x1 = room.max().x(), z0 = room.min().z(), z1 = room.max().z();
 		var ring = new ArrayList<Slot>();
-		for (int x = x0; x <= x1; x++) ring.add(new Slot(new Vec3i(x, y, z0), Walls.Side.NORTH, Walls.Side.EAST));
-		for (int z = z0 + 1; z <= z1; z++) ring.add(new Slot(new Vec3i(x1, y, z), Walls.Side.EAST, Walls.Side.SOUTH));
-		for (int x = x1 - 1; x >= x0; x--) ring.add(new Slot(new Vec3i(x, y, z1), Walls.Side.SOUTH, Walls.Side.WEST));
-		for (int z = z1 - 1; z > z0; z--) ring.add(new Slot(new Vec3i(x0, y, z), Walls.Side.WEST, Walls.Side.NORTH));
+		for (int x = x0; x <= x1; x++) ring.add(slot(work, new Vec3i(x, y, z0), Walls.Side.NORTH, Walls.Side.EAST));
+		for (int z = z0 + 1; z <= z1; z++) ring.add(slot(work, new Vec3i(x1, y, z), Walls.Side.EAST, Walls.Side.SOUTH));
+		for (int x = x1 - 1; x >= x0; x--) ring.add(slot(work, new Vec3i(x, y, z1), Walls.Side.SOUTH, Walls.Side.WEST));
+		for (int z = z1 - 1; z > z0; z--) ring.add(slot(work, new Vec3i(x0, y, z), Walls.Side.WEST, Walls.Side.NORTH));
 		int start = Math.floorMod(Long.hashCode(seed * 0x9E3779B97F4A7C15L), ring.size());
 		var result = new ArrayList<Slot>();
 		var centre = middle(room);
@@ -175,6 +181,51 @@ public final class Rooms {
 			if (!kept(slot.at(), keep) && !slot.at().equals(centre)) result.add(slot);
 		}
 		return result;
+	}
+
+	/** A slot whose wall shows a window above the floor takes only pieces one block high. */
+	private static Slot slot(Work work, Vec3i at, Walls.Side wall, Walls.Side along) {
+		int height = Math.min(3, work.room.height() - 1);
+		for (int h = 1; h <= 2; h++) {
+			var behind = Furniture.step(new Vec3i(at.x(), at.y() + h, at.z()), wall, 1);
+			if (work.pen.get(behind).map(b -> opening(b.state())).orElse(false)) height = 1;
+		}
+		return new Slot(at, wall, along, height);
+	}
+
+	/**
+	 * Reads the room before furnishing it. Everything already drawn inside counts
+	 * as filled; each cell of it on the floor or at head height, and each wall
+	 * cell beside the floor that is a door or an opening, is kept clear around.
+	 */
+	private static List<Box> existing(Work work) {
+		var keep = new ArrayList<Box>();
+		Box room = work.room;
+		int y = room.min().y();
+		for (int x = room.min().x(); x <= room.max().x(); x++) for (int z = room.min().z(); z <= room.max().z(); z++) {
+			for (int h = y; h <= room.max().y(); h++) {
+				var at = new Vec3i(x, h, z);
+				if (work.pen.get(at).map(b -> !b.state().isAir()).orElse(false)) {
+					work.filled.add(at);
+					if (h <= y + 1) keep.add(new Box(at, at));
+				}
+			}
+			boolean edge = x == room.min().x() || x == room.max().x() || z == room.min().z() || z == room.max().z();
+			if (!edge) continue;
+			for (var side : Walls.Side.values()) {
+				var wall = Furniture.step(new Vec3i(x, y, z), side, 1);
+				if (room.contains(wall)) continue;
+				if (work.pen.get(wall).map(b -> b.state().isAir() || b.state().id().endsWith("_door") || b.state().id().endsWith("_fence_gate")).orElse(false))
+					keep.add(new Box(new Vec3i(x, y, z), new Vec3i(x, y, z)));
+			}
+		}
+		return keep;
+	}
+
+	/** Glass, panes, bars, trapdoors, doors and authored AIR: a wall cell that is seen or walked through. */
+	private static boolean opening(BlockStateRef state) {
+		String id = state.id();
+		return state.isAir() || id.contains("glass") || id.endsWith("_pane") || id.endsWith("_bars") || id.endsWith("_trapdoor") || id.endsWith("_door") || id.endsWith("_fence_gate");
 	}
 
 	private static boolean kept(Vec3i at, List<Box> keep) {
@@ -272,7 +323,7 @@ public final class Rooms {
 
 	private static Piece stack(String block, int height) {
 		return one((work, s) -> {
-			for (int h = 0; h < height && s.at().y() + h <= work.room.max().y() - 1; h++) work.put(new Vec3i(s.at().x(), s.at().y() + h, s.at().z()), BlockStateRef.parse(block));
+			for (int h = 0; h < Math.min(height, s.height()) && s.at().y() + h <= work.room.max().y() - 1; h++) work.put(new Vec3i(s.at().x(), s.at().y() + h, s.at().z()), BlockStateRef.parse(block));
 		});
 	}
 

@@ -47,10 +47,10 @@ public final class Cottage implements DrawProgram {
 		for (int x : new int[]{-3, 3}) pen.brush(Brush.solid(BlockStateRef.of("stripped_" + wood + "_log"))).fill(Box.of(x, 1, 8, x, 3, 8));
 		Roofs.shed(pen, Box.of(-3, 1, 6, 3, 3, 8), Walls.Side.SOUTH, tile, Roofs.Options.defaults().withLowPitch());
 
-		// Furnish last; keep the doorway and the whole flight clear on both floors.
-		var door = new Vec3i(0, 1, 3);
+		// Furnish last. The door, the windows and the flight's steps are read from the
+		// canvas; the stairwell lies below the upper room's floor, so name it there.
 		var style = Rooms.Style.of(wood, "red").withSeed(context.seed());
-		Rooms.furnish(pen, Rooms.inside(lower), Rooms.Use.KITCHEN, style, new Box(door, door), flight);
+		Rooms.furnish(pen, Rooms.inside(lower), Rooms.Use.KITCHEN, style);
 		Rooms.furnish(pen, Rooms.inside(upper), Rooms.Use.BEDROOM, style, flight);
 
 		canvas.anchor("front_door", new Vec3i(0, 1, 9));

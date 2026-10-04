@@ -135,6 +135,7 @@ WorldsmithDrawExporter.write(drawing, Path.of("build/draw/author_build.nbt"));
   local-to-parent transforms. `pen.translate(30,0,20).rotateY(1)` rotates local geometry
   before placing it at (30,0,20). State orientation is deferred to native export.
 - `set(x,y,z)`, `points(List<Vec3i>)`, `fill(Box)`, `shell(Box,thickness)`, `clear(Box)`, `forget(Box)`.
+- `get(localPosition)` reads what the canvas holds there: empty for KEEP, else the stored block.
 - One operation is transactional: if a callback or budget check throws, its voxel writes
   are discarded. Earlier successful operations remain. Work reservations are still charged.
   Do not make nested edits or snapshots from a brush/mask. The canvas is thread-confined.
@@ -364,9 +365,8 @@ no building is left as empty shells:
 
 ```java
 var room = Rooms.inside(walls);                      // within the wall line, floor to the course under the top
-var door = new Vec3i(5, 1, 7);                       // the cell just inside the doorway
 List<Rooms.Light> lights = Rooms.furnish(pen, room, Rooms.Use.TAVERN,
-    Rooms.Style.of("spruce", "red").withSeed(context.seed()), new Box(door, door), stairFootprint);
+    Rooms.Style.of("spruce", "red").withSeed(context.seed()));   // doors and stairs already drawn are read
 ```
 
 - Uses are `BEDROOM` (beds along the walls, nightstands, a rug), `KITCHEN`
@@ -378,8 +378,11 @@ List<Rooms.Light> lights = Rooms.furnish(pen, room, Rooms.Use.TAVERN,
   free as a walkway, and tables, seats and rugs use only the middle beyond it.
   The room's centre cell, which `AuthoringContext.room` declares as the room's
   destination, stays bare floor.
-  Nothing is placed within one block of a `keepClear` box: pass the cell inside
-  every doorway and the footprint of every stair flight and landing.
+- The canvas is read first. Doors, gates and openings in the walls are kept
+  clear, so are the cells around anything already drawn on the room's floor
+  (stair steps, your own pieces), and in front of a window only one-block-high
+  pieces stand. Pass `keepClear` boxes for what the room cannot see: a stairwell
+  cut in the floor below it, or anything you will draw after furnishing.
 - `Style` picks the wood of seats and tables, the dye of beds and rugs, and a
   seed that varies where along the walls the pieces start.
 - Lanterns stand on furniture or the floor, never hang from a ceiling that may
@@ -442,10 +445,10 @@ public final class Cottage implements DrawProgram {
         for (int x : new int[]{-3, 3}) pen.brush(Brush.solid(BlockStateRef.of("stripped_" + wood + "_log"))).fill(Box.of(x, 1, 8, x, 3, 8));
         Roofs.shed(pen, Box.of(-3, 1, 6, 3, 3, 8), Walls.Side.SOUTH, tile, Roofs.Options.defaults().withLowPitch());
 
-        // Furnish last; keep the doorway and the whole flight clear on both floors.
-        var door = new Vec3i(0, 1, 3);
+        // Furnish last. The door, the windows and the flight's steps are read from the
+        // canvas; the stairwell lies below the upper room's floor, so name it there.
         var style = Rooms.Style.of(wood, "red").withSeed(context.seed());
-        Rooms.furnish(pen, Rooms.inside(lower), Rooms.Use.KITCHEN, style, new Box(door, door), flight);
+        Rooms.furnish(pen, Rooms.inside(lower), Rooms.Use.KITCHEN, style);
         Rooms.furnish(pen, Rooms.inside(upper), Rooms.Use.BEDROOM, style, flight);
 
         canvas.anchor("front_door", new Vec3i(0, 1, 9));

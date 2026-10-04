@@ -35,6 +35,12 @@ public final class Painter {
 	public Painter mirrorX() { return transformed(GridTransform.reflectX()); }
 	public Painter mirrorZ() { return transformed(GridTransform.reflectZ()); }
 
+	/**
+	 * What the canvas holds at a position local to this view: empty for KEEP,
+	 * otherwise the block as it was stored. Reading never draws.
+	 */
+	public Optional<DrawBlock> get(Vec3i local) { return canvas.get(transform.apply(Objects.requireNonNull(local))); }
+
 	public Painter set(int x, int y, int z) { return points(List.of(new Vec3i(x, y, z))); }
 	public Painter fill(Box box) { return scan(box, p -> true, 1); }
 	/** Clears to explicit air, respecting this view's mask/clip. */

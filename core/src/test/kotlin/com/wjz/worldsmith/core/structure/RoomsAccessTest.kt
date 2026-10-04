@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 
 /** A furnished room must stay walkable from its door and readably lit, judged by the checks a published structure gets. */
 class RoomsAccessTest {
-    private fun house(walls: Box, door: Int, use: Rooms.Use, seed: Long): Pair<DrawStructure, List<Rooms.Light>> {
+    private fun house(walls: Box, door: Int, use: Rooms.Use, seed: Long, nameTheDoor: Boolean = true): Pair<DrawStructure, List<Rooms.Light>> {
         val canvas = DrawCanvas(Box.of(-3, 0, -3, walls.max().x() + 3, walls.max().y() + 3, walls.max().z() + 4))
         val pen = canvas.pen("minecraft:stone")
         val frame = Walls.Frame.of("stripped_spruce_log", "spruce_log", "white_concrete", "cobblestone")
@@ -15,7 +15,8 @@ class RoomsAccessTest {
         Walls.door(pen, walls, Walls.Side.SOUTH, door, "spruce_door")
         pen.brush(Brush.solid("minecraft:stone_bricks")).fill(Box.of(door - 1, 0, walls.max().z() + 1, door + 1, 0, walls.max().z() + 2))
         val inside = Vec3i(door, walls.min().y(), walls.max().z() - 1)
-        val lights = Rooms.furnish(pen, Rooms.inside(walls), use, Rooms.Style.of("spruce", "red").withSeed(seed), Box(inside, inside))
+        val style = Rooms.Style.of("spruce", "red").withSeed(seed)
+        val lights = if (nameTheDoor) Rooms.furnish(pen, Rooms.inside(walls), use, style, Box(inside, inside)) else Rooms.furnish(pen, Rooms.inside(walls), use, style)
         return canvas.snapshot() to lights
     }
 
@@ -44,6 +45,15 @@ class RoomsAccessTest {
             assertEquals(emptyList<String>(), lighting.diagnostics.map { "${it.code}: ${it.message}" }, "$use/$seed")
             assertTrue(drawing.voxels().count { it.position().y() == 1 && !it.block().state().isAir && it.position().x() in 1..10 && it.position().z() in 1..7 } > 3,
                 "$use/$seed is furnished")
+        }
+    }
+
+    @Test fun `a door in the walls is found without being named`() {
+        val walls = Box.of(0, 1, 0, 11, 5, 8)
+        for (use in Rooms.Use.entries) for (seed in 0L..3L) {
+            val (drawing, lights) = house(walls, 5, use, seed, nameTheDoor = false)
+            val geometry = StructureDrawCompiler.compile(blueprint(walls, 5, lights, listOf(BuildPos(2, 1, 2), BuildPos(9, 1, 6))), drawing, strict = false)
+            assertTrue(geometry.diagnostics.isEmpty(), "$use/$seed: ${geometry.diagnostics}")
         }
     }
 
