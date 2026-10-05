@@ -85,6 +85,18 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
                 val recipe=McpJson.decode<TextureRecipe>(raw);val result=attach(a,TextureRecipes.render(recipe))
                 result.copy(structuredContent=JsonObject(result.structuredContent+buildJsonObject {put("recipeVersion",TextureRecipes.VERSION);put("seed",recipe.seed);put("imageModelUsed",false)}))
             }),
+            McpTool("worldsmith_get_texture_template","Start a texture from a template",
+                "Return an editable TextureRecipe: a 16x16 block face that tiles without a seam (${TextureTemplate.entries.filter {it.block}.joinToString(", ")}) or a 16x16 item icon (${TextureTemplate.entries.filterNot {it.block}.joinToString(", ")}), shaded from five-step ramps of a base and an accent #RRGGBB colour, with an enlarged preview. Recolour, reseed or edit its operations, then pass it to worldsmith_build_texture. Read-only.",
+                McpJson.schema(mapOf("template" to str,"base" to str,"accent" to str,"seed" to integer),listOf("template")),true,handler={a->
+                    val template=TextureTemplate.valueOf(McpJson.string(a,"template").uppercase())
+                    val recipe=TextureTemplates.recipe(template,a["base"]?.jsonPrimitive?.content ?: template.base,a["accent"]?.jsonPrimitive?.content ?: template.accent,a["seed"]?.jsonPrimitive?.long ?: 0L)
+                    val png=TextureRecipes.render(recipe).bytes
+                    McpToolResult.success(buildJsonObject {
+                        put("template",template.name);put("target",if(template.block)"block face, tiles seamlessly" else "item icon");put("recipe",McpJson.encode(recipe))
+                        put("palette",McpJson.encode(listOf("0 outline","1 dark","2 base","3 light","4 highlight","5..9 accent ramp in the same order","10 base half-step toward dark")))
+                        put("nextTool","worldsmith_build_texture")
+                    },images=listOf(McpImage(Base64.getEncoder().encodeToString(TextureTemplates.preview(template,png)))))
+                }),
             McpTool("worldsmith_import_texture_file","Import a PNG from the dedicated texture inbox","Read a single PNG filename from the configured host-local texture inbox, avoiding base64 through the model. No arbitrary paths, URLs or symlinks. Optional fitWidth/fitHeight plus resample=nearest explicitly resizes the entire image, preserving the original file.",McpJson.schema(revision+mapOf("filename" to str,"fitWidth" to integer,"fitHeight" to integer,"resample" to str),listOf("sessionId","expectedRevision","filename")),false,handler=::importTexture),
             McpTool("worldsmith_get_content_contract","Read a typed content contract","Read exact theme, blocks, creatures, items, quests, mechanics, story or abilities fields, or world_design for complete-world authoring plans. Existing worldgen domain contracts remain separate.",McpJson.schema(mapOf("module" to str),listOf("module")),true,handler={contract(McpJson.string(it,"module"))}),
             McpTool("worldsmith_put_content_modules","Commit a world content draft","Atomically merge complete typed module documents at expectedRevision: theme, blocks, creatures, items, quests, mechanics, abilities, story, terrain, biomes, features. Structure tools own architecture. removeAssets detaches obsolete handles without deleting their stored bytes. Repairable links may remain in drafts. Invalidates publication.",McpJson.schema(revision+mapOf("modules" to obj,"removeAssets" to McpJson.array()),listOf("sessionId","expectedRevision","modules")),false,handler=::putModules),
@@ -219,7 +231,7 @@ class WorldContentMcpService(private val store:ManagedPackStore, private val nat
         put("contract",contract);put("imageModelProvidedByMod",false);put("providerIndependent",true)
         put("textureInbox",textureInbox?.toString()?.let(::JsonPrimitive) ?: JsonNull)
         put("fileImportRequiresSameHostOrClientTransfer",true);put("rawPngUploadTool","worldsmith_put_texture_asset")
-        put("recipeTool","worldsmith_build_texture");put("creatureUvTool","worldsmith_build_creature")
+        put("recipeTool","worldsmith_build_texture");put("templateTool","worldsmith_get_texture_template");put("creatureUvTool","worldsmith_build_creature")
     })
     private fun input(s:WorkflowSession)=WorldContentInput(s.id,s.contentModules+mapOf("structures" to McpJson.encode(s.structureLibrary()).jsonObject),s.contentAssets.values.map(::portable))
     private fun draft(s:WorkflowSession)=McpToolResult.success(buildJsonObject {

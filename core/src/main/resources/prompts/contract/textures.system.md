@@ -35,6 +35,29 @@ not only an enlarged atlas, while preserving exact face rectangles and orientati
 reusable data recipe to a real PNG and attaches it to the session. It uses no AI
 service, network call, executable source, shell command or vendor-specific SDK.
 
+### Start from a template
+
+`worldsmith_get_texture_template(template, base, accent, seed)` returns an
+editable recipe and an enlarged preview, without attaching anything:
+
+- Block faces, 16 x 16 and tiling without a seam: `PLANKS`, `STONE_BRICKS`,
+  `COBBLESTONE`, `SMOOTH_STONE`, `ORE` (the base is the ore, the accent its
+  stone), `LOG_SIDE`, `LOG_TOP` (the accent is the bark), `LEAVES`, `SAND`,
+  `METAL_BLOCK`, `GLASS` (a clear pane in a lit frame, for GLASS blocks) and
+  `CRYSTAL`.
+- Item icons, 16 x 16 on clear ground with a dark rim: `GEM`, `INGOT`, `SWORD`
+  and `POTION` (the accent is the hilt or the cork), `ORB`, `KEY`, `COIN`,
+  `SHARD`.
+
+Its palette is two five-step ramps, built the way pixel artists shade: index 0
+outline, 1 dark, 2 base, 3 light, 4 highlight for the base colour, the same at
+5..9 for the accent, and 10 a half-step between base and dark. Shadows lean
+cool and highlights warm. Recolour by passing `base` and `accent`; a different
+`seed` reshuffles the stones, joints, grooves or ore. Then change what makes the
+item this world's own - a different blade, a rune on the coin, a second colour
+of ore - and build it with `worldsmith_build_texture`. A template is a start,
+not a finish: two worlds should not ship the same sword.
+
 Recipe fields: schemaVersion=1, width/height (1..512), palette (1..256 exact
 #RRGGBB or #RRGGBBAA colors), seed (integer), operations (1..256).
 Canvas starts transparent. Operations paint in order, with a total bounded pixel
