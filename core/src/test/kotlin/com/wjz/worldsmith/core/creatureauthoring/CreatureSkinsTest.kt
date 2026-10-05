@@ -50,6 +50,20 @@ class CreatureSkinsTest {
     }
 
     @Test
+    fun `a belly colour countershades the underside and the foot of each side`() {
+        val pale = skin.copy(materials = skin.materials + ("hide" to SkinMaterial("#8A5A3C", shade = 0f, grain = 0f, pattern = SkinPattern.SPOTS, patternDensity = 1f, belly = "#E0D0B0")))
+        val painted = image(CreatureSkins.paint(layout, pale))
+        val bottom = face("body", "torso", "bottom"); val side = face("body", "torso", "left")
+        assertEquals(0xffE0D0B0.toInt(), painted.getRGB(bottom.x + 2, bottom.y + 2), "the underside is the belly, without spots")
+        assertEquals(0xffE0D0B0.toInt(), painted.getRGB(side.x + 1, side.y + side.height - 1), "the foot of a side")
+        val first = side.height - 1 - (0 until side.height).reversed().takeWhile { painted.getRGB(side.x + 1, side.y + it) == 0xffE0D0B0.toInt() }.count()
+        assertTrue(painted.getRGB(side.x + 1, side.y + first) != 0xff8A5A3C.toInt(), "a softened edge row between")
+        val top = face("body", "torso", "top")
+        assertTrue(painted.getRGB(top.x + 1, top.y + 1) != 0xffE0D0B0.toInt(), "the back stays dark")
+        assertTrue(CreatureSkins.validate(layout, pale.copy(materials = pale.materials + ("hide" to SkinMaterial("#8A5A3C", belly = "cream")))).any { "belly" in it })
+    }
+
+    @Test
     fun `painting is deterministic and a mirrored limb shares its source's pixels`() {
         assertArrayEquals(CreatureSkins.paint(layout, skin), CreatureSkins.paint(layout, skin))
         val grainy = skin.copy(materials = skin.materials + ("hide" to SkinMaterial("#8A5A3C", grain = 0.1f)))

@@ -96,7 +96,7 @@ object CreatureTemplates {
             List(s) { r -> String(CharArray(s) { c -> if (s > 1 && r == 0 && c == 0) 'h' else 'e' }) }, mapOf("e" to "#17151a", "h" to "#f2efe6"))
         return when (plan) {
             CreatureBodyPlan.QUADRUPED -> CreatureSkin(mapOf(
-                "fur" to SkinMaterial("#8a6a4a", pattern = SkinPattern.FUR),
+                "fur" to SkinMaterial("#8a6a4a", pattern = SkinPattern.FUR, belly = "#c2a37c"),
                 "muzzle" to SkinMaterial("#c9ab86", shade = 0.15f),
                 "leg" to SkinMaterial("#6e533a", pattern = SkinPattern.FUR, patternDensity = 0.15f),
             ), listOf(eye("head", "skull", 1, 1), eye("head", "skull", 4, 1),
@@ -112,7 +112,7 @@ object CreatureTemplates {
                     List(s) { if (right) "e".repeat(s) + "w".repeat(s) else "w".repeat(s) + "e".repeat(s) }, mapOf("w" to "#f2efe6", "e" to "#2d3b5a"))
             })
             CreatureBodyPlan.BIRD -> CreatureSkin(mapOf(
-                "plume" to SkinMaterial("#9aa6b0", pattern = SkinPattern.SCALES, patternDensity = 0.35f),
+                "plume" to SkinMaterial("#9aa6b0", pattern = SkinPattern.SCALES, patternDensity = 0.35f, belly = "#dde3e8"),
                 "head" to SkinMaterial("#6f7d89"),
                 "beak" to SkinMaterial("#e0a030", shade = 0.1f, grain = 0f),
                 "wing" to SkinMaterial("#6e7c88", pattern = SkinPattern.STRIPES, patternDensity = 0.3f),

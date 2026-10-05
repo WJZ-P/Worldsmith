@@ -14,7 +14,9 @@ import kotlin.math.roundToInt
  * darkens undersides and the lower part of each side, [grain] is a variation in
  * 2x2 clusters that keeps a flat colour from reading as plastic without
  * dithering it, and a [pattern] is drawn in [patternColor] - by default a tone
- * of the base, subtle for fur and scales, strong for spots and stripes.
+ * of the base, subtle for fur and scales, strong for spots and stripes. A
+ * [belly] colour countershades: it fills the underside and the lowest
+ * [bellyHeight] of each side, plain, the way most animals are paler beneath.
  */
 @Serializable data class SkinMaterial @JvmOverloads constructor(
     val base: String,
@@ -23,6 +25,8 @@ import kotlin.math.roundToInt
     val pattern: SkinPattern = SkinPattern.NONE,
     val patternColor: String? = null,
     val patternDensity: Float = 0.25f,
+    val belly: String? = null,
+    val bellyHeight: Float = 0.35f,
 )
 
 /**
@@ -64,6 +68,8 @@ object CreatureSkins {
         skin.materials.forEach { (role, m) ->
             if (!COLOR.matches(m.base)) add("$role.base must be #RRGGBB")
             if (m.patternColor != null && !COLOR.matches(m.patternColor)) add("$role.patternColor must be #RRGGBB")
+            if (m.belly != null && !COLOR.matches(m.belly)) add("$role.belly must be #RRGGBB")
+            if (!m.bellyHeight.isFinite() || m.bellyHeight !in 0f..1f) add("$role.bellyHeight is 0..1")
             if (!m.shade.isFinite() || m.shade !in 0f..0.6f) add("$role.shade is 0..0.6")
             if (!m.grain.isFinite() || m.grain !in 0f..0.3f) add("$role.grain is 0..0.3")
             if (!m.patternDensity.isFinite() || m.patternDensity !in 0f..1f) add("$role.patternDensity is 0..1")
@@ -99,12 +105,22 @@ object CreatureSkins {
                 SkinPattern.FUR -> 0.84; SkinPattern.SCALES -> 0.78; SkinPattern.SPECKLE -> 0.74; else -> 0.6
             })
             val salt = skin.seed xor island.id.hashCode().toLong() * 0x9E3779B97F4A7C15uL.toLong()
+            val under = material.belly?.let(::rgb)
             island.faces.forEach { face ->
+                // The first belly row of a side is half way between, so the change reads as a soft edge.
+                val firstBelly = if (face.height <= 1) face.height else Math.ceil((1 - material.bellyHeight) * (face.height - 1).toDouble()).toInt()
                 for (fy in 0 until face.height) for (fx in 0 until face.width) {
                     val px = face.x + fx; val py = face.y + fy
-                    val marked = pattern(material, face.width, face.height, fx, fy, salt)
+                    val belly = under != null && face.face != "top" && (face.face == "bottom" || fy >= firstBelly)
+                    val marked = !belly && pattern(material, face.width, face.height, fx, fy, salt)
                     val light = light(face.face, fy, face.height, material.shade) + (noise(salt, px shr 1, py shr 1) - 0.5) * 2 * material.grain
-                    image.setRGB(px, py, 0xff shl 24 or scale(if (marked) accent else base, 1 + light))
+                    val colour = when {
+                        belly && face.face != "bottom" && fy == firstBelly -> blend(base, under!!)
+                        belly -> under!!
+                        marked -> accent
+                        else -> base
+                    }
+                    image.setRGB(px, py, 0xff shl 24 or scale(colour, 1 + light))
                 }
             }
         }
@@ -170,6 +186,7 @@ object CreatureSkins {
     }
 
     private fun rgb(text: String): Int = text.substring(1, 7).toInt(16)
+    private fun blend(a: Int, b: Int): Int = (((a shr 16 and 0xff) + (b shr 16 and 0xff)) / 2 shl 16) or (((a shr 8 and 0xff) + (b shr 8 and 0xff)) / 2 shl 8) or (((a and 0xff) + (b and 0xff)) / 2)
     private fun argb(text: String): Int = if (text.length == 7) (0xff shl 24) or rgb(text)
         else (text.substring(7, 9).toInt(16) shl 24) or rgb(text)
 

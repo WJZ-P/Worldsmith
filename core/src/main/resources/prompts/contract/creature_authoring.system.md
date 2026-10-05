@@ -75,7 +75,7 @@ unit a skin colours.
 
 ```json
 {"materials": {
-   "fur":    {"base": "#C8641E", "shade": 0.22, "pattern": "FUR", "patternDensity": 0.5},
+   "fur":    {"base": "#C8641E", "shade": 0.22, "pattern": "FUR", "patternDensity": 0.5, "belly": "#E8C9A0"},
    "cream":  {"base": "#EFE3CF", "shade": 0.15},
    "dark":   {"base": "#3B2A22"}},
  "decals": [{"bone": "head", "cube": "skull", "face": "front", "x": 0, "y": 2,
@@ -88,6 +88,10 @@ unit a skin colours.
 - `pattern` NONE, SPECKLE, SPOTS, STRIPES, SCALES or FUR at `patternDensity` 0..1,
   in `patternColor` or a tone of the base - subtle for fur and scales, strong for
   spots and stripes. Most materials want NONE; see the direction above.
+- `belly` countershades: that colour fills the underside and the lowest
+  `bellyHeight` (default 0.35) of each side, plain and with a softened first row,
+  as most animals are paler beneath. It reads as an animal at a distance more
+  than any pattern does; leave it out for armour, cloth, stone or slime.
 - A decal stamps pixel art on one face of one cube: `face` is top, bottom, left,
   front, right or back; `x`/`y` are face-local as the face is drawn in the UV guide;
   `.` keeps the skin beneath. Up to 64 decals. Eyes, nostrils, a mouth, markings.
