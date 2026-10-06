@@ -56,6 +56,7 @@ class StructureCheckService(private val native:StructureNativeHost?=null) {
                 if(g.protectedAreas.size>32||g.protectedAreas.any {!validBox(it)})problems+=original(Diagnostic("protectedAreas","DRAWING_PROTECTED_BOUNDS",DiagnosticSeverity.ERROR,"Invalid protected volume"))
                 val report=if(estimateLighting)StructureLightingChecker.analyze(metadata,g.voxels)else StructureLightingChecker.validate(metadata,g.voxels)
                 light["$id:$variant"]=report;problems+=report.diagnostics.map(::original)
+                problems+=StructureInteriorChecks.bareRooms(metadata,g.voxels).map(::original)
             }
             problems
         }

@@ -390,6 +390,9 @@ List<Rooms.Light> lights = Rooms.furnish(pen, room, Rooms.Use.TAVERN,
   is within six blocks of one, so the READABLE estimate stays at level 8 or
   more. Each returned `Light` has the position, block and level to declare: in a
   `StructureProgram`, `a.lightFixture("hall_light_" + i, l.at(), l.state(), l.level())`.
+- Preflight warns `BARE_ROOM` for a declared room of 12 or more floor cells
+  with almost nothing standing on it. It never blocks publication: a hall, an
+  arena or a cleared vault may stay bare on purpose.
 - Furnish after the walls, floors, doors and stairs, and after
   `AuthoringContext.room`, which authors AIR through the room. Add your own
   pieces afterwards for a room that should feel particular: a shrine's altar, a
