@@ -5,6 +5,14 @@ There is no mandatory architectural style, asset catalog, roof enum or socket gr
 Write your own Java functions, loops, equations and composition. The SDK is a canvas,
 not an agent runner: this reference tool does not execute source code.
 
+For buildings, an architectural kit handles the block states that are easy to get
+wrong one block at a time, so your own code goes to massing and character:
+`Walls` (framed walls, windows, doors, arches, floors), `Roofs` (gable, hip, lean-to,
+low pitch), `Stairs` (flights between storeys), `Railings` (railings, battlements),
+`Furniture` and `Rooms` (single pieces, or a whole room furnished for its use). The
+sections below document each; section "A whole building from the kit" puts them
+together.
+
 ## Runtime boundary
 
 - The drawing package is Java 21, using only JDK classes. No Python, NumPy,

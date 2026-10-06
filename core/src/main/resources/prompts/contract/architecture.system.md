@@ -107,7 +107,7 @@ the same `views`, `renderMode`, `region`, `frame`, `cutaway` and `sliceY` vocabu
 | --- | --- | --- |
 | Main mass, before ornament | `views:["isometric","isometric_back","front","top"], renderMode:"clay"` | Focal hierarchy, proportion, skyline, useful voids; would the theme still read without colour? |
 | Exterior | `views:["front","back","left","right"], renderMode:"material"` | Entrance legibility, bay rhythm, depth, roof/wall/base relationships and unfinished side/rear faces |
-| Interior, each occupied storey | `views:["top","isometric"], cutaway:true, sliceY:<just above that floor's openings>` | Room use, circulation, support, stairs, headroom and fixtures; crop a storey or hide a named roof component where useful |
+| Interior, each occupied storey | `views:["top","isometric"], cutaway:true, sliceY:<just above that floor's openings>` | Room use, circulation, support, stairs, headroom and fixtures; crop a storey or hide a named roof component where useful. A room that shows what it is for - beds, a hearth, a counter, an anvil - is what tells the player what the building is; preflight warns BARE_ROOM for a declared room left almost empty |
 | Whole group | `worldsmith_preview_assembly` with `views:["top","isometric","isometric_back"], renderMode:"clay"` | Centerpiece versus support, approach, gaps, path connections and repetition; inspect material view separately |
 
 Drawing/assembly sliceY is original Y; blueprint preview sliceY is normalized local
