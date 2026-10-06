@@ -19,13 +19,18 @@ placement is a separate natural habitat or typed structure encounter declaration
 2. Call `worldsmith_build_creature` with `sessionId` and a `recipe`. To start from a
    rigged body plan rather than from nothing, read
    `worldsmith_get_creature_template(bodyPlan, id, displayName, scale)` - QUADRUPED,
-   BIPED, BIRD or SERPENT at scale 1..3. Its pivots already sit at the joints, with
+   BIPED, BIRD, SERPENT or ARTHROPOD (eight straight legs splayed to the ground,
+   alternate legs stepping together: a spider, a beetle, a scorpion's base) at
+   scale 1..3. Its pivots already sit at the joints, with
    roles, hind-leg gait phase, a foldable spread wing, a hinged jaw or a jointed
    body, feet on the ground line and material roles for the skin painter. It also
    returns a starter `skin` - a palette per material role and eyes on the head's
    front face - and previews the two together. Reshape, add and rename cubes to
    make the species; move a joint only on purpose. Recolour the skin to the
-   species and keep its eyes, moving each decal with the cube it sits on.
+   species and keep its eyes, moving each decal with the cube it sits on. An
+   arthropod's legs reach the ground through their roll (z rotation); lengthen a
+   leg or raise the body and the feet float or sink, so check the front and left
+   views and adjust the roll with it.
 3. Omit `textureAsset` during geometry work: the build returns a real diagnostic UV
    guide and a runtime definition whose texture hash identifies that guide. The guide
    is NOT automatically attached to the world's assets. `textureGuideOnly=true` means

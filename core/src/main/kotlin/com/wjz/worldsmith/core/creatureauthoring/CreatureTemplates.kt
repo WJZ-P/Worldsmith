@@ -8,7 +8,7 @@ import com.wjz.worldsmith.core.content.CreatureDrives
 import com.wjz.worldsmith.core.content.CreatureMovement
 import kotlinx.serialization.Serializable
 
-@Serializable enum class CreatureBodyPlan { QUADRUPED, BIPED, BIRD, SERPENT }
+@Serializable enum class CreatureBodyPlan { QUADRUPED, BIPED, BIRD, SERPENT, ARTHROPOD }
 
 /**
  * Starting rigs for the common body plans. What a model most often gets wrong
@@ -23,7 +23,7 @@ object CreatureTemplates {
     @JvmStatic @JvmOverloads
     fun recipe(plan: CreatureBodyPlan, id: String, displayName: String, scale: Int = 1): CreatureRecipe {
         require(scale in 1..3) { "Template scale is 1..3" }
-        val b = CreatureBuilder.create(id, displayName, if (plan == CreatureBodyPlan.BIPED) CreatureCategory.HOSTILE else CreatureCategory.PASSIVE)
+        val b = CreatureBuilder.create(id, displayName, if (plan == CreatureBodyPlan.BIPED || plan == CreatureBodyPlan.ARTHROPOD) CreatureCategory.HOSTILE else CreatureCategory.PASSIVE)
             .atlas(when (scale) { 1 -> 64; 2 -> 128; else -> 256 }, when (scale) { 1 -> 64; 2 -> 128; else -> 256 }, 1)
         val s = scale.toFloat()
         fun root(id: String, x: Float, height: Float, z: Float) = b.bone(id, null, x * s, 24f - height * s, z * s)
@@ -77,8 +77,41 @@ object CreatureTemplates {
                 }
                 b.attributes(CreatureAttributes(width = 0.6f * s, height = 0.5f * s))
             }
+            CreatureBodyPlan.ARTHROPOD -> {
+                root("body", 0f, 7f, 0f).role(CreatureBoneRole.BODY).box("thorax", -3f, -2f, -4f, 6, 4, 7, "carapace").end()
+                child("abdomen", "body", 0f, -1f, 3f).box("abdomen", -4f, -3f, 0f, 8, 6, 9, "abdomen").end()
+                child("head", "body", 0f, 0f, -4f).role(CreatureBoneRole.HEAD).box("skull", -2.5f, -2f, -4f, 5, 4, 4, "carapace").end()
+                child("fangs", "head", 0f, 2f, -4f).role(CreatureBoneRole.JAW)
+                    .box("fang_l", -2f, 0f, -1f, 1, 2, 1, "fang").box("fang_r", 1f, 0f, -1f, 1, 2, 1, "fang").end()
+                // Eight straight legs splayed out and down, as a vanilla spider's are, each leaning
+                // toward its end of the body; the splay is solved so every foot meets the ground
+                // line. Alternate legs step together, the walk of a spider or a beetle.
+                listOf(-30f, -10f, 10f, 30f).forEachIndexed { k, lean ->
+                    val leg = "leg_l${k + 1}"
+                    child(leg, "body", -3f, 1f, -3f + 2f * k).role(CreatureBoneRole.LEG_LEFT).gaitPhase(if (k % 2 == 0) 0f else 180f)
+                        .rotation(lean, 0f, splay(lean, hip = 6f, length = 12f)).box("leg", -0.5f, 0f, -0.5f, 1, 12, 1, "leg").end()
+                    b.mirrorSubtree(leg, "leg_r${k + 1}")
+                }
+                b.attributes(CreatureAttributes(width = 1.3f * s, height = 0.9f * s))
+            }
         }
         return b.recipe()
+    }
+
+    /**
+     * The outward roll, in degrees, that sets the foot of a straight one-block-thick leg
+     * hanging `length` from a hip `hip` above the ground, leant `lean` degrees fore or aft,
+     * exactly on the ground line. Rotations compose as Rz * Ry * Rx, as both renderers do.
+     */
+    private fun splay(lean: Float, hip: Float, length: Float): Float {
+        val a = Math.toRadians(lean.toDouble())
+        fun lowest(roll: Double) = listOf(-0.5, 0.5).maxOf { x -> listOf(0.0, length.toDouble()).maxOf { y -> listOf(-0.5, 0.5).maxOf { z ->
+            val y1 = y * Math.cos(a) - z * Math.sin(a)
+            x * Math.sin(roll) + y1 * Math.cos(roll)
+        } } }
+        var low = 0.0; var high = Math.PI / 2
+        repeat(60) { val mid = (low + high) / 2; if (lowest(mid) > hip) low = mid else high = mid }
+        return Math.toDegrees((low + high) / 2).toFloat()
     }
 
     /**
@@ -118,6 +151,15 @@ object CreatureTemplates {
                 "wing" to SkinMaterial("#6e7c88", pattern = SkinPattern.STRIPES, patternDensity = 0.3f),
                 "leg" to SkinMaterial("#d08a2a", grain = 0f),
             ), listOf(eye("head", "skull", 0, 1), eye("head", "skull", 3, 1)))
+            CreatureBodyPlan.ARTHROPOD -> CreatureSkin(mapOf(
+                "carapace" to SkinMaterial("#3b3530", shade = 0.25f),
+                "abdomen" to SkinMaterial("#4a3d33", pattern = SkinPattern.STRIPES, patternColor = "#2a2420", patternDensity = 0.35f),
+                "leg" to SkinMaterial("#2e2925", pattern = SkinPattern.STRIPES, patternColor = "#5a4a3c", patternDensity = 0.2f),
+                "fang" to SkinMaterial("#cdb48a", shade = 0.1f, grain = 0f),
+            ), listOf("e.e.e", ".e.e.").mapIndexed { row, pattern ->
+                // Many small eyes in two rows, the way a spider looks back.
+                SkinDecal("head", "skull", "front", 0, (row + 1) * s, List(s) { pattern.map { c -> c.toString().repeat(s) }.joinToString("") }, mapOf("e" to "#d22b20"))
+            })
             CreatureBodyPlan.SERPENT -> CreatureSkin(mapOf(
                 "scale" to SkinMaterial("#5f7a3a", pattern = SkinPattern.SCALES, patternDensity = 0.5f),
                 "belly" to SkinMaterial("#cfc08a", shade = 0.1f),
