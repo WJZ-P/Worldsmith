@@ -43,6 +43,17 @@ public final class AuthoringContext {
         ports.add(Map.of("id",id,"at",AuthoredStructure.point(edge),"facing",facing,"type","walk","passage",true));entrances.add(AuthoredStructure.point(feet));clearance.add(AuthoredStructure.box(corridor));return this;
     }
     public AuthoringContext lightFixture(String id,Vec3i at,BlockStateRef state,int level){named(id);canvas().pen(Brush.solid(state)).set(at.x(),at.y(),at.z());lights.add(Map.of("at",AuthoredStructure.point(at),"level",level));return this;}
+    /**
+     * A room declared and furnished for its use in one step: {@link #room} clears and floors it,
+     * {@link Rooms#furnish} furnishes it after reading the walls, doors and anything else already
+     * drawn around it, and every light it stands is declared as a fixture. Draw walls and doors first.
+     */
+    public AuthoringContext furnishedRoom(String id,Box interior,BlockStateRef floor,Rooms.Use use,Rooms.Style style,Box... keepClear){
+        room(id,interior,floor);
+        var lights=Rooms.furnish(canvas().pen("stone"),interior,use,style,keepClear);
+        for(int i=0;i<lights.size();i++){var light=lights.get(i);lightFixture(id+"_light_"+i,light.at(),light.state(),light.level());}
+        return this;
+    }
     /** Deliberate building-wide atmosphere; ordinary rooms still default to authored READABLE fixtures. */
     public AuthoringContext intentionallyDark(String reason){
         if(reason==null||reason.isBlank()||reason.length()>512||reason.chars().anyMatch(Character::isISOControl))throw new IllegalArgumentException("A printable dark-atmosphere design reason of 1..512 characters is required");

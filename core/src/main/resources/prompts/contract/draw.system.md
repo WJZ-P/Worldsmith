@@ -386,10 +386,14 @@ List<Rooms.Light> lights = Rooms.furnish(pen, room, Rooms.Use.TAVERN,
 - `Style` picks the wood of seats and tables, the dye of beds and rugs, and a
   seed that varies where along the walls the pieces start.
 - Lanterns stand on furniture or the floor, never hang from a ceiling that may
-  not be there, and more are added on free wall cells until every walkway cell
-  is within six blocks of one, so the READABLE estimate stays at level 8 or
-  more. Each returned `Light` has the position, block and level to declare: in a
-  `StructureProgram`, `a.lightFixture("hall_light_" + i, l.at(), l.state(), l.level())`.
+  not be there, and more are added on free wall cells until every free floor
+  cell keeps block light 8 or more around the furniture, so the READABLE
+  estimate passes. Each returned `Light` has the position, block and level to
+  declare as a lighting source.
+- In a `StructureProgram`, `a.furnishedRoom(id, interior, floor, use, style,
+  keepClear...)` does it all at once: it declares and floors the room as
+  `a.room` does, furnishes it, and declares every light as a fixture. Draw the
+  walls and doors first, since it reads them.
 - Preflight warns `BARE_ROOM` for a declared room of 12 or more floor cells
   with almost nothing standing on it. It never blocks publication: a hall, an
   arena or a cleared vault may stay bare on purpose.
