@@ -562,7 +562,7 @@ It has no world, player, biome-selection or group-policy objects.
 
 StructureProgram.generate(AuthoringContext) returns AuthoredStructure. The context
 exposes seed(), parameters(), random(streamName), canvas(bounds), origin(position),
-material(name,state), room(id,interior,floor), indoorPassage(id,interior,floor),
+material(name,state), room(id,interior,floor), furnishedRoom(id,interior,floor,use,style,keepClear...), indoorPassage(id,interior,floor),
 entrance(id,feet,facing,floor,headroom), lightFixture(id,at,state,level), support(at),
 protect(region), keepClear(region), component(id,region), instance(id,authoredComponent,transform),
 container(at,state,items), bossSpawner(at,creatureId),
