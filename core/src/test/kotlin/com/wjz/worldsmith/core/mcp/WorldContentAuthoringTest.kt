@@ -335,6 +335,7 @@ class WorldContentAuthoringTest {
         assertEquals(1, template.images.size)
         val built = call("worldsmith_build_creature", buildJsonObject { put("sessionId", id); put("recipe", template.structuredContent.getValue("recipe")) })
         assertFalse(built.isError, built.text)
+        assertEquals(0, built.structuredContent.getValue("stance").jsonArray.size, "a template stands on the ground")
         assertTrue("fur" in template.structuredContent.getValue("materialRoles").jsonArray.map { it.jsonPrimitive.content })
         val painted = call("worldsmith_paint_creature_skin", buildJsonObject {
             put("sessionId", id); put("expectedRevision", revision(id)); put("buildId", built.structuredContent.getValue("buildId"))

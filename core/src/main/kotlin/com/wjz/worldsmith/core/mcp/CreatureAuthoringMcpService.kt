@@ -128,6 +128,7 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
         put("sessionId",sid);put("buildId",id);put("recipe",McpJson.encode(record.recipe));put("definition",McpJson.encode(record.definition))
         put("uvLayout",McpJson.encode(record.uvLayout));put("texture",McpJson.encode(record.texture));put("textureGuideOnly",record.textureGuideOnly)
         put("readyForContentDraft",!record.textureGuideOnly);put("runtimeSchema",com.wjz.worldsmith.core.content.CreatureSounds.requiredSchema(record.definition));put("worldActivated",false)
+        put("stance",McpJson.encode(CreatureStance.inspect(record.definition)))
         put("publication",if(record.textureGuideOnly)"Paint the guide and attach the real PNG; rebuild with textureAsset. Guide textures are not auto-attached to world content." else "Merge this definition into the session CreatureLibrary using put_content_modules at the current revision; do not replace other species accidentally.")
     }
     private fun read(sid:String,id:String):BuildRecord {

@@ -31,6 +31,11 @@ placement is a separate natural habitat or typed structure encounter declaration
    arthropod's legs reach the ground through their roll (z rotation); lengthen a
    leg or raise the body and the feet float or sink, so check the front and left
    views and adjust the roll with it.
+   Every build reports `stance`: warnings when the rest pose's lowest point floats
+   above or sinks below the ground line (Y=24) by more than half a pixel
+   (`CREATURE_FLOATS`, `CREATURE_SINKS`), and when a leg stops short of the lowest
+   foot (`CREATURE_LEG_SHORT`). Fix them after any change to legs, pivots or
+   rolls; leave them only for a creature that hovers or holds a leg up on purpose.
 3. Omit `textureAsset` during geometry work: the build returns a real diagnostic UV
    guide and a runtime definition whose texture hash identifies that guide. The guide
    is NOT automatically attached to the world's assets. `textureGuideOnly=true` means
