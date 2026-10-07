@@ -57,6 +57,7 @@ class StructureCheckService(private val native:StructureNativeHost?=null) {
                 val report=if(estimateLighting)StructureLightingChecker.analyze(metadata,g.voxels)else StructureLightingChecker.validate(metadata,g.voxels)
                 light["$id:$variant"]=report;problems+=report.diagnostics.map(::original)
                 problems+=StructureInteriorChecks.bareRooms(metadata,g.voxels).map(::original)
+                problems+=StructureInteriorChecks.openRooms(metadata,g.voxels).map(::original)
             }
             problems
         }

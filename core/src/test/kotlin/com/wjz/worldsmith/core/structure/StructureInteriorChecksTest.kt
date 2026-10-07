@@ -6,13 +6,14 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class StructureInteriorChecksTest {
-    private fun room(walls: Box, furnished: Boolean): Pair<StructureBlueprint, CompiledStructure> {
-        val canvas = DrawCanvas(Box.of(-2, 0, -2, walls.max().x() + 2, walls.max().y() + 2, walls.max().z() + 3))
+    private fun room(walls: Box, furnished: Boolean, roof: Boolean = false): Pair<StructureBlueprint, CompiledStructure> {
+        val canvas = DrawCanvas(Box.of(-2, 0, -2, walls.max().x() + 2, walls.max().y() + 9, walls.max().z() + 3))
         val pen = canvas.pen("minecraft:stone")
         Walls.floor(pen, walls, "spruce_planks")
         Walls.frame(pen, walls, Walls.Frame.of("stripped_spruce_log", "spruce_log", "calcite", "cobblestone"))
         Walls.door(pen, walls, Walls.Side.SOUTH, (walls.min().x() + walls.max().x()) / 2, "spruce_door")
         val inside = Rooms.inside(walls)
+        if (roof) Roofs.gable(pen, walls, Roofs.Ridge.X, Roofs.Material.of("spruce_stairs", "spruce_slab", "spruce_planks"), Roofs.Options.defaults())
         if (furnished) Rooms.furnish(pen, inside, Rooms.Use.KITCHEN, Rooms.Style.of("spruce", "red"))
         else pen.brush(Brush.solid("minecraft:lantern")).set(inside.min().x(), inside.min().y(), inside.min().z())
         val floor = BuildBox(BuildPos(inside.min().x(), inside.min().y(), inside.min().z()), BuildPos(inside.max().x(), inside.min().y(), inside.max().z()))
@@ -32,6 +33,17 @@ class StructureInteriorChecksTest {
 
         val (kitchen, kitchenGeometry) = room(walls, furnished = true)
         assertEquals(emptyList<String>(), StructureInteriorChecks.bareRooms(kitchen, kitchenGeometry.voxels).map { it.code })
+    }
+
+    @Test fun `a room left without a roof is pointed out`() {
+        val walls = Box.of(0, 1, 0, 11, 5, 8)
+        val (roofless, geometry) = room(walls, furnished = true)
+        val open = StructureInteriorChecks.openRooms(roofless, geometry.voxels)
+        assertEquals(listOf("ROOM_OPEN_TO_SKY"), open.map { it.code })
+        assertEquals(DiagnosticSeverity.WARNING, open.single().severity)
+
+        val (roofed, roofedGeometry) = room(walls, furnished = true, roof = true)
+        assertEquals(emptyList<String>(), StructureInteriorChecks.openRooms(roofed, roofedGeometry.voxels).map { it.code })
     }
 
     @Test fun `a closet may stay empty`() {

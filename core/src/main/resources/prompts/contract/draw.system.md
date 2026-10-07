@@ -403,8 +403,9 @@ List<Rooms.Light> lights = Rooms.furnish(pen, room, Rooms.Use.TAVERN,
   `a.room` does, furnishes it, and declares every light as a fixture. Draw the
   walls and doors first, since it reads them.
 - Preflight warns `BARE_ROOM` for a declared room of 12 or more floor cells
-  with almost nothing standing on it. It never blocks publication: a hall, an
-  arena or a cleared vault may stay bare on purpose.
+  with almost nothing standing on it, and `ROOM_OPEN_TO_SKY` when over a quarter
+  of its floor has nothing above head height - a roof left off or a gap in it.
+  Neither blocks publication: a hall may stay bare, a courtyard or ruin open.
 - Furnish after the walls, floors, doors and stairs, and after
   `AuthoringContext.room`, which authors AIR through the room. Add your own
   pieces afterwards for a room that should feel particular: a shrine's altar, a
