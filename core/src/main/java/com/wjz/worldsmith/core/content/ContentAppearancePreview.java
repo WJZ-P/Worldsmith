@@ -7,6 +7,8 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +31,7 @@ public final class ContentAppearancePreview {
         Map<String, BufferedImage> decoded = new LinkedHashMap<>();
         Map<String, Object> metrics = new LinkedHashMap<>();
         for (String hash : appearance.assetIds()) {
-            BufferedImage texture = decode(hash, assets.get(hash)); decoded.put(hash, texture); metrics.put(hash, metrics(texture));
+            BufferedImage texture = decode(hash, assets.get(hash)); decoded.put(hash, texture); metrics.put(hash, metrics(texture, false));
         }
         BufferedImage image = canvas(1440, 1150); Graphics2D g = graphics(image);
         heading(g, "MATERIAL / " + definition.getDisplayName(), definition.getId() + "  ·  " + definition.getProfile() + "  ·  " + appearance.getOrientation() + "  ·  light " + definition.getLight());
@@ -87,7 +89,7 @@ public final class ContentAppearancePreview {
                     label(g, size + " px", x + offsets[k] - 2, y + 186, 12, background == 0 ? Color.WHITE : INK);
                 }
             }
-            metrics.put(definition.getId(), Map.of("texture", definition.getTextureAsset(), "metrics", metrics(texture)));
+            metrics.put(definition.getId(), Map.of("texture", definition.getTextureAsset(), "metrics", metrics(texture, true)));
         }
         footer(g, image.getHeight() - 13, "Offline icon review only. Wearable armor UVs and native held-item transforms are separate validation targets."); g.dispose();
         Map<String, Object> metadata = base("items", definitions.stream().map(CustomItemDefinition::getId).toList(), image);
@@ -142,13 +144,49 @@ public final class ContentAppearancePreview {
             throw new IllegalArgumentException("Material and icon previews require native square power-of-two PNGs, 16..256");
         return ImageIO.read(new ByteArrayInputStream(bytes));
     }
-    private static Map<String, Object> metrics(BufferedImage image) {
-        int width = image.getWidth(), height = image.getHeight(), transparent = 0, partial = 0; long horizontal = 0, vertical = 0;
-        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) { int alpha = image.getRGB(x,y) >>> 24; if (alpha == 0) transparent++; else if (alpha < 255) partial++; }
-        for (int y = 0; y < height; y++) horizontal += rgbaDelta(image.getRGB(0,y), image.getRGB(width-1,y));
-        for (int x = 0; x < width; x++) vertical += rgbaDelta(image.getRGB(x,0), image.getRGB(x,height-1));
-        return Map.of("width",width,"height",height,"transparentFraction",transparent/(double)(width*height),"partialAlphaFraction",partial/(double)(width*height),
-            "leftRightMeanRgbaDelta", horizontal/(double)(height*4), "topBottomMeanRgbaDelta", vertical/(double)(width*4));
+    static Map<String, Object> metrics(BufferedImage image, boolean icon) {
+        int width = image.getWidth(), height = image.getHeight(), transparent = 0, partial = 0;
+        var colours = new HashSet<Integer>();
+        // Mean change from each column to the next and each row to the next, the last one wrapping round to the first.
+        double[] columns = new double[width], rows = new double[height];
+        for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+            int argb = image.getRGB(x,y), alpha = argb >>> 24;
+            // Colours are counted in 16 steps per channel, so grain within one tone counts once.
+            if (alpha == 0) transparent++; else { if (alpha < 255) partial++; colours.add((argb >> 12 & 0xf00) | (argb >> 8 & 0xf0) | (argb >> 4 & 0xf)); }
+            columns[x] += rgbaDelta(argb, image.getRGB((x+1)%width,y)) / (double)(height*4);
+            rows[y] += rgbaDelta(argb, image.getRGB(x,(y+1)%height)) / (double)(width*4);
+        }
+        double leftRight = columns[width-1], topBottom = rows[height-1], neighboursX = 0, neighboursY = 0;
+        for (int x = 0; x + 1 < width; x++) neighboursX = Math.max(neighboursX, columns[x]);
+        for (int y = 0; y + 1 < height; y++) neighboursY = Math.max(neighboursY, rows[y]);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("width",width); result.put("height",height); result.put("transparentFraction",transparent/(double)(width*height)); result.put("partialAlphaFraction",partial/(double)(width*height));
+        result.put("leftRightMeanRgbaDelta", leftRight); result.put("topBottomMeanRgbaDelta", topBottom); result.put("opaqueColours", colours.size());
+        result.put("review", review(icon, transparent/(double)(width*height), colours.size(), width*height, leftRight, neighboursX, topBottom, neighboursY));
+        return result;
+    }
+
+    /**
+     * Review opportunities read from the metrics, deliberately not quality judgments: an icon
+     * covering its whole tile, a face whose wrap from one edge to the opposite changes more than
+     * any step between neighbouring columns or rows inside it (a line where tiled faces meet;
+     * intended for a framed panel), and more colours than pixel art that reads at 16 px has.
+     */
+    static List<Map<String, Object>> review(boolean icon, double transparentFraction, int colours, int pixels, double leftRight, double neighboursX, double topBottom, double neighboursY) {
+        var review = new ArrayList<Map<String, Object>>();
+        if (icon && transparentFraction < 0.15) review.add(Map.of("code", "ICON_FILLS_TILE",
+            "observation", Math.round((1 - transparentFraction) * 100) + "% of the icon's tile is opaque",
+            "suggestion", "Vanilla item icons stand on clear ground, a silhouette with a dark rim covering roughly 30-70% of the tile, so they read in a hotbar slot. Cut the background away unless the item really is a square."));
+        String[] edges = {"left and right", "top and bottom"}; double[] across = {leftRight, topBottom}, within = {neighboursX, neighboursY};
+        if (!icon) for (int i = 0; i < 2; i++) {
+            if (across[i] > Math.max(24, 1.5 * within[i])) review.add(Map.of("code", "FACE_EDGE_SEAM",
+                "observation", "Its " + edges[i] + " edges differ by " + Math.round(across[i]) + " per channel, more than any step inside it (at most " + Math.round(within[i]) + ")",
+                "suggestion", "Tiled, this face shows a line where blocks meet. Keep it for a framed panel; otherwise carry the pattern across the edge, as bricks and seamless templates do."));
+        }
+        if (colours > 48 * Math.max(1, pixels / 256)) review.add(Map.of("code", "TEXTURE_MANY_COLOURS",
+            "observation", colours + " distinct colours (in 16 steps per channel) in a " + pixels + "-pixel texture",
+            "suggestion", "Vanilla textures read through a few value steps of each colour, about 4-16 at 16 px. Reduce to a small ramp per material so it reads as pixel art rather than noise."));
+        return review;
     }
     private static int rgbaDelta(int a,int b) { int n=0; for(int shift=0;shift<32;shift+=8)n+=Math.abs((a>>>shift&255)-(b>>>shift&255)); return n; }
     private static Map<String,Object> base(String kind,Object id,BufferedImage image) { Map<String,Object> result=new LinkedHashMap<>(); result.put("renderer",VERSION);result.put("kind",kind);result.put("content",id);result.put("minecraftScreenshot",false);result.put("aestheticQualityValidated",false);result.put("width",image.getWidth());result.put("height",image.getHeight());return result; }

@@ -134,7 +134,12 @@ actual-PNG cube, labelled face planes, tile repetition and small-scale review.
 For 1..8 ordinary item icons use kind:"item" and their local ids to compare actual
 16/32 px silhouettes and enlarged images on dark/light backgrounds. These offline
 sheets report alpha/edge metrics, not automatic artistic-quality approval and not
-Minecraft screenshots. Creature builds use
+Minecraft screenshots. Each texture's metrics carry `review` hints for the common
+mistakes: `ICON_FILLS_TILE` (an item icon with almost no clear ground),
+`FACE_EDGE_SEAM` (a block face whose wrap from one edge to the opposite changes
+more than any step inside it, so a line shows where faces meet; keep it for a
+framed panel) and `TEXTURE_MANY_COLOURS` (more colours than pixel art that reads
+at 16 px uses). They are opportunities to look again, not failures. Creature builds use
 `worldsmith_preview_creature` for geometry/UV/pose inspection. A vision-capable client
 or a person can judge the visible result; text-only clients can still inspect the
 metadata but should not claim they visually reviewed an image.
