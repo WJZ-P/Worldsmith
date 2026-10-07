@@ -105,6 +105,7 @@ class CreatureAuthoringMcpService(private val sessions:WorkflowSessions,private 
         val built=build(buildJsonObject {put("sessionId",session.id);put("recipe",McpJson.encode(record.recipe));put("textureAsset",asset)})
         return McpToolResult.success(JsonObject(built.structuredContent+buildJsonObject {
             put("revision",attached.structuredContent.getValue("revision"));put("skinAsset",asset);put("paintedFromBuild",McpJson.string(a,"buildId"))
+            put("skinReview",JsonArray(CreatureSkins.review(record.definition,skin).map {hint->JsonObject(hint.mapValues {JsonPrimitive(it.value)})}))
         }),images=built.images+McpImage(Base64.getEncoder().encodeToString(png)))
     }
     private fun preview(a:JsonObject):McpToolResult {

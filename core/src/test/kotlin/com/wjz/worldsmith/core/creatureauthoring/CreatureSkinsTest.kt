@@ -64,6 +64,17 @@ class CreatureSkinsTest {
     }
 
     @Test
+    fun `a skin with nothing on the head is pointed out`() {
+        val definition = builder.build("a".repeat(64)).definition
+        assertEquals(emptyList<Any>(), CreatureSkins.review(definition, skin), "the eyes on the skull give it a face")
+        assertEquals(listOf("SKIN_NO_FACE"), CreatureSkins.review(definition, skin.copy(decals = emptyList())).map { it["code"] })
+        for (plan in CreatureBodyPlan.entries) {
+            val template = CreatureAuthoring.compile(CreatureTemplates.recipe(plan, "t", "T"), "a".repeat(64)).definition
+            assertEquals(emptyList<Any>(), CreatureSkins.review(template, CreatureTemplates.skin(plan)), "$plan")
+        }
+    }
+
+    @Test
     fun `painting is deterministic and a mirrored limb shares its source's pixels`() {
         assertArrayEquals(CreatureSkins.paint(layout, skin), CreatureSkins.paint(layout, skin))
         val grainy = skin.copy(materials = skin.materials + ("hide" to SkinMaterial("#8A5A3C", grain = 0.1f)))

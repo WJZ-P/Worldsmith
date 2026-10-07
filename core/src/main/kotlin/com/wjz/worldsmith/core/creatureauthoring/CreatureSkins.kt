@@ -94,6 +94,18 @@ object CreatureSkins {
         }
     }
 
+    /**
+     * Review hints on a skin, not failures: a head with no decal at all, the commonest
+     * reason a painted creature reads as a block. A faceless golem or slime stays valid.
+     */
+    @JvmStatic fun review(definition: com.wjz.worldsmith.core.content.CreatureDefinition, skin: CreatureSkin): List<Map<String, String>> {
+        val heads = definition.model.bones.filter { it.role == com.wjz.worldsmith.core.content.CreatureBoneRole.HEAD }.map { it.id }.toSet()
+        return if (heads.isEmpty() || skin.decals.any { it.bone in heads }) emptyList() else listOf(mapOf(
+            "code" to "SKIN_NO_FACE",
+            "observation" to "No decal is painted on the head (${heads.sorted().joinToString()})",
+            "suggestion" to "Eyes are what make a blocky model read as a creature: stamp at least a pair on the head's front face, and a nose, mouth or markings if the species has them. Leave it only for a faceless golem or slime."))
+    }
+
     @JvmStatic fun paint(layout: CreatureUvLayout, skin: CreatureSkin): ByteArray {
         val problems = validate(layout, skin)
         require(problems.isEmpty()) { problems.take(12).joinToString("; ") }

@@ -107,7 +107,9 @@ unit a skin colours.
   `.` keeps the skin beneath. Up to 64 decals. Eyes, nostrils, a mouth, markings.
   A decal on a mirrored limb shows on both sides because they share pixels.
 
-Painting is deterministic and uses no image model. Iterate on decals by painting
+The result's `skinReview` points out a head with no decal at all (`SKIN_NO_FACE`),
+the commonest reason a painted creature reads as a block; a faceless golem may keep
+it. Painting is deterministic and uses no image model. Iterate on decals by painting
 again from the same geometry build.
 
 ## Recipe fields
