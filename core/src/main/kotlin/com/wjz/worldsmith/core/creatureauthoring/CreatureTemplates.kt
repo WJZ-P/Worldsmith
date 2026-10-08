@@ -35,7 +35,7 @@ object CreatureTemplates {
                 root("body", 0f, 10f, 0f).role(CreatureBoneRole.BODY).box("torso", -3f, -3f, -6f, 6, 6, 12, "fur").end()
                 child("head", "body", 0f, -2f, -6f).role(CreatureBoneRole.HEAD)
                     .box("skull", -3f, -4f, -5f, 6, 5, 5, "fur").box("muzzle", -2f, -1f, -8f, 4, 3, 3, "muzzle")
-                    .box("ear_l", -3f, -6f, -3f, 2, 2, 1, "fur").box("ear_r", 1f, -6f, -3f, 2, 2, 1, "fur").end()
+                    .box("ear_l", -3f, -6f, -3f, 2, 2, 1, "ear").box("ear_r", 1f, -6f, -3f, 2, 2, 1, "ear").end()
                 child("leg_fl", "body", -2f, 3f, -4f).role(CreatureBoneRole.LEG_LEFT).box("leg", -1f, 0f, -1f, 2, 7, 2, "leg").end()
                 child("leg_hl", "body", -2f, 3f, 5f).role(CreatureBoneRole.LEG_LEFT).gaitPhase(180f).box("leg", -1f, 0f, -1f, 2, 7, 2, "leg").end()
                 child("tail", "body", 0f, -2f, 6f).role(CreatureBoneRole.TAIL).rotation(-30f, 0f, 0f).box("root", -1f, -1f, 0f, 2, 2, 4, "fur").end()
@@ -130,6 +130,8 @@ object CreatureTemplates {
         return when (plan) {
             CreatureBodyPlan.QUADRUPED -> CreatureSkin(mapOf(
                 "fur" to SkinMaterial("#8a6a4a", pattern = SkinPattern.FUR, belly = "#c2a37c"),
+                // Ears stay the back's colour: a belly band would paint a pale stripe across them.
+                "ear" to SkinMaterial("#7d5f42", pattern = SkinPattern.FUR, patternDensity = 0.15f),
                 "muzzle" to SkinMaterial("#c9ab86", shade = 0.15f),
                 "leg" to SkinMaterial("#6e533a", pattern = SkinPattern.FUR, patternDensity = 0.15f),
             ), listOf(eye("head", "skull", 1, 1), eye("head", "skull", 4, 1),
